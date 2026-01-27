@@ -1,6 +1,6 @@
 {
-  "name": "wenay-react",
-  "version": "0.0.105",
+  "name": "wenay-react2",
+  "version": "0.0.1",
   "description": "Common react",
   "strict": true,
   "main": "lib/index.js",
