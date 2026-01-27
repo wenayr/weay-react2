@@ -1,0 +1,139 @@
+:root {
+  --base-border: 1px solid rgba(255, 255, 255, 0.41);
+  --base-color-hover: #fff;
+}
+:root {
+  --menu-bg-color: rgba(12, 12, 12, 0.91);
+  --menu-blur: 10px;
+  --menu-border: var(--base-border);
+  --menu-active-background: rgba(255, 255, 255, 0.23);
+
+  --menu-item-color: var(--base-color-hover);
+  --menu-item-hover-color: #101010;
+  --menu-item-hover-bg-color: var(--base-color-hover);
+
+}
+
+.menu-container{
+  position: fixed;
+  user-select: none;
+  right: 0;
+}
+.menu-container.activeM {
+  background: var(--menu-active-background);
+}
+
+.menu-button {
+  padding: 4px 10px;
+  color: var(--menu-item-color);
+  font-size: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dropdown-content2 {
+  position: absolute;
+  /*right: 0;*/
+  top: 100%;
+}
+
+.dropdown-content2.dropdown-up {
+  top: auto;
+  bottom: 100%;
+  align-items: flex-end;
+ }
+
+
+.dropdown-content {
+  background: var(--menu-bg-color);
+  border-top: var(--menu-border);
+  border-left: var(--menu-border);
+  border-right: var(--menu-border);
+  user-select: none;
+  min-width: 50px;
+  height: min-content;
+  width: max-content;
+}
+
+.menu-item {
+  min-height: 30px;
+  padding: 10px;
+  position: relative;
+  cursor: pointer;
+  border-bottom: var(--menu-border);
+  transition: background 0.3s;
+}
+
+.menu-item:hover,
+.menu-item.force-hover {
+  background: var(--menu-item-hover-bg-color);
+  color: var(--menu-item-hover-color);
+}
+
+.submenu {
+  background: var(--menu-bg-color);
+
+  backdrop-filter: blur(var(--menu-blur)); /* Размытие */
+  -webkit-backdrop-filter: blur(var(--menu-blur)); /* Для Safari */
+
+  border: var(--menu-border);
+  min-width: 200px;
+}
+.draggable-div {
+  position: relative;
+  /*padding: 20px;*/
+  /*margin: 20px;*/
+  /*background-color: #fff;*/
+  /*border: 1px solid #ddd; !* базовая граница, можно убрать *!*/
+  cursor: pointer;
+}
+
+/* Псевдоэлемент для отрисовки обводки */
+.draggable-div::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 3px solid transparent;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+/* Запуск анимации, когда зажата кнопка мыши */
+.draggable-div.outline-animation::after {
+  animation: running-line 0.5s linear forwards;
+}
+
+/* Если анимация успела завершиться, обводка остается */
+.draggable-div.outline-complete::after {
+  border-color: #007bff;
+  /* Чтобы псевдоэлемент точно отображал полную обводку */
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+}
+
+/* Анимация «бегущей линии» */
+@keyframes running-line {
+  0% {
+    border-color: transparent;
+    clip-path: polygon(0 0, 0 0, 0 0, 0 0);
+  }
+  25% {
+    border-color: #007bff;
+    /* Рисуем верхнюю линию */
+    clip-path: polygon(0 0, 100% 0, 100% 0, 0 0);
+  }
+  50% {
+    /* Добавляем правую сторону */
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 100% 100%);
+  }
+  75% {
+    /* Добавляем нижнюю сторону */
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  }
+  100% {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  }
+}

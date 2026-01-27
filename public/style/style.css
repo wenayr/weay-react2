@@ -1,0 +1,257 @@
+:root {
+  /* Основные фоновые цвета */
+  --color-bg-dark: #131821;
+  --color-bg-light: #17202e;
+
+  /* Скролл */
+  --color-scrollbar-track: rgba(255, 255, 255, 0);
+  --color-scrollbar-thumb: #1d262c;
+  --color-scrollbar-thumb-alt: #4c4562;
+  --scrollbar-size: 12px;
+
+  /* Кнопки */
+  --color-red-button: #881b1b;
+  --color-red-button-hover: #c72929;
+  --color-black-button: #1c1b1b;
+  --color-black-button-hover: #444444;
+
+  /* Основные текстовые/обводки */
+  --color-text-base: #c4c4c4;
+  --color-text-theme: #5D9FFA;
+  --color-border-common: rgb(50, 62, 71);
+
+  /* Типографика */
+  --font-family-base: 'Roboto', serif;
+  --font-size-base: 12px;
+  --text-transform-base: uppercase;
+
+  /* Кнопки */
+  --button-height: 30px;
+  --button-padding: 8px 10px;
+
+  /* MSTrade */
+  --ms-trade-bg: #1f272d;
+  --ms-trade-bg-active: #262f36;
+  --ms-trade-color: #676E73;
+  --ms-trade-color-hover: #a6b2b7;
+  --ms-trade-color-active: #bdbdbd;
+}
+
+/* Сбрасываем box-sizing */
+*,
+*::before,
+*::after {
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+/* Основные фоны */
+html,
+.fon {
+  background: var(--color-bg-dark);
+}
+.fonLight {
+  background: var(--color-bg-light);
+}
+
+/* Стили прокрутки (scrollbar) */
+body::-webkit-scrollbar {
+  width: var(--scrollbar-size); /* ширина scrollbar */
+}
+::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track); /* цвет дорожки */
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar-thumb); /* цвет плашки */
+  border-radius: 20px; /* закругления плашки */
+}
+
+/* Дублирующие селекторы scrollbar, если нужна поддержка под некоторыми движками */
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+}
+*::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track);
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar-thumb);
+  border-radius: 20px;
+}
+
+/* Кнопки */
+.defButton {
+  padding: 20px;
+  display: block;
+  width: 30%;
+}
+
+.redButton {
+  background: var(--color-red-button);
+}
+.redButton:hover {
+  background: var(--color-red-button-hover);
+}
+
+.blackButton {
+  background: var(--color-black-button);
+}
+.blackButton:hover {
+  background: var(--color-black-button-hover);
+}
+
+html {
+  height: 100vh;
+}
+
+/* Тексты, цвет и отступы */
+.toLine {
+  display: flex;
+}
+
+/* инпуты */
+input:invalid {
+  box-shadow: 0 0 5px 1px red;
+}
+
+/* Блоки-кнопки, миниэлементы */
+.toButton,
+.toButtonA {
+  text-align: center;
+  height: auto;
+  cursor: default;
+}
+
+/* Заполнение последнего дива на всю оставшуюся часть */
+.toSpace,
+.toSpaceColum {
+  display: flex;
+}
+.toSpaceColum {
+  flex-direction: column;
+}
+.toSpaceStatic {
+  flex: 0 0 auto;
+}
+.toSpaceOther {
+  flex: 1 1 100%;
+}
+
+/* Кнопки */
+.toButton {
+  padding: var(--button-padding);
+  height: var(--button-height);
+  display: block;
+}
+.toButtonA {
+  user-select: none;
+  height: var(--button-height);
+  padding: var(--button-padding);
+  display: block;
+}
+
+/* Меню */
+.maxSize {
+  height: 100%;
+  width: 100%;
+}
+.border {
+  border: solid 1px var(--color-border-common);
+}
+.borderTop {
+  border-top: solid 1px var(--color-border-common);
+}
+.borderRight {
+  border-right: solid 1px var(--color-border-common);
+}
+.borderBottom {
+  border-bottom: solid 1px var(--color-border-common);
+}
+
+/* Наведение/активность */
+.to,
+.toButtonA {
+  user-select: none;
+  color: var(--color-text-theme);
+  text-align: center;
+  cursor: default;
+}
+.toButton:hover,
+.toButton:active,
+.toButtonA {
+  user-select: none;
+  min-height: 30px;
+  border-bottom-style: solid;
+  border-color: var(--color-text-theme);
+  color: var(--color-text-theme);
+  display: block;
+  padding: 8px 10px;
+}
+.toButtonA:hover {
+  /* border-color: #ffffff; */
+  color: #ffffff;
+}
+
+/* Кнопки формы */
+button[type="submit"] {
+  background: #86b32d;
+  border-bottom: 1px solid #5d7d1f;
+}
+input[type="color"] {
+  width: 30px;
+  height: 30px;
+  border: none;
+  overflow: hidden;
+  background-color: transparent;
+  color: transparent;
+  padding: 0;
+  display: block;
+}
+
+/* Основное тело */
+body {
+  color: var(--color-text-base);
+  vertical-align: middle;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  text-transform: var(--text-transform-base);
+
+  margin: 0;
+  height: 100vh;
+  width: 100%;
+
+  display: flex;
+}
+
+/* Доп. стили .msTradeAlt */
+.msTradeAlt {
+  font-size: var(--font-size-base);
+  cursor: default;
+  color: var(--ms-trade-color);
+  background: var(--ms-trade-bg);
+  justify-content: center;
+  align-items: center;
+  padding: 3px 4px;
+  margin: 3px 4px;
+  gap: 10px;
+  height: 24px;
+  border-radius: 4px;
+  line-height: 18px;
+  user-select: none;
+}
+.msTradeAlt:hover {
+  color: var(--ms-trade-color-hover);
+  background: var(--ms-trade-bg);
+}
+.msTradeActive {
+  color: var(--ms-trade-color-active);
+  background: var(--ms-trade-bg-active);
+}
+
+/* Подключение шрифта */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  src: url('./Roboto-Regular.ttf') format('truetype');
+}

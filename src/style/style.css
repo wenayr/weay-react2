@@ -1,0 +1,334 @@
+:root {
+  /* Основные фоновые цвета */
+  --color-bg-dark: #131821;
+  --color-bg-light: #17202e;
+
+  /* Скролл */
+  --color-scrollbar-track: rgba(255, 255, 255, 0);
+  --color-scrollbar-thumb: #1d262c;
+  /* альтернатива для MSTradeScroll */
+  --color-scrollbar-thumb-alt: #4c4562;
+
+  /* Основные текстовые/обводки */
+  --color-text-base: #c4c4c4;
+  --color-text-theme: #5D9FFA;
+  --color-border-common: rgb(50, 62, 71);
+}
+
+/* Сбрасываем box-sizing */
+*,
+*::before,
+*::after {
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+/* Основные фоны */
+html,
+.fon {
+  background: var(--color-bg-dark);
+}
+.fonLight {
+  background: var(--color-bg-light);
+}
+
+/* Стили прокрутки (scrollbar) */
+body::-webkit-scrollbar {
+  width: 12px; /* ширина scrollbar */
+}
+::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track); /* цвет дорожки */
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar-thumb); /* цвет плашки */
+  border-radius: 20px; /* закругления плашки */
+}
+
+.MSTradeScroll .ag-body-viewport::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track);
+}
+.MSTradeScroll .ag-body-viewport::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar-thumb-alt) !important;
+  border-radius: 20px;
+}
+
+/* Дублирующие селекторы scrollbar, если нужна поддержка под некоторыми движками */
+*::-webkit-scrollbar {
+  width: 12px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track);
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar-thumb);
+  border-radius: 20px;
+}
+
+/* Кнопки */
+.defButton {
+  padding: 20px;
+  display: block;
+  width: 30%;
+}
+
+html {
+  height: 100vh;
+}
+
+.toRight {
+  float: right;
+  margin-right: 20px;
+  margin-left: auto;
+}
+.toLine {
+  display: flex;
+}
+
+/* инпуты */
+.toNumberInput {
+  width: 70px;
+  margin-right: 10%;
+}
+input:invalid {
+  box-shadow: 0 0 5px 1px red;
+}
+
+/* Блоки-кнопки, миниэлементы */
+.toButton,
+.miniEl,
+.toButtonA,
+.toButtonEasy {
+  text-align: center;
+  height: auto;
+  cursor: default;
+}
+
+/* Кнопки Switch */
+.LeftMenuParameters {
+  font-size: 12px;
+  min-height: 30px;
+}
+.miniEl {
+  margin-left: auto;
+  padding: 8px 10px;
+  margin-right: 10px;
+  font-size: 12px;
+}
+
+/* Заполнение последнего дива на всю оставшуюся часть */
+.toSpace,
+.toSpaceColum {
+  display: flex;
+}
+.toSpaceColum {
+  flex-direction: column;
+}
+.toSpaceStatic {
+  flex: 0 0 auto;
+}
+.toSpaceOther {
+  flex: 1 1 100%;
+}
+
+/* Кнопки */
+.toButton {
+  padding: 8px 10px;
+  height: 30px;
+  display: block;
+}
+.toButtonEasy {
+  height: auto;
+  display: block;
+}
+.toButtonA {
+  user-select: none;
+  height: 30px;
+  padding: 8px 10px;
+  display: block;
+}
+
+/* Меню */
+.MenuR {
+  box-shadow: 0 0 20px 14px rgba(34, 60, 80, 0.2);
+  margin-top: 4px;
+  min-width: 80px;
+  width: max-content;
+  background: rgba(12, 12, 12, 0.91);
+}
+
+.maxSize {
+  height: 100%;
+  width: 100%;
+}
+
+.testAnime {
+  animation: 100ms ease-in-out moveDown;
+}
+
+@keyframes moveDown {
+  from {
+    margin-top: -65px;
+  }
+  to {
+    margin-top: 0;
+  }
+}
+.border {
+  border: solid 1px var(--color-border-common);
+}
+
+/* Наведение/активность */
+.toButtonA,
+.miniEl:hover {
+  user-select: none;
+  color: var(--color-text-theme);
+  text-align: center;
+  cursor: default;
+}
+.miniEl:hover {
+  color: var(--color-text-theme);
+}
+.toButton:hover,
+.toButton:active,
+.toButtonA {
+  user-select: none;
+  min-height: 30px;
+  border-bottom-style: solid;
+  border-color: var(--color-text-theme);
+  color: var(--color-text-theme);
+  display: block;
+  padding: 8px 10px;
+}
+.toButtonA:hover {
+  /* border-color: #ffffff; */
+  color: #ffffff;
+}
+.toButtonEasy:hover {
+  color: var(--color-text-theme);
+}
+
+/* Элементы меню-индикаторы */
+.toIndicatorMenuButton {
+  user-select: none;
+  padding-left: 10px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  vertical-align: middle;
+}
+.toIndicatorMenuButton:hover {
+  background: #3a4b57;
+}
+
+/* input-стили */
+.inputCan {
+  -webkit-writing-mode: horizontal-tb !important;
+  text-rendering: auto;
+  color: inherit;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-transform: none;
+  text-indent: 0;
+  text-shadow: none;
+  display: inline-block;
+  background-color: inherit;
+  -webkit-rtl-ordering: logical;
+  cursor: text;
+  font: inherit;
+  padding: 1px 2px;
+  outline: none;
+  text-align: right;
+  font-size: 14px;
+
+  border-image: none;
+  border-style: none;
+  border-color: var(--color-text-theme);
+}
+.inputCan:hover {
+  color: var(--color-text-theme);
+  border-image: none;
+}
+.inputCan:active,
+.inputCan:focus {
+  color: var(--color-text-theme);
+  border-image: none;
+}
+
+/* Кнопки формы */
+button[type="submit"] {
+  background: #86b32d;
+  border-bottom: 1px solid #5d7d1f;
+}
+input[type="color"] {
+  width: 30px;
+  height: 30px;
+  border: none;
+  overflow: hidden;
+  background-color: transparent;
+  color: transparent;
+  padding: 0;
+  display: block;
+}
+
+/* Основное тело */
+body {
+  color: var(--color-text-base);
+  vertical-align: middle;
+  font-family: 'Roboto', serif;
+  font-size: 12px;
+  text-transform: uppercase;
+
+  margin: 0;
+  height: 100vh;
+  width: 100%;
+
+  display: flex;
+}
+
+/* Текстовые блоки */
+.toPTextIndicator {
+  margin-block-start: 0.7em;
+  margin-block-end: 0.7em;
+}
+
+/* React анимации появления/удаления */
+.example-exit {
+  opacity: 1;
+  transform: translateY(0px);
+}
+.example-exit.example-exit-active {
+  opacity: 0;
+  transform: translateY(-250px);
+  transition: 0.3s;
+}
+
+/* Доп. стили .msTradeAlt */
+.msTradeAlt {
+  font-size: 12px;
+  cursor: default;
+  color: #676E73;
+  background: #1f272d;
+  justify-content: center;
+  align-items: center;
+  padding: 3px 4px;
+  margin: 3px 4px;
+  gap: 10px;
+  height: 24px;
+  border-radius: 4px;
+  line-height: 18px;
+  user-select: none;
+}
+.msTradeAlt:hover {
+  color: #a6b2b7;
+  background: #1f272d;
+}
+.msTradeActive {
+  color: #bdbdbd;
+  background: #262f36;
+}
+.newButtonSimple {
+  border: rgba(255, 255, 255, 0.1) 1px solid;
+  border-radius: 8px;
+  margin-top: -1px;
+  margin-left: -1px;
+}
