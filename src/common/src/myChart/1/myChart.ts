@@ -34,6 +34,7 @@ export interface IChartCanvas {
     setShowTimeAxis(enabled: boolean): void;
     setShowPriceAxis(enabled: boolean): void;
     draw(): void;
+    destroy(): void;
 }
 
 /**
@@ -208,11 +209,19 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
         ctx.restore();
     }
 
+    let animationFrameId: number | null = null;
+    let destroyed = false;
+    let docListenersActive = false;
     function animate() {
+        if (destroyed) return;
+        if (!canvas.isConnected) {
+            destroy();
+            return;
+        }
         if (state.needsRender) {
             draw();
         }
-        requestAnimationFrame(animate);
+        animationFrameId = requestAnimationFrame(animate);
     }
     animate();
 
@@ -289,23 +298,38 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
     }
 
     // ~~~ События мыши ~~~
-    canvas.addEventListener("mousedown", (e) => {
+    const addDocListeners = () => {
+        if (docListenersActive) return;
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+        docListenersActive = true;
+    };
+    const removeDocListeners = () => {
+        if (!docListenersActive) return;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        docListenersActive = false;
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
         state.isDragging = true;
         state.lastDragX = e.clientX;
-    });
-    document.addEventListener("mousemove", (e) => {
+        addDocListeners();
+    };
+    const onMouseMove = (e: MouseEvent) => {
         if (state.isDragging) {
             const dx = e.clientX - state.lastDragX;
             state.lastDragX = e.clientX;
             scrollX(dx); // тянем график
         }
-    });
-    document.addEventListener("mouseup", () => {
+    };
+    const onMouseUp = () => {
         state.isDragging = false;
-    });
+        removeDocListeners();
+    };
 
     // ===> Привязка зума к скроллу мышки <===
-    canvas.addEventListener("wheel", (e) => {
+    const onWheel = (e: WheelEvent) => {
         e.preventDefault();
         // e.deltaY > 0 => крутим вниз => factor < 1 => отдаляем
         // e.deltaY < 0 => крутим вверх => factor > 1 => приближаем
@@ -315,7 +339,25 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
         const mouseX = e.clientX - rect.left;
 
         zoomX(factor, mouseX);
-    }, { passive: false });
+    };
+
+    canvas.addEventListener("mousedown", onMouseDown);
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+
+    function destroy() {
+        if (destroyed) return;
+        destroyed = true;
+        canvas.removeEventListener("mousedown", onMouseDown);
+        removeDocListeners();
+        canvas.removeEventListener("wheel", onWheel);
+        if (animationFrameId !== null) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        if (canvas.parentElement) {
+            canvas.parentElement.removeChild(canvas);
+        }
+    }
 
     // Собираем и возвращаем API
     return {
@@ -330,5 +372,6 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
         setShowTimeAxis,
         setShowPriceAxis,
         draw: drawManually,
+        destroy,
     };
 }

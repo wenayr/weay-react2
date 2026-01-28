@@ -967,6 +967,10 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
 
     function renderLoop() {
         if (destroyed) return;
+        if (!canvas.isConnected) {
+            destroy();
+            return;
+        }
         updatePanels();
 
         const xMin = transform.offsetX;
