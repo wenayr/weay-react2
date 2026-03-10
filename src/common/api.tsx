@@ -21,7 +21,7 @@ export * from "./src/logs/miniLogs";
 
 export * from "./src/MyResizeObserver";
 export * from "./src/other";
-export * from "./src/Parameters2";
+export * from "./src/ParametersEngine";
 export * from "./src/arrayPromise";
 
 export * from "./src/Resizeble";

@@ -26,13 +26,21 @@ export function MiniButton({name, arr, get, onClick, style}: { name: string, arr
         </Button>
 }
 
-export function MiniButton2({name, children, statusDef}: { name: string, statusDef?: boolean, children: React.ReactElement}) {
-    return <Button className={"newButtonSimple"} statusDef = {statusDef} button={(e) => <div className={e ? "msTradeAlt msTradeActive" : "msTradeAlt"}>{name}</div>}>
-        {children}
+export function MiniButton2({name, children, statusDef, className = "newButtonSimple"}: {
+    name: string,
+    statusDef?: boolean,
+    children: React.ReactElement | (() => React.ReactElement),
+    className?: string
+}) {
+    const content = typeof children === 'function' ? children() : children;
+    return <Button
+        className={className}
+        statusDef={statusDef}
+        button={(e) => <div className={e ? "msTradeAlt msTradeActive" : "msTradeAlt"}>{name}</div>}
+    >
+        {content}
     </Button>
 }
-export function MiniButton3({name, children}: { name: string, children: ()=>React.ReactElement}) {
-    return <Button button={(e) => <div className={e ? "msTradeAlt msTradeActive" : "msTradeAlt"}>{name}</div>}>
-        {children}
-    </Button>
-}
+
+// Deprecated: Use MiniButton2 instead
+export const MiniButton3 = MiniButton2;

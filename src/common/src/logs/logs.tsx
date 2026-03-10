@@ -3,7 +3,7 @@ import React, {useCallback, useEffect, useRef} from "react";
 import {copyToClipboard, Params, timeLocalToStr_hhmmss, UnArray} from "wenay-common";
 import {renderBy, updateBy} from "../../updateBy";
 import {ColDef, ColGroupDef, GridReadyEvent} from "ag-grid-community";
-import {ParametersReact} from "../Parameters2";
+import {ParametersReact} from "../ParametersEngine";
 import {staticGetAdd} from "../mapMemory";
 import {mouseMenuApi} from "../menu/menuMouse";
 

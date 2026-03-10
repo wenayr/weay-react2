@@ -34,30 +34,31 @@ type tButton = tButtonBase & {
 type tState = {
     state: [boolean, React.Dispatch<React.SetStateAction<boolean>>],
 }
-export function DivOutsideClick2({children, outsideClick, zIndex, key, style={}, status = true}: {
+export const DivOutsideClick = React.forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & {
     outsideClick: () => void,
-    zIndex?: number,
-    key?: key,
-    children: tChildrenEl,
     status?: boolean,
-    style?: React.CSSProperties,
-    className?: string
-}) {
+    zIndex?: number,
+}>( ({children, outsideClick, zIndex, style={}, status = true, ...other}, forwardedRef) => {
     const style2 = zIndex ? {...style, zIndex} : style
-    const ref = useOutside({outsideClick: outsideClick, status});
-    return <div ref={ref} key={key} style={style2}>{children}</div>;
-}
+    const internalRef = useOutside({outsideClick: outsideClick, status});
 
-export function DivOutsideClick({children, outsideClick, zIndex, key, style={}, status = true, ...other}: HTMLAttributes<any> & {
-    outsideClick: () => void,
-    status?: boolean,
-    zIndex?: number,
-    key?: key,
-}) {
-    const style2 = zIndex ? {...style, zIndex} : style
-    const ref = useOutside({outsideClick: outsideClick, status});
-    return React.createElement("div", {...other, ref, key, style: style2}, children)
-}
+    // Combine refs if forwardedRef is provided
+    const ref = forwardedRef
+        ? (node: HTMLDivElement | null) => {
+            internalRef.current = node;
+            if (typeof forwardedRef === 'function') {
+                forwardedRef(node);
+            } else if (forwardedRef) {
+                forwardedRef.current = node;
+            }
+        }
+        : internalRef;
+
+    return <div ref={ref} style={style2} {...other}>{children}</div>;
+});
+
+// Deprecated: Use DivOutsideClick instead
+export const DivOutsideClick2 = DivOutsideClick;
 
 function ButtonBase({children, button, style = {}, className = "", state: [a, setA]}: tButtonBase & tState) {
     return <div style={{position: "relative", width: "min-content", ...style}} className={className}>

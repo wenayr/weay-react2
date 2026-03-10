@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from "react";
 import {Params, UnAwaited} from "wenay-common";
-import {ParametersReact} from "./Parameters2";
+import {ParametersReact} from "./ParametersEngine";
 
 export function EditParams2<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>({onSave, params: paramsDef}: {
     params: ()=>Promise<TParams>,

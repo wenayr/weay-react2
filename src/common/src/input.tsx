@@ -1,6 +1,38 @@
 import React, {useRef} from "react";
 import {DivRnd3} from "./RNDFunc3";
-import {DivOutsideClick, useOutside} from "./commonFuncReact";
+import {DivOutsideClick} from "./commonFuncReact";
+
+// Unified modal wrapper component
+function ModalWrapper({
+    outClick,
+    children,
+    zIndex,
+    size = {height: 150, width: 300},
+    keyForSave,
+    position
+}: {
+    outClick: () => any,
+    children: React.ReactElement,
+    zIndex?: number,
+    size?: {height: number, width: number},
+    keyForSave: string,
+    position?: {x: number, y: number}
+}) {
+    const defaultPosition = position ?? {y: -(size.height/2), x: -(size.width/2)};
+
+    return <DivOutsideClick outsideClick={outClick} style={{position: "absolute", top: "50%", left: "50%"}}>
+        <DivRnd3
+            keyForSave={keyForSave}
+            size={size}
+            zIndex={zIndex}
+            position={defaultPosition}
+            className={"fon border fonLight"}
+            moveOnlyHeader={true}
+        >
+            {children}
+        </DivRnd3>
+    </DivOutsideClick>
+}
 
 export function InputPage({callback, name = "", txt =""}: {callback: (txt: string)=>void, name?: string, txt?: string}) {
     const txtName = useRef(txt)
@@ -16,28 +48,24 @@ export function InputPage({callback, name = "", txt =""}: {callback: (txt: strin
 }
 
 export function InputPageModal({callback, name, outClick, keyForSave = "InputPage2", txt}: Parameters<typeof InputPage>[0] & {outClick: ()=>any, keyForSave?: string}) {
-    return <DivOutsideClick outsideClick={outClick} style={{position: "absolute", top: "50%", left: "50%"}}>
-        <DivRnd3 keyForSave={keyForSave}
-                size={{height: 150, width: 300}}
-                position={{y: -150, x: -250}}
-                className={"fon border fonLight"}
-                moveOnlyHeader={true}>
-            {InputPage({callback, name, txt})}
-        </DivRnd3>
-    </DivOutsideClick>
+    return <ModalWrapper
+        outClick={outClick}
+        keyForSave={keyForSave}
+        size={{height: 150, width: 300}}
+        position={{y: -150, x: -250}}
+    >
+        {InputPage({callback, name, txt})}
+    </ModalWrapper>
 }
 export function InputFileModal({callback, name, outClick, keyForSave = "InputFile2"}: Parameters<typeof InputFile>[0] & {outClick: ()=>any, keyForSave?: string}) {
-    const ref = useRef<HTMLDivElement>(null);
-    useOutside({ref, outsideClick: outClick});
-    return <div ref={ref} style={{position: "absolute", top: "50%", left: "50%"}}>
-        <DivRnd3 keyForSave={keyForSave}
-                size={{height: 150, width: 300}}
-                position={{y: -150, x: -250}}
-                className={"fon border fonLight"}
-                moveOnlyHeader={true}>
-            {InputFile({callback, name})}
-        </DivRnd3>
-    </div>
+    return <ModalWrapper
+        outClick={outClick}
+        keyForSave={keyForSave}
+        size={{height: 150, width: 300}}
+        position={{y: -150, x: -250}}
+    >
+        {InputFile({callback, name})}
+    </ModalWrapper>
 }
 export function InputFile({callback, name = ""}: {callback: (file: File | null)=>void, name?: string}) {
     let file: File | null = null
@@ -50,16 +78,12 @@ export function InputFile({callback, name = ""}: {callback: (file: File | null)=
     </div>
 }
 export function PageModalFree({outClick, children, zIndex, size = {height: 150, width: 300}, keyForSave = "PageModalFree2"}: {zIndex?: number, outClick: ()=>any, children: React.JSX.Element, size?: {height: number, width: number}, keyForSave?: string}) {
-    const ref = useRef<HTMLDivElement>(null);
-    useOutside({ref, outsideClick: outClick});
-    return <div ref={ref} style={{position: "absolute", top: "50%", left: "50%"}}>
-        <DivRnd3 keyForSave={keyForSave}
-                size={size}
-                zIndex={zIndex}
-                position={{y: -(size.height/2), x: -(size.width/2)}}
-                className={"fon border fonLight"}
-                moveOnlyHeader={true}>
-            {children}
-        </DivRnd3>
-    </div>
+    return <ModalWrapper
+        outClick={outClick}
+        keyForSave={keyForSave}
+        size={size}
+        zIndex={zIndex}
+    >
+        {children}
+    </ModalWrapper>
 }

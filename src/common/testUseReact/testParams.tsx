@@ -1,4 +1,4 @@
-import {ParametersReact} from "../src/Parameters2";
+import {ParametersReact} from "../src/ParametersEngine";
 import {Params} from "wenay-common";
 
 const getParams = () => {
