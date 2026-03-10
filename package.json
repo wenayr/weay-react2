@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "testjest": "jest",ф
+    "testjest": "jest",
     "testjest2": "jest --clearCache",
     "update": "npm update",
     "build & watch": "npm run _clearDir  &&  tsc --watch",
@@ -22,6 +22,7 @@
   },
   "files": [
     "lib/**/*",
+    "README.md",
     "!**/*.tsbuildinfo"
   ],
   "author": "wenay",
