@@ -8,7 +8,7 @@ export interface IServerSaveBasePromise {
 
 const HostName = location.toString()
 
-export class CSaveToCache implements IServerSaveBasePromise{// localStorage
+export class CSaveToCache implements IServerSaveBasePromise{
     async set(key: string, value: object) : Promise<boolean>  {
         const t = new Response(JSON.stringify(value));
         if (window.caches) {
@@ -37,20 +37,16 @@ export class CSaveToCache implements IServerSaveBasePromise{// localStorage
 
 }
 
-export class CSaveToLocalStorage  implements IServerSaveBasePromise{// CacheGДocalStorage
+export class CSaveToLocalStorage  implements IServerSaveBasePromise{
     async set(key: string, value: object) : Promise<boolean>  {
         const t = new Response(JSON.stringify(value));
-        // console.log("CacheG set ",window.caches, HostName)
         if (window.localStorage) {
             await localStorage.setItem(key,JSON.stringify(value))
-            // const Cache = await localStorage.open(key)
-            // Cache.put(HostName, t);
             return true
         }
         return false
     }
     async get<T extends object>(key: string) : Promise<T|null> {
-        // console.log("CacheG get ",window.caches, HostName)
         if (window.localStorage) {
             const st = await localStorage.getItem(key)
             if (st) return JSON.parse(st)
@@ -73,27 +69,27 @@ export class CSaveToLocalStorage  implements IServerSaveBasePromise{// CacheGДo
         return false
     }
 }
-// CacheG
-export const CacheG = new CSaveToCache
-export const CacheLocal = new CSaveToLocalStorage
 
-async function addDataToMap(data: [k: string,v: any][], map: Map<string,any>) {
+export const CacheG = new CSaveToCache()
+export const CacheLocal = new CSaveToLocalStorage()
+
+async function addDataToMap(data: [k: string,v: unknown][], map: Map<string,unknown>) {
     if (data) {
         for (let [k,v] of data) {
             const tr = (map.get(k) || map.set(k, v).get(k)!)
-            if (tr) {
+            if (tr && typeof tr === 'object') {
                 Object.assign(tr, v)
                 renderBy(tr)
             }
         }
     }
 }
-export const ObjectStringToDate = (obj: any) => {
+export const ObjectStringToDate = (obj: unknown): void => {
     if (typeof obj == "object" && obj) {
         if (Array.isArray(obj)) obj.forEach(ObjectStringToDate)
         else Object.entries(obj).forEach(([k,v])=>{
             if (typeof v == "string") {
-                if (isDate(v)) {obj[k] = new Date(v)}
+                if (isDate(v)) {(obj as Record<string, unknown>)[k] = new Date(v)}
             }
             if (typeof v == "object") ObjectStringToDate(v)
         })
@@ -104,11 +100,11 @@ function isDate(_date: string){
     return _regExp.test(_date);
 }
 
-export function CashFuncMapBase(arr: [k: string, v: Map<string, any>][], Save: IServerSaveBasePromise) {
+export function CacheFuncMapBase(arr: [k: string, v: Map<string, unknown>][], Save: IServerSaveBasePromise) {
     return {
         async load(){
             for (let [k,v] of arr) {
-                const t = await Save.get(k) as [k: string, v: any][]
+                const t = await Save.get(k) as [k: string, v: unknown][]
                 ObjectStringToDate(t)
                 await addDataToMap(t, v)
             }
@@ -118,7 +114,7 @@ export function CashFuncMapBase(arr: [k: string, v: Map<string, any>][], Save: I
                 await Save.set(k, [...v.entries()])
             }
         },
-        async clean(){
+        async clear(){
             for (let [k,v] of arr) {
                 await Save.delete(k)
             }
@@ -127,6 +123,6 @@ export function CashFuncMapBase(arr: [k: string, v: Map<string, any>][], Save: I
     }
 }
 
-export function CashFuncMapCash(arr: [k: string, v: Map<string, any>][]) {
-    return CashFuncMapBase(arr, CacheLocal)
+export function CacheFuncMap(arr: [k: string, v: Map<string, unknown>][]) {
+    return CacheFuncMapBase(arr, CacheLocal)
 }

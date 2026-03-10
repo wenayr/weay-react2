@@ -1,11 +1,11 @@
 import {createRoot} from "react-dom/client";
 import "./index"
-import {TestMain} from "./common/testUseReact/use";
+import {LegacyTestMain} from "./common/testUseReact/use";
 import {GridStyleDefault} from "./common/src/styleGrid";
 
 const r = GridStyleDefault()
 export function Test() {
-    return <TestMain/>
+    return <LegacyTestMain/>
 }
 function GeneralInit(pare:HTMLElement){
     const root = createRoot(pare!); // createRoot(container!) if you use TypeScript

@@ -6,8 +6,8 @@ export const StyleOtherColum: React.CSSProperties = {display: "flex", flexDirect
 export function useOutside({outsideClick, ref = useRef<HTMLDivElement|null>(null), status = true}: {ref?: React.RefObject<HTMLDivElement|null>, outsideClick: () => void, status?: boolean}) {
     useEffect(() => {
         if (status) {
-            function handleClickOutside(event: any) {
-                if (ref.current && !ref.current.contains(event.target)) outsideClick();
+            function handleClickOutside(event: MouseEvent | TouchEvent) {
+                if (ref.current && event.target instanceof Node && !ref.current.contains(event.target)) outsideClick();
             }
             document.addEventListener("mousedown", handleClickOutside);
             return () => document.removeEventListener("mousedown", handleClickOutside)

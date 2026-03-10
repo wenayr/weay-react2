@@ -55,14 +55,6 @@ export function MiniLogs({data, onClick}:{data: any[], onClick?: (e: CellMouseDo
             onCellMouseDown = {(e)=>{
                 // @ts-ignore
                 onClick?.(e)
-                // if (e.event?.button == 2) {
-                //     // copyToClipboard(e.value)
-                //     mouseAdd.map.set("sym",[
-                //         {
-                //             name: "copy", onClick: ()=> {copyToClipboard(e.value)}
-                //         }
-                //     ])
-                // }
             }}
         ></AgGridReact>
     </div>
