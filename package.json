@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Common react",
   "strict": true,
   "main": "dist/index.js",
@@ -22,7 +22,6 @@
   },
   "files": [
     "lib/**/*",
-    "README.md",
     "!**/*.tsbuildinfo"
   ],
   "author": "wenay",
