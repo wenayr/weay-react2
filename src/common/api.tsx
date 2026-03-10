@@ -1,42 +1,30 @@
-export {DraggableOutlineDiv} from "./src/DraggableOutlineDiv";
-
+// ... existing code ...
 import "../style/menuRight.css"
 import "../style/style.css"
-export * from "./src/applyTransactionAsyncUpdate";
-export * from "./src/addDownAnyKey";
-// export * from "./src/cash";
-export * from "./src/commonFuncReact";
-export * from "./src/input";
 
+// Папки с index.ts
+export * from "./src/components";
+export * from "./src/hooks";
+export * from "./src/styles";
+export * from "./src/utils";
+
+// Папки без index.ts, экспортируем каждый файл отдельно
 export * from "./src/menu/menu";
 export * from "./src/menu/menuMouse";
 export * from "./src/menu/menuR";
 
 export * from "./src/logs/logs";
 export * from "./src/logs/logs3";
-export * from "./src/miniButton";
 export * from "./src/logs/miniLogs";
 
-export * from "./src/MyResizeObserver";
-export * from "./src/other";
-export * from "./src/ParametersEngine";
-export * from "./src/arrayPromise";
+export * from "./src/myChart/1/myChart";
+export * from "./src/myChart/1/myChartTest";
+export * from "./src/myChart/chartEngine/chartEngineReact";
 
-export * from "./src/Resizeble";
-// export * from "./src/RNDFunc";
-export * from "./src/RNDFunc3";
-export * from "./src/styleGrid";
-export * from "./src/modal";
-export * from "./src/mapMemory";
-export * from "./src/RightMenu";
-
-export * from "./src/cash";
-
+// Файлы в корне src/common
 export * from "./updateBy";
 
-export * from "./src/leftModal2";
-export {PageVisibilityProvider} from "./src/pageVisibilityContext";
-
-export function test(){
-    return 5
+export function test() {
+    return 5;
 }
+// ... existing code ...
