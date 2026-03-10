@@ -1,8 +1,8 @@
 import React, {ReactElement, useEffect, useMemo, useRef, useState} from "react";
-import {const_Date, deepCloneMutable, isDate, Params, TF, timeLocalToStr_yyyymmdd, timeLocalToStr_yyyymmdd_hhmm, timeLocalToStr_yyyymmdd_hhmmss, timeLocalToStr_yyyymmdd_hhmmss_ms} from "wenay-common";
+import {const_Date, deepCloneMutable, isDate, Params, TF, timeLocalToStr_yyyymmdd, timeLocalToStr_yyyymmdd_hhmm, timeLocalToStr_yyyymmdd_hhmmss, timeLocalToStr_yyyymmdd_hhmmss_ms} from "wenay-common2";
 import {setResizeableElement} from "./MyResizeObserver";
-import {SetAutoStepForElement} from "./inputAutoStep";
 import {CParameter, FNameButton} from "./Parameters";
+import {SetAutoStepForElement} from "../utils";
 
 function timeToStr(time: number | string | const_Date, step?: number) {
     function getTimeStep<T>(time: number) {

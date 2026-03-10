@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 // задать автоматическое управление шагом для элемента input
-import {GetDblPrecision, GetDblPrecision2, NormalizeDouble} from "wenay-common";
+import {GetDblPrecision, GetDblPrecision2, NormalizeDouble} from "wenay-common2";
 
 export function SetAutoStepForElement(element :HTMLInputElement, params :{minStep? :number|undefined, maxStep? :number} = { maxStep: 1})
 {

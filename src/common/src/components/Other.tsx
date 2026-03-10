@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from "react";
-import {Params, UnAwaited} from "wenay-common";
+import {Params, PromiseResult} from "wenay-common2";
 import {ParametersReact} from "./ParametersEngine";
 
 export function EditParams2<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>({onSave, params: paramsDef}: {
@@ -31,7 +31,7 @@ export function EditParams3<TParams extends Params.IParamsExpandableReadonly = P
         paramsDef().then(e=> {
             setParams(e)})
     }, [true]);
-    const [params, setParams] = useState<UnAwaited<ReturnType<typeof paramsDef>>|null>(null)
+    const [params, setParams] = useState<PromiseResult<ReturnType<typeof paramsDef>>|null>(null)
     return <div className={"maxSize"}>
         {params && params.map((z, i)=><ParametersReact key={i} params={z} onChange={e => {
             params[i] = z

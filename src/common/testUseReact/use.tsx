@@ -1,10 +1,11 @@
-import {Button, ButtonHover,  DivRnd3, MenuBase, mouseMenuApi, renderBy, tMenuReact, updateBy} from "../api";
+import {MenuBase, mouseMenuApi, renderBy, tMenuReact, updateBy} from "../api";
 import {GridExample, tt} from "./useGrid";
 import {MyChartEngine} from "../src/myChart/chartEngine/chartEngineReact";
 import {TestParams} from "./testParams";
 import {createContext, Suspense, use, useContext, useEffect, useMemo, useState} from "react";
-import {sleepAsync} from "wenay-common";
-import {DropdownMenu, DropdownMenuTest} from "../src/RightMenu";
+import {sleepAsync} from "wenay-common2";
+import {Button, ButtonHover} from "../src/hooks";
+import {DivRnd3} from "../src/components";
 
 
 const a = {}
@@ -53,7 +54,6 @@ export function LegacyTestMain() {
     // </div>
     updateBy(b)
     return <div className={"maxSize"}>
-        <DropdownMenuTest/>
         <div style={{margin: 80}}>
             <ButtonHover button={()=><div >menu</div>}>
                 <MenuBase zIndex={12} coordinate={{x: 0, y: 0}} data={[

@@ -1,6 +1,6 @@
 import React, {useRef} from "react";
-import {DivRnd3} from "./RNDFunc3";
-import {DivOutsideClick} from "./commonFuncReact";
+import {DivOutsideClick} from "../hooks";
+import {DivRnd3} from "./Dnd";
 
 // Unified modal wrapper component
 function ModalWrapper({

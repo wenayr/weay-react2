@@ -11,10 +11,10 @@ import {
 } from "ag-grid-community";
 import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
-import {applyTransactionAsyncUpdate} from "../src/applyTransactionAsyncUpdate";
-import {sleepAsync} from "wenay-common";
+import {sleepAsync} from "wenay-common2";
 import {renderBy, updateBy} from "../updateBy";
 import {mouseMenuApi} from "../src/menu/menuMouse";
+import {applyTransactionAsyncUpdate} from "../src/utils";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 

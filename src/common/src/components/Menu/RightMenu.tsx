@@ -6,11 +6,10 @@ import React, {
     useRef,
     useState
 } from 'react';
-import { DivOutsideClick } from './commonFuncReact';
-import { GetModalFuncJSX } from './modal';
-import { sleepAsync } from 'wenay-common';
-import { Position, useDraggable } from './use_draggable_hook';
-import { DraggableOutlineDiv } from './DraggableOutlineDiv';
+import { sleepAsync } from 'wenay-common2';
+import {GetModalFuncJSX} from "../Modal";
+import {DivOutsideClick, Position, useDraggable} from "../../hooks";
+import {DraggableOutlineDiv} from "../Dnd";
 
 type MenuElement = {
     label: string;

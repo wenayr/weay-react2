@@ -1,5 +1,5 @@
-import {ParametersReact} from "../src/ParametersEngine";
-import {Params} from "wenay-common";
+import {Params} from "wenay-common2";
+import {ParametersReact} from "../src/components";
 
 const getParams = () => {
     return new class testParams extends Params.CParams{

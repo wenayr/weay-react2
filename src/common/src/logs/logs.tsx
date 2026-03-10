@@ -1,11 +1,11 @@
 import {AgGridReact} from "ag-grid-react";
 import React, {useCallback, useEffect, useRef} from "react";
-import {copyToClipboard, Params, timeLocalToStr_hhmmss, UnArray} from "wenay-common";
+import {copyToClipboard, Params, timeLocalToStr_hhmmss, ArrayElementType} from "wenay-common2";
 import {renderBy, updateBy} from "../../updateBy";
 import {ColDef, ColGroupDef, GridReadyEvent} from "ag-grid-community";
-import {ParametersReact} from "../ParametersEngine";
-import {staticGetAdd} from "../mapMemory";
 import {mouseMenuApi} from "../menu/menuMouse";
+import {staticGetAdd} from "../utils";
+import {ParametersReact} from "../components";
 
 type tLogsInput<T extends object> = T & {id : string, var?: number, time: Date, txt: string}
 type tLogs<T extends object = {}> = tLogsInput<T> & {num: number}
@@ -94,7 +94,7 @@ export function PageLogs({update}: {update?: number}) {
         ...e,
         time: (e.time)
     })))
-    type el = UnArray<typeof rowData >
+    type el = ArrayElementType<typeof rowData >
     const datum = datumMiniConst
     const setting = staticGetAdd("settingLogs",settingLogs)
     const apiGrid = useRef<GridReadyEvent<el>|null>(null)

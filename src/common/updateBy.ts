@@ -1,5 +1,5 @@
 import {useLayoutEffect, useState} from "react";
-import {waitRun} from "wenay-common";
+import {waitRun} from "wenay-common2";
 
 type tFunc2 = Map<object, (a?: any) => void>
 export const map3 = new WeakMap<object, tFunc2>();

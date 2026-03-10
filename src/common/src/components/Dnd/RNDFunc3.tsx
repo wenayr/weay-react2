@@ -7,7 +7,7 @@ import React, {
     useState
 } from "react";
 import { Rnd } from "react-rnd";
-import { renderBy, updateBy } from "../updateBy";
+import {renderBy, updateBy} from "../../../updateBy";
 
 type tPosition = { x: number; y: number };
 type tSize = { height: number | string; width: number | string };

@@ -1,6 +1,5 @@
-// document.addEventListener('mousedown',
-import {renderBy} from "../updateBy";
 import {useEffect} from "react";
+import {renderBy} from "../../updateBy";
 
 export const KeyDown = {
     key: "" as string

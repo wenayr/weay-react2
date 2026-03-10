@@ -1,4 +1,4 @@
-import {renderBy} from "../updateBy";
+import {renderBy} from "../../updateBy";
 
 export interface IServerSaveBasePromise {
     set(key: string, value: object): Promise<boolean>

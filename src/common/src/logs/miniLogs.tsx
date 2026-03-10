@@ -1,4 +1,4 @@
-import {copyToClipboard, timeLocalToStr_hhmmss} from "wenay-common";
+import {copyToClipboard, timeLocalToStr_hhmmss} from "wenay-common2";
 import {AgGridReact} from "ag-grid-react";
 import React, {useRef} from "react";
 import {CellMouseDownEvent, GridReadyEvent} from "ag-grid-community";

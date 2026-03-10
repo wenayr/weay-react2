@@ -6,7 +6,7 @@ import React, {
     useRef,
     useState,
 } from 'react';
-import { PromiseArrayListen, sleepAsync } from "wenay-common";
+import { PromiseArrayListen, sleepAsync } from "wenay-common2";
 
 /*******************************************************
  * Типы данных для меню
