@@ -1,45 +1,36 @@
-import { useSyncExternalStore } from "react";
-import { waitRun } from "wenay-common2"; // Оставляем твою утилиту
+import { useLayoutEffect, useSyncExternalStore } from "react";
+import { waitRun } from "wenay-common2";
 
-// Тип для слушателей (функции без аргументов)
-type Listener = () => void;
+type Listener = (a?: any) => void;
 
-// Внутреннее состояние для каждого объекта-наблюдателя
 interface ObserverState {
     listeners: Set<Listener>;
     version: number;
 }
 
-// Глобальные карты для хранения стейта и таймаутов
-const map3 = new WeakMap<object, ObserverState>();
+export const map3 = new WeakMap<object, ObserverState>();
 export const mapWait = new Map<object, ReturnType<typeof waitRun>>();
 
-// Вспомогательная функция ленивой инициализации стейта
 function getObserverState(obj: object): ObserverState {
     let state = map3.get(obj);
     if (!state) {
-        state = {
-            listeners: new Set(),
-            version: 0
-        };
+        state = { listeners: new Set(), version: 0 };
         map3.set(obj, state);
     }
     return state;
 }
 
-// Общая логика оповещения React-а об изменениях
 function triggerUpdate(obj: object, reverse = false, lastOnly = false) {
     const state = map3.get(obj);
     if (!state || state.listeners.size === 0) return;
 
-    // Увеличиваем версию — это триггер для useSyncExternalStore
     state.version += 1;
 
     let listenersArray = Array.from(state.listeners);
 
     if (lastOnly) {
         const last = listenersArray.at(-1);
-        if (last) last();
+        if (last) last(obj);
         return;
     }
 
@@ -47,12 +38,8 @@ function triggerUpdate(obj: object, reverse = false, lastOnly = false) {
         listenersArray.reverse();
     }
 
-    listenersArray.forEach(listener => listener());
+    listenersArray.forEach(listener => listener(obj));
 }
-
-// ----------------------------------------------------------------------
-// ПУБЛИЧНОЕ API
-// ----------------------------------------------------------------------
 
 export function renderBy(a: object, ms?: number) {
     if (ms) {
@@ -61,9 +48,7 @@ export function renderBy(a: object, ms?: number) {
                 mapWait.delete(a);
                 triggerUpdate(a);
             });
-    } else {
-        triggerUpdate(a);
-    }
+    } else triggerUpdate(a);
 }
 
 export function renderByRevers(a: object, ms?: number, reverse = true) {
@@ -73,9 +58,7 @@ export function renderByRevers(a: object, ms?: number, reverse = true) {
                 mapWait.delete(a);
                 triggerUpdate(a, reverse);
             });
-    } else {
-        triggerUpdate(a, reverse);
-    }
+    } else triggerUpdate(a, reverse);
 }
 
 export function renderByLast(a: object, ms?: number) {
@@ -85,31 +68,46 @@ export function renderByLast(a: object, ms?: number) {
                 mapWait.delete(a);
                 triggerUpdate(a, false, true);
             });
-    } else {
-        triggerUpdate(a, false, true);
-    }
+    } else triggerUpdate(a, false, true);
 }
 
-export function useUpdateBy<T extends object>(a: T) {
+export function useUpdateBy<T extends object>(
+    a: T,
+    f?: React.Dispatch<React.SetStateAction<T>> | ((a: T) => void)
+) {
     useSyncExternalStore(
         (listener) => {
+            if (f) return () => {};
+
             const state = getObserverState(a);
             state.listeners.add(listener);
 
             return () => {
                 state.listeners.delete(listener);
-                if (state.listeners.size === 0) {
-                    map3.delete(a);
-                }
+                if (state.listeners.size === 0) map3.delete(a);
             };
         },
-        () => getObserverState(a).version
+        () => (f ? 0 : getObserverState(a).version)
     );
+
+    useLayoutEffect(() => {
+        if (!f) return;
+
+        const state = getObserverState(a);
+        state.listeners.add(f);
+
+        return () => {
+            state.listeners.delete(f);
+            if (state.listeners.size === 0) map3.delete(a);
+        };
+    }, [a, f]);
 }
 
-// Backward-compatible alias
-export function updateBy<T extends object>(a: T) {
-    useUpdateBy(a);
+export function updateBy<T extends object>(
+    a: T,
+    f?: React.Dispatch<React.SetStateAction<T>> | ((a: T) => void)
+) {
+    useUpdateBy(a, f);
 }
 
 // import {useLayoutEffect, useState} from "react";
