@@ -129,7 +129,7 @@ export function applyTransactionAsyncUpdate2<T>(params: params<T>) {
 
 type UnUndefined<T extends (any | undefined)> = T extends undefined ? never : T
 type t1<T = any> = ColDef<T>["comparator"]
-type paramsCompare<TData = any> = Parameters<UnUndefined<t1>>
+type paramsCompare<TData = any> = Parameters<Extract<UnUndefined<t1>, (...args: any) => any>>
 
 export function getComparatorGrid<T = any>(func?: (...param: paramsCompare<T>) => [a: number, b: number]): t1 {
     return (...param) => {
