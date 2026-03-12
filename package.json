@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Common react",
   "strict": true,
   "main": "dist/index.js",
@@ -32,8 +32,8 @@
     }
   },
   "dependencies": {
-    "ag-grid-community": "^34.2.0",
-    "ag-grid-react": "^34.2.0",
+    "ag-grid-community": "^35.1.0",
+    "ag-grid-react": "^35.1.0",
     "re-resizable": "^6.11.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
