@@ -54,7 +54,7 @@ export function InputPageModal({callback, name, outClick, keyForSave = "InputPag
         size={{height: 150, width: 300}}
         position={{y: -150, x: -250}}
     >
-        {InputPage({callback, name, txt})}
+        <InputPage callback={callback} name={name} txt={txt} />
     </ModalWrapper>
 }
 export function InputFileModal({callback, name, outClick, keyForSave = "InputFile2"}: Parameters<typeof InputFile>[0] & {outClick: ()=>any, keyForSave?: string}) {
@@ -64,7 +64,7 @@ export function InputFileModal({callback, name, outClick, keyForSave = "InputFil
         size={{height: 150, width: 300}}
         position={{y: -150, x: -250}}
     >
-        {InputFile({callback, name})}
+        <InputFile callback={callback} name={name} />
     </ModalWrapper>
 }
 export function InputFile({callback, name = ""}: {callback: (file: File | null)=>void, name?: string}) {

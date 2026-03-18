@@ -1,7 +1,7 @@
 import {createRoot} from "react-dom/client";
 import "./index"
+import {GridStyleDefault} from "./common/src/styles";
 import {LegacyTestMain} from "./common/testUseReact/use";
-import {GridStyleDefault} from "./common/src/styleGrid";
 
 const r = GridStyleDefault()
 export function Test() {

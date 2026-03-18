@@ -73,15 +73,19 @@ const saveStatus: {[key: string]: boolean} = {}
 export function Button({keySave, statusDef, outClick, ...data}: tButton) {
     if (keySave && saveStatus[keySave]) statusDef = saveStatus[keySave]
     const state = useState(statusDef ?? false)
-    return outClick ? DivOutsideClick({
-            status: state[0],
-            children: ButtonBase({...data, state}),
-            outsideClick: () => {
-                state[1](false);
-                if (typeof outClick == "function") outClick()
-            }
-        })
-        : ButtonBase({...data, state})
+    
+    const handleOutsideClick = () => {
+        state[1](false);
+        if (typeof outClick == "function") outClick()
+    }
+
+    return outClick ? (
+        <DivOutsideClick status={state[0]} outsideClick={handleOutsideClick}>
+            <ButtonBase {...data} state={state} />
+        </DivOutsideClick>
+    ) : (
+        <ButtonBase {...data} state={state} />
+    )
 }
 
 export function ButtonHover(props: tButtonBase){
@@ -97,13 +101,13 @@ export function ButtonHover(props: tButtonBase){
         }</div>
 }
 export const ButtonOutClick: typeof Button = ({outClick = true, ...a}) => Button({...a, outClick})
-export function ButtonAbs(...a: Parameters<typeof Button>) {
-    const children: typeof a[0]["children"] = (api) =>
+export function ButtonAbs(props: Parameters<typeof Button>[0]) {
+    const children: typeof props.children = (api) =>
         <div style={{position: "relative"}}>
             <div style={{
                 position: "absolute",
-                zIndex: a[0]?.zIndex ?? 9
-            }}>{typeof a[0].children == "function" ? a[0].children(api) : a[0].children}</div>
+                zIndex: props.zIndex ?? 9
+            }}>{typeof props.children == "function" ? props.children(api) : props.children}</div>
         </div>
-    return Button({...a[0], children})
+    return <Button {...props} children={children} />
 }
