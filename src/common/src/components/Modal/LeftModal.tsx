@@ -1,8 +1,8 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import {Color, colorGenerator2, ColorString, sleepAsync} from "wenay-common2";
-import {Drag22} from "../Dnd";
 import {renderBy, updateBy} from "../../../updateBy";
 import {GetModalJSX} from "./Modal";
+import { Drag22 } from "../Dnd/RNDFunc3";
 function useViewport() {
     const [width, setWidth] = useState(window.innerWidth);
 

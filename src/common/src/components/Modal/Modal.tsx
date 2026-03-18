@@ -1,6 +1,6 @@
 import React from "react";
-import {InputPageModal} from "../Input";
 import {renderBy, updateBy} from "../../../updateBy";
+import {InputPageModal} from "../Input";
 
 export function inputModal({setModalJSX, func, name, txt}: {
     txt?: string,

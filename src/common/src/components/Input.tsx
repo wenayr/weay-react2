@@ -1,6 +1,6 @@
 import React, {useRef} from "react";
 import {DivOutsideClick} from "../hooks/useOutside";
-import {DivRnd3} from "./Dnd";
+import { DivRnd3 } from "./Dnd/RNDFunc3";
 
 // Unified modal wrapper component
 function ModalWrapper({
@@ -41,7 +41,7 @@ export function InputPage({callback, name = "", txt =""}: {callback: (txt: strin
         <input type={"text"} style={{width:"100%"}}
                defaultValue={txtName.current}
                onChange={(e) => {
-                   txtName.current = e.target.value //?? txt
+                   txtName.current = (e.target as HTMLInputElement).value
                }}/>
         <div style={{marginTop: 20}} className={"msTradeAlt msTradeActive"} onClick={()=>{callback(txtName.current)}}>send</div>
     </div>
@@ -71,7 +71,7 @@ export function InputFile({callback, name = ""}: {callback: (file: File | null)=
     let file: File | null = null
     return <div className={"maxSize"} style={{padding: 20,}}>
         <label>{name}</label>
-        <input type={"file"} style={{width:"100%"}} onChange={(e) => {
+        <input type={"file"} style={{width:"100%"}} onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
             file = e.target.files?.[0] ?? null
         }}/>
         <div style={{marginTop: 20}} className={"msTradeAlt msTradeActive"} onClick={()=>{callback(file)}}>send</div>

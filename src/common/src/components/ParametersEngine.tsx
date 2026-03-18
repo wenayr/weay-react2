@@ -59,8 +59,8 @@ function CheckBox(set: (data: boolean) => void, val: boolean, style?: React.CSSP
         type="checkbox"
         style={{marginTop: "auto", marginBottom: "auto", ...style}}
         checked={val}
-        onChange={(a) => {
-            set(a.currentTarget.checked)
+        onChange={(a: React.ChangeEvent<HTMLInputElement>) => {
+            set(a.target.checked)
         }}
     />
 }
@@ -69,8 +69,8 @@ function InputString(set: (data: string)=>void, val :string, style?: React.CSSPr
         type="text"
         style={{marginTop: "auto", marginBottom: "auto", ...style}}
         value={val}
-        onChange={(e) => {
-            set(e.currentTarget.value)
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+            set(e.target.value)
         }}
     />
 }
@@ -117,8 +117,8 @@ function InputTime(set: (data: string) => void, value: string | const_Date, rang
                max={toNum(range?.defaultMax ?? range?.max ?? new Date().toString())}
                step={range?.defaultStep ?? step}
                value={toNum(value)}
-               onInput={(e) => {
-                   setVal(Number(e.currentTarget.value));
+               onInput={(e: React.FormEvent<HTMLInputElement>) => {
+                   setVal(Number((e.currentTarget as HTMLInputElement).value));
                }}
                ref={(ref) => {
                    if (ref) {
@@ -129,7 +129,7 @@ function InputTime(set: (data: string) => void, value: string | const_Date, rang
         <div>
             <input type={step % TF.D1.msec == 0 ? "date" : "datetime-local"}
                    style={{width: "calc(100% - 13px)", marginTop: 5}}
-                   onInput={(e) => {
+                   onInput={(e: React.FormEvent<HTMLInputElement>) => {
                        set(e.currentTarget.value);
                    }}
                    min={toInputStr(min)}
@@ -152,10 +152,8 @@ function InputTime(set: (data: string) => void, value: string | const_Date, rang
                max={toNum(max)} // ?? (range.step && range.step%1==0 ? Number.MAX_SAFE_INTEGER : Number.MAX_VALUE)}
                step={step} //range.step ?? Math.min((range.defaultStep??1), 1e-8)
                value={toNum(value)}
-               onInput={(e) => {
-                   //console.log("value:",toNum(value),"->",e.currentTarget.value);
-                   //<input type="number" value={this.vvv ?? 99} onInput={(e)=>{console.log(this.vvv= e.currentTarget.value); this.Refresh(); }}/>
-                   const target = e.currentTarget;
+               onInput={(e: React.FormEvent<HTMLInputElement>) => {
+                   const target = e.currentTarget as HTMLInputElement;
                    setVal(Number(target.value));
                }}
             //onMouseEnter={()=>console.log("!!!", deepClone(_ref?.classList))}
@@ -222,9 +220,10 @@ function InputNumber(set: (data: number)=>void, value: number, range: Readonly<P
                max={range.defaultMax ?? range.max}
                step={range.defaultStep ?? range.step}
                value={String(value)}
-               onInput={(e) => {
-                   set(Number(e.currentTarget.value));
-                   if (_ref) _ref.step = e.currentTarget.step;
+               onInput={(e: React.FormEvent<HTMLInputElement>) => {
+                   const current = e.currentTarget as HTMLInputElement;
+                   set(Number(current.value));
+                   if (_ref) _ref.step = current.step;
                }}
                ref={(ref) => {
                    if (ref) {
@@ -238,8 +237,8 @@ function InputNumber(set: (data: number)=>void, value: number, range: Readonly<P
                max={max} // ?? (range.step && range.step%1==0 ? Number.MAX_SAFE_INTEGER : Number.MAX_VALUE)}
                step={step} //range.step ?? Math.min((range.defaultStep??1), 1e-8)
                value={val}
-               onInput={(e) => {
-                   const target = e.currentTarget;
+               onInput={(e: React.FormEvent<HTMLInputElement>) => {
+                   const target = e.currentTarget as HTMLInputElement;
                    let value2 = target.value != "" ? Number(target.value) : value;
                    //if (target.value=="") console.log(value, range);
                    _inputNumStrMap.set(range, {

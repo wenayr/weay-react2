@@ -2,7 +2,14 @@
 // задать автоматическое управление шагом для элемента input
 import {GetDblPrecision, GetDblPrecision2, NormalizeDouble} from "wenay-common2";
 
-export function SetAutoStepForElement(element :HTMLInputElement, params :{minStep? :number|undefined, maxStep? :number} = { maxStep: 1})
+interface IStepInputElement extends HTMLElement {
+	value: string;
+	step: string;
+	min: string;
+	max: string;
+}
+
+export function SetAutoStepForElement(element: IStepInputElement, params :{minStep? :number|undefined, maxStep? :number} = { maxStep: 1})
 {
 	function parse(valueStr :string) { let val= parseFloat(valueStr);  return isNaN(val) ? null : val; }
     const {minStep, maxStep=1} = params;

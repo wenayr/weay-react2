@@ -1,3 +1,3 @@
 export * from './Modal';
-export * from './LeftModal';
 export * from './ModalContextProvider';
+export * from './LeftModal';

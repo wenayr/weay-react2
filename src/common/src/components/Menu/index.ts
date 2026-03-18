@@ -1,2 +1,2 @@
-export * from './RightMenu';
 export * from './StickerMenu';
+export * from './RightMenu';
