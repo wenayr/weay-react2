@@ -2,14 +2,14 @@
 import "../style/menuRight.css"
 import "../style/style.css"
 
+// 0. СТИЛИ - независимые
+export * from "./src/styles/styleGrid";
+
 // 1. БАЗОВЫЙ СЛОЙ - никаких зависимостей внутри проекта
 export * from "./updateBy";
 
 // 2. ХУКИ - зависят только от updateBy
 export * from "./src/hooks";
-
-// 3. СТИЛИ - независимые
-export * from "./src/styles";
 
 // 4. DND компоненты - зависят от updateBy
 export * from "./src/components/Dnd";
@@ -46,6 +46,7 @@ export * from "./src/menu/menuR";
 export * from "./src/logs/logs";
 export * from "./src/logs/logs3";
 export * from "./src/logs/miniLogs";
+
 
 // 14. ГРАФИКИ - самый высокий уровень
 export * from "./src/myChart/1/myChart";
