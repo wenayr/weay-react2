@@ -1,5 +1,6 @@
 import { deepClone } from "wenay-common2";
-import {ExRNDMap3, mapResiReact} from "../components";
+import { ExRNDMap3 } from "../components/Dnd/RNDFunc3";
+import { mapResiReact } from "../components/Dnd/Resizable";
 
 const staticProps = new Map<string,object>()
 

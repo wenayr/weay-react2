@@ -1,6 +1,6 @@
 import React, {useEffect, useRef} from "react";
 import {MenuBase, tMenuReact, tMenuReactStrictly} from "./menu";
-import {DivOutsideClick} from "../hooks";
+import {DivOutsideClick} from "../hooks/useOutside";
 
 // Функция-обёртка для создания компонента MenuR и управления глобальной переменной `bb`
 export function GetMenuR(){

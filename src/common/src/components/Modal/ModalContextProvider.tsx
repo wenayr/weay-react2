@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import {DivOutsideClick} from "../../hooks";
+import {DivOutsideClick} from "../../hooks/useOutside";
 
 // Контекст хранит только функцию setModal
 const ModalContext = createContext<(jsx: ReactNode | null) => void>(() => {});

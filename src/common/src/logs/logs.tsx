@@ -4,8 +4,8 @@ import {copyToClipboard, Params, timeLocalToStr_hhmmss, ArrayElementType} from "
 import {renderBy, updateBy} from "../../updateBy";
 import {ColDef, ColGroupDef, GridReadyEvent} from "ag-grid-community";
 import {mouseMenuApi} from "../menu/menuMouse";
-import {staticGetAdd} from "../utils";
-import {ParametersReact} from "../components";
+import { staticGetAdd } from "../utils/mapMemory";
+import { ParametersReact } from "../components/ParametersEngine";
 
 type tLogsInput<T extends object> = T & {id : string, var?: number, time: Date, txt: string}
 type tLogs<T extends object = {}> = tLogsInput<T> & {num: number}

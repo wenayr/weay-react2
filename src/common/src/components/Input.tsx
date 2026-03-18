@@ -1,5 +1,5 @@
 import React, {useRef} from "react";
-import {DivOutsideClick} from "../hooks";
+import {DivOutsideClick} from "../hooks/useOutside";
 import {DivRnd3} from "./Dnd";
 
 // Unified modal wrapper component
