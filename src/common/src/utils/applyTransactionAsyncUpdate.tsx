@@ -39,7 +39,7 @@ export function applyTransactionAsyncUpdate<T>(
                 arrNew.push(newData);
                 return null; // Новая строка обрабатывается отдельно
             }
-
+            if (option?.remove) arrRemove.push(a)
             // Если строка найдена - обновить данные в буфере
             return newData;
         }) // Убираем `null` и оставляем только существующие строки
