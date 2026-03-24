@@ -118,13 +118,10 @@ export function applyTransactionAsyncUpdate2<T>(params: params<T>) {
                     remove: arrRemove,
                 });
         } else {
-            // === ОБЫЧНЫЙ РЕЖИМ ===
             const newData = 'newData' in params ? params.newData : undefined;
             const removeData = 'removeData' in params ? params.removeData : undefined;
 
-            if (newData?.length)
-                applyTransactionAsyncUpdate(g, newData, getId, bufTable, op);
-
+            // Сначала удаляем — чтобы async update не конфликтовал
             if (removeData?.length) {
                 const toRemove: T[] = [];
                 removeData.forEach(e => {
@@ -136,6 +133,9 @@ export function applyTransactionAsyncUpdate2<T>(params: params<T>) {
                 if (toRemove.length)
                     g.api.applyTransaction({remove: toRemove});
             }
+
+            if (newData?.length)
+                applyTransactionAsyncUpdate(g, newData, getId, bufTable, op);
         }
     } else {
         // === ГРИД НЕ ГОТОВ — работаем только с буфером ===
