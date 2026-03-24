@@ -7,7 +7,7 @@ import {
     themeAlpine
 } from "ag-grid-community";
 import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
-export { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
+ export { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
 
 
 
@@ -15,8 +15,8 @@ export { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
 // import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 // Register all community features
-ModuleRegistry.registerModules([AllCommunityModule]);
 export function GridStyleDefault(){
+    ModuleRegistry.registerModules([AllCommunityModule]);
     const theme:  Theme<ThemeDefaultParams> = themeAlpine
         .withPart(colorSchemeDarkBlue)
         .withPart(iconSetMaterial)

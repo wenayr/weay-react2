@@ -4,7 +4,8 @@ const optionsDef = {
     update: true,
     add: true,
     updateBuffer: true,
-    sync: false
+    sync: false,
+    remove: false,
 }
 type options = Partial<typeof optionsDef>
 
@@ -21,6 +22,7 @@ export function applyTransactionAsyncUpdate<T>(
     // Проверка наличия сетки и доступа к данным через API
     if (grid?.api.getRowNode) {
         const arrNew: T[] = []; // Массив для новых данных (добавляемые строки)
+        const arrRemove: T[] = []; // Массив для удаляемых строк
 
         // Основная обработка данных (map используется для обновления или создания записей)
         const arr = newData.map(e => {
@@ -44,7 +46,11 @@ export function applyTransactionAsyncUpdate<T>(
             .filter(e => e) as T[];
 
         if (op.sync) {
-            grid.api.applyTransaction({add: op.add ? arrNew : [], update: op.update ? arr : []});
+            grid.api.applyTransaction({
+                add: op.add ? arrNew : [], 
+                update: op.update ? arr : [],
+                remove: op.remove ? arrRemove : []
+            });
             return
         }
 
@@ -57,6 +63,11 @@ export function applyTransactionAsyncUpdate<T>(
         // Асинхронное обновление существующих строк
         if (arr.length && op.update) {
             grid.api.applyTransactionAsync({update: arr});
+        }
+        
+        // Асинхронное удаление строк
+        if (arrRemove.length && op.remove) {
+            grid.api.applyTransactionAsync({remove: arrRemove});
         }
     }
 }
