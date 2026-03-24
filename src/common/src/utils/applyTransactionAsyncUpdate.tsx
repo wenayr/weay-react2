@@ -5,7 +5,6 @@ const optionsDef = {
     add: true,
     updateBuffer: true,
     sync: false,
-    remove: false,
 }
 type options = Partial<typeof optionsDef>
 
@@ -16,60 +15,32 @@ export function applyTransactionAsyncUpdate<T>(
     bufTable: { [id: string]: Partial<T> },
     option?: options
 ) {
-    // Установка параметров (объединение переданных опций с настройками по умолчанию)
     const op = {...optionsDef, ...(option ?? {})};
+    if (!grid?.api.getRowNode) return
 
-    // Проверка наличия сетки и доступа к данным через API
-    if (grid?.api.getRowNode) {
-        const arrNew: T[] = []; // Массив для новых данных (добавляемые строки)
-        const arrRemove: T[] = []; // Массив для удаляемых строк
+    const arrNew: T[] = [];
+    const arr = newData.map(e => {
+        const id = getId(e);
+        const merged = {...(bufTable[id] ?? {}), ...e} as T
+        if (op.updateBuffer) bufTable[id] = merged
+        const existing = grid.api.getRowNode(id)?.data;
+        if (!existing) { arrNew.push(merged); return null }
+        return merged;
+    }).filter(e => e) as T[];
 
-        // Основная обработка данных (map используется для обновления или создания записей)
-        const arr = newData.map(e => {
-            // Получение ID для текущей строки
-            const id = getId(e);
-
-            const newData = {...(bufTable[id] ?? {}), ...e} as T
-            if (op.updateBuffer) bufTable[id] = newData
-            // Попытка найти существующую строку по ID
-            const a = grid.api.getRowNode(id)?.data;
-
-            if (!a) {
-                // Если строка не найдена - добавить в массив для добавления
-                arrNew.push(newData);
-                return null; // Новая строка обрабатывается отдельно
-            }
-            if (option?.remove) arrRemove.push(a)
-            // Если строка найдена - обновить данные в буфере
-            return newData;
-        }) // Убираем `null` и оставляем только существующие строки
-            .filter(e => e) as T[];
-
-        if (op.sync) {
-            grid.api.applyTransaction({
-                add: op.add ? arrNew : [], 
-                update: op.update ? arr : [],
-                remove: op.remove ? arrRemove : []
-            });
-            return
-        }
-
-        // Добавление новых строк (если есть элементы)
-        if (arrNew.length && op.add) {
-            // добавление элементов должно быть синхронно, т.к. может прейти его update до исполнения
-            grid.api.applyTransaction({add: arrNew});
-        }
-
-        // Асинхронное обновление существующих строк
-        if (arr.length && op.update) {
-            grid.api.applyTransactionAsync({update: arr});
-        }
-        
-        // Асинхронное удаление строк
-        if (arrRemove.length && op.remove) {
-            grid.api.applyTransactionAsync({remove: arrRemove});
-        }
+    if (op.sync) {
+        grid.api.applyTransaction({
+            add: op.add ? arrNew : [],
+            update: op.update ? arr : [],
+        });
+        return
     }
+
+    if (arrNew.length && op.add)
+        grid.api.applyTransaction({add: arrNew});
+
+    if (arr.length && op.update)
+        grid.api.applyTransactionAsync({update: arr});
 }
 
 const map = new WeakMap()
@@ -91,49 +62,102 @@ type CommonParams<T> = {
 }
 
 type params<T> = CommonParams<T> & (
-    // Вариант с newData
     | {
-    newData: (Partial<T>)[];
-    synchronization?: never;// React.RefObject<GridReadyEvent<any, any> | null>
-    gridRef?: React.RefObject<GridReadyEvent<T, any> | null | undefined>;
-    grid?: GridReadyEvent<T, any> | null | undefined;
-}
-    // Вариант с synchronization и либо grid, либо gridRef
+        newData?: (Partial<T>)[];
+        removeData?: (Partial<T>)[];
+        synchronization?: never;
+        gridRef?: React.RefObject<GridReadyEvent<T, any> | null | undefined>;
+        grid?: GridReadyEvent<T, any> | null | undefined;
+    }
     | ({
-    newData?: never;
-    synchronization: true;
-} & (
-    | { grid: GridReadyEvent<T, any> | null | undefined; gridRef?: never }
-    | { gridRef: React.RefObject<GridReadyEvent<T, any> | null | undefined>; grid?: never }
+        newData?: never;
+        removeData?: never;
+        synchronization: true;
+    } & (
+        | { grid: GridReadyEvent<T, any> | null | undefined; gridRef?: never }
+        | { gridRef: React.RefObject<GridReadyEvent<T, any> | null | undefined>; grid?: never }
     ))
-    );
+);
+
+function resolveGrid<T>(params: params<T>): GridReadyEvent<T, any> | null {
+    if (params.grid?.api?.getRowNode) return params.grid
+    const ref = ('gridRef' in params) ? params.gridRef : undefined
+    if (ref?.current?.api?.getRowNode) return ref.current
+    return null
+}
 
 export function applyTransactionAsyncUpdate2<T>(params: params<T>) {
-    const {grid, gridRef, newData, getId, bufTable} = params;
-    // Установка параметров (объединение переданных опций с настройками по умолчанию)
+    const {getId, bufTable} = params;
     const op = {...optionsDef, ...(params.option ?? {})};
-    // Проверка наличия сетки и доступа к данным через API
-    if (grid?.api.getRowNode) {
-        if (!newData) {
-            applyTransactionAsyncUpdate(grid, Object.values(bufTable), getId, bufTable, op)
-        } else
-            applyTransactionAsyncUpdate(grid, newData, getId, bufTable, op)
-    } else if (gridRef?.current?.api.getRowNode) {
-        if (!newData) {
-            applyTransactionAsyncUpdate(gridRef.current, Object.values(bufTable), getId, bufTable, op)
-        } else
-            applyTransactionAsyncUpdate(gridRef.current, newData, getId, bufTable, op)
+    const g = resolveGrid(params);
+
+    if (g) {
+        if (params.synchronization) {
+            // === СИНХРОНИЗАЦИЯ: bufTable — истина ===
+            const bufIds = new Set(Object.keys(bufTable));
+            const gridIds = new Set<string>();
+            const arrAdd: T[] = [];
+            const arrUpdate: T[] = [];
+            const arrRemove: T[] = [];
+
+            g.api.forEachNode(node => {
+                if (!node.data) return
+                const id = getId(node.data);
+                gridIds.add(id);
+                if (!bufIds.has(id)) arrRemove.push(node.data);
+                else arrUpdate.push(bufTable[id] as T);
+            });
+
+            for (const id of bufIds)
+                if (!gridIds.has(id)) arrAdd.push(bufTable[id] as T);
+
+            if (arrAdd.length || arrUpdate.length || arrRemove.length)
+                g.api.applyTransaction({
+                    add: op.add ? arrAdd : [],
+                    update: op.update ? arrUpdate : [],
+                    remove: arrRemove,
+                });
+        } else {
+            // === ОБЫЧНЫЙ РЕЖИМ ===
+            const newData = 'newData' in params ? params.newData : undefined;
+            const removeData = 'removeData' in params ? params.removeData : undefined;
+
+            if (newData?.length)
+                applyTransactionAsyncUpdate(g, newData, getId, bufTable, op);
+
+            if (removeData?.length) {
+                const toRemove: T[] = [];
+                removeData.forEach(e => {
+                    const id = getId(e);
+                    delete bufTable[id];
+                    const existing = g.api.getRowNode(id)?.data;
+                    if (existing) toRemove.push(existing);
+                });
+                if (toRemove.length)
+                    g.api.applyTransaction({remove: toRemove});
+            }
+        }
     } else {
-        if (map.get(bufTable)) map.set(bufTable, new Set())
-        const m = map.get(bufTable)
+        // === ГРИД НЕ ГОТОВ — работаем только с буфером ===
+        if (!map.has(bufTable)) map.set(bufTable, new Set())
+        const m = map.get(bufTable) as Set<string> | undefined
+
+        const newData = 'newData' in params ? params.newData : undefined;
+        const removeData = 'removeData' in params ? params.removeData : undefined;
+
         if (newData)
             newData.forEach(e => {
-                // Получение ID для текущей строки
                 const id = getId(e);
-                // m? - это странно, но так надо
                 m?.add(id)
                 if (op.updateBuffer) bufTable[id] = {...(bufTable[id] ?? {}), ...e} as T
-            }) // Убираем `null` и оставляем только существующие строки
+            });
+
+        if (removeData)
+            removeData.forEach(e => {
+                const id = getId(e);
+                m?.delete(id);
+                delete bufTable[id];
+            });
     }
 }
 
