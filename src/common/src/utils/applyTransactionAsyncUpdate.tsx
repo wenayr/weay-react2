@@ -1,5 +1,5 @@
 import {ColDef, GridReadyEvent} from "ag-grid-community";
-
+// обертка для упрощения работы с гридом через точку памяти
 const optionsDef = {
     update: true,
     add: true,
@@ -8,16 +8,19 @@ const optionsDef = {
 }
 type options = Partial<typeof optionsDef>
 
-export function applyTransactionAsyncUpdate<T>(
-    grid: GridReadyEvent<T, any> | null | undefined,
-    newData: (Partial<T>)[],
-    getId: (...a: any[]) => string,
-    bufTable: { [id: string]: Partial<T> },
-    option?: options
+function applyTransactionAsyncUpdate3<T>({getId, bufTable, option, newData, grid, remove} : {
+                                             grid: GridReadyEvent<T, any> | null | undefined,
+                                             newData: (Partial<T>)[],
+                                             remove?: (Partial<T>)[],
+                                             getId: (...a: any[]) => string,
+                                             bufTable: { [id: string]: Partial<T> },
+                                             option?: options
+                                         }
 ) {
     const op = {...optionsDef, ...(option ?? {})};
     if (!grid?.api.getRowNode) return
 
+    // определяем какие строки надо добавить, а какие только обновить
     const arrNew: T[] = [];
     const arr = newData.map(e => {
         const id = getId(e);
@@ -37,10 +40,20 @@ export function applyTransactionAsyncUpdate<T>(
     }
 
     if (arrNew.length && op.add)
-        grid.api.applyTransaction({add: arrNew});
+        grid.api.applyTransaction({add: arrNew, remove: remove as any}); // для удаления важно только получить ид
 
     if (arr.length && op.update)
-        grid.api.applyTransactionAsync({update: arr});
+        grid.api.applyTransactionAsync({update: arr, remove: remove as any});
+}
+// тут нет удаления но эта версия может использовать где то
+export function applyTransactionAsyncUpdate<T>(
+    grid: GridReadyEvent<T, any> | null | undefined,
+    newData: (Partial<T>)[],
+    getId: (...a: any[]) => string,
+    bufTable: { [id: string]: Partial<T> },
+    option?: options
+) {
+    return applyTransactionAsyncUpdate3({getId, option, newData, grid, bufTable})
 }
 
 const map = new WeakMap()
@@ -63,35 +76,36 @@ type CommonParams<T> = {
 
 type params<T> = CommonParams<T> & (
     | {
-        newData?: (Partial<T>)[];
-        removeData?: (Partial<T>)[];
-        synchronization?: never;
-        gridRef?: React.RefObject<GridReadyEvent<T, any> | null | undefined>;
-        grid?: GridReadyEvent<T, any> | null | undefined;
-    }
+    newData?: (Partial<T>)[];
+    removeData?: (Partial<T>)[];
+    synchronization?: never;
+    gridRef?: React.RefObject<GridReadyEvent<T, any> | null | undefined>;
+    grid?: GridReadyEvent<T, any> | null | undefined;
+    onlyMemo?: boolean;
+}
     | ({
-        newData?: never;
-        removeData?: never;
-        synchronization: true;
-    } & (
-        | { grid: GridReadyEvent<T, any> | null | undefined; gridRef?: never }
-        | { gridRef: React.RefObject<GridReadyEvent<T, any> | null | undefined>; grid?: never }
+    newData?: never;
+    removeData?: never;
+    synchronization: true;
+    onlyMemo?: never;
+} & (
+    | { grid: GridReadyEvent<T, any> | null | undefined; gridRef?: never }
+    | { gridRef: React.RefObject<GridReadyEvent<T, any> | null | undefined>; grid?: never }
     ))
-);
+    );
 
 function resolveGrid<T>(params: params<T>): GridReadyEvent<T, any> | null {
     if (params.grid?.api?.getRowNode) return params.grid
-    const ref = ('gridRef' in params) ? params.gridRef : undefined
-    if (ref?.current?.api?.getRowNode) return ref.current
+    if (params.gridRef?.current?.api?.getRowNode) return params.gridRef.current
     return null
 }
 
 export function applyTransactionAsyncUpdate2<T>(params: params<T>) {
-    const {getId, bufTable} = params;
+    const {getId, bufTable, newData, removeData} = params;
     const op = {...optionsDef, ...(params.option ?? {})};
     const g = resolveGrid(params);
 
-    if (g) {
+    if (g && params.onlyMemo!=true) {
         if (params.synchronization) {
             // === СИНХРОНИЗАЦИЯ: bufTable — истина ===
             const bufIds = new Set(Object.keys(bufTable));
@@ -118,46 +132,28 @@ export function applyTransactionAsyncUpdate2<T>(params: params<T>) {
                     remove: arrRemove,
                 });
         } else {
-            const newData = 'newData' in params ? params.newData : undefined;
-            const removeData = 'removeData' in params ? params.removeData : undefined;
-
-            // Сначала удаляем — чтобы async update не конфликтовал
-            if (removeData?.length) {
-                const toRemove: T[] = [];
-                removeData.forEach(e => {
-                    const id = getId(e);
-                    delete bufTable[id];
-                    const existing = g.api.getRowNode(id)?.data;
-                    if (existing) toRemove.push(existing);
-                });
-                if (toRemove.length)
-                    g.api.applyTransaction({remove: toRemove});
-            }
+            const toRemove: T[] = [];
+            removeData?.forEach(e => {
+                const id = getId(e);
+                delete bufTable[id];
+                const existing = g.api.getRowNode(id)?.data;
+                if (existing) toRemove.push(existing);
+            });
 
             if (newData?.length)
-                applyTransactionAsyncUpdate(g, newData, getId, bufTable, op);
+                applyTransactionAsyncUpdate3({grid:g, newData, getId, bufTable, option: op, remove: toRemove});
         }
     } else {
-        // === ГРИД НЕ ГОТОВ — работаем только с буфером ===
         if (!map.has(bufTable)) map.set(bufTable, new Set())
-        const m = map.get(bufTable) as Set<string> | undefined
 
-        const newData = 'newData' in params ? params.newData : undefined;
-        const removeData = 'removeData' in params ? params.removeData : undefined;
+        newData?.forEach(e => {
+            const id = getId(e);
+            bufTable[id] = {...(bufTable[id] ?? {}), ...e} as T
+        });
 
-        if (newData)
-            newData.forEach(e => {
-                const id = getId(e);
-                m?.add(id)
-                if (op.updateBuffer) bufTable[id] = {...(bufTable[id] ?? {}), ...e} as T
-            });
-
-        if (removeData)
-            removeData.forEach(e => {
-                const id = getId(e);
-                m?.delete(id);
-                delete bufTable[id];
-            });
+        removeData?.forEach(e => {
+            delete bufTable[getId(e)];
+        });
     }
 }
 
