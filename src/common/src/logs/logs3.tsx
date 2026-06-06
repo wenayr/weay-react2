@@ -339,7 +339,7 @@ export function LogsNotifications() {
                                 {typeof log.txt === 'object' ? JSON.stringify(log.txt) : log.txt}
                             </div>
                             <p style={{ textAlign: 'right', marginRight: 10 }}>
-                                {log.time.toLocaleDateString()}
+                                {new Date(log.time).toLocaleDateString()}
                             </p>
                         </div>
                     );

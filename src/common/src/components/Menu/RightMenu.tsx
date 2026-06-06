@@ -234,6 +234,7 @@ export function MenuRightApi() {
                 const i = elements.indexOf(e);
                 if (i !== -1) elements.splice(i, 1);
             });
+            render?.([...elements]);
         },
         get() {
             return elements;

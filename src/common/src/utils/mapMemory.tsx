@@ -56,13 +56,14 @@ export function staticGetAdd<T extends object>(key: any, def: T, options: {abs?:
 }
 
 export function staticGetById<T extends object>(key: any, def: T, id: string|number){
-    const t = map.get(key)
-    type t = {__id: string|number, data: T}
-    const el: t = {__id: id, data: def}
-    if ((el && el.__id != id) || !el) {
-        return staticGetAdd(key, el, {abs: true}).data
+    type W = {__id: string|number, data: T}
+    const stored = staticProps.get(key) as W | undefined
+    if (!stored || stored.__id !== id) {
+        const fresh: W = {__id: id, data: def}
+        staticProps.set(key, fresh)
+        return fresh.data
     }
-    return el.data
+    return stored.data
 }
 export const Cash = CacheFuncMap(
     [

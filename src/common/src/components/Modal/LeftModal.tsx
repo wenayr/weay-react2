@@ -15,46 +15,6 @@ function useViewport() {
     return { width };
 }
 
-// Custom hook for smooth snap scrolling animation
-function useSmoothSnapScroll() {
-    const animationState = useRef({ isAnimating: false });
-    const currentPosition = useRef({ x: 0, y: 0 });
-
-    const animateTo = async (target: number, onUpdate: (value: number) => void, onComplete?: () => void) => {
-        animationState.current.isAnimating = true;
-        const step = 40;
-
-        const animate = async () => {
-            if (!animationState.current.isAnimating || currentPosition.current.x === target) {
-                return;
-            }
-
-            const direction = target > currentPosition.current.x ? 1 : -1;
-            await sleepAsync(10);
-            const nextPosition = currentPosition.current.x + direction * step;
-
-            if (Math.abs(target - nextPosition) < step) {
-                animationState.current.isAnimating = false;
-                currentPosition.current.x = target;
-                onUpdate(target);
-                onComplete?.();
-                return;
-            }
-
-            currentPosition.current.x = nextPosition;
-            onUpdate(nextPosition);
-            animate();
-        };
-
-        await animate();
-    };
-
-    const stopAnimation = () => {
-        animationState.current.isAnimating = false;
-    };
-
-    return { animateTo, stopAnimation, currentPosition };
-}
 const MENU_WIDTH_RATIO = 0.8;
 
 // Main sidebar menu component with snap scrolling behavior

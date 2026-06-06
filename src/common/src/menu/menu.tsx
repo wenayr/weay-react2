@@ -368,7 +368,7 @@ export function MenuBase({
                              className,
                              menuElement,
                          }: MenuBaseProps): ReactElement {
-    const [_, forceUpdate] = useState(false);
+    const [, forceUpdate] = useState(false);
     const update = () => forceUpdate((p) => !p);
     const refMenu = useRef<HTMLDivElement | null>(null);
 

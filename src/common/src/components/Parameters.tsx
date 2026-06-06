@@ -31,7 +31,7 @@ export function CParameter(props: {
                 {props.children}
             </div>
             {/* Комментарий отображается только при наведении */}
-            {hovered && props.commentary?.length && (
+            {hovered && props.commentary && props.commentary.length > 0 && (
                 <div
                     className="commentary"
                     style={{

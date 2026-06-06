@@ -53,8 +53,9 @@ export function getLogsApi<T extends object = {}>(
 
     return {
         addLogs(a: tLogsInput<T>){
-            addToArr(datumMiniConst.last, {...a, num: num++}, 50)
-            addToArr(datumConst.map.get(a.id) ?? datumConst.map.set(a.id,[]).get(a.id)!, {...a, num: num++}, setting.limitPer)
+            const item = {...a, num: num++}
+            addToArr(datumMiniConst.last, item, 50)
+            addToArr(datumConst.map.get(a.id) ?? datumConst.map.set(a.id,[]).get(a.id)!, item, setting.limitPer)
             renderBy(datumConst)
             renderBy(datumMiniConst)
         },

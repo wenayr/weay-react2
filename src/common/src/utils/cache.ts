@@ -48,7 +48,7 @@ export class CSaveToLocalStorage  implements IServerSaveBasePromise{
     async get<T extends object>(key: string) : Promise<T|null> {
         if (window.localStorage) {
             const st = await localStorage.getItem(key)
-            if (st) return JSON.parse(st)
+            if (st) { try { return JSON.parse(st) } catch { return null } }
         }
         return null
     }

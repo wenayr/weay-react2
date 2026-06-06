@@ -3,17 +3,19 @@ import React, {HTMLAttributes, ReactElement, useEffect, useRef, useState} from "
 export const StyleOtherRow: React.CSSProperties = {display: "flex", flexDirection: "row", flex: "auto 1 1"}
 export const StyleOtherColum: React.CSSProperties = {display: "flex", flexDirection: "column", flex: "auto 0 1"}
 
-export function useOutside({outsideClick, ref = useRef<HTMLDivElement|null>(null), status = true}: {ref?: React.RefObject<HTMLDivElement|null>, outsideClick: () => void, status?: boolean}) {
+export function useOutside({outsideClick, ref, status = true}: {ref?: React.RefObject<HTMLDivElement|null>, outsideClick: () => void, status?: boolean}) {
+    const internalRef = useRef<HTMLDivElement|null>(null); // useRef всегда в теле, не в дефолте параметра — иначе нарушаются Rules of Hooks
+    const r = ref ?? internalRef;
     useEffect(() => {
         if (status) {
             function handleClickOutside(event: MouseEvent | TouchEvent) {
-                if (ref.current && event.target instanceof Node && !ref.current.contains(event.target)) outsideClick();
+                if (r.current && event.target instanceof Node && !r.current.contains(event.target)) outsideClick();
             }
             document.addEventListener("mousedown", handleClickOutside);
             return () => document.removeEventListener("mousedown", handleClickOutside)
         }
-    }, [ref, status, outsideClick]);
-    return ref
+    }, [r, status, outsideClick]);
+    return r
 }
 
 type key = React.Key | null | undefined
