@@ -10,7 +10,7 @@ export function MiniLogs({data, onClick}:{data: any[], onClick?: (e: CellMouseDo
             field: "time",
             sort: "desc",
             width: 50,
-            valueFormatter: (e: any)=>e.value.time ? timeLocalToStr_hhmmss(e.value.time) : e.value.time
+            valueFormatter: (e: any)=>e.value ? timeLocalToStr_hhmmss(e.value) : e.value
         },
         {
             field: "id",

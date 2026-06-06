@@ -134,7 +134,7 @@ export function PageLogs({update}: {update?: number}) {
                 field: "time",
                 sort: "desc",
                 width: 50,
-                valueFormatter: (e)=>e.value.time ? timeLocalToStr_hhmmss(e.value.time) : e.value.time
+                valueFormatter: (e)=>e.value ? timeLocalToStr_hhmmss(e.value) : e.value
             },
             {
                 field: "id",
