@@ -24,8 +24,7 @@ function GetMouseMenuApi(data?: {name?: string}){
     function ReactMouse(agr: Parameters<typeof MenuR>[0]) {
         const datum = menuMouse.value //staticGetAdd(menuMouse.name, menuMouse.value
 
-        return MenuR({...(agr ?? {}), other: agr.other ? agr.other : other, statusOn: datum.status, onUnClick: ()=> {
-                map.clear() }})
+        return MenuR({...(agr ?? {}), other: agr.other ? agr.other : other, statusOn: datum.status, onConsume: ()=> { map.clear() }})
     }
 
     return {

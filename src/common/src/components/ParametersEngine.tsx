@@ -1,6 +1,6 @@
 import React, {ReactElement, useEffect, useMemo, useRef, useState} from "react";
 import {const_Date, deepCloneMutable, isDate, Params, TF, timeLocalToStr_yyyymmdd, timeLocalToStr_yyyymmdd_hhmm, timeLocalToStr_yyyymmdd_hhmmss, timeLocalToStr_yyyymmdd_hhmmss_ms} from "wenay-common2";
-import {setResizeableElement} from "./MyResizeObserver";
+import {setResizeableElement, removeResizeableElement} from "./MyResizeObserver";
 import {CParameter, FNameButton} from "./Parameters";
 import {SetAutoStepForElement} from "../utils";
 
@@ -122,7 +122,7 @@ function InputTime(set: (data: string) => void, value: string | const_Date, rang
                }}
                ref={(ref) => {
                    if (ref) {
-                       setResizeableElement(ref);
+                       setResizeableElement(ref); return () => removeResizeableElement(ref);
                    }
                }}
         />
@@ -187,7 +187,7 @@ function InputList<T extends number | string | boolean | const_Date>(set: (data:
         }}
         ref={(ref) => {
             if (ref) {
-                setResizeableElement(ref);
+                setResizeableElement(ref); return () => removeResizeableElement(ref);
             }
         }}>
         {
@@ -227,7 +227,7 @@ function InputNumber(set: (data: number)=>void, value: number, range: Readonly<P
                }}
                ref={(ref) => {
                    if (ref) {
-                       setResizeableElement(ref);
+                       setResizeableElement(ref); return () => removeResizeableElement(ref);
                    }
                }}
         />
@@ -287,7 +287,7 @@ function InputListArray<T extends number | string>(set: (data: T[]) => void, val
                    multiple={true}
                    ref={(ref) => {
                        if (ref) {
-                           setResizeableElement(ref);
+                           setResizeableElement(ref); return () => removeResizeableElement(ref);
                        }
                    }}>
         {
@@ -332,14 +332,15 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
         myParams.current = p
         Refresh()
     }, [p]);
-    let timeoutId: NodeJS.Timeout | null = null;
+    const timeoutId = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => { if (timeoutId.current != null) clearTimeout(timeoutId.current); }, []);
     function refreshIndicator() {
         data.onChange(myParams.current as TParams);
     }
 
     function refreshIndicatorDelayed() {
-        if (timeoutId != null) clearTimeout(timeoutId)
-        timeoutId = setTimeout(() => {
+        if (timeoutId.current != null) clearTimeout(timeoutId.current)
+        timeoutId.current = setTimeout(() => {
             refreshIndicator();
         }, 200);
     }

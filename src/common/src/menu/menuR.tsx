@@ -7,12 +7,13 @@ export function GetMenuR(){
     let bb = false; // Глобальная переменная, предотвращающая множественное открытие меню (флаг активности)
 
     // Основной компонент MenuR
-    function MenuR({children, other = () => [], statusOn = true, onUnClick, zIndex, className}: {
+    function MenuR({children, other = () => [], statusOn = true, onUnClick, onConsume, zIndex, className}: {
         children: React.ReactElement,                        // Дочерний компонент
         zIndex?: number,                                     // Значение z-index для контекстного меню
         other?: () => (tMenuReact)[],                        // Дополнительные элементы меню
         statusOn?: boolean,                                  // Включение/выключение меню
         onUnClick?: (e: boolean) => void,                    // Колбэк при закрытии меню
+        onConsume?: () => void,                              // вызывается при открытии после снятия снимка пунктов
         className?: (active?: boolean) => string,            // CSS-класс для меню
     }) {
         const data = {x: 0, y: 0}; // Текущая позиция элемента, где происходит взаимодействие
@@ -75,9 +76,11 @@ export function GetMenuR(){
                              x = y = 0;
                              if (bb) return; // Если меню уже активно, выходим
                              bb = true;
+                             const menu = other().filter(el => el) as tMenuReactStrictly[];
+                             onConsume?.();
                              setShow({
                                  status: true,
-                                 // Устанавливаем координаты меню относительно элемента
+                                 menu,
                                  coordinate: {
                                      x: e.changedTouches[0].clientX - data.x,
                                      y: e.changedTouches[0].clientY - data.y
@@ -96,7 +99,9 @@ export function GetMenuR(){
                          if (event.button == 2 || Date.now() - timeEvent.current < 300) {
                              if (bb) return; // Если меню уже активно, ничего не делаем
                              bb = true;
-                             setShow({status: true, coordinate: {x: event.clientX - data.x, y: event.clientY - data.y}});
+                             const menu = other().filter(el => el) as tMenuReactStrictly[];
+                             onConsume?.();
+                             setShow({status: true, menu, coordinate: {x: event.clientX - data.x, y: event.clientY - data.y}});
                          }
                      }
                  }}
@@ -116,7 +121,7 @@ export function GetMenuR(){
                             className={className}
                             data={[
                                 ...(show.plusMenu ?? []),
-                                ...(other().filter(e => e) as tMenuReactStrictly[])
+                                ...(show.menu ?? [])
                             ]}
                             coordinate={{...show.coordinate!}} // Указываем текущие координаты меню
                             zIndex={zIndex}                   // Передаём z-index

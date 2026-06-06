@@ -34,7 +34,7 @@ export function EditParams3<TParams extends Params.IParamsExpandableReadonly = P
     const [params, setParams] = useState<PromiseResult<ReturnType<typeof paramsDef>>|null>(null)
     return <div className={"maxSize"}>
         {params && params.map((z, i)=><ParametersReact key={i} params={z} onChange={e => {
-            params[i] = z
+            params[i] = e
             setParams(params)
         }}/>)}
         {onSave && <div className={"msTradeActive msTradeAlt"} onClick={async () => {

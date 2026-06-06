@@ -230,7 +230,10 @@ export function MenuRightApi() {
             render?.(elements);
         },
         delete(array: MenuElement[]) {
-            array.forEach((e) => elements.splice(elements.indexOf(e), 1));
+            array.forEach((e) => {
+                const i = elements.indexOf(e);
+                if (i !== -1) elements.splice(i, 1);
+            });
         },
         get() {
             return elements;
