@@ -461,13 +461,28 @@ export function createRenderer(): Renderer {
 
         const result: DataPoint[] = [];
         let lastPixX = -1;
+        let minPt: DataPoint | null = null;
+        let maxPt: DataPoint | null = null;
+        const flush = () => {
+            if (!minPt || !maxPt) return;
+            const a = minPt.x <= maxPt.x ? minPt : maxPt;
+            const b = a === minPt ? maxPt : minPt;
+            result.push(a);
+            if (b !== a) result.push(b);
+        };
         for (const pt of visible) {
             const px = Math.round(xToPixX(pt.x, transform, panel));
             if (px !== lastPixX) {
-                result.push(pt);
+                flush();
+                minPt = pt;
+                maxPt = pt;
                 lastPixX = px;
+            } else {
+                if (pt.y < minPt!.y) minPt = pt;
+                if (pt.y > maxPt!.y) maxPt = pt;
             }
         }
+        flush();
         if (result.length < 2) return;
 
         ctx.save();

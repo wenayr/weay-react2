@@ -406,12 +406,12 @@ export function getApiLeftMenu() {
 
 
 export const ApiLeftMenu = getApiLeftMenu()
-ApiLeftMenu.setMenu([
-    {button: <div style={{width: 200, height: 50, background: "rgb(92,50,213)"}}>1</div>, el: () => <div>1</div>, color: "rgb(92,50,213)"},
-    {button: <div style={{width: 200, height: 50, background: "rgb(98,149,58)"}}>2</div>, el: () => <div>2</div>},
-], "test")
 export function TestLeft333() {
-    return <ApiLeftMenu.Modal2 zIndex={20} />
+    // тест-меню перенесено сюда из уровня модуля — раньше ApiLeftMenu.setMenu(...) выполнялся при импорте и протекал всем потребителям
+    return <ApiLeftMenu.Modal2 zIndex={20} menu={[
+        {button: <div style={{width: 200, height: 50, background: "rgb(92,50,213)"}}>1</div>, el: () => <div>1</div>, color: "rgb(92,50,213)"},
+        {button: <div style={{width: 200, height: 50, background: "rgb(98,149,58)"}}>2</div>, el: () => <div>2</div>},
+    ]} />
 }
 
 
