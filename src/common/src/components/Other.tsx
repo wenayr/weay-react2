@@ -9,7 +9,7 @@ export function EditParams2<TParams extends Params.IParamsExpandableReadonly = P
     useEffect(() => {
         paramsDef().then(e=> {
             setParamsD(e)})
-    }, [true]);
+    }, []);
     const [paramsD, setParamsD] = useState<TParams|null>(null)
     const params = useRef<TParams|null>(null);
 
@@ -30,7 +30,7 @@ export function EditParams3<TParams extends Params.IParamsExpandableReadonly = P
     useEffect(() => {
         paramsDef().then(e=> {
             setParams(e)})
-    }, [true]);
+    }, []);
     const [params, setParams] = useState<PromiseResult<ReturnType<typeof paramsDef>>|null>(null)
     return <div className={"maxSize"}>
         {params && params.map((z, i)=><ParametersReact key={i} params={z} onChange={e => {

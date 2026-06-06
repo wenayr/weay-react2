@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect, MouseEvent, TouchEvent } from 'react';
 
-interface StickerMenuProps {}
-
-const StickerMenu: React.FC<StickerMenuProps> = () => {
+const StickerMenu: React.FC = () => {
     // Флаг состояния: открыто меню или закрыто
     const [isOpen, setIsOpen] = useState<boolean>(false);
     // Сдвиг по X в процессе перетаскивания

@@ -963,6 +963,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
     }
 
     function attachToContainer(container: HTMLElement) {
+        if (resizeObserver) resizeObserver.disconnect();
         containerEl = container;
         resizeObserver = new ResizeObserver((entries) => {
             for (const entry of entries) {

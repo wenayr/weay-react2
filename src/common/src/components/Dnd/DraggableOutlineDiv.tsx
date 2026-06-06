@@ -1,4 +1,4 @@
-import {FC, useRef, useState} from "react";
+import {FC, useEffect, useRef, useState} from "react";
 
 const ANIMATION_DURATION = 500; // длительность анимации в мс
 export function DraggableOutlineDiv(){
@@ -28,6 +28,8 @@ export function DraggableOutlineDiv(){
             timerRef.current = null;
         }
     };
+
+    useEffect(() => () => { if (timerRef.current) window.clearTimeout(timerRef.current); }, []);
 
     return (
         <div

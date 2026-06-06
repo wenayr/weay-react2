@@ -45,7 +45,8 @@ export const tt = {}
 export const GridExample = () => {
 
     updateBy(tt, () => {
-        applyTransactionAsyncUpdate<IRow>(gridApi.current, [{make: "Tesla", price: 7777}], e=> e.make, {})
+        const price = Math.round(Math.random() * 90000) + 10000
+        applyTransactionAsyncUpdate<IRow>(gridApi.current, [{make: "Tesla", model: "Model Y", price, electric: true}], e=> e.make, {})
     })
     // Row Data: The data to be displayed.
     const [rowData, setRowData] = useState<IRow[]>([

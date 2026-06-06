@@ -13,7 +13,7 @@ function GetMouseMenuApi(data?: {name?: string}){
         get value() {return value}
     }
 
-    const map = new Map<string, (tMenuReact|false)[]>
+    const map = new Map<string, (tMenuReact|false)[]>()
 
     function other() {
         if (map.has("only")) return  map.get("only")!

@@ -39,7 +39,6 @@ export class CSaveToCache implements IServerSaveBasePromise{
 
 export class CSaveToLocalStorage  implements IServerSaveBasePromise{
     async set(key: string, value: object) : Promise<boolean>  {
-        const t = new Response(JSON.stringify(value));
         if (window.localStorage) {
             await localStorage.setItem(key,JSON.stringify(value))
             return true

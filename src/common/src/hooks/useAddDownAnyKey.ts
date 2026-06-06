@@ -8,7 +8,6 @@ export const KeyDown = {
 export function useAddDownAnyKey() {
     useEffect(() => {
         const func: (this: Document, ev: KeyboardEvent) => any = (ev) => {
-            console.log(ev);
             KeyDown.key = ev.key;
             renderBy(KeyDown);
         };
@@ -16,7 +15,7 @@ export function useAddDownAnyKey() {
         return () => {
             document.removeEventListener("keydown", func);
         };
-    }, [true]);
+    }, []);
 }
 
 // Backward-compatible name.

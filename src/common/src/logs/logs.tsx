@@ -116,7 +116,6 @@ export function PageLogs({update}: {update?: number}) {
 
     updateBy(datum, ()=>{
         const data = datum.last[0]
-        console.log({data})
         if (data) { // data.time timeLocalToStr_yyyymmdd_hhmmss_ms
             apiGrid.current?.api.applyTransactionAsync({
                 add: [

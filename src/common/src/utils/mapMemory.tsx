@@ -40,7 +40,7 @@ export function deepMergeWithMap(target: any, source: any, visited = new Map<any
 }
 
 
-const map = new Map<object, boolean>
+const map = new Map<object, boolean>()
 
 export function staticGetAdd<T extends object>(key: any, def: T, options: {abs?: boolean, deepAutoMerge?: boolean, reversDeep?: boolean} = {reversDeep: false}) {
     if (options.deepAutoMerge && !map.get(def)) {

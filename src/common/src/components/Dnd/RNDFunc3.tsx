@@ -529,8 +529,6 @@ export function Drag22({
             x: posRef.current.x - e.clientX,
             y: posRef.current.y - e.clientY
         };
-        console.log("xxx");
-        console.log(offsetMouse.current.x, posRef.current.x, e.clientX);
         setDraggingMouse(true);
     };
 

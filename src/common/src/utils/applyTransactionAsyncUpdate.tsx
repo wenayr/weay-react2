@@ -56,8 +56,6 @@ export function applyTransactionAsyncUpdate<T>(
     return applyTransactionAsyncUpdate3({getId, option, newData, grid, bufTable})
 }
 
-const map = new WeakMap()
-
 export function getUpdateTable<T>(
     grid: GridReadyEvent<T, any> | null | undefined,
     newData: (Partial<T>)[],
@@ -144,8 +142,6 @@ export function applyTransactionAsyncUpdate2<T>(params: params<T>) {
                 applyTransactionAsyncUpdate3({grid:g, newData, getId, bufTable, option: op, remove: toRemove});
         }
     } else {
-        if (!map.has(bufTable)) map.set(bufTable, new Set())
-
         newData?.forEach(e => {
             const id = getId(e);
             bufTable[id] = {...(bufTable[id] ?? {}), ...e} as T
