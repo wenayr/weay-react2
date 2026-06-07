@@ -35,15 +35,17 @@ function applyTransactionAsyncUpdate3<T>({getId, bufTable, option, newData, grid
         grid.api.applyTransaction({
             add: op.add ? arrNew : [],
             update: op.update ? arr : [],
+            remove: remove as any,
         });
         return
     }
 
-    if (arrNew.length && op.add)
-        grid.api.applyTransaction({add: arrNew, remove: remove as any}); // для удаления важно только получить ид
+    // remove применяем один раз и независимо: иначе при пустых add/update удаление терялось, а при обоих — дублировалось
+    if ((arrNew.length && op.add) || remove?.length)
+        grid.api.applyTransaction({add: (arrNew.length && op.add) ? arrNew : [], remove: remove as any});
 
     if (arr.length && op.update)
-        grid.api.applyTransactionAsync({update: arr, remove: remove as any});
+        grid.api.applyTransactionAsync({update: arr});
 }
 // тут нет удаления но эта версия может использовать где то
 export function applyTransactionAsyncUpdate<T>(
@@ -138,8 +140,8 @@ export function applyTransactionAsyncUpdate2<T>(params: params<T>) {
                 if (existing) toRemove.push(existing);
             });
 
-            if (newData?.length)
-                applyTransactionAsyncUpdate3({grid:g, newData, getId, bufTable, option: op, remove: toRemove});
+            if (newData?.length || toRemove.length)
+                applyTransactionAsyncUpdate3({grid:g, newData: newData ?? [], getId, bufTable, option: op, remove: toRemove});
         }
     } else {
         newData?.forEach(e => {

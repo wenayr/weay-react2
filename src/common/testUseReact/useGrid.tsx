@@ -14,7 +14,7 @@ import { AgGridReact } from "ag-grid-react";
 import {sleepAsync} from "wenay-common2";
 import {renderBy, updateBy} from "../updateBy";
 import {mouseMenuApi} from "../src/menu/menuMouse";
-import {applyTransactionAsyncUpdate} from "../src/utils";
+import {applyTransactionAsyncUpdate, applyTransactionAsyncUpdate2} from "../src/utils";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -81,6 +81,7 @@ export const GridExample = () => {
     // Container: Defines the grid's theme & dimensions.
     return (
         <div style={{ width: "100%", height: "100%" }}>
+    <button onClick={() => applyTransactionAsyncUpdate2<IRow>({gridRef: gridApi, getId: e => e.make, bufTable: {}, removeData: [{make: "Tesla"}]})}>удалить Tesla</button>
     <AgGridReact
         onGridReady={e=> {
             gridApi.current = e
