@@ -48,6 +48,11 @@ function applyTransactionAsyncUpdate3<T>({getId, bufTable, option, newData, grid
         grid.api.applyTransactionAsync({update: arr});
 }
 // тут нет удаления но эта версия может использовать где то
+/**
+ * @deprecated v1: не поддерживает удаление строк и молча теряет данные, пока грид не готов.
+ * Используйте `useAgGrid`/`createGridBuffer` (grid/agGrid4) — буфер + attach/sync,
+ * либо как минимум `applyTransactionAsyncUpdate2`.
+ */
 export function applyTransactionAsyncUpdate<T>(
     grid: GridReadyEvent<T, any> | null | undefined,
     newData: (Partial<T>)[],

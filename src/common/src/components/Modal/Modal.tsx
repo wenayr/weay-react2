@@ -5,7 +5,8 @@ import {InputPageModal} from "../Input";
 export function inputModal({setModalJSX, func, name, txt}: {
     txt?: string,
     name?: string,
-    setModalJSX: React.Dispatch<React.SetStateAction<React.JSX.Element | null>>,
+    /** Любой сеттер модалки: setState или setModal из useModal (ModalProvider) */
+    setModalJSX: (jsx: React.JSX.Element | null) => void,
     func: (txt: string) => void
 }) {
     setModalJSX(<InputPageModal callback={txt => {
@@ -15,7 +16,8 @@ export function inputModal({setModalJSX, func, name, txt}: {
 }
 
 export function confirmModal({setModalJSX, func}: {
-    setModalJSX: React.Dispatch<React.SetStateAction<React.JSX.Element | null>>,
+    /** Любой сеттер модалки: setState или setModal из useModal (ModalProvider) */
+    setModalJSX: (jsx: React.JSX.Element | null) => void,
     func: () => any
 }) {
     setModalJSX(<InputPageModal callback={txt => {
@@ -24,6 +26,10 @@ export function confirmModal({setModalJSX, func}: {
     }} outClick={() => setModalJSX(null)} name={"password 111"}/>)
 }
 
+/**
+ * @deprecated Императивное хранилище JSX на updateBy/renderBy.
+ * Используйте `ModalProvider`/`useModal` (ModalContextProvider) — контекст + портал.
+ */
 export function GetModalJSX(){
     const data = (() => {
         let _jsx = null as React.JSX.Element | null
@@ -69,6 +75,10 @@ export function GetModalJSX(){
     return data
 }
 type t1 = (()=>React.JSX.Element | null) | null
+/**
+ * @deprecated Императивное хранилище JSX на updateBy/renderBy.
+ * Используйте `ModalProvider`/`useModal` (ModalContextProvider) — контекст + портал.
+ */
 export function GetModalFuncJSX(){
     const data = (() => {
         let _jsx: t1 = null
