@@ -12,7 +12,11 @@ export function useOutside({outsideClick, ref, status = true}: {ref?: React.RefO
                 if (r.current && event.target instanceof Node && !r.current.contains(event.target)) outsideClick();
             }
             document.addEventListener("mousedown", handleClickOutside);
-            return () => document.removeEventListener("mousedown", handleClickOutside)
+            document.addEventListener("touchstart", handleClickOutside);
+            return () => {
+                document.removeEventListener("mousedown", handleClickOutside);
+                document.removeEventListener("touchstart", handleClickOutside);
+            }
         }
     }, [r, status, outsideClick]);
     return r

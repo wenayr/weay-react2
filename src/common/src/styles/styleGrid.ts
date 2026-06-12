@@ -1,3 +1,4 @@
+import type {CSSProperties} from "react";
 import {CellClassParams} from "ag-grid-community";
 import type {Theme, ThemeDefaultParams} from "ag-grid-community";
 import {
@@ -46,8 +47,7 @@ export const StyleGridDefault = {
 
 export function StyleCSSHeadGridEdit(name: string, rules: string) {
     let style = document.createElement('style');
-    style.type = 'text/css';
-    document.getElementsByTagName('head')[0].appendChild(style);
+    document.head.appendChild(style);
     style.sheet?.insertRule(name + "{" + rules + "}", 0);
 }
 
@@ -60,4 +60,4 @@ export function StyleCSSHeadGrid() {
     StyleCSSHeadGridEdit('.ag-header-cell-label', 'justify-content: center');
 }
 
-export type tCallFuncAgGrid<T> = (params: CellClassParams & { data: T }) => {}
+export type tCallFuncAgGrid<T> = (params: CellClassParams & { data: T }) => CSSProperties | Record<string, any>

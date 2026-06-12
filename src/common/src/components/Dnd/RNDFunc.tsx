@@ -25,6 +25,7 @@ export function Drag2({
     const [a, setA] = useState(false);
     const [b, setB] = useState(false);
     const lastD = useRef<{ x: number; y: number }>(last?.current ?? { y: x, x: y });
+    const wasDragging = useRef(false);
 
     // Обновляем значения `lastD` при изменении `x` или `y`
     useLayoutEffect(() => {
@@ -35,9 +36,14 @@ export function Drag2({
     // Основная логика обработки событий перемещения
     useEffect(() => {
         if (!(a || b)) {
-            onStop?.();
+            // onStop только после реального drag — раньше срабатывал и на первичном маунте
+            if (wasDragging.current) {
+                wasDragging.current = false;
+                onStop?.();
+            }
             return;
         }
+        wasDragging.current = true;
 
         if (a) {
             const handleMouseMove = (e: MouseEvent) => {

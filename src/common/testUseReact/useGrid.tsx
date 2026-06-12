@@ -76,7 +76,7 @@ export const GridExample = () => {
             .then(e=>{
                 applyTransactionAsyncUpdate<IRow>(gridApi.current, [{make: "Tesla", price: 55555}], e=> e.make, {})
             })
-    })
+    }, [])
 
     // Container: Defines the grid's theme & dimensions.
     return (

@@ -422,7 +422,7 @@ export function MenuBase({
                 ? menu(dataMemo)
                 : dataMemo.map((item, i, arr) => (
                     <MenuItemWrapper
-                        key={i}
+                        key={typeof item.name === "string" ? item.name : i}
                         item={item}
                         index={i}
                         update={update}

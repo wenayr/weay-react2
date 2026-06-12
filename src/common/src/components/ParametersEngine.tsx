@@ -116,7 +116,7 @@ function InputTime(set: (data: string) => void, value: string | const_Date, rang
                min={toNum(range?.defaultMin ?? range?.min ?? "2015.01.01")}
                max={toNum(range?.defaultMax ?? range?.max ?? new Date().toString())}
                step={range?.defaultStep ?? step}
-               value={toNum(value)}
+               value={toNum(value) ?? ""}
                onInput={(e: React.FormEvent<HTMLInputElement>) => {
                    setVal(Number((e.currentTarget as HTMLInputElement).value));
                }}
@@ -151,7 +151,7 @@ function InputTime(set: (data: string) => void, value: string | const_Date, rang
                min={toNum(min)} // ?? (range.step ? Math.round((range.step%1==0 ? Number.MIN_SAFE_INTEGER : -Number.MAX_VALUE) / range.step) * range.step  : undefined)} // ?? (range.step && range.step%1==0 ? Number.MIN_SAFE_INTEGER : Number.MIN_VALUE)}
                max={toNum(max)} // ?? (range.step && range.step%1==0 ? Number.MAX_SAFE_INTEGER : Number.MAX_VALUE)}
                step={step} //range.step ?? Math.min((range.defaultStep??1), 1e-8)
-               value={toNum(value)}
+               value={toNum(value) ?? ""}
                onInput={(e: React.FormEvent<HTMLInputElement>) => {
                    const target = e.currentTarget as HTMLInputElement;
                    setVal(Number(target.value));

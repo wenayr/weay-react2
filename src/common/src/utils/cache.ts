@@ -75,7 +75,7 @@ export const CacheLocal = new CSaveToLocalStorage()
 async function addDataToMap(data: [k: string,v: unknown][], map: Map<string,unknown>) {
     if (data) {
         for (let [k,v] of data) {
-            const tr = (map.get(k) || map.set(k, v).get(k)!)
+            const tr = map.has(k) ? map.get(k) : map.set(k, v).get(k)!
             if (tr && typeof tr === 'object') {
                 Object.assign(tr, v)
                 renderBy(tr)

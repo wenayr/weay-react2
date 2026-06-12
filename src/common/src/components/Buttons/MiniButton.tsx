@@ -12,7 +12,7 @@ export function MiniButton({name, arr, get, onClick, style}: { name: string, arr
                         arr.map((k, i) =>
                             <div
                                 className={data[k] ? 'msTradeAlt msTradeActive' : 'msTradeAlt'}
-                                key={i}
+                                key={k}
                                 onClick={() => {
                                     const t = data
                                     t[k] = !(t[k] ?? false)

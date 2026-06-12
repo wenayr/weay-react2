@@ -51,7 +51,7 @@ export function staticGetAdd<T extends object>(key: any, def: T, options: {abs?:
         }
     }
     if (options.abs) staticProps.set(key, def)
-    const t = (staticProps.get(key) || staticProps.set(key, def).get(key)!) as T
+    const t = (staticProps.has(key) ? staticProps.get(key) : staticProps.set(key, def).get(key)!) as T
     return t// Object.assign(def, t) // t //
 }
 

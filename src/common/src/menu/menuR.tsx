@@ -111,9 +111,9 @@ export function GetMenuR(){
                     // Показываем контекстное меню
                     <DivOutsideClick
                         outsideClick={() => {
-                            onUnClick?.(false); // Вызов обработчика при закрытии меню
-                            if (!bb) return;
+                            if (!bb) return; // Меню уже неактивно — обработчик закрытия не дёргаем
                             bb = false; // Меню больше не активно
+                            onUnClick?.(false); // Вызов обработчика при закрытии меню
                             setShow({status: false}); // Скрываем меню
                         }}
                     >

@@ -122,14 +122,8 @@ export function DropdownMenu({
     // Отрисовка выпадающего меню (dop)
     const dop = (isFixed || isOpen) && (
         <div
-            onMouseEnter={() => {
-                data.current.m1 = true;
-            }}
-            onMouseLeave={() => {
-                data.current.m1 = false;
-                jsx.set(null);
-                setSelect(null);
-            }}
+            onMouseEnter={handleContentMouseEnter}
+            onMouseLeave={handleContentMouseLeave}
             className={`dropdown-content2 ${!isTop ? 'dropdown-up' : ''}`}
             style={{
                 display: 'flex',
@@ -145,7 +139,7 @@ export function DropdownMenu({
             >
                 {elements.map((item, index) => (
                     <div
-                        key={index}
+                        key={item.label}
                         className={`menu-item ${select === index ? 'force-hover' : ''}`}
                         onMouseEnter={() => handleSelect(item, index)}
                         onClick={() => handleSelect(item, index)}

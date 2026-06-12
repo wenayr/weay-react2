@@ -120,6 +120,10 @@ export function DivRndBase3({
         }
     });
 
+    // limit через ref: inline-объект в props не должен переподписывать document-listeners на каждый рендер
+    const limitRef = useRef(limit);
+    useLayoutEffect(() => { limitRef.current = limit; });
+
     /**
      * Хук для перетаскивания мышкой (a) и перетаскивания на тач-устройствах (b).
      * Снимаем подписки при размонтировании и при изменении зависимостей (a/b).
@@ -138,12 +142,13 @@ export function DivRndBase3({
             if (e.buttons === 1) {
                 let newX = e.clientX + data.x;
                 let newY = e.clientY + data.y;
-                if (limit) {
-                    if (limit.x?.min !== undefined && limit.x.min > newX) newX = limit.x.min;
-                    if (limit.x?.max !== undefined && limit.x.max < newX) newX = limit.x.max;
+                const lim = limitRef.current;
+                if (lim) {
+                    if (lim.x?.min !== undefined && lim.x.min > newX) newX = lim.x.min;
+                    if (lim.x?.max !== undefined && lim.x.max < newX) newX = lim.x.max;
 
-                    if (limit.y?.min !== undefined && limit.y.min > newY) newY = limit.y.min;
-                    if (limit.y?.max !== undefined && limit.y.max < newY) newY = limit.y.max;
+                    if (lim.y?.min !== undefined && lim.y.min > newY) newY = lim.y.min;
+                    if (lim.y?.max !== undefined && lim.y.max < newY) newY = lim.y.max;
                 }
                 setX(newX);
                 setY(newY);
@@ -172,12 +177,13 @@ export function DivRndBase3({
 
             let newX = t.clientX + data.x;
             let newY = t.clientY + data.y;
-            if (limit) {
-                if (limit.x?.min !== undefined && limit.x.min > newX) newX = limit.x.min;
-                if (limit.x?.max !== undefined && limit.x.max < newX) newX = limit.x.max;
+            const lim = limitRef.current;
+            if (lim) {
+                if (lim.x?.min !== undefined && lim.x.min > newX) newX = lim.x.min;
+                if (lim.x?.max !== undefined && lim.x.max < newX) newX = lim.x.max;
 
-                if (limit.y?.min !== undefined && limit.y.min > newY) newY = limit.y.min;
-                if (limit.y?.max !== undefined && limit.y.max < newY) newY = limit.y.max;
+                if (lim.y?.min !== undefined && lim.y.min > newY) newY = lim.y.min;
+                if (lim.y?.max !== undefined && lim.y.max < newY) newY = lim.y.max;
             }
             setX(newX);
             setY(newY);
@@ -217,7 +223,7 @@ export function DivRndBase3({
             document.removeEventListener("touchmove", touchMoveHandler);
             document.removeEventListener("touchend", touchEndHandler);
         };
-    }, [a, b, limit, x, y]);
+    }, [a, b]);
 
     // При первой отрисовке добавляем "окно" в массив, при размонтировании — удаляем
     useEffect(() => {

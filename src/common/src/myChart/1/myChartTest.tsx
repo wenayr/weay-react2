@@ -43,7 +43,11 @@ export function ChartDemo() {
             // optional: chart.jumpToEnd();
         }, 2000);
 
-        return () => clearInterval(timer);
+        return () => {
+            clearInterval(timer);
+            chart.destroy();
+            chartRef.current = null;
+        };
     }, []);
 
     return (
