@@ -17,6 +17,9 @@ export * from "./src/components/Dnd";
 // 5. UTILS - теперь зависят от Dnd (mapMemory импортирует ExRNDMap3, mapResiReact)
 export * from "./src/utils";
 
+// 5b. ГРИД (agGrid4): ядро-буфер + headless-хук + AgGridMy. Новый путь вместо applyTransactionAsyncUpdate
+export * from "./src/grid/agGrid4";
+
 // 6. БАЗОВЫЕ КОМПОНЕНТЫ - зависят от hooks
 export * from "./src/components/Buttons";
 export * from "./src/components/MyResizeObserver";
