@@ -6,7 +6,8 @@
  */
 
 import React, { useState, useMemo, useEffect } from "react";
-import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact } from "../api";
+import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact, ModalProvider, useModal, useAgGrid, AgGridMy, type BufferTable } from "../api";
+import type { ColDef } from "ag-grid-community";
 import { Params } from "wenay-common2";
 import { Button, ButtonHover, DivOutsideClick } from "../src/hooks";
 import { DivRnd3 } from "../src/components";
@@ -116,6 +117,57 @@ const DebounceDemo = () => {
     );
 };
 
+/* ---------- 12. agGrid4: контроллер + внешний буфер ---------- */
+type tQARow = { id: string; name: string; price: number };
+const agQABuffer: BufferTable<tQARow> = {}; // модульный буфер — переживает ремаунт грида
+const agQACols = [
+    { field: "name", headerName: "Название" },
+    { field: "price", headerName: "Цена" },
+] satisfies ColDef<tQARow>[];
+const rndPrice = () => +(Math.random() * 1000).toFixed(2);
+
+const AgGrid4Inner = () => {
+    const grid = useAgGrid<tQARow>({ externalBuffer: agQABuffer });
+    return (
+        <div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                <button onClick={() => grid.updateData({ newData: [{ id: "tsla", name: "Tesla", price: rndPrice() }] })}>добавить/обновить Tesla</button>
+                <button onClick={() => grid.updateData({ newData: [{ id: "aapl", name: "Apple", price: rndPrice() }] })}>добавить/обновить Apple</button>
+                <button onClick={() => grid.updateData({ removeData: [{ id: "tsla" }] })}>удалить Tesla</button>
+            </div>
+            <div style={{ height: 220 }}><AgGridMy<tQARow> controller={grid} columnDefs={agQACols} /></div>
+        </div>
+    );
+};
+
+const AgGrid4Demo = () => {
+    const [on, setOn] = useState(true);
+    return (
+        <div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                <button onClick={() => setOn(v => !v)}>{on ? "размонтировать грид" : "смонтировать грид"}</button>
+                <button onClick={() => { agQABuffer["msft"] = { id: "msft", name: "Microsoft (мимо грида)", price: rndPrice() }; }}>записать MSFT прямо в буфер</button>
+            </div>
+            {on ? <AgGrid4Inner /> : <div style={{ padding: 20, color: "#57606a" }}>грид размонтирован — буфер живёт в модуле</div>}
+        </div>
+    );
+};
+
+/* ---------- 13. ModalProvider / useModal ---------- */
+const ModalOpener = () => {
+    const setModal = useModal();
+    return (
+        <button onClick={() => setModal(
+            <div style={{ background: "#fff", padding: 24, borderRadius: 8, minWidth: 260 }}>
+                <b>Модалка через useModal</b>
+                <div style={{ margin: "10px 0", fontSize: 13 }}>Закрой: Escape, клик вне, или кнопкой.</div>
+                <button onClick={() => setModal(null)}>закрыть</button>
+            </div>
+        )}>открыть модалку</button>
+    );
+};
+const ModalDemo = () => <ModalProvider><ModalOpener /></ModalProvider>;
+
 /* ---------- borad ---------- */
 function ActiveChecks() {
     return (
@@ -181,6 +233,21 @@ function ActiveChecks() {
                    note="Баги плана: EditParams3 теряет правку (Other.tsx); сломанный debounce и отсутствие cleanup ResizeObserver в ParametersEngine."
                    tall>
                 <div style={{ minHeight: 260 }}><TestParams /></div>
+            </Check>
+
+            <Check n={12} title="agGrid4 — контроллер, удаление, внешний буфер"
+                   do="«добавить/обновить Tesla» и «Apple» — строки появляются/обновляются. «удалить Tesla» — исчезает. Затем: «размонтировать грид» → «записать MSFT прямо в буфер» → «смонтировать грид»."
+                   expect="Обновления по ID без дублей; удаление работает. После ремаунта грид сам догоняет буфер: Tesla/Apple на месте, MSFT появился (attach→sync). Тема — тёмная, как у прод-гридов (GridStyleDefault)."
+                   note="Новый путь вместо applyTransactionAsyncUpdate (v1 помечен @deprecated). Ядро createGridBuffer работает и вне React."
+                   tall>
+                <AgGrid4Demo />
+            </Check>
+
+            <Check n={13} title="ModalProvider / useModal — Escape и клик вне"
+                   do="Нажми «открыть модалку». Закрой её Escape. Открой снова — закрой кликом вне. Открой — закрой кнопкой «закрыть»."
+                   expect="Все три способа закрывают. Затемнённый фон поверх всего (z-index из токена --wenay-z-modal)."
+                   note="M1: Escape и опции closeOnEscape/closeOnOutsideClick добавлены; useModal и прежнее поведение без изменений. GetModalJSX помечен @deprecated.">
+                <ModalDemo />
             </Check>
 
             <Check n={8} title="Закрытие по клику вне (DivOutsideClick)"
@@ -256,7 +323,7 @@ export function QABoard() {
                 <a href="#archive" style={link(archive)}>Архив проверенного</a>
             </div>
             <div style={{ color: "#57606a", fontSize: 13, marginBottom: 8 }}>
-                {archive ? "Проверенные и исправленные узлы — оставлены для повторной примерки." : "Тыкай элементы, сверяй с «Ожидается», отмечай ✓/✗."}
+                {archive ? "Проверенные и исправленные узлы — оставлены для повторной примерки." : "Тыкай элементы, сверяй с «Ожидается», отмечай ✓/✗. Регресс токенов (S1): внешний вид ВСЕХ карточек/меню/гридов не должен был измениться — переменные перенесены в tokens.css без смены значений."}
             </div>
             {archive ? <ArchiveChecks /> : <ActiveChecks />}
         </div>
