@@ -30,75 +30,30 @@
 
 ## K0 — Минимальные (безвредные, тесты не требуются)
 
-> **Фильтр публичного API (проверено грепом).** В K0 попадает только то, что НЕ видно наружу: комментарии, локальные переменные в телах функций, приватные объявления (без `export`), build-скрипты, и правки с идентичным поведением. Символ уходит в публичный API только при `export` + достижимости через barrel'ы до `api.tsx`. Не-`export` объявление приватно, даже если файл реэкспортится через `export *`.
-> Подтверждено приватным: `useSmoothSnapScroll` (LeftModal.tsx:19, без `export`), `StickerMenuProps` (StickerMenu.tsx:3, без `export`), `map` WeakMap (applyTransactionAsyncUpdate.tsx:59), `test2.tsx` (нигде не импортируется).
+> ✅ **Выполнено 2026-06-12** (мёртвый код LeftModal, комментарии inputAutoStep, AXIS_THICKNESS, onWheel-касты, константы myChart). Остаток:
 
-### Мёртвый код / комментарии
-- `inputAutoStep.ts:47,48,50,57,66,68,69` — закомментированные `console.log` и старые варианты обработчиков. **Удалить.**
-- `LeftModal.tsx:145` — `if (!lastPosition.current.auto) return;` сразу после установки `auto=true` — мёртвая ветка. **Удалить.**
-- `LeftModal.tsx:432` — `api={a => menuApi = a}` присваивает в переменную, которая нигде не читается — мёртвое присваивание (связано с K3-багом «api не разведён»).
-- `copyCompiledFiles.mjs:12-16,39` — ветки `if (0)` и обёртка `if (1)`. **Убрать.**
-- `chartEngineReact.tsx:455,521` — локальные `const AXIS_THICKNESS = 40` затеняют верхнеуровневый (дублирование ×4 по файлу). **Свести к одной константе.**
-- `chartEngine.ts:857` / `chartEngineReact.tsx` — лишний `onWheel as any` (типы совпадают). **Убрать каст.**
-
-### Косметика типов / стиля
+- `copyCompiledFiles.mjs:12-16,39` — ветки `if (0)` и обёртка `if (1)`. **Убрать.** (Файл сборки — по договорённости KB не трогаем без обсуждения.)
 - ~~`cache.ts:31` — лишний неиспользуемый generic `<T>` у `delete`.~~ **ПЕРЕНЕСЕНО в K3** — метод на экспортируемых классах, удаление generic ломает компиляцию у потребителей, делающих `delete<X>(key)`.
-- `myChart.ts:115,116,140` — магические числа `marginTop/marginBottom=20`, захардкоженный цвет линии `rgb(0,180,0)`. **Вынести в константы/конфиг** (без смены дефолтов).
-- `chartEngine.ts:949,977,915,938` — магическое `40` = `AXIS_THICKNESS` продублировано числом. **Вынести в общую константу** (значение не менять).
 
 ---
 
 ## K1 — Лёгкие (низкий риск, беглая проверка)
 
-### Очистка ресурсов в `useEffect` (реальные, но локальные утечки)
-- `myChartTest.tsx:46` — `useEffect` чистит только `clearInterval`, но не вызывает `chart.destroy()`. **Добавить `chart.destroy()` в cleanup.** (Демо-файл, но паттерн утечки реальный.)
-- `useGrid.tsx:73-78` — `useEffect` без массива зависимостей → `sleepAsync(1000)`-таймер копится каждый рендер. **Добавить `[]`.** (Dev-only.)
-- `chartEngineReact.tsx:933-946` — `renderLoop` без guard `canvas.isConnected` (в `chartEngine.ts:970` есть). **Добавить guard** для защиты внешних потребителей от вечного RAF. *(Решено НЕ делать: есть guard `destroyed`, а `isConnected` сломает temp-detach.)*
+> ✅ **Выполнено 2026-06-12** (утечки cleanup, deps drag-эффектов, onStop-гейт Drag2, dirty-флаг renderLoop обоих движков, controlled value, map.has, styleGrid, menuR порядок, RightMenu guard, touchstart, стабильные key MiniButton/menu/RightMenu). Остаток:
 
-### Производительность / перерисовки
-- `RNDFunc3.tsx:220` — deps эффекта `[a,b,limit,x,y]`: на каждый тик drag (изменение `x/y`) document-listeners пере-навешиваются. Хендлеры читают `x/y` через ref. **Убрать `x,y` (и `limit`, если читается через ref) из deps.**
-- `RNDFunc.tsx` (Drag2) — `onStop` срабатывает на первичном маунте (см. `RNDFunc.tsx:38-40`) до реального drag. **Гейтить через ref `wasDragging`.**
-- `chartEngine.ts:968-986` / `chartEngineReact.tsx:933` — `renderLoop` перерисовывает всё каждый кадр без dirty-флага. **Ввести флаг «нужна перерисовка»** (как `needsRender` в `myChart.ts`). Заметная экономия CPU на статичном графике.
-
-### Мелкие баги / guard'ы
-- `Other.tsx:36` (`key={i}`), `MiniButton.tsx:15`, `menu.tsx:423`, `RightMenu.tsx:146-155`, `logs`-гриды — индексные `key` на изменяемых/удаляемых списках. **Заменить на стабильный id/label** там, где список может переупорядочиваться.
-- `ParametersEngine.tsx:119,154` — `value={toNum(value)}` может дать `undefined` → controlled/uncontrolled warning. **Привести к `''`/числу.**
-- `cache.ts:79`, `mapMemory.tsx:54`, `cache.ts:12` (#12) — паттерн `map.get(k) || map.set(...)`: falsy-значение трактуется как отсутствующее. **Использовать `map.has(k)`.** (Сейчас данные — объекты, поэтому не стреляет, но хрупко.)
-- `styleGrid.ts:53-58` — `style.type='text/css'` (устаревшее), `getElementsByTagName('head')[0]` без guard. **`document.head.appendChild(style)`.**
-- `styleGrid.ts:69` — тип `tCallFuncAgGrid` возвращает `{}` (вместо `React.CSSProperties`/`Record<string,any>`). **Расширить тип** (расширение типа безопасно для потребителей).
-- `menuR.tsx:108-113` — `onUnClick?.(false)` вызывается до guard `if (!bb) return` → срабатывает при уже неактивном меню. **Переставить порядок.**
-- `RightMenu.tsx:125-132` — inline `onMouseLeave` ставит `jsx.set(null)` без 50ms-guard, конфликтует с защищёнными хендлерами. **Пропустить через `handleContentMouseLeave`.**
-- `useOutside.tsx:12-13` — навешивается только `mousedown`, хотя тип хендлера `MouseEvent | TouchEvent`. **Добавить `touchstart` (+removeEventListener)** или сузить тип.
+- `Other.tsx:36` (`key={i}`) — оставлено намеренно: список параметров не переупорядочивается, стабильного id у элементов нет.
+- `logs`-гриды — индексных key грепом не найдено (видимо, уже починено ранее).
 
 ---
 
 ## K2 — Сложные (нужны тесты, риск регрессии)
 
-### Хуки: корректность жизненного цикла
-- `useDraggable.tsx:28,30,31 (агрегатно 95-125, 36-71)` — комплекс проблем:
-  - effect re-subscribe document-listeners на каждый mousemove из-за `position` в deps;
-  - таймеры `holdTimerMouse/holdTimerTouch` и hold-listeners (`mouseup`/`touchend`) не очищаются при unmount во время drag → утечка + setState на размонтированном;
-  - mismatched add/remove `handleMouseUpForHold` между рендерами (не мемоизирован).
-  **Переписать на refs/`AbortController`**, вынести cleanup в отдельный unmount-эффект. **Обязательны тесты drag-сценариев.**
-- `RNDFunc3.tsx:42-53` (`DivRnd3`/`ff`) — `useMemo` вызывается из вспомогательной функции `ff`, dep меняет тип (number↔boolean). Хрупкое использование хуков. **Рефакторинг на корректный паттерн.**
+> ✅ **Выполнено 2026-06-12** (проверено временными jest-тестами, прогнаны и удалены): useDraggable переписан; DivRnd3 без useMemo-в-колбэке; StickerMenu подписка один раз; menu.tsx stale-guard в async-эффектах (deps намеренно не меняли); chartEngine×2 — бинарный поиск диапазона, dirty-флаг, minMaxChunks-геттер; MyResizeObserver батч; updateBy чистый getSnapshot; inputAutoStep addEventListener+disposer и устойчивое определение степени 0.1. Остаток:
 
-### Подписки / эффекты с проблемными зависимостями
-- `StickerMenu.tsx:69-80,57-66` — re-subscribe 4 document-listeners на каждый `dragX`; `finishDrag` завязан на этом. **Подписка один раз `[]`, дельта drag через ref.**
-- `menu.tsx:215-258` — эффекты с deps `[item.status, item.next, ...]` (функции пересоздаются вызывающим → постоянные ре-фетчи async-меню); нет guard на unmount → setState после размонтирования. **Mounted-ref / AbortController, пересмотреть deps.**
-- `menu.tsx:386-401` — `useLayoutEffect`: `setTop(prev => prev + (h - rect.bottom))` накапливается при повторных запусках → дрейф позиции. **Пересмотреть формулу/деп.**
+- `menu.tsx:386-401` — `useLayoutEffect`: `setTop(prev => prev + (h - rect.bottom))` накапливается при повторных запусках → дрейф позиции. **Пересмотреть формулу/деп.** *(Отложено осознанно: формула завязана на снап у края вьюпорта, нужна визуальная проверка всех путей меню.)*
 - `logs.tsx:132-218` — `Main = useCallback(..., [true])` замораживает компонент, закрывая `rowData/setting` с первого рендера (stale closure). Работает только потому, что данные текут через транзакционный API. **Флаг; не переписывать вслепую, иначе регрессия.** Покрыть тестами перед изменением.
-
-### Производительность отрисовки графиков
-- `chartEngine.ts:463,533` — `data.filter(...)` создаёт новый массив каждый кадр для каждого dataset. Данные отсортированы по x → **бинарный поиск видимого диапазона + итерация по срезу** без `filter`. Заметный выигрыш по GC.
 - `myChart.ts:217-220` — `destroy()` изнутри RAF при `!canvas.isConnected`: при временном detach (портал, перенос узла) график самоуничтожается без восстановления, внешний `chartRef` становится «мёртвым». **Различать temp-detach и реальный unmount** (или явный `destroy()` снаружи).
-- `chartEngine.ts:137` / `addData` — `ds.minMaxChunks` (публичное поле) становится stale после `buildMinMaxChunks` (переприсваивает внутренний массив). **Синхронизировать публичное поле или сделать его геттером.**
-- `MyResizeObserver.tsx:67-78` — `for(;;)` цикл с layout read/write на каждой итерации (reflow-thrash). **Снизить число итераций / батчить чтения-записи.**
-- `ParametersEngine.tsx:205-214,244` — `_inputNumStrMap` (WeakMap по идентичности `range`): если вызывающий пересоздаёт `range` каждый рендер, кэш промаха, недопечатанное значение теряется. **Завязать на стабильный ключ.**
-
-### Прочее
-- `updateBy.ts:74-104` — `getSnapshot` для `useSyncExternalStore` имеет побочный эффект (`getObserverState(a)` создаёт/пишет состояние во время рендера). Снапшот должен быть чистым. **Читать без создания:** `() => f ? 0 : (map3.get(a)?.version ?? 0)`. Затрагивает ядро реактивности — тесты обязательны.
-- `inputAutoStep.ts:15-82` (`SetAutoStepForElement`) — присваивает `element.onkeyup/onchange` напрямую (затирает чужие хендлеры, нет teardown). **Вернуть disposer / использовать addEventListener.** Публичный util — осторожно.
-- `inputAutoStep.ts:44,53` — хрупкая float-математика определения `modeAuto` (`Math.log10(...) % 1 == 0`, `Math.sign(minDefault!)` при guard по `_min`). **Переписать определение шага/знака с тестами.**
+- `ParametersEngine.tsx:205-214,244` — `_inputNumStrMap` (WeakMap по идентичности `range`): если вызывающий пересоздаёт `range` каждый рендер, кэш промаха, недопечатанное значение теряется. **Завязать на стабильный ключ.** *(Нужно продуктовое решение, какой ключ стабильный.)*
 
 ---
 
