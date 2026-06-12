@@ -9,8 +9,20 @@ interface IStepInputElement extends HTMLElement {
 	max: string;
 }
 
+// шаг является степенью 0.1 (0.1, 0.01, ...) — устойчиво к float-шуму,
+// в отличие от прежнего Math.log10(step)%1==0
+function isPowerOfTenth(step: number) {
+	if (!(step > 0 && step < 1)) return false;
+	const digits = Math.round(-Math.log10(step));
+	return Math.abs(Math.pow(0.1, digits) - step) < step * 1e-9;
+}
+
+// свои хендлеры на элементе: повторный вызов снимает предыдущие (как раньше перезапись on*)
+const appliedHandlers = new WeakMap<HTMLElement, () => void>();
+
 export function SetAutoStepForElement(element: IStepInputElement, params :{minStep? :number|undefined, maxStep? :number} = { maxStep: 1})
 {
+	appliedHandlers.get(element)?.();
 	function parse(valueStr :string) { let val= parseFloat(valueStr);  return isNaN(val) ? null : val; }
     const {minStep, maxStep=1} = params;
     const maxDigits= minStep ? GetDblPrecision(minStep) : undefined;
@@ -41,13 +53,13 @@ export function SetAutoStepForElement(element: IStepInputElement, params :{minSt
 		//if (Math.abs(min) < step) min= Math.floor(Math.abs(min)/step)*step * Math.sign(min);
 		if (_min!=null) {
 			if (Math.abs(_min) % step !=0)
-				_min= Math.floor(Math.abs(_min)/step) * step * Math.sign(minDefault!);
+				_min= Math.floor(Math.abs(_min)/step) * step * Math.sign(_min);
 			element.min= _min+"";
 		}
 		element.step= step+"";
 		return step;
 	}
-	let modeAuto = !_step || (_step<1 && Math.log10(_step-Math.trunc(_step))%1==0);  // является степенью 0.1
+	let modeAuto = !_step || isPowerOfTenth(_step);
 	if (modeAuto) {
 		calculateStep((_step ? (Math.round(parseFloat(element.value)/_step) *_step) : element.value)+"");
 	}
@@ -58,9 +70,10 @@ export function SetAutoStepForElement(element: IStepInputElement, params :{minSt
         modeAuto= false;
     else modeAuto ||= (_step!=null && (minStep==null || _step>minStep));
 
-	element.onkeyup= ()=>{ if (modeAuto) calculateStep(element.value); }
+	// addEventListener вместо on*=: не затираем чужие хендлеры; возвращаем disposer
+	const onKeyUp = ()=>{ if (modeAuto) calculateStep(element.value); }
 
-	element.onchange= ()=> {
+	const onChange = ()=> {
 		let digits= _digits;  if (digits!=null)  element.value= parseFloat(element.value).toFixed(digits);
 		if (minDefault!=null && parseFloat(element.value) < minDefault) {
 			element.step = stepDefault+"";
@@ -70,6 +83,16 @@ export function SetAutoStepForElement(element: IStepInputElement, params :{minSt
 		}
 		element.setAttribute("value", element.value);
 	}
+
+	element.addEventListener("keyup", onKeyUp);
+	element.addEventListener("change", onChange);
+	const dispose = () => {
+		element.removeEventListener("keyup", onKeyUp);
+		element.removeEventListener("change", onChange);
+		appliedHandlers.delete(element);
+	};
+	appliedHandlers.set(element, dispose);
+	return dispose;
 }
 
 //import * as Time from "./Time"

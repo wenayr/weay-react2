@@ -61,20 +61,20 @@ export function setResizeableElement(el: HTMLElement) {
     const existing = resizeableElementMap.get(el);
     if (existing) global_resizeObserver.delete(existing);
     const observerId = global_resizeObserver.add(parentParent, () => {
+        // Прыгаем сразу на величину рассинхрона (раньше — по 1px с reflow на каждый шаг);
+        // несколько итераций только на дозатяжку, верхняя граница спасает от вечного цикла
         let lastRangeDelta = 0;
-        let i = 0;
-        //console.log("###",el.style.width, el.clientWidth);
-        for (let width = el.clientWidth; ;) {//} width>=20;  width--) {
-            let rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentParent.getBoundingClientRect().right - 0);
+        for (let width = el.clientWidth, i = 0; i < 8; i++) {
+            const rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentParent.getBoundingClientRect().right);
             if (rangeDelta == 0) break;
             if (lastRangeDelta && rangeDelta * lastRangeDelta < 0) break;
             lastRangeDelta = rangeDelta;
-            if (rangeDelta > 0) width--; else width++;
             defaultWidth ??= el.clientWidth;
-            if (width < 10 || width > defaultWidth) break;
+            width -= rangeDelta;
+            if (width < 10) width = 10;
+            if (width > defaultWidth) width = defaultWidth;
             el.style.width = width + "px";
-            //console.log(i+": "+numEl.getBoundingClientRect().right,"<", parentParent.getBoundingClientRect().right, rangeEl.clientWidth); //numEl.clientLeft, numEl.clientWidth);
-            i++;
+            if (width == 10 || width == defaultWidth) break;
         }
     });
     resizeableElementMap.set(el, observerId);

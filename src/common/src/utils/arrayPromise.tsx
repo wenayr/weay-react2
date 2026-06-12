@@ -1,4 +1,10 @@
 
+/**
+ * Оборачивает массив thunk'ов промисов колбэками прогресса.
+ * КОНТРАКТ: счётчики countOk/countError корректны только при СТРОГО ПОСЛЕДОВАТЕЛЬНОМ
+ * запуске thunk'ов (один за другим). При параллельном запуске (Promise.all)
+ * значения счётчиков в колбэках — гонка, полагаться на них нельзя.
+ */
 export function ArrayPromise<T = unknown>({arr, catchF, thenF}: {
     arr: (() => Promise<T>)[],
     thenF?: (data: T, i: number, countOk: number, countError: number, count: number) => unknown,
