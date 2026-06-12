@@ -87,7 +87,8 @@ export function useUpdateBy<T extends object>(
                 if (state.listeners.size === 0) map3.delete(a);
             };
         },
-        () => (f ? 0 : getObserverState(a).version)
+        // getSnapshot обязан быть чистым: только читаем версию, состояние создаёт subscribe
+        () => (f ? 0 : (map3.get(a)?.version ?? 0))
     );
 
     useLayoutEffect(() => {

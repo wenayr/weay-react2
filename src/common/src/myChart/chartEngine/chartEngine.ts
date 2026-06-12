@@ -134,7 +134,8 @@ export function createDataSet(params: CreateDataSetParams): DataSet {
         data: internalData,
         style: mergedStyle,
         chunkSize,
-        minMaxChunks,
+        // buildMinMaxChunks переприсваивает локальный массив — геттер вместо stale-снимка
+        get minMaxChunks() { return minMaxChunks; },
         getMinMaxInRange,
         addData
     };
@@ -334,6 +335,23 @@ export interface Transform {
 // Ширина оси Y справа — единая константа на файл
 const AXIS_THICKNESS = 40;
 
+// Данные отсортированы по x: границы видимого диапазона бинарным поиском,
+// без filter-аллокаций на каждый кадр. Возвращает [start, end) по индексам.
+function visibleRange(data: DataPoint[], xMin: number, xMax: number): [number, number] {
+    let lo = 0, hi = data.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (data[mid].x < xMin) lo = mid + 1; else hi = mid;
+    }
+    const start = lo;
+    hi = data.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (data[mid].x <= xMax) lo = mid + 1; else hi = mid;
+    }
+    return [start, lo];
+}
+
 export function createRenderer(): Renderer {
     function getNiceTicks(minVal: number, maxVal: number, count: number): number[] {
         const range = maxVal - minVal || 1;
@@ -459,15 +477,15 @@ export function createRenderer(): Renderer {
         // Видимый X
         const xMinVisible = transform.offsetX;
         const xMaxVisible = transform.offsetX + (panel.width - AXIS_THICKNESS) / transform.scaleX;
-        // Фильтруем
-        const visible = data.filter((pt) => pt.x >= xMinVisible && pt.x <= xMaxVisible);
-        if (visible.length < 2) return;
+        const [start, end] = visibleRange(data, xMinVisible, xMaxVisible);
+        if (end - start < 2) return;
 
         // Простейший LOD: если xToPixX(pt.x) совпадает (округляется) с предыдущим, пропускаем
         const result: DataPoint[] = [];
         let lastPixX = -1;
 
-        for (const pt of visible) {
+        for (let i = start; i < end; i++) {
+            const pt = data[i];
             const px = Math.round(xToPixX(pt.x, transform, panel));
             if (px !== lastPixX) {
                 result.push(pt);
@@ -530,14 +548,15 @@ export function createRenderer(): Renderer {
         const barColor = style.barColor ?? '#66cc66';
         const xMinVisible = transform.offsetX;
         const xMaxVisible = transform.offsetX + (panel.width - AXIS_THICKNESS) / transform.scaleX;
-        const visible = data.filter((pt) => pt.x >= xMinVisible && pt.x <= xMaxVisible);
-        if (visible.length === 0) return;
+        const [start, end] = visibleRange(data, xMinVisible, xMaxVisible);
+        if (end === start) return;
 
         ctx.save();
         ctx.fillStyle = barColor;
         const barWidth = 5;
 
-        for (const pt of visible) {
+        for (let i = start; i < end; i++) {
+            const pt = data[i];
             const px = xToPixX(pt.x, transform, panel);
             const py = yToPixY(pt.y, panel, transform, isYRightAxis);
             const pyBase = yToPixY(panel.verticalRange.minY, panel, transform, isYRightAxis);
@@ -912,6 +931,22 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
     let containerEl: HTMLElement | null = null;
     let resizeObserver: ResizeObserver | null = null;
 
+    // Dirty-флаг: рисуем только при изменениях. Хуки инвалидации покрывают interaction
+    // (включая кроссхейр), addData/addPanel/resize; stamp в renderLoop ловит прямые
+    // мутации через dataModel/panelManager (длины данных, геометрия панелей, размер canvas).
+    let needsRender = true;
+    let lastStamp = NaN;
+    function invalidate() { needsRender = true; }
+    function frameStamp() {
+        const panels = panelManager.panels;
+        let s = panels.length + canvas.width * 3 + canvas.height * 5;
+        for (const p of panels) {
+            s += p.top * 7 + p.height * 13 + (p.autoFocusY ? 1 : 0);
+            for (const ds of p.dataSets) s += ds.data.length * 31;
+        }
+        return s;
+    }
+
     // Ось Y справа
     const isYRightAxis = true;
 
@@ -937,6 +972,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         getPanels,
         () => {
             // onTransformChanged => перерисовать
+            invalidate();
             updatePanels();
         },
         (p) => toggleAutoFocusY(p),
@@ -971,15 +1007,25 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
             destroy();
             return;
         }
-        updatePanels();
 
-        const xMin = transform.offsetX;
-        const xMax = transform.offsetX + (canvas.width - AXIS_THICKNESS) / transform.scaleX;
-        const crosshair = interaction.getCrosshairPos();
+        const stamp = frameStamp();
+        if (stamp !== lastStamp) {
+            lastStamp = stamp;
+            needsRender = true;
+        }
 
-        // Рендер каждой панели
-        for (const panel of panelManager.panels) {
-            renderer.drawPanel(ctx, panel, transform, { xMin, xMax }, crosshair, isYRightAxis);
+        if (needsRender) {
+            needsRender = false;
+            updatePanels();
+
+            const xMin = transform.offsetX;
+            const xMax = transform.offsetX + (canvas.width - AXIS_THICKNESS) / transform.scaleX;
+            const crosshair = interaction.getCrosshairPos();
+
+            // Рендер каждой панели
+            for (const panel of panelManager.panels) {
+                renderer.drawPanel(ctx, panel, transform, { xMin, xMax }, crosshair, isYRightAxis);
+            }
         }
 
         animationFrameId = requestAnimationFrame(renderLoop);
@@ -1021,6 +1067,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
                         canvas.height = newH;
                         // пересчитать layoutPanels
                         panelManager.layoutPanels(newW, newH);
+                        invalidate(); // смена размера canvas стирает битмап — перерисовать обязательно
                     }
                 }
             }
@@ -1029,7 +1076,10 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
     }
 
     function createDataSetFn(params: CreateDataSetParams) {
-        return dataModel.addDataSet(params);
+        const ds = dataModel.addDataSet(params);
+        const addDataOrig = ds.addData;
+        ds.addData = (p) => { addDataOrig(p); invalidate(); };
+        return ds;
     }
 
     function addPanelFn(config: {
@@ -1043,6 +1093,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         resizable?: boolean;
     }) {
         panelManager.addPanel(config);
+        invalidate();
     }
 
     return {
