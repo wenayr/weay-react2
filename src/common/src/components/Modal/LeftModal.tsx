@@ -380,7 +380,13 @@ export function getApiLeftMenu() {
         key?: string,
         menu?: (MenuItemPartial | MenuItem)[]
     }) {
-        if (menu) setMenu(menu, key);
+        // сев в эффекте, а не в рендере: иначе двойной сев в StrictMode и сайд-эффект при каждом рендере
+        useEffect(() => {
+            if (menu) {
+                setMenu(menu, key);
+                renderBy(menuStore);
+            }
+        }, [menu, key]);
         updateBy(menuStore);
         return (
             <div className={"maxSize"} style={{position: "absolute", zIndex: zIndex0}}>

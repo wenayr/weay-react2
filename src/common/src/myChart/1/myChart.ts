@@ -217,11 +217,24 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
     let animationFrameId: number | null = null;
     let destroyed = false;
     let docListenersActive = false;
+    // temp-detach (портал, перенос узла) — не повод самоуничтожаться: ждём reconnect
+    // с grace-периодом; настоящий unmount без destroy() добьёт авто-очистка по таймауту
+    const DETACH_DESTROY_MS = 10_000;
+    let disconnectedSince: number | null = null;
     function animate() {
         if (destroyed) return;
         if (!canvas.isConnected) {
-            destroy();
+            disconnectedSince ??= performance.now();
+            if (performance.now() - disconnectedSince > DETACH_DESTROY_MS) {
+                destroy();
+                return;
+            }
+            animationFrameId = requestAnimationFrame(animate);
             return;
+        }
+        if (disconnectedSince != null) {
+            disconnectedSince = null;
+            state.needsRender = true; // после reconnect перерисовать принудительно
         }
         if (state.needsRender) {
             draw();

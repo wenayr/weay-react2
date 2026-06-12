@@ -389,20 +389,40 @@ export function MenuBase({
     const [isLeftAligned, setIsLeftAligned] = useState(!!coordinate.toLeft);
     const [xOffset, setXOffset] = useState(0);
 
+    // Зеркало текущих коррекций — чтобы пересчёт шёл «от базы» (coordinate), а не от prev:
+    // дельтовая формула setTop(prev + ...) накапливалась между запусками → дрейф позиции
+    const applied = useRef({ top, isLeftAligned, xOffset, menuWidth });
+    applied.current = { top, isLeftAligned, xOffset, menuWidth };
+
     useLayoutEffect(() => {
         if (!refMenu.current) return;
         const rect = refMenu.current.getBoundingClientRect();
         const w = window.innerWidth,
             h = window.innerHeight;
-        if (h - rect.bottom < 8) setTop((prev) => prev + (h - rect.bottom));
+        const s = applied.current;
+
+        // приводим замер к базе: вычитаем уже применённые коррекции
+        const dTop = s.top - coordinate.y;
+        const dLeft = (s.isLeftAligned ? -1 * (s.menuWidth + 3 + s.xOffset) : coordinate.x) - coordinate.x;
+        const baseBottom = rect.bottom - dTop;
+        const baseX = rect.x - dLeft;
+        const baseRight = rect.right - dLeft;
+
+        // вертикаль: тот же снап низа к краю вьюпорта, но от базы — идемпотентно
+        setTop(h - baseBottom < 8 ? coordinate.y + (h - baseBottom) : coordinate.y);
         setLeftPos(rect.x);
         setMenuWidth(rect.width);
-        if (!coordinate.toLeft && w - rect.right < 8 && rect.width < (coordinate.left ?? 0)) {
-            setXOffset(rect.x - (coordinate.left ?? 0));
-            setIsLeftAligned(true);
-        }
-        if (coordinate.toLeft) {
-            setXOffset((coordinate.left ?? 0) - rect.x - 4);
+
+        if (!coordinate.toLeft) {
+            if (w - baseRight < 8 && rect.width < (coordinate.left ?? 0)) {
+                setXOffset(baseX - (coordinate.left ?? 0));
+                setIsLeftAligned(true);
+            } else {
+                setXOffset(0);
+                setIsLeftAligned(false);
+            }
+        } else {
+            setXOffset((coordinate.left ?? 0) - baseX - 4);
         }
     }, [coordinate.x, coordinate.y, coordinate.toLeft, coordinate.left]);
 

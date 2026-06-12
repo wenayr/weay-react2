@@ -24,7 +24,8 @@ export function Drag2({
     const lastT = useRef<{ x: number; y: number; id: number } | null>(null);
     const [a, setA] = useState(false);
     const [b, setB] = useState(false);
-    const lastD = useRef<{ x: number; y: number }>(last?.current ?? { y: x, x: y });
+    // дефолт был {y: x, x: y} — координаты местами; исправлено (K3, см. CHANGELOG/план)
+    const lastD = useRef<{ x: number; y: number }>(last?.current ?? { x, y });
     const wasDragging = useRef(false);
 
     // Обновляем значения `lastD` при изменении `x` или `y`

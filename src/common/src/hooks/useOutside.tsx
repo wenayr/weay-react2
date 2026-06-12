@@ -77,9 +77,19 @@ function ButtonBase({children, button, style = {}, className = "", state: [a, se
 
 const saveStatus: {[key: string]: boolean} = {}
 export function Button({keySave, statusDef, outClick, ...data}: tButton) {
-    if (keySave && saveStatus[keySave]) statusDef = saveStatus[keySave]
-    const state = useState(statusDef ?? false)
-    
+    // фича keySave была мертва: saveStatus читался, но не писался. Теперь статус
+    // персистится (in-memory, в рамках сессии) при каждом переключении.
+    if (keySave && saveStatus[keySave] != null) statusDef = saveStatus[keySave]
+    const [status, setStatusRaw] = useState(statusDef ?? false)
+    const setStatus: typeof setStatusRaw = (v) => {
+        setStatusRaw(prev => {
+            const next = typeof v === "function" ? (v as (p: boolean) => boolean)(prev) : v
+            if (keySave) saveStatus[keySave] = next
+            return next
+        })
+    }
+    const state: [boolean, typeof setStatusRaw] = [status, setStatus]
+
     const handleOutsideClick = () => {
         state[1](false);
         if (typeof outClick == "function") outClick()

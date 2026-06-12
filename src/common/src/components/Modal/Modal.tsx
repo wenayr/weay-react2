@@ -15,15 +15,19 @@ export function inputModal({setModalJSX, func, name, txt}: {
     }} outClick={() => setModalJSX(null)} name={name ?? "name"} txt={txt}/>)
 }
 
-export function confirmModal({setModalJSX, func}: {
+export function confirmModal({setModalJSX, func, password = "111"}: {
     /** Любой сеттер модалки: setState или setModal из useModal (ModalProvider) */
     setModalJSX: (jsx: React.JSX.Element | null) => void,
-    func: () => any
+    func: () => any,
+    /** Кодовое слово подтверждения. Дефолт "111" оставлен для совместимости; задайте своё. */
+    password?: string
 }) {
+    // свой пароль в подсказке не светим; легаси-дефолт показываем как раньше
+    const hint = password == "111" ? "password 111" : "password"
     setModalJSX(<InputPageModal callback={txt => {
-        if (txt == "111") func()
+        if (txt == password) func()
         setModalJSX(null)
-    }} outClick={() => setModalJSX(null)} name={"password 111"}/>)
+    }} outClick={() => setModalJSX(null)} name={hint}/>)
 }
 
 /**
