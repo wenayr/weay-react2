@@ -338,9 +338,10 @@ export interface Transform {
     scaleY?: number;
 }
 
-export function createRenderer(): Renderer {
-    const AXIS_THICKNESS = 40;
+// Ширина оси Y справа — единая константа на файл
+const AXIS_THICKNESS = 40;
 
+export function createRenderer(): Renderer {
     function getNiceTicks(minVal: number, maxVal: number, count: number): number[] {
         const range = maxVal - minVal || 1;
         const roughStep = range / count;
@@ -452,7 +453,6 @@ export function createRenderer(): Renderer {
         const gradientFill = style.gradientFill ?? true;
         const lineWidth = style.lineWidth ?? 2;
 
-        const AXIS_THICKNESS = 40;
         const xMinVisible = transform.offsetX;
         const xMaxVisible = transform.offsetX + (panel.width - AXIS_THICKNESS) / transform.scaleX;
 
@@ -533,7 +533,6 @@ export function createRenderer(): Renderer {
         style: DataSetStyle
     ) {
         const barColor = style.barColor ?? '#66cc66';
-        const AXIS_THICKNESS = 40;
         const xMinVisible = transform.offsetX;
         const xMaxVisible = transform.offsetX + (panel.width - AXIS_THICKNESS) / transform.scaleX;
         const visible = data.filter((pt) => pt.x >= xMinVisible && pt.x <= xMaxVisible);
@@ -709,7 +708,7 @@ export function createInteraction(
             return;
         }
 
-        const axisRightX = activePanel.left + activePanel.width - 40;
+        const axisRightX = activePanel.left + activePanel.width - AXIS_THICKNESS;
         if (localX >= axisRightX) {
             // масштаб по Y, если autoFocusY=false
             dragMode = DragMode.ScaleY;
@@ -803,7 +802,7 @@ export function createInteraction(
         const localY = e.clientY - rect.top;
         const p = findPanel(localX, localY, getPanels());
         if (!p) return;
-        const axisRightX = p.left + p.width - 40;
+        const axisRightX = p.left + p.width - AXIS_THICKNESS;
         if (localX >= axisRightX) {
             onToggleAutoFocusY(p);
             onTransformChanged();
@@ -838,7 +837,7 @@ export function createInteraction(
         attached = false;
         canvas.removeEventListener('mousedown', onMouseDown);
         canvas.removeEventListener('mousemove', onMouseMove);
-        canvas.removeEventListener('wheel', onWheel as any);
+        canvas.removeEventListener('wheel', onWheel);
         canvas.removeEventListener('dblclick', onDblClick);
         document.removeEventListener('mouseup', onGlobalMouseUp);
     }
@@ -927,7 +926,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
 
     function updatePanels() {
         const x1 = transform.offsetX;
-        const x2 = transform.offsetX + (canvas.width - 40) / transform.scaleX;
+        const x2 = transform.offsetX + (canvas.width - AXIS_THICKNESS) / transform.scaleX;
         for (const p of panelManager.panels) {
             if (p.autoFocusY) {
                 const { minY, maxY } = dataModel.getGlobalMinMaxY(
@@ -950,7 +949,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         updatePanels();
 
         const xMin = transform.offsetX;
-        const xMax = transform.offsetX + (canvas.width - 40) / transform.scaleX;
+        const xMax = transform.offsetX + (canvas.width - AXIS_THICKNESS) / transform.scaleX;
         const crosshair = interaction.getCrosshairPos();
 
         for (const p of panelManager.panels) {

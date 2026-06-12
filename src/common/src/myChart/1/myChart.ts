@@ -1,3 +1,8 @@
+// Отступы графика и цвет линии (значения прежние, вынесены из тела отрисовки)
+const CHART_MARGIN_TOP = 20;
+const CHART_MARGIN_BOTTOM = 20;
+const CHART_LINE_COLOR = "rgb(0,180,0)";
+
 /**
  * Точка на графике: время (time) и цена (price).
  */
@@ -112,8 +117,8 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
             maxY = 100;
         }
         const rangeY = maxY - minY || 1;
-        const marginTop = 20;
-        const marginBottom = state.showTimeAxis ? 20 : 0;
+        const marginTop = CHART_MARGIN_TOP;
+        const marginBottom = state.showTimeAxis ? CHART_MARGIN_BOTTOM : 0;
         const chartHeight = state.height - marginTop - marginBottom;
 
         function toScreenX(i: number) {
@@ -137,7 +142,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
                 ctx.lineTo(x, y);
             }
         }
-        ctx.strokeStyle = "rgb(0,180,0)";
+        ctx.strokeStyle = CHART_LINE_COLOR;
         ctx.lineWidth = 2;
         ctx.stroke();
 

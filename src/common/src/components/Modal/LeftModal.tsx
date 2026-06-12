@@ -102,8 +102,6 @@ function SidebarMenuComponent({y_, x_, api, arr, zIndex}: {
         lastPosition.current.auto = true;
         const step = 40;
 
-        if (!lastPosition.current.auto) return;
-
         const animate = async () => {
             if (!lastPosition.current.auto || currentPosition.current.x === target) return;
 
@@ -347,8 +345,6 @@ export function getApiLeftMenu() {
         );
     };
 
-    type MenuApiType = Parameters<Parameters<typeof LeftMenuComponent>[0]["api"]>[0] | null;
-    let menuApi: MenuApiType = null;
     const menuStore = new Map<string, MenuItem[]>();
 
     const setMenu = (items: (MenuItemPartial | MenuItem)[], key = "base") => {
@@ -389,7 +385,7 @@ export function getApiLeftMenu() {
         return (
             <div className={"maxSize"} style={{position: "absolute", zIndex: zIndex0}}>
                 <modal.Render/>
-                <LeftMenuComponent zIndex={zIndex} api={a => menuApi = a} menu={getAllMenuItems()}/>
+                <LeftMenuComponent zIndex={zIndex} api={() => {}} menu={getAllMenuItems()}/>
             </div>
         );
     }
