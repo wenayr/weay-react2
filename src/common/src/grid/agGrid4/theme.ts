@@ -1,14 +1,19 @@
 // Тема ag-grid. Чистая сборка + хук. Самодостаточно (без ThemeProvider — его в проекте нет;
 // появится — useAgGridTheme начнёт брать режим из него, сигнатура не изменится).
 import { useMemo } from 'react'
-import { colorSchemeDark, colorSchemeLight, themeAlpine } from 'ag-grid-community'
+import { colorSchemeDarkBlue, colorSchemeLight, iconSetMaterial, themeAlpine } from 'ag-grid-community'
+import { tokens } from '../../styles/tokens'
 
 export type tThemeMode = 'light' | 'dark'
 
-/** Чистая сборка ag-grid темы из режима. Без React. */
+/** Чистая сборка ag-grid темы из режима. Без React.
+ *  dark — те же part'ы и параметры, что у легаси GridStyleDefault: единый вид гридов. */
 export function buildAgTheme(mode: tThemeMode) {
-    const colorScheme = mode == 'dark' ? colorSchemeDark : colorSchemeLight
-    return themeAlpine.withPart(colorScheme).withParams({ browserColorScheme: mode })
+    const colorScheme = mode == 'dark' ? colorSchemeDarkBlue : colorSchemeLight
+    return themeAlpine
+        .withPart(colorScheme)
+        .withPart(iconSetMaterial)
+        .withParams({ ...tokens.grid, browserColorScheme: mode })
 }
 
 /** Тема приложения; дефолт — тёмная, как в проде. */

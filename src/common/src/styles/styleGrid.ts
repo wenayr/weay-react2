@@ -8,6 +8,7 @@ import {
 } from "ag-grid-community";
 import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
  export { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
+import {tokens} from "./tokens";
 
 
 
@@ -20,14 +21,7 @@ export function GridStyleDefault(){
     const theme:  Theme<ThemeDefaultParams> = themeAlpine
         .withPart(colorSchemeDarkBlue)
         .withPart(iconSetMaterial)
-        .withParams({
-            'fontFamily': 'Roboto',
-            'textColor': 'rgba(214,214,214,0.9)',
-            'tabTextColor': 'rgba(227,227,227,0.9)',
-            'fontSize': '10px',
-            'spacing': '3px',
-            'backgroundColor' :'rgb(19,24,33)'
-        });
+        .withParams({...tokens.grid});
 // Mark all grids as using legacy themes
     provideGlobalGridOptions({ theme: theme});
     return {theme, provideGlobalGridOptions};

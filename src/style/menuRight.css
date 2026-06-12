@@ -1,18 +1,5 @@
-:root {
-  --base-border: 1px solid rgba(255, 255, 255, 0.41);
-  --base-color-hover: #fff;
-}
-:root {
-  --menu-bg-color: rgba(12, 12, 12, 0.91);
-  --menu-blur: 10px;
-  --menu-border: var(--base-border);
-  --menu-active-background: rgba(255, 255, 255, 0.23);
-
-  --menu-item-color: var(--base-color-hover);
-  --menu-item-hover-color: #101010;
-  --menu-item-hover-bg-color: var(--base-color-hover);
-
-}
+/* Токены вынесены в tokens.css (значения те же) */
+@import "./tokens.css";
 
 .menu-container{
   position: fixed;

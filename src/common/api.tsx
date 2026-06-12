@@ -4,6 +4,7 @@ import "../style/style.css"
 
 // 0. СТИЛИ - независимые
 export * from "./src/styles/styleGrid";
+export * from "./src/styles/tokens";
 
 // 1. БАЗОВЫЙ СЛОЙ - никаких зависимостей внутри проекта
 export * from "./updateBy";
