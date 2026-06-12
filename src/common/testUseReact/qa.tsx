@@ -55,12 +55,14 @@ const ReactivityDemo = () => (
 
 // Клик-вне через DivOutsideClick напрямую: display:inline-block → зона закрытия облегает
 // содержимое (нет «полосы на всю ширину», как у Button+outClick).
+// Попап — position:absolute: иначе он раздувает прямоугольник обёртки, и клик правее кнопки
+// (в пределах ширины попапа) попадает в саму обёртку → contains() считает его «внутри».
 const OutsideDemo = () => {
     const [open, setOpen] = useState(false);
     return (
-        <DivOutsideClick status={open} outsideClick={() => setOpen(false)} style={{ display: "inline-block" }}>
+        <DivOutsideClick status={open} outsideClick={() => setOpen(false)} style={{ display: "inline-block", position: "relative" }}>
             <div onClick={() => setOpen(v => !v)} style={{ display: "inline-block", padding: "6px 12px", border: "1px solid #6e7781", borderRadius: 6, cursor: "pointer", background: open ? "#6e7781" : "#fff", color: open ? "#fff" : "#000" }}>open</div>
-            {open && <div style={{ marginTop: 8, padding: 16, width: 220, border: "1px solid #6e7781", borderRadius: 8, background: "#fafbfc" }}>закроюсь по клику в любом месте, кроме этой плашки и кнопки</div>}
+            {open && <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 8, padding: 16, width: 220, border: "1px solid #6e7781", borderRadius: 8, background: "#fafbfc", zIndex: 5 }}>закроюсь по клику в любом месте, кроме этой плашки и кнопки</div>}
         </DivOutsideClick>
     );
 };
@@ -221,10 +223,10 @@ function ActiveChecks() {
 
             <Check n={6} title="График (MyChartEngine) — LOD min+max"
                    do="Дай графику накопить данные, затем ОТДАЛИ колесом (zoom out). Смотри на амплитуду линии."
-                   expect="При отдалении линия сохраняет амплитуду — пики не «схлопываются» в прямую. ✅ Фикс: LOD берёт min+max на пиксель."
-                   note="Исправлено: drawLineChartLOD теперь на каждый пиксель берёт min+max точки (а не первую) → пики/провалы не срезаются. Перф (dirty-флаг/filter каждый кадр) — НЕ трогали."
+                   expect="При отдалении линия сохраняет амплитуду — пики не «схлопываются» в прямую. ✅ Фикс: LOD берёт min+max на пиксель. Обе панели (линия + бары) целиком в карточке, ничего не уезжает вниз."
+                   note="Исправлено: drawLineChartLOD теперь на каждый пиксель берёт min+max точки (а не первую) → пики/провалы не срезаются. Фикс высоты: у MyChartEngine была захардкожена height 600px → нижняя панель выходила за карточку; добавлен опциональный проп style (дефолт 600px не менялся). Перф (dirty-флаг/filter каждый кадр) — НЕ трогали."
                    tall>
-                <div style={{ height: 300 }}><MyChartEngine /></div>
+                <div style={{ height: 300 }}><MyChartEngine style={{ height: "100%" }} /></div>
             </Check>
 
             <Check n={7} title="Параметры (ParametersReact / ParametersEngine)"
@@ -251,9 +253,9 @@ function ActiveChecks() {
             </Check>
 
             <Check n={8} title="Закрытие по клику вне (DivOutsideClick)"
-                   do="Нажми «open». Затем кликни ЛЮБОЕ место вне плашки — в т.ч. на той же горизонтали (раньше там была «полоса», теперь нет)."
-                   expect="Клик в любом месте вне плашки/кнопки закрывает её. Клик по плашке или кнопке — НЕ закрывает."
-                   note="БАГ lib (карточка раньше падала на нём): Button+outClick оборачивает в DivOutsideClick, а тот — блочный div на всю ширину → вся горизонтальная полоса считается «внутри». Здесь DivOutsideClick использован с display:inline-block. Реальный фикс lib: дефолтно облегать содержимое (или дать Button сужать обёртку).">
+                   do="Нажми «open». Затем кликни ЛЮБОЕ место вне плашки — в т.ч. на той же горизонтали и ЧУТЬ ПРАВЕЕ кнопки open (в пределах ширины плашки — раньше там была мёртвая зона)."
+                   expect="Клик в любом месте вне плашки/кнопки закрывает её — включая зону правее кнопки над плашкой. Клик по плашке или кнопке — НЕ закрывает."
+                   note="БАГ lib (карточка раньше падала на нём): Button+outClick оборачивает в DivOutsideClick, а тот — блочный div на всю ширину → вся горизонтальная полоса считается «внутри». Здесь DivOutsideClick использован с display:inline-block, а попап — position:absolute (иначе он раздувает прямоугольник обёртки → мёртвая зона правее кнопки). Реальный фикс lib: дефолтно облегать содержимое (или дать Button сужать обёртку).">
                 <OutsideDemo />
             </Check>
         </>

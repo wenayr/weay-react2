@@ -1051,7 +1051,7 @@ export function generateIncrementalData(
 /**
  * Пример React-компонента MyChart
  */
-export const MyChartEngine: React.FC = () => {
+export const MyChartEngine: React.FC<{ style?: React.CSSProperties }> = ({ style }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const engineRef = useRef<ChartEngine | null>(null);
@@ -1132,7 +1132,8 @@ export const MyChartEngine: React.FC = () => {
                 width: '100%',
                 height: '600px',
                 border: '1px solid #ccc',
-                position: 'relative'
+                position: 'relative',
+                ...style
             }}
         >
             <canvas ref={canvasRef} />
