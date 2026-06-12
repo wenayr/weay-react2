@@ -214,14 +214,16 @@ const MenuItemWrapper = ({
 
     useEffect(() => {
         if (item.status && item.next) {
+            let alive = true; // guard: не сеттим стейт после размонтирования/смены item
             const result = item.next();
             if (result instanceof Promise) {
                 result.then((val) => {
-                    setChildMenu(val.filter(Boolean) as tMenuReactStrictly[]);
+                    if (alive) setChildMenu(val.filter(Boolean) as tMenuReactStrictly[]);
                 });
             } else {
                 setChildMenu(result.filter(Boolean) as tMenuReactStrictly[]);
             }
+            return () => { alive = false; };
         } else {
             setChildMenu([]);
         }
@@ -229,14 +231,16 @@ const MenuItemWrapper = ({
 
     useEffect(() => {
         if (item.status && item.func) {
+            let alive = true;
             const result = item.func();
             if (result instanceof Promise) {
                 result.then((val) => {
-                    setAsyncFuncElement(val);
+                    if (alive) setAsyncFuncElement(val);
                 });
             } else {
                 setAsyncFuncElement(result);
             }
+            return () => { alive = false; };
         } else {
             setAsyncFuncElement(null);
         }
@@ -244,14 +248,16 @@ const MenuItemWrapper = ({
 
     useEffect(() => {
         if (item.status && item.onFocus) {
+            let alive = true;
             const result = item.onFocus();
             if (result instanceof Promise) {
                 result.then((val) => {
-                    setOnFocusMenu(val.filter(Boolean) as tMenuReactStrictly[]);
+                    if (alive) setOnFocusMenu(val.filter(Boolean) as tMenuReactStrictly[]);
                 });
             } else {
                 setOnFocusMenu(result.filter(Boolean) as tMenuReactStrictly[]);
             }
+            return () => { alive = false; };
         } else {
             setOnFocusMenu([]);
         }

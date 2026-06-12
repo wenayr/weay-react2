@@ -39,16 +39,18 @@ export const ExRNDMap3 = new Map<string, tRND>();
 let k = 0;
 const openWindows: { ar: { k: number }[] } = { ar: [] };
 
+// Замораживает поддерево до смены update (намеренно игнорирует смену render-замыкания) —
+// прежняя семантика useMemo-в-колбэке, но без вызова хука из произвольного места
+const MemoChild = React.memo(
+    ({ update, render }: { update: number; render: (u: number) => React.ReactElement }) => render(update),
+    (prev, next) => prev.update === next.update
+);
+
 export const DivRnd3: typeof DivRndBase3 = (a) => {
-    // const Base = ({ update }: { update: number }) => {
-    //     console.log(update)
-    //     return typeof a.children === "function" ? a.children(update) : a.children;
-    // }
-    const Base2 = ({ update }: { update: number }) => {
-        return typeof a.children === "function" ? a.children(update) : a.children;
-    }
-    // const ff = (update: number) => useMemo(() => <Base update={update} />, [update]);
-    const ff = (update: number) => useMemo(() => <Base2 update={update} />, [typeof a.children === "function"  ? update : true]);
+    const isFunc = typeof a.children === "function";
+    const renderChild = (update: number): React.ReactElement =>
+        typeof a.children === "function" ? a.children(update) : (a.children as React.ReactElement);
+    const ff = (update: number) => <MemoChild update={isFunc ? update : 0} render={renderChild} />;
 
     return DivRndBase3({ ...a, children: ff });
 };

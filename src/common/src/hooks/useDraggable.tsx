@@ -24,26 +24,46 @@ export function useDraggable(
     onDragStart?: DragStartCallback
 ): UseDraggableReturn {
     const [position, setPosition] = useState<Position>({ x: initialX, y: initialY });
+    const positionRef = useRef(position);
+    const setPos = (p: Position) => {
+        positionRef.current = p;
+        setPosition(p);
+    };
+
     const offsetMouse = useRef<Position>({ x: 0, y: 0 });
     const offsetTouch = useRef<{ x: number; y: number; id: number } | null>(null);
     const [draggingMouse, setDraggingMouse] = useState(false);
     const [draggingTouch, setDraggingTouch] = useState(false);
 
+    // Колбэки через ref: эффекты подписки не зависят от их идентичности
+    const onDragEndRef = useRef(onDragEnd);
+    const onDragStartRef = useRef(onDragStart);
+    useEffect(() => {
+        onDragEndRef.current = onDragEnd;
+        onDragStartRef.current = onDragStart;
+    });
+
     // Таймеры для определения длинного нажатия
     const holdTimerMouse = useRef<number | null>(null);
     const holdTimerTouch = useRef<number | null>(null);
 
-    const cancelMouseHold = () => {
-        if (holdTimerMouse.current) {
+    // Стабильные (одна ссылка на всё время жизни) хендлеры отмены hold —
+    // раньше add/remove получали разные функции между рендерами и листенеры копились
+    const cancelMouseHold = useRef(function cancelMouseHold() {
+        if (holdTimerMouse.current != null) {
             clearTimeout(holdTimerMouse.current);
             holdTimerMouse.current = null;
         }
-        document.removeEventListener("mouseup", handleMouseUpForHold);
-    };
+        document.removeEventListener("mouseup", cancelMouseHold);
+    }).current;
 
-    const handleMouseUpForHold = () => {
-        cancelMouseHold();
-    };
+    const cancelTouchHold = useRef(function cancelTouchHold() {
+        if (holdTimerTouch.current != null) {
+            clearTimeout(holdTimerTouch.current);
+            holdTimerTouch.current = null;
+        }
+        document.removeEventListener("touchend", cancelTouchHold);
+    }).current;
 
     const handleMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
         e.preventDefault();
@@ -53,25 +73,13 @@ export function useDraggable(
         };
         if (timeOut) {
             holdTimerMouse.current = window.setTimeout(() => {
-                setDraggingMouse(true);
                 holdTimerMouse.current = null;
-                document.removeEventListener("mouseup", handleMouseUpForHold);
+                document.removeEventListener("mouseup", cancelMouseHold);
+                setDraggingMouse(true);
             }, timeOut);
-            document.addEventListener("mouseup", handleMouseUpForHold);
+            document.addEventListener("mouseup", cancelMouseHold);
         }
-        onDragStart?.()
-    };
-
-    const cancelTouchHold = () => {
-        if (holdTimerTouch.current) {
-            clearTimeout(holdTimerTouch.current);
-            holdTimerTouch.current = null;
-        }
-        document.removeEventListener("touchend", handleTouchEndForHold);
-    };
-
-    const handleTouchEndForHold = () => {
-        cancelTouchHold();
+        onDragStartRef.current?.();
     };
 
     const handleTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
@@ -84,85 +92,90 @@ export function useDraggable(
         };
         if (timeOut) {
             holdTimerTouch.current = window.setTimeout(() => {
-                setDraggingTouch(true);
                 holdTimerTouch.current = null;
-                document.removeEventListener("touchend", handleTouchEndForHold);
+                document.removeEventListener("touchend", cancelTouchHold);
+                setDraggingTouch(true);
             }, timeOut);
-            document.addEventListener("touchend", handleTouchEndForHold);
+            document.addEventListener("touchend", cancelTouchHold);
         }
     };
 
     useEffect(() => {
-        if (draggingMouse) {
-            const handleMouseMove = (e: MouseEvent) => {
-                const newX = e.clientX - offsetMouse.current.x;
-                const newY = e.clientY - offsetMouse.current.y;
-                setPosition({ x: newX, y: newY });
-            };
+        if (!draggingMouse) return;
 
-            const handleMouseUp = (e: MouseEvent) => {
+        const handleMouseMove = (e: MouseEvent) => {
+            setPos({
+                x: e.clientX - offsetMouse.current.x,
+                y: e.clientY - offsetMouse.current.y,
+            });
+        };
 
-                setPosition({ x: 0, y: 0 });
-                // Остальные действия по завершению перетаскивания мышью
-                document.removeEventListener("mousemove", handleMouseMove);
-                document.removeEventListener("mouseup", handleMouseUp);
-                setDraggingMouse(false);
-                if (onDragEnd) {
-                    onDragEnd({ ...position });
-                }
-                // Сбрасываем смещение
-                offsetMouse.current = { x: 0, y: 0 };
-            };
+        const handleMouseUp = () => {
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
+            const final = { ...positionRef.current };
+            setPos({ x: 0, y: 0 });
+            setDraggingMouse(false);
+            onDragEndRef.current?.(final);
+            offsetMouse.current = { x: 0, y: 0 };
+        };
 
-            document.addEventListener("mousemove", handleMouseMove);
-            document.addEventListener("mouseup", handleMouseUp);
+        document.addEventListener("mousemove", handleMouseMove);
+        document.addEventListener("mouseup", handleMouseUp);
 
-            return () => {
-                document.removeEventListener("mousemove", handleMouseMove);
-                document.removeEventListener("mouseup", handleMouseUp);
-            };
-        }
-    }, [draggingMouse, onDragEnd, position]);
+        return () => {
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, [draggingMouse]);
 
     useEffect(() => {
-        if (draggingTouch) {
-            const handleTouchMove = (e: TouchEvent) => {
-                if (!offsetTouch.current) return;
-                const theTouch = Array.from(e.changedTouches).find(
-                    (t) => t.identifier === offsetTouch.current?.id
-                );
-                if (!theTouch) return;
-                const newX = theTouch.clientX - offsetTouch.current.x;
-                const newY = theTouch.clientY - offsetTouch.current.y;
-                setPosition({ x: newX, y: newY });
-            };
+        if (!draggingTouch) return;
 
-            const handleTouchEnd = (e: TouchEvent) => {
-                if (!offsetTouch.current) return;
-                const ended = Array.from(e.changedTouches).find(
-                    (t) => t.identifier === offsetTouch.current?.id
-                );
-                if (ended) {
-                    setPosition({ x: 0, y: 0 });
-                    document.removeEventListener("touchmove", handleTouchMove);
-                    document.removeEventListener("touchend", handleTouchEnd);
-                    setDraggingTouch(false);
-                    if (onDragEnd) {
-                        onDragEnd({ ...position });
-                    }
-                    offsetTouch.current = null;
-                }
-            };
+        const handleTouchMove = (e: TouchEvent) => {
+            if (!offsetTouch.current) return;
+            const theTouch = Array.from(e.changedTouches).find(
+                (t) => t.identifier === offsetTouch.current?.id
+            );
+            if (!theTouch) return;
+            setPos({
+                x: theTouch.clientX - offsetTouch.current.x,
+                y: theTouch.clientY - offsetTouch.current.y,
+            });
+        };
 
-            document.addEventListener("touchmove", handleTouchMove);
-            document.addEventListener("touchend", handleTouchEnd);
-
-            return () => {
+        const handleTouchEnd = (e: TouchEvent) => {
+            if (!offsetTouch.current) return;
+            const ended = Array.from(e.changedTouches).find(
+                (t) => t.identifier === offsetTouch.current?.id
+            );
+            if (ended) {
                 document.removeEventListener("touchmove", handleTouchMove);
                 document.removeEventListener("touchend", handleTouchEnd);
-            };
-        }
-    }, [draggingTouch, onDragEnd, position]);
+                const final = { ...positionRef.current };
+                setPos({ x: 0, y: 0 });
+                setDraggingTouch(false);
+                onDragEndRef.current?.(final);
+                offsetTouch.current = null;
+            }
+        };
+
+        document.addEventListener("touchmove", handleTouchMove);
+        document.addEventListener("touchend", handleTouchEnd);
+
+        return () => {
+            document.removeEventListener("touchmove", handleTouchMove);
+            document.removeEventListener("touchend", handleTouchEnd);
+        };
+    }, [draggingTouch]);
+
+    // Размонтирование во время hold: чистим таймеры и hold-листенеры
+    useEffect(() => () => {
+        if (holdTimerMouse.current != null) clearTimeout(holdTimerMouse.current);
+        if (holdTimerTouch.current != null) clearTimeout(holdTimerTouch.current);
+        document.removeEventListener("mouseup", cancelMouseHold);
+        document.removeEventListener("touchend", cancelTouchHold);
+    }, []);
 
     return {
         position,

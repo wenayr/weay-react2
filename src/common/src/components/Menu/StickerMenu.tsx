@@ -3,8 +3,14 @@ import React, { useState, useRef, useEffect, MouseEvent, TouchEvent } from 'reac
 const StickerMenu: React.FC = () => {
     // Флаг состояния: открыто меню или закрыто
     const [isOpen, setIsOpen] = useState<boolean>(false);
-    // Сдвиг по X в процессе перетаскивания
+    // Сдвиг по X в процессе перетаскивания; дублируется в ref, чтобы document-listeners
+    // подписывались один раз, а не на каждый тик drag
     const [dragX, setDragX] = useState<number>(0);
+    const dragXRef = useRef(0);
+    const setDrag = (v: number): void => {
+        dragXRef.current = v;
+        setDragX(v);
+    };
     // Рефы для отслеживания начала перетаскивания и самого процесса
     const startXRef = useRef<number | null>(null);
     const draggingRef = useRef<boolean>(false);
@@ -29,14 +35,14 @@ const StickerMenu: React.FC = () => {
     const handleMouseMove = (e: MouseEvent<Document>): void => {
         if (!draggingRef.current || startXRef.current === null) return;
         const deltaX = e.clientX - startXRef.current;
-        setDragX(deltaX);
+        setDrag(deltaX);
     };
 
     // Обработка движения при касании
     const handleTouchMove = (e: TouchEvent<Document>): void => {
         if (!draggingRef.current || startXRef.current === null) return;
         const deltaX = e.touches[0].clientX - startXRef.current;
-        setDragX(deltaX);
+        setDrag(deltaX);
     };
 
     // Завершение перетаскивания (мышь)
@@ -54,12 +60,13 @@ const StickerMenu: React.FC = () => {
     // Функция завершения перетаскивания: если сдвиг больше половины ширины меню — переключаем состояние
     const finishDrag = (): void => {
         draggingRef.current = false;
-        if (dragX < -menuWidth / 2) {
+        const delta = dragXRef.current;
+        if (delta < -menuWidth / 2) {
             setIsOpen(true);
-        } else if (dragX > menuWidth / 2) {
+        } else if (delta > menuWidth / 2) {
             setIsOpen(false);
         }
-        setDragX(0);
+        setDrag(0);
         startXRef.current = null;
     };
 
@@ -75,7 +82,7 @@ const StickerMenu: React.FC = () => {
             document.removeEventListener('mouseup', handleMouseUp as any);
             document.removeEventListener('touchend', handleTouchEnd as any);
         };
-    }, [dragX]);
+    }, []);
 
     // Переключение состояния меню по клику
     const handleClick = (): void => {
