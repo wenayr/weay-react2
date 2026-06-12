@@ -318,3 +318,29 @@ body {
   margin-top: -1px;
   margin-left: -1px;
 }
+
+/* Кнопка закрытия окна (DivRnd3 и др.) */
+.wenayCloseBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border-common);
+  color: var(--color-text-base);
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+.wenayCloseBtn:hover {
+  background: #e5484d;
+  border-color: #e5484d;
+  color: #fff;
+  transform: scale(1.08);
+}
+.wenayCloseBtn:active {
+  transform: scale(0.95);
+}

@@ -363,18 +363,19 @@ export function DivRndBase3({
                 {onCLickClose && (
                     <div
                         key="323"
-                        className="msTradeAlt"
+                        className="wenayCloseBtn"
+                        title="Закрыть"
                         style={{
                             position: "absolute",
-                            right: -15,
-                            top: -15,
-                            fontSize: "32px",
-                            zIndex: zIndexX * 2 + zIndex + 1,
-                            cursor: "pointer"
+                            right: -12,
+                            top: -12,
+                            zIndex: zIndexX * 2 + zIndex + 1
                         }}
                         onClick={onCLickClose}
                     >
-                        x
+                        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                            <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                        </svg>
                     </div>
                 )}
             </div>
