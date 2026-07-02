@@ -6,22 +6,24 @@ export interface IServerSaveBasePromise {
     delete(key: string): Promise<boolean>;
 }
 
-const HostName = location.toString()
+function getHostName() {
+    return typeof location != "undefined" ? location.toString() : "wenay-react2";
+}
 
 export class CSaveToCache implements IServerSaveBasePromise{
     async set(key: string, value: object) : Promise<boolean>  {
         const t = new Response(JSON.stringify(value));
-        if (window.caches) {
+        if (typeof caches != "undefined") {
             const Cache = await caches.open(key)
-            await Cache.put(HostName, t);
+            await Cache.put(getHostName(), t);
             return true
         }
         return false
     }
     async get<T extends object>(key: string) : Promise<T|null> {
-        if (window.caches) {
+        if (typeof caches != "undefined") {
             const Cache = await caches.open(key)
-            const cachedResponse = await Cache.match(HostName);
+            const cachedResponse = await Cache.match(getHostName());
             if (cachedResponse) {
                 return ( await cachedResponse.json()) as T
             }
@@ -29,7 +31,7 @@ export class CSaveToCache implements IServerSaveBasePromise{
         return null
     }
     async delete<T extends object>(key: string) : Promise<boolean> {
-        if (window.caches) {
+        if (typeof caches != "undefined") {
             return await caches.delete(key)
         }
         return false
@@ -39,21 +41,21 @@ export class CSaveToCache implements IServerSaveBasePromise{
 
 export class CSaveToLocalStorage  implements IServerSaveBasePromise{
     async set(key: string, value: object) : Promise<boolean>  {
-        if (window.localStorage) {
+        if (typeof localStorage != "undefined") {
             await localStorage.setItem(key,JSON.stringify(value))
             return true
         }
         return false
     }
     async get<T extends object>(key: string) : Promise<T|null> {
-        if (window.localStorage) {
+        if (typeof localStorage != "undefined") {
             const st = await localStorage.getItem(key)
             if (st) { try { return JSON.parse(st) } catch { return null } }
         }
         return null
     }
     async delete<T extends object>(key: string) : Promise<boolean> {
-        if (window.localStorage) {
+        if (typeof localStorage != "undefined") {
             localStorage.removeItem(key)
             return true
         }
@@ -61,7 +63,7 @@ export class CSaveToLocalStorage  implements IServerSaveBasePromise{
     }
 
     async deleteAll() : Promise<boolean> {
-        if (window.localStorage) {
+        if (typeof localStorage != "undefined") {
             await localStorage.clear()
             return true
         }
@@ -72,14 +74,12 @@ export class CSaveToLocalStorage  implements IServerSaveBasePromise{
 export const CacheG = new CSaveToCache()
 export const CacheLocal = new CSaveToLocalStorage()
 
-async function addDataToMap(data: [k: string,v: unknown][], map: Map<string,unknown>) {
-    if (data) {
-        for (let [k,v] of data) {
-            const tr = map.has(k) ? map.get(k) : map.set(k, v).get(k)!
-            if (tr && typeof tr === 'object') {
-                Object.assign(tr, v)
-                renderBy(tr)
-            }
+function addDataToMap(data: [k: string,v: unknown][], map: Map<string,unknown>) {
+    for (let [k,v] of data) {
+        const tr = map.has(k) ? map.get(k) : map.set(k, v).get(k)!
+        if (tr && typeof tr === 'object') {
+            Object.assign(tr, v)
+            renderBy(tr)
         }
     }
 }
@@ -94,18 +94,20 @@ export const ObjectStringToDate = (obj: unknown): void => {
         })
     }
 }
+// module-level constant: this runs for every string of every cached object on load
+const ISO_DATE_RE = /^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]+)?(Z)?$/;
 function isDate(_date: string){
-    const _regExp  = new RegExp('^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(.[0-9]+)?(Z)?$');
-    return _regExp.test(_date);
+    return ISO_DATE_RE.test(_date);
 }
 
 export function CacheFuncMapBase(arr: [k: string, v: Map<string, unknown>][], Save: IServerSaveBasePromise) {
     return {
         async load(){
             for (let [k,v] of arr) {
-                const t = await Save.get(k) as [k: string, v: unknown][]
+                const t = await Save.get<[k: string, v: unknown][]>(k)
+                if (!t) continue
                 ObjectStringToDate(t)
-                await addDataToMap(t, v)
+                addDataToMap(t, v)
             }
         },
         async save(){

@@ -17,7 +17,7 @@ export function EditParams2<TParams extends Params.IParamsExpandableReadonly = P
         {paramsD && <ParametersReact params={paramsD} onChange={e => params.current = e}/>}
         {onSave && <div className={"msTradeActive msTradeAlt"} onClick={async () => {
             const t = params.current || paramsD
-            if (t) onSave?.(t)
+            if (t) onSave(t)
         }}>save
         </div>}
     </div>
@@ -38,7 +38,7 @@ export function EditParams3<TParams extends Params.IParamsExpandableReadonly = P
             setParams(params)
         }}/>)}
         {onSave && <div className={"msTradeActive msTradeAlt"} onClick={async () => {
-            params && onSave?.(params)
+            if (params) onSave(params)
         }}>save
         </div>}
     </div>

@@ -1,58 +1,68 @@
-// ... existing code ...
 import "../style/menuRight.css"
 import "../style/style.css"
+import * as hooksV2 from "./src/hooks";
+import * as dndV2 from "./src/components/Dnd";
+import * as utilsV2 from "./src/utils";
+import * as gridV2 from "./src/grid/agGrid4";
+import * as modalV2 from "./src/components/Modal";
+import * as menuV2 from "./src/menu/menu";
+import * as menuMouseV2 from "./src/menu/menuMouse";
+import * as menuRV2 from "./src/menu/menuR";
+import * as logsV2 from "./src/logs/logs";
+import * as updateByV2 from "./updateBy";
 
-// 0. СТИЛИ - независимые
+
+// 0. STYLES - independent
 export * from "./src/styles/styleGrid";
 export * from "./src/styles/tokens";
 
-// 1. БАЗОВЫЙ СЛОЙ - никаких зависимостей внутри проекта
+// 1. BASE LAYER - no internal project dependencies
 export * from "./updateBy";
 
-// 2. ХУКИ - зависят только от updateBy
+// 2. HOOKS - depend only on updateBy
 export * from "./src/hooks";
 
-// 4. DND компоненты - зависят от updateBy
+// 4. DND components - depend on updateBy
 export * from "./src/components/Dnd";
 
-// 5. UTILS - теперь зависят от Dnd (mapMemory импортирует ExRNDMap3, mapResiReact)
+// 5. UTILS - now depend on Dnd (mapMemory imports ExRNDMap3, mapResiReact)
 export * from "./src/utils";
 
-// 5b. ГРИД (agGrid4): ядро-буфер + headless-хук + AgGridMy. Новый путь вместо applyTransactionAsyncUpdate
+// 5b. GRID (agGrid4): core buffer + headless hook + AgGridMy. New path instead of applyTransactionAsyncUpdate
 export * from "./src/grid/agGrid4";
 
-// 6. БАЗОВЫЕ КОМПОНЕНТЫ - зависят от hooks
+// 6. BASE COMPONENTS - depend on hooks
 export * from "./src/components/Buttons";
 export * from "./src/components/MyResizeObserver";
 export * from "./src/components/Other";
 
-// 7. Parameters - зависит от utils
+// 7. Parameters - depends on utils
 export * from "./src/components/Parameters";
 
-// 8. ParametersEngine - зависит от Parameters и utils
+// 8. ParametersEngine - depends on Parameters and utils
 export * from "./src/components/ParametersEngine";
 
-// 9. Input - зависит от hooks и Dnd
+// 9. Input - depends on hooks and Dnd
 export * from "./src/components/Input";
 
-// 10. Modal - зависит от Input и updateBy
+// 10. Modal - depends on Input and updateBy
 export * from "./src/components/Modal";
 
-// 11. Menu - зависит от hooks, Dnd и Modal
+// 11. Menu - depends on hooks, Dnd, and Modal
 export * from "./src/components/Menu";
 
-// 12. МЕНЮ - зависят от компонентов
+// 12. MENU - depends on components
 export * from "./src/menu/menu";
 export * from "./src/menu/menuMouse";
 export * from "./src/menu/menuR";
 
-// 13. ЛОГИ - зависят от utils/mapMemory, menu и components/ParametersEngine
+// 13. LOGS - depend on utils/mapMemory, menu, and components/ParametersEngine
 export * from "./src/logs/logs";
 export * from "./src/logs/logs3";
 export * from "./src/logs/miniLogs";
 
 
-// 14. ГРАФИКИ - самый высокий уровень
+// 14. CHARTS - highest level
 export * from "./src/myChart/1/myChart";
 export * from "./src/myChart/1/myChartTest";
 export * from "./src/myChart/chartEngine/chartEngineReact";
@@ -60,4 +70,17 @@ export * from "./src/myChart/chartEngine/chartEngineReact";
 export function test() {
     return 5;
 }
-// ... existing code ...
+export const v2 = {
+    hooks: hooksV2,
+    dnd: dndV2,
+    utils: utilsV2,
+    grid: gridV2,
+    modal: modalV2,
+    menu: {
+        ...menuV2,
+        mouse: menuMouseV2,
+        rightClick: menuRV2,
+    },
+    logs: logsV2,
+    updateBy: updateByV2,
+} as const;

@@ -51,12 +51,16 @@ export function StyleCSSHeadGridEdit(name: string, rules: string) {
     style.sheet?.insertRule(name + "{" + rules + "}", 0);
 }
 
+let headGridStylesApplied = false;
 export function StyleCSSHeadGrid() {
-    // уменьшаем отступы с боков для заголовков
+    // idempotent: repeated calls used to append a new <style> to <head> every time
+    if (headGridStylesApplied) return;
+    headGridStylesApplied = true;
+    // Reduce side padding for headers
     StyleCSSHeadGridEdit('.ag-theme-alpine-dark .ag-theme-alpine .ag-header-cell, .ag-theme-alpine-dark .ag-header-group-cell',
         "padding-left: 3px; padding-right: 3px;"
     );
-    // выравнивание в заголовке по центру
+    // Center header content
     StyleCSSHeadGridEdit('.ag-header-cell-label', 'justify-content: center');
 }
 

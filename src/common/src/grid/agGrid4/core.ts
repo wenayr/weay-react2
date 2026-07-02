@@ -1,16 +1,16 @@
-// Слой 1 (core): чистая логика буфера — closure-фабрика. Без React, без ag-grid.
-// Буфер = последнее известное состояние строк по id («точка памяти»). Вся анти-гонка здесь.
+// Layer 1 (core): pure buffer logic, implemented as a closure factory. No React, no ag-grid.
+// Buffer = the last known row state by id (a memory point). All race handling is here.
 //
-// Отличия от agGrid2/3 (оптимизации):
-//  - зависимости (getId, буфер, api) захватываются фабрикой один раз — одна точка входа
-//    updateData вместо дублирования «буфер/грид» в хуке;
-//  - мёрж строки на месте (Object.assign) — без аллокации нового объекта на каждый апдейт
-//    (важно на потоке: меньше мусора для GC);
-//  - add-vs-update решается по Set доставленных id, без api.getRowNode на каждую строку.
+// Differences from agGrid2/3 (optimizations):
+//  - dependencies (getId, buffer, api) are captured by the factory once: one entry point,
+//    updateData, instead of duplicating buffer/grid branching in the hook;
+//  - in-place row merge (Object.assign), with no new object allocated for each update
+//    (important on streams: less garbage for GC);
+//  - add vs update is decided by a Set of delivered ids, without api.getRowNode per row.
 
 export type RowId = string
 
-/** Достаёт стабильный id строки. Работает и по частичным данным. */
+/** Gets a stable row id. Works with partial data too. */
 export type GetId<T> = (data: Partial<T>) => RowId
 
 export type BufferTable<T> = Record<RowId, Partial<T>>
@@ -21,7 +21,7 @@ export type GridTransaction<T> = {
     remove?: T[]
 }
 
-/** Минимальный контракт grid api (реальный GridApi структурно подходит). */
+/** Minimal grid api contract (the real GridApi is structurally compatible). */
 export type GridApiLike<T> = {
     forEachNode(callback: (node: { data?: T }) => void): void
     applyTransaction(tx: GridTransaction<T>): unknown
@@ -31,35 +31,35 @@ export type GridApiLike<T> = {
 export type PushOptions = {
     add?: boolean
     update?: boolean
-    /** add+update одной СИНХРОННОЙ транзакцией. По умолчанию: add — sync, update — async (батч). */
+    /** add+update in one SYNCHRONOUS transaction. Default: add is sync, update is async (batched). */
     sync?: boolean
 }
 
 export type UpdateArgs<T> = {
     newData?: Partial<T>[]
     removeData?: Partial<T>[]
-    /** Только обновить буфер, грид не трогать. */
+    /** Only update the buffer; do not touch the grid. */
     onlyMemo?: boolean
     option?: PushOptions
 }
 
 /**
- * Ядро таблицы: буфер + доставка в грид. Жизненный цикл:
- *  1. updateData в любой момент — буфер обновится всегда, грид — если подключён;
- *  2. attach(api) на onGridReady — sync догоняет всё, что прилетело раньше;
- *  3. detach() на destroy грида — ядро снова копит в буфер до следующего attach.
+ * Table core: buffer + delivery to the grid. Lifecycle:
+ *  1. updateData at any time: the buffer is always updated, the grid only if attached;
+ *  2. attach(api) on onGridReady: sync catches up with everything that arrived earlier;
+ *  3. detach() on grid destroy: the core accumulates in the buffer again until the next attach.
  */
 export function createGridBuffer<T>(deps: {
     getId: GetId<T>
-    /** Внешний буфер (объект выше компонента) — переживает ремаунт роута. Иначе свой. */
+    /** External buffer (object above the component) survives route remounts. Otherwise use an internal one. */
     externalBuffer?: BufferTable<T>
 }) {
     const { getId } = deps
     const buf: BufferTable<T> = deps.externalBuffer ?? {}
-    const inGrid = new Set<RowId>() // id, уже доставленные в грид
+    const inGrid = new Set<RowId>() // ids already delivered to the grid
     let api: GridApiLike<T> | null = null
 
-    // ─── Буфер ───────────────────────────────────────────────────────────────
+    // --- Buffer ----------------------------------------------------------------
 
     function upsert(rows: Partial<T>[]) {
         for (const row of rows) {
@@ -68,9 +68,9 @@ export function createGridBuffer<T>(deps: {
         }
     }
 
-    // ─── Доставка в грид ─────────────────────────────────────────────────────
+    // --- Grid delivery ---------------------------------------------------------
 
-    /** Главная точка: льёшь данные когда угодно — буфер сам решит, дошли они до грида или нет. */
+    /** Main entry point: push data any time; the buffer decides whether it reaches the grid. */
     function updateData(args: UpdateArgs<T>) {
         const { newData, removeData, onlyMemo, option } = args
         if (newData) upsert(newData)
@@ -90,9 +90,9 @@ export function createGridBuffer<T>(deps: {
 
         const add = opt.add ? toAdd : []
         const update = opt.update ? toUpdate : []
-        // помечаем доставленными только то, что реально уедет в грид
+        // Mark as delivered only the rows that are actually sent to the grid.
         for (const row of add) inGrid.add(getId(row))
-        // ag-grid находит строку для remove через getRowId — частичных данных достаточно
+        // ag-grid finds rows for remove through getRowId, so partial data is enough.
         const remove = removeData?.filter(row => inGrid.delete(getId(row))) as T[] | undefined
 
         if (opt.sync) {
@@ -100,13 +100,13 @@ export function createGridBuffer<T>(deps: {
             return
         }
         if (add.length || remove?.length) api.applyTransaction({ add, remove })
-        // батчинг update отдаёт сам грид (asyncTransactionWaitMillis)
+        // Let the grid itself batch updates (asyncTransactionWaitMillis).
         if (update.length) api.applyTransactionAsync({ update })
     }
 
     /**
-     * Привести грид к буферу целиком (буфер — истина).
-     * Чего нет в буфере → remove, чего нет в гриде → add, остальное → update.
+     * Bring the whole grid in line with the buffer (the buffer is the source of truth).
+     * Missing from the buffer -> remove; missing from the grid -> add; everything else -> update.
      */
     function sync() {
         if (!api) return
@@ -132,11 +132,11 @@ export function createGridBuffer<T>(deps: {
             api.applyTransaction({ add, update, remove })
     }
 
-    // ─── Жизненный цикл ──────────────────────────────────────────────────────
+    // --- Lifecycle -------------------------------------------------------------
 
     function attach(gridApi: GridApiLike<T>) {
         api = gridApi
-        sync() // догнать гонку: данные могли прилететь раньше onGridReady
+        sync() // catch up with the race: data may have arrived before onGridReady
     }
 
     function detach() {
@@ -145,20 +145,20 @@ export function createGridBuffer<T>(deps: {
     }
 
     return {
-        // в React-биндинг (или другой владелец грида)
+        // for the React binding (or another grid owner)
         control: { attach, detach },
-        // наружу потребителю
+        // public consumer api
         api: { updateData, sync, getId, buffer: buf },
     }
 }
 
 export type GridBufferCore<T> = ReturnType<typeof createGridBuffer<T>>
 
-// ─── Утилиты ─────────────────────────────────────────────────────────────────
+// --- Utilities ---------------------------------------------------------------
 
 export type NumberPair = [a: number, b: number]
 
-/** Компаратор колонок: числа — как числа, пустые/NaN вниз (с учётом инверсии). */
+/** Column comparator: numbers as numbers, empty/NaN values last (respecting inversion). */
 export function numericComparator<T = any>(map?: (a: any, b: any) => NumberPair) {
     return (a1: any, b1: any, _nodeA?: T, _nodeB?: T, inv?: boolean): number => {
         const [a, b] = map ? map(a1, b1) : [a1, b1]

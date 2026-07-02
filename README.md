@@ -1,65 +1,65 @@
-Вот расширенное руководство по API (с типизацией и примерами использования). Этот формат отлично подойдет для документации, чтобы другие разработчики (или AI-ассистенты) могли сразу понимать, какие пропсы принимает компонент и как его внедрять.
+Here is an expanded API guide with typings and usage examples. This format is suitable for documentation so other developers or AI assistants can quickly understand which props a component accepts and how to integrate it.
 
 ---
 
-## 🛠 Справочник API (Components & Hooks)
+## API Reference (Components & Hooks)
 
-### 🪟 Модальные и плавающие окна (MDI)
+### Modal and Floating Windows (MDI)
 
 #### `DivRnd3`
-Обертка для создания окон со свободным перемещением, изменением размеров (resize) и сохранением состояния.
+Wrapper for creating freely movable, resizable windows with state persistence.
 
-**Типизация:**
+**Typing:**
 ```typescript
 type tDivRndBase = {
     children: React.ReactElement | ((update: number) => React.ReactElement);
     position?: { x: number; y: number };
     size?: { height: number | string; width: number | string };
-    keyForSave?: string;        // Ключ для кэширования позиции/размера в памяти
+    keyForSave?: string;        // Key for caching the position/size in memory
     limit?: { x?: { max?: number; min?: number }, y?: { max?: number; min?: number } };
-    onCLickClose?: () => void;  // Добавляет крестик закрытия окна
-    header?: React.ReactElement | boolean; // Шапка для перетаскивания (иначе тянется за весь блок)
+    onCLickClose?: () => void;  // Adds a close button to the window
+    header?: React.ReactElement | boolean; // Drag handle header; otherwise the whole block is draggable
     zIndex?: number;
 }
 ```
 
-**Пример:**
+**Example:**
 ```textmate
-<DivRnd3 
-    keyForSave="my_tool_window" 
-    size={{ width: 300, height: 200 }} 
+<DivRnd3
+    keyForSave="my_tool_window"
+    size={{ width: 300, height: 200 }}
     onCLickClose={() => setOpen(false)}
-    header={<div>Мой инструмент</div>}
+    header={<div>My tool</div>}
 >
-    <div>Контент окна</div>
+    <div>Window content</div>
 </DivRnd3>
 ```
 
 
 #### `GetModalJSX()`
-Фабрика глобальных модальных окон. Позволяет вызывать окна из бизнес-логики без привязки к локальному стейту компонента.
+Factory for global modal windows. It lets business logic open windows without being tied to local component state.
 
-**Пример:**
+**Example:**
 ```textmate
 const myModal = GetModalJSX();
 
-// 1. В корневом файле приложения (App.tsx):
+// 1. In the app root file (App.tsx):
 <myModal.Render />
 
-// 2. В любом месте логики:
-myModal.set(<div onClick={() => myModal.set(null)}>Закрыть меня</div>);
-// Для множественных окон: myModal.addJSX( <Component/> )
+// 2. Anywhere in the logic:
+myModal.set(<div onClick={() => myModal.set(null)}>Close me</div>);
+// For multiple windows: myModal.addJSX(<Component/>)
 ```
 
 
 ---
 
-### 🖱 Drag-and-Drop и Взаимодействие (Hooks & Wrappers)
+### Drag-and-Drop and Interaction (Hooks & Wrappers)
 
 #### `useOutside` / `DivOutsideClick`
-Отслеживание клика вне элемента (полезно для закрытия дропдаунов и меню).
+Tracks clicks outside an element, useful for closing dropdowns and menus.
 
-**Типизация:**
+**Typing:**
 ```typescript
 // Hook
 function useOutside(params: { outsideClick: () => void, status?: boolean, ref?: RefObject }): RefObject;
@@ -68,7 +68,7 @@ function useOutside(params: { outsideClick: () => void, status?: boolean, ref?: 
 type Props = { outsideClick: () => void, status?: boolean, zIndex?: number } & HTMLAttributes;
 ```
 
-**Пример:**
+**Example:**
 ```textmate
 <DivOutsideClick outsideClick={() => setDropdownOpen(false)} status={isOpen}>
     <div className="dropdown-menu">...</div>
@@ -77,14 +77,14 @@ type Props = { outsideClick: () => void, status?: boolean, zIndex?: number } & H
 
 
 #### `Drag22`
-Отслеживает сдвиг мыши/пальца и возвращает новые координаты, не вмешиваясь в CSS напрямую.
+Tracks mouse/finger movement and returns new coordinates without touching CSS directly.
 
-**Типизация:**
+**Typing:**
 ```typescript
 type Drag2Props = {
-    x?: number; y?: number;               // Стартовые/текущие координаты
-    onX?: (val: number) => void;          // Коллбек изменения X
-    onY?: (val: number) => void;          // Коллбек изменения Y
+    x?: number; y?: number;               // Start/current coordinates
+    onX?: (val: number) => void;          // X change callback
+    onY?: (val: number) => void;          // Y change callback
     onStart?: () => void; onStop?: () => void;
     children: ReactNode;
 };
@@ -93,58 +93,58 @@ type Drag2Props = {
 
 ---
 
-### 📋 Контекстные меню (`MenuR` / `mouseMenuApi`)
+### Context Menus (`MenuR` / `mouseMenuApi`)
 
-Умные контекстные меню. Вызываются на ПК (ПКМ) и мобилках (долгий тап / дабл-тап). Поддерживают асинхронную генерацию элементов.
+Smart context menus. They open on desktop via right click and on mobile via long tap / double tap. They support asynchronous item generation.
 
-**Типизация элемента меню (`tMenuReactStrictly`):**
+**Menu item typing (`tMenuReactStrictly`):**
 ```typescript
 type tMenuReactStrictly = {
     name: string | ((status?: any) => string);
-    onClick?: (e: any) => void | Promise<any> | Promise<any>[]; // Поддержка промисов со счетчиком ok/error
-    status?: boolean; // Раскрыто ли подменю
-    next?: () => tMenuReact[] | Promise<tMenuReact[]>; // Вложенное меню
-    func?: () => React.ReactElement | Promise<React.ReactElement>; // Кастомный рендер при наведении
+    onClick?: (e: any) => void | Promise<any> | Promise<any>[]; // Promise support with ok/error counters
+    status?: boolean; // Whether the submenu is expanded
+    next?: () => tMenuReact[] | Promise<tMenuReact[]>; // Nested menu
+    func?: () => React.ReactElement | Promise<React.ReactElement>; // Custom hover render
 };
 ```
 
-**Примеры:**
+**Examples:**
 ```textmate
-// 1. Использование компонента-обертки
+// 1. Using the wrapper component
 const menuItems = () => [
-    { name: "Копировать", onClick: () => copy() },
-    { name: "Опции", next: () => [{ name: "Опция 1", onClick: () => {} }] }
+    { name: "Copy", onClick: () => copy() },
+    { name: "Options", next: () => [{ name: "Option 1", onClick: () => {} }] }
 ];
 
 <MenuR other={menuItems}>
-    <div className="item">Кликни меня правой кнопкой</div>
+    <div className="item">Right-click me</div>
 </MenuR>
 
-// 2. Глобальный вызов через API
-mouseMenuApi.map.set("global_action", [{ name: "Глобальное действие", onClick: () => {} }]);
+// 2. Global call through the API
+mouseMenuApi.map.set("global_action", [{ name: "Global action", onClick: () => {} }]);
 ```
 
 
 ---
 
-### 📊 Обновление таблиц Ag-Grid (`applyTransactionAsyncUpdate2`)
+### Ag-Grid Table Updates (`applyTransactionAsyncUpdate2`)
 
-Функция для безопасного, пакетного и асинхронного обновления данных таблицы, синхронизированного с локальным буфером (кэшем).
+Function for safe batched asynchronous table data updates synchronized with a local buffer/cache.
 
-**Типизация:**
+**Typing:**
 ```typescript
 type Params<T> = {
     gridRef?: React.RefObject<GridReadyEvent<T, any>>;
-    newData: Partial<T>[];                         // Массив новых данных
-    getId: (row: Partial<T>) => string;            // Функция получения ID
-    bufTable: { [id: string]: Partial<T> };        // Локальный кэш-словарь
+    newData: Partial<T>[];                         // New data array
+    getId: (row: Partial<T>) => string;            // ID getter
+    bufTable: { [id: string]: Partial<T> };        // Local cache dictionary
     option?: { update?: boolean, add?: boolean, updateBuffer?: boolean, sync?: boolean };
 };
 ```
 
-**Пример:**
+**Example:**
 ```textmate
-// Мгновенно обновляет кэш и отправляет транзакцию в Ag-Grid
+// Immediately updates the cache and sends a transaction to Ag-Grid
 applyTransactionAsyncUpdate2({
     gridRef: apiGrid,
     newData: [{ id: "user_1", balance: 500 }],
@@ -157,91 +157,92 @@ applyTransactionAsyncUpdate2({
 
 ---
 
-### ⚙️ Автогенерация UI настроек (`ParametersReact`)
+### UI Settings Autogeneration (`ParametersReact`)
 
-Движок, который принимает объект со схемой данных и рендерит готовую форму управления (инпуты, слайдеры, селекты).
+Engine that accepts an object with a data schema and renders a ready-to-use control form with inputs, sliders, and selects.
 
-**Типизация:**
-Схема строится на основе типов `Params.IParamsExpandableReadonly`. 
-Поддерживаются типы: `number`, `string`, `boolean`, `Date`, массивы, вложенные объекты.
+**Typing:**
+The schema is built from `Params.IParamsExpandableReadonly` types.
+Supported types: `number`, `string`, `boolean`, `Date`, arrays, and nested objects.
 
-**Пример:**
+**Example:**
 ```textmate
 const mySettings = {
-    showGrid: true, // Сгенерирует Checkbox
-    opacity: { 
-        value: 0.5, 
-        range: { min: 0, max: 1, step: 0.1 }, 
-        name: "Прозрачность" 
-    }, // Сгенерирует Range Slider + Number Input
+    showGrid: true, // Generates a Checkbox
+    opacity: {
+        value: 0.5,
+        range: { min: 0, max: 1, step: 0.1 },
+        name: "Opacity"
+    }, // Generates a Range Slider + Number Input
     theme: {
         value: "dark",
         range: ["dark", "light", "system"]
-    } // Сгенерирует Select
+    } // Generates a Select
 };
 
-<ParametersReact 
-    params={mySettings} 
+<ParametersReact
+    params={mySettings}
     onChange={(newParams) => {
-        console.log("Новое значение:", newParams.opacity.value);
-    }} 
+        console.log("New value:", newParams.opacity.value);
+    }}
 />
 ```
 
 
 ---
 
-### 📜 Система логирования (`logsApi`)
+### Logging System (`logsApi`)
 
-Регистрация логов, таблица их просмотра и система всплывающих уведомлений (toasts). 
+Log registration, log viewer table, and toast notification system.
 
 **API:**
 ```typescript
-// 1. Добавление лога
+// 1. Adding a log
 logsApi.addLogs({
     id: "system",
-    var: 10,           // Важность (важно для фильтрации уведомлений)
+    var: 10,           // Severity, important for notification filtering
     time: new Date(),
-    txt: "Соединение разорвано"
+    txt: "Connection lost"
 });
 
-// 2. Рендер компонентов (обычно где-то в корне):
-<logsApi.React.Message zIndex={9999} /> // Всплывающие уведомления справа сверху
-<logsApi.React.PageLogs />              // Таблица всех логов Ag-Grid
+// 2. Rendering components, usually somewhere near the root:
+<logsApi.React.Message zIndex={9999} /> // Toast notifications in the top-right corner
+<logsApi.React.PageLogs />              // Ag-Grid table with all logs
 ```
-Да, в кодовой базе есть еще несколько очень важных архитектурных паттернов и UI-компонентов, которые активно используются и обязательно должны быть в документации, чтобы другой разработчик (или ИИ) понимал, как строить интерфейсы в этом проекте.
 
-Вот вторая часть дополнений для `README.md`:
+There are several other important architectural patterns and UI components actively used in the codebase. They should be documented so another developer or AI assistant can understand how interfaces are built in this project.
+
+Here is the second part of the `README.md` additions:
 
 ---
 
-### 🗂 Боковая навигация (Sidebar)
+### Sidebar Navigation
 
 #### `ApiLeftMenu`
-Готовое API для управления левым выдвижным меню (Sidebar). Поддерживает свайпы, плавную доводку (snap scrolling) и императивное управление вкладками.
+Ready-made API for controlling the left slide-out sidebar menu. It supports swipes, smooth snap scrolling, and imperative tab control.
 
-**API и Типизация:**
+**API and Typing:**
 ```typescript
 type MenuItem = {
-    el: () => React.JSX.Element;   // Компонент вкладки
-    button?: React.JSX.Element;    // Кастомная кнопка (опционально)
-    color?: ColorString;           // Цвет фона
-    textB?: string;                // Текст по умолчанию для кнопки
+    el: () => React.JSX.Element;   // Tab component
+    button?: React.JSX.Element;    // Custom button, optional
+    color?: ColorString;           // Background color
+    textB?: string;                // Default button text
 };
 
-// Регистрация пунктов меню:
+// Register menu items:
 ApiLeftMenu.setMenu(items: MenuItem[], key?: string);
 ```
 
-**Пример использования:**
+**Usage example:**
 ```textmate
-// 1. Регистрация вкладок (можно делать где угодно в логике):
+// 1. Register tabs, can be done anywhere in the logic:
 ApiLeftMenu.setMenu([
-    { textB: "Дашборд", el: () => <Dashboard />, color: "rgb(92,50,213)" },
-    { textB: "Настройки", el: () => <Settings /> }
+    { textB: "Dashboard", el: () => <Dashboard />, color: "rgb(92,50,213)" },
+    { textB: "Settings", el: () => <Settings /> }
 ], "main_menu");
 
-// 2. Рендер самого меню в корневом Layout:
+// 2. Render the menu itself in the root Layout:
 export function AppLayout() {
     return <ApiLeftMenu.Modal2 zIndex={20} />;
 }
@@ -250,30 +251,30 @@ export function AppLayout() {
 
 ---
 
-### 🎛 Интерактивные элементы и Кнопки
+### Interactive Elements and Buttons
 
-#### `Button` (из `useOutside.tsx`) / `MiniButton`
-Продвинутые компоненты кнопок, которые инкапсулируют логику раскрывающихся списков (dropdowns), всплывающих панелей и отслеживают клик снаружи для автоматического закрытия.
+#### `Button` (from `useOutside.tsx`) / `MiniButton`
+Advanced button components that encapsulate dropdown logic, popover panels, and outside-click tracking for automatic closing.
 
-**Типизация `Button`:**
+**`Button` typing:**
 ```typescript
 type tButton = {
-    button: ReactElement | ((status: boolean) => ReactElement); // Сама кнопка (может менять вид от статуса)
-    children: ReactNode | ((api: {onClose: () => void}) => ReactNode); // Выпадающий контент
-    outClick?: boolean | (() => void); // Закрывать ли по клику вне области (true по умолчанию)
-    statusDef?: boolean; // Начальное состояние (открыто/закрыто)
+    button: ReactElement | ((status: boolean) => ReactElement); // The button itself; can change by status
+    children: ReactNode | ((api: {onClose: () => void}) => ReactNode); // Dropdown content
+    outClick?: boolean | (() => void); // Whether to close on outside click; true by default
+    statusDef?: boolean; // Initial state, open/closed
 };
 ```
 
-**Пример:**
+**Example:**
 ```textmate
-<Button 
+<Button
     outClick={true}
-    button={(isOpen) => <div className={isOpen ? "active" : ""}>Опции</div>}
+    button={(isOpen) => <div className={isOpen ? "active" : ""}>Options</div>}
 >
     {({ onClose }) => (
         <div className="dropdown-panel">
-            <div onClick={() => { doSomething(); onClose(); }}>Действие 1</div>
+            <div onClick={() => { doSomething(); onClose(); }}>Action 1</div>
         </div>
     )}
 </Button>
@@ -281,14 +282,14 @@ type tButton = {
 
 
 #### `FResizableReact`
-Обертка над `re-resizable`. Позволяет делать панели с изменяемым размером (например, колонки или нижние логи), сохраняя их размер в кэш.
+Wrapper over `re-resizable`. It creates resizable panels, for example columns or lower log panes, and stores their size in cache.
 
-**Пример:**
+**Example:**
 ```textmate
-<FResizableReact 
-    keyForSave="bottom_panel_size" 
+<FResizableReact
+    keyForSave="bottom_panel_size"
     size={{ height: 200, width: "100%" }}
-    moveWith={false} // Разрешить ресайз только по высоте
+    moveWith={false} // Allow resize only by height
 >
     <LogsTable />
 </FResizableReact>
@@ -297,63 +298,63 @@ type tButton = {
 
 ---
 
-### 🔄 Глобальная реактивность (Паттерн `renderBy` / `updateBy`)
+### Global Reactivity (`renderBy` / `updateBy` Pattern)
 
-*(Примечание: это важнейший концепт проекта, используемый вместо классического `useState` / `Redux` для сложной бизнес-логики).*
+*(Note: this is a key project concept used instead of classic `useState` / `Redux` for complex business logic.)*
 
-Во многих местах проекта используется мутабельный подход к состоянию: вы меняете свойства обычного JS-объекта и вызываете `renderBy(obj)`, чтобы принудительно обновить все компоненты, которые подписаны на этот объект через `updateBy(obj)`.
+Many places in the project use a mutable state approach: you mutate properties of a plain JS object and call `renderBy(obj)` to force an update of all components subscribed to that object through `updateBy(obj)`.
 
-**Пример паттерна:**
+**Pattern example:**
 ```textmate
 import { renderBy, updateBy } from "./updateBy";
 
-// 1. Глобальное или локальное состояние (обычный объект)
+// 1. Global or local state, a plain object
 const myState = {
     count: 0,
     text: "hello"
 };
 
-// 2. Компонент-потребитель
+// 2. Consumer component
 function CounterViewer() {
-    // Компонент подписывается на изменения myState
-    updateBy(myState); 
-    
+    // The component subscribes to myState changes
+    updateBy(myState);
+
     return <div>{myState.count}</div>;
 }
 
-// 3. Изменение состояния (где угодно, даже вне React)
+// 3. State change, anywhere, even outside React
 function increment() {
     myState.count += 1;
-    renderBy(myState); // Триггерит ререндер CounterViewer
+    renderBy(myState); // Triggers a CounterViewer rerender
 }
 ```
 
 
 ---
 
-### 📊 Полезные утилиты для Ag-Grid
+### Useful Ag-Grid Utilities
 
-#### `GridStyleDefault` и `StyleCSSHeadGrid`
-Быстрое применение единого корпоративного стиля ко всем таблицам приложения.
+#### `GridStyleDefault` and `StyleCSSHeadGrid`
+Quickly apply the common corporate style to all application tables.
 
-**Пример внедрения в корень проекта:**
+**Root integration example:**
 ```typescript
 import { GridStyleDefault, StyleCSSHeadGrid } from "./styleGrid";
 
-// Применяет темную тему, сжимает отступы, центрирует заголовки
+// Applies the dark theme, compresses spacing, and centers headers
 GridStyleDefault();
 StyleCSSHeadGrid();
 ```
 
 
 #### `getComparatorGrid`
-Фабрика для создания кастомных функций сортировки колонок Ag-Grid, корректно обрабатывающая `undefined`, `NaN` и инверсию.
-**Пример:**
+Factory for creating custom Ag-Grid column sort functions that correctly handle `undefined`, `NaN`, and inversion.
+**Example:**
 ```textmate
 const columnDefs = [
-    { 
-        field: "price", 
-        comparator: getComparatorGrid() // Безопасная сортировка чисел
+    {
+        field: "price",
+        comparator: getComparatorGrid() // Safe numeric sorting
     }
 ];
 ```
@@ -361,22 +362,22 @@ const columnDefs = [
 
 ---
 
-### ⌨️ Глобальные хуки
+### Global Hooks
 
 #### `useAddDownAnyKey`
-Регистрирует глобальный слушатель нажатий клавиатуры и сохраняет последнюю нажатую клавишу в экспортируемый реактивный объект `KeyDown`.
+Registers a global keyboard listener and stores the last pressed key in the exported reactive object `KeyDown`.
 
-**Пример использования:**
+**Usage example:**
 ```textmate
 import { KeyDown, useAddDownAnyKey } from "./useAddDownAnyKey";
 import { updateBy } from "./updateBy";
 
 function HotkeyListener() {
-    useAddDownAnyKey(); // Инициализация хука
-    updateBy(KeyDown);  // Подписка на нажатия
+    useAddDownAnyKey(); // Hook initialization
+    updateBy(KeyDown);  // Subscribe to key presses
 
     if (KeyDown.key === "Escape") {
-        return <div>Нажат Escape!</div>;
+        return <div>Escape pressed!</div>;
     }
     return null;
 }

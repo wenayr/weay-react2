@@ -2,7 +2,7 @@ import React from "react";
 import {Resizable, ResizableProps} from "re-resizable";
 
 type tSaveMap = {height?: number|string, width?: number|string}
-// память всех размеров колонок
+// Memory for all column sizes
 export const mapResiReact = new Map<string,tSaveMap >()
 type t3 = Pick<ResizableProps, "style" | "enable" | "onResize" | "children" | "size" | "maxWidth"| "maxHeight"| "minWidth"| "minHeight">
 
@@ -28,8 +28,8 @@ export function FResizableReact(
     }
     return <Resizable style = {style}
                       onResize = {(event, direction, elementRef, delta)=> {
-                          onResize?.()
-                          // костыль устраняет какой-то баг - проявляется при изменении родительского дива
+                          onResize?.(obj)
+                          // Workaround for a bug that appears when the parent div changes
                           if (moveHeight == false && typeof obj.height == "string" && elementRef.style.height != obj.height) elementRef.style.height = obj.height
                       }}
                       enable = {enable}

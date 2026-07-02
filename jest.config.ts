@@ -13,9 +13,9 @@ const jestConfig: JestConfigWithTsJest = {
   // fakeTimers: {legacyFakeTimers: true},
   rootDir: './__test',
   // roots: ['<rootDir>/__test'],
-  // testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.(jsx?|tsx?)$', // выбранные папки и файлы для тестов
-  // testRegex: '^.+\\test\\.(t|j)sx?$', // Шаблон для поиска тестовых файлов
-  testRegex: '^.+.(t|j)sx?$', // Шаблон для поиска тестовых файлов
+  // testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.(jsx?|tsx?)$', // selected folders and files for tests
+  // testRegex: '^.+\\test\\.(t|j)sx?$', // Pattern for finding test files
+  testRegex: '^.+.(t|j)sx?$', // Pattern for finding test files
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
 }
 

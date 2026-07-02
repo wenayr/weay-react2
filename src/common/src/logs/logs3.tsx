@@ -10,13 +10,13 @@ import React, {
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridReadyEvent } from 'ag-grid-community';
 
-// При необходимости раскомментируйте стили AG Grid:
+// Uncomment AG Grid styles if needed:
 // import 'ag-grid-community/styles/ag-grid.css';
 // import 'ag-grid-community/styles/ag-theme-alpine.css';
 // import 'ag-grid-community/styles/ag-theme-alpine-dark.css';
 
 /** -----------------------------
- *  1. Типы для логов
+ *  1. Log types
  * -----------------------------
  */
 export interface tLogsInput<T extends object = {}> {
@@ -24,7 +24,7 @@ export interface tLogsInput<T extends object = {}> {
     var?: number;
     time: Date;
     txt: string;
-    [key: string]: any; // любые доп. поля
+    [key: string]: any; // any additional fields
 }
 
 export interface tLogs<T extends object = {}> extends tLogsInput<T> {
@@ -32,39 +32,39 @@ export interface tLogs<T extends object = {}> extends tLogsInput<T> {
 }
 
 /** -----------------------------
- *  2. Функция staticGetAdd —
- *     загружает/сохраняет данные в localStorage.
+ *  2. staticGetAdd function -
+ *     loads and saves data in localStorage.
  * -----------------------------
  */
 function staticGetAdd<T>(key: string, defaultValue: T): T {
     try {
         const stored = localStorage.getItem(key);
-        // Если в localStorage ничего нет, то записываем defaultValue
+        // If localStorage has no value, write defaultValue
         if (!stored) {
             localStorage.setItem(key, JSON.stringify(defaultValue));
             return defaultValue;
         }
-        // Если что-то нашли, пытаемся объединить с defaultValue
-        // (на случай, если в defaultValue появились новые поля)
+        // If a value was found, try to merge it with defaultValue
+        // in case new fields were added to defaultValue
         const parsed = JSON.parse(stored);
         return { ...defaultValue, ...parsed };
     } catch (error) {
-        console.error("Ошибка чтения localStorage:", error);
+        console.error("localStorage read error:", error);
         return defaultValue;
     }
 }
 
 /** -----------------------------
- *  3. Интерфейс контекста
+ *  3. Context interface
  * -----------------------------
  */
 interface LogsContextValue {
-    // Массив логов
+    // Log array
     logs: tLogs[];
-    // Функция добавления лога
+    // Function for adding a log
     addLog: (input: tLogsInput) => void;
 
-    // Настройки
+    // Settings
     minVarLogs: number;
     setMinVarLogs: (value: number) => void;
 
@@ -79,33 +79,33 @@ interface LogsContextValue {
 }
 
 /** -----------------------------
- *  4. Создаём сам контекст
- *     и провайдер для логов + настроек
+ *  4. Create the context itself
+ *     and provider for logs and settings
  * -----------------------------
  */
 const LogsContext = createContext<LogsContextValue | null>(null);
 
 export function LogsProvider({ children }: { children: React.ReactNode }) {
-    // 4.1. Загружаем настройки из localStorage через staticGetAdd
-    const savedSettings = staticGetAdd("logSettings", {
+    // 4.1. Load settings from localStorage once (lazy init: the provider rerenders on every addLog)
+    const [savedSettings] = useState(() => staticGetAdd("logSettings", {
         minVarLogs: 0,
         minVarMessage: 0,
         timeShow: 2,
         showMessages: true
-    });
+    }));
 
-    // 4.2. Список логов в памяти (не сохраняем логи в localStorage,
-    //      только настройки — но можно и логи, если нужно)
+    // 4.2. In-memory log list (logs are not saved to localStorage,
+    //      only settings are, but logs can be saved too if needed)
     const [logs, setLogs] = useState<tLogs[]>([]);
     const counterRef = useRef(0);
 
-    // 4.3. Сами настройки (инициализируем тем, что вернул staticGetAdd)
+    // 4.3. Settings themselves, initialized from staticGetAdd output
     const [minVarLogs, setMinVarLogs] = useState(savedSettings.minVarLogs);
     const [minVarMessage, setMinVarMessage] = useState(savedSettings.minVarMessage);
     const [timeShow, setTimeShow] = useState(savedSettings.timeShow);
     const [showMessages, setShowMessages] = useState(savedSettings.showMessages);
 
-    // 4.4. Следим за изменениями настроек и сохраняем их обратно в localStorage
+    // 4.4. Watch settings changes and save them back to localStorage
     useEffect(() => {
         const toSave = {
             minVarLogs,
@@ -116,18 +116,18 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem("logSettings", JSON.stringify(toSave));
     }, [minVarLogs, minVarMessage, timeShow, showMessages]);
 
-    // 4.5. Функция добавления лога (генерируем поле num автоматически)
+    // 4.5. Function for adding a log, generates the num field automatically
     const addLog = useCallback((input: tLogsInput) => {
         counterRef.current += 1;
         const num = counterRef.current;
         setLogs((prevLogs) => {
             const newLog: tLogs = { ...input, num };
-            // ограничимся 500 логами (можно менять)
+            // Limit to 500 logs; this can be changed
             return [newLog, ...prevLogs].slice(0, 500);
         });
     }, []);
 
-    // 4.6. Возвращаем провайдер контекста
+    // 4.6. Return the context provider
     return (
         <LogsContext.Provider
             value={{
@@ -149,7 +149,7 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
 }
 
 /** -----------------------------
- *  5. Хук для удобного доступа к контексту
+ *  5. Hook for convenient context access
  * -----------------------------
  */
 export function useLogsContext() {
@@ -161,19 +161,19 @@ export function useLogsContext() {
 }
 
 /** -----------------------------
- *  6. Компонент LogsTable
- *     (аналог PageLogs)
+ *  6. LogsTable component
+ *     (PageLogs equivalent)
  * -----------------------------
  */
 export function LogsTable() {
     const { logs, minVarLogs } = useLogsContext();
     const gridRef = useRef<GridReadyEvent | null>(null);
 
-    // Определения колонок
+    // Column definitions
     const columnDefs: ColDef[] = useMemo(() => [
         {
             field: 'time',
-            headerName: 'Время',
+            headerName: 'Time',
             sort: 'desc',
             valueFormatter: (params) => {
                 const dateObj = params.value;
@@ -183,10 +183,10 @@ export function LogsTable() {
             width: 120,
         },
         { field: 'id', headerName: 'ID', width: 80 },
-        { field: 'var', headerName: 'Важность', width: 90 },
+        { field: 'var', headerName: 'Importance', width: 90 },
         {
             field: 'txt',
-            headerName: 'Сообщение',
+            headerName: 'Message',
             flex: 1,
             wrapText: true,
             autoHeight: true
@@ -200,7 +200,7 @@ export function LogsTable() {
         wrapText: true,
     }), []);
 
-    // Следим за minVarLogs и настраиваем фильтр AG Grid
+    // Watch minVarLogs and configure the AG Grid filter
     useEffect(() => {
         if (gridRef.current?.api) {
             if (minVarLogs > 0) {
@@ -237,8 +237,8 @@ export function LogsTable() {
 }
 
 /** -----------------------------
- *  7. Компонент LogsNotifications
- *     (аналог MessageEventLogs)
+ *  7. LogsNotifications component
+ *     (MessageEventLogs equivalent)
  * -----------------------------
  */
 interface NotificationItem {
@@ -257,26 +257,34 @@ export function LogsNotifications() {
 
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const counterRef = useRef(0);
+    const lastLogRef = useRef<tLogs | null>(null);
+    const timersRef = useRef(new Set<ReturnType<typeof setTimeout>>());
 
     useEffect(() => {
         if (logs.length === 0) return;
         const newestLog = logs[0];
+        // gate by log identity: a settings change must not re-add the same log
+        if (newestLog === lastLogRef.current) return;
+        lastLogRef.current = newestLog;
         if ((newestLog.var ?? 0) < minVarMessage) return;
 
         counterRef.current += 1;
         const newItem = { id: counterRef.current, log: newestLog };
         setNotifications((prev) => [newItem, ...prev]);
 
-        // убираем нотификацию через timeShow секунд
+        // Remove notification after timeShow seconds; per-item timers are NOT cancelled
+        // when the next log arrives - the old cleanup froze every notification but the last
         const timer = setTimeout(() => {
+            timersRef.current.delete(timer);
             setNotifications((prev) => prev.filter((item) => item.id !== newItem.id));
         }, timeShow * 1000);
-
-        return () => clearTimeout(timer);
+        timersRef.current.add(timer);
     }, [logs, minVarMessage, timeShow]);
 
+    useEffect(() => () => { timersRef.current.forEach(clearTimeout); }, []);
+
     if (!showMessages) {
-        // Если скрыли всплывашки, показываем только "log"
+        // If popups are hidden, show only "log"
         return (
             <div style={{ position: 'absolute', right: 10, top: 10, zIndex: 999 }}>
                 <div
@@ -293,7 +301,7 @@ export function LogsNotifications() {
         );
     }
 
-    // Иначе выводим список текущих нотификаций
+    // Otherwise render the current notification list
     return (
         <div style={{ position: 'absolute', right: 10, top: 10, zIndex: 999 }}>
             <div
@@ -326,7 +334,7 @@ export function LogsNotifications() {
                                 wordWrap: 'break-word'
                             }}
                         >
-                            <p style={{ textAlign: 'center', fontSize: 10, marginBottom: 1 }}>оповещение</p>
+                            <p style={{ textAlign: 'center', fontSize: 10, marginBottom: 1 }}>notification</p>
                             <hr
                                 style={{
                                     backgroundImage: 'linear-gradient(to right, transparent, rgba(255, 255, 255, 1), transparent)',
@@ -350,8 +358,8 @@ export function LogsNotifications() {
 }
 
 /** -----------------------------
- *  8. Компонент LogsSettings
- *     (аналог InputSettingLogs)
+ *  8. LogsSettings component
+ *     (InputSettingLogs equivalent)
  * -----------------------------
  */
 export function LogsSettings() {
@@ -369,7 +377,7 @@ export function LogsSettings() {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 10 }}>
             <label>
-                Минимальная важность для <b>таблицы</b> (minVarLogs):
+                Minimum importance for the <b>table</b> (minVarLogs):
                 <input
                     type="number"
                     value={minVarLogs}
@@ -379,7 +387,7 @@ export function LogsSettings() {
             </label>
 
             <label>
-                Минимальная важность для <b>оповещений</b> (minVarMessage):
+                Minimum importance for <b>notifications</b> (minVarMessage):
                 <input
                     type="number"
                     value={minVarMessage}
@@ -389,7 +397,7 @@ export function LogsSettings() {
             </label>
 
             <label>
-                Время отображения (сек) (timeShow):
+                Display time (sec) (timeShow):
                 <input
                     type="number"
                     value={timeShow}
@@ -399,7 +407,7 @@ export function LogsSettings() {
             </label>
 
             <label>
-                Отображать всплывашки (showMessages):
+                Show popups (showMessages):
                 <input
                     type="checkbox"
                     checked={showMessages}
@@ -412,7 +420,7 @@ export function LogsSettings() {
 }
 
 /** -----------------------------
- *  9. MainPage — вкладки (Таблица / Настройки)
+ *  9. MainPage - tabs (Table / Settings)
  * -----------------------------
  */
 export function MainPage() {
@@ -431,7 +439,7 @@ export function MainPage() {
                         cursor: 'pointer'
                     }}
                 >
-                    Таблица логов
+                    Log table
                 </button>
                 <button
                     onClick={() => setCurrentTab('settings')}
@@ -443,7 +451,7 @@ export function MainPage() {
                         cursor: 'pointer'
                     }}
                 >
-                    Настройки
+                    Settings
                 </button>
             </div>
 
@@ -456,7 +464,7 @@ export function MainPage() {
 }
 
 /** -----------------------------
- *  10. Корневой компонент App
+ *  10. Root App component
  * -----------------------------
  */
 export default function AppLogs() {

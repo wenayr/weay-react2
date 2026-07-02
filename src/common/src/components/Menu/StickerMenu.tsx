@@ -1,76 +1,79 @@
 import React, { useState, useRef, useEffect, MouseEvent, TouchEvent } from 'react';
 
 const StickerMenu: React.FC = () => {
-    // Флаг состояния: открыто меню или закрыто
+    // State flag: menu is open or closed
     const [isOpen, setIsOpen] = useState<boolean>(false);
-    // Сдвиг по X в процессе перетаскивания; дублируется в ref, чтобы document-listeners
-    // подписывались один раз, а не на каждый тик drag
+    // X offset during dragging; duplicated in a ref so document listeners
+    // subscribe once instead of on every drag tick
     const [dragX, setDragX] = useState<number>(0);
     const dragXRef = useRef(0);
     const setDrag = (v: number): void => {
         dragXRef.current = v;
         setDragX(v);
     };
-    // Рефы для отслеживания начала перетаскивания и самого процесса
+    // Refs for tracking drag start and dragging itself
     const startXRef = useRef<number | null>(null);
     const draggingRef = useRef<boolean>(false);
+    const movedRef = useRef<boolean>(false);
 
-    // Настройки размеров: общая ширина меню и ширина видимой части (стикер) при закрытом состоянии
-    const menuWidth = 250; // общая ширина открытого меню
-    const stickerWidth = 50; // ширина видимой части при закрытом меню
+    // Size settings: total menu width and visible sticker width when closed
+    const menuWidth = 250; // total width of the open menu
+    const stickerWidth = 50; // width of the visible part when the menu is closed
 
-    // Начало перетаскивания (мышь)
+    // Start dragging with mouse
     const handleMouseDown = (e: MouseEvent<HTMLDivElement>): void => {
         draggingRef.current = true;
         startXRef.current = e.clientX;
     };
 
-    // Начало перетаскивания (касание)
+    // Start dragging with touch
     const handleTouchStart = (e: TouchEvent<HTMLDivElement>): void => {
         draggingRef.current = true;
         startXRef.current = e.touches[0].clientX;
     };
 
-    // Обработка движения мыши
+    // Handle mouse movement
     const handleMouseMove = (e: MouseEvent<Document>): void => {
         if (!draggingRef.current || startXRef.current === null) return;
         const deltaX = e.clientX - startXRef.current;
         setDrag(deltaX);
     };
 
-    // Обработка движения при касании
+    // Handle touch movement
     const handleTouchMove = (e: TouchEvent<Document>): void => {
         if (!draggingRef.current || startXRef.current === null) return;
         const deltaX = e.touches[0].clientX - startXRef.current;
         setDrag(deltaX);
     };
 
-    // Завершение перетаскивания (мышь)
+    // Finish dragging with mouse
     const handleMouseUp = (): void => {
         if (!draggingRef.current) return;
         finishDrag();
     };
 
-    // Завершение перетаскивания (касание)
+    // Finish dragging with touch
     const handleTouchEnd = (): void => {
         if (!draggingRef.current) return;
         finishDrag();
     };
 
-    // Функция завершения перетаскивания: если сдвиг больше половины ширины меню — переключаем состояние
+    // Finish dragging: switch state if offset is greater than half of the menu width
     const finishDrag = (): void => {
         draggingRef.current = false;
         const delta = dragXRef.current;
         if (delta < -menuWidth / 2) {
             setIsOpen(true);
+            movedRef.current = true; // suppress the click that follows mouseup, it would toggle back
         } else if (delta > menuWidth / 2) {
             setIsOpen(false);
+            movedRef.current = true;
         }
         setDrag(0);
         startXRef.current = null;
     };
 
-    // Подписываемся на глобальные события движения и завершения перетаскивания
+    // Subscribe to global movement and drag-finish events
     useEffect(() => {
         document.addEventListener('mousemove', handleMouseMove as any);
         document.addEventListener('touchmove', handleTouchMove as any);
@@ -84,26 +87,30 @@ const StickerMenu: React.FC = () => {
         };
     }, []);
 
-    // Переключение состояния меню по клику
+    // Toggle menu state on click
     const handleClick = (): void => {
+        if (movedRef.current) {
+            movedRef.current = false;
+            return;
+        }
         setIsOpen(!isOpen);
     };
 
     /*
-      Вычисляем итоговый сдвиг по X:
-      - Когда меню закрыто, сдвигаем его влево так, чтобы виден был только стикер.
-      - При перетаскивании корректируем позицию относительно текущего сдвига.
+      Calculate the final X offset:
+      - When the menu is closed, shift it left so only the sticker is visible.
+      - During dragging, adjust the position relative to the current offset.
     */
     let translateX = 0;
     if (dragX !== 0) {
-        // Если меню открыто, перетаскиваем вправо (открытие) только в отрицательном направлении
-        // Если закрыто — перетаскиваем влево (открытие) только в положительном направлении
+        // If the menu is open, drag right only in the negative direction
+        // If closed, drag left only in the positive direction
         translateX = isOpen ? Math.min(0, dragX) : Math.max(0, dragX);
     }
     const baseTranslate = isOpen ? 0 : -(menuWidth - stickerWidth);
     const finalTranslate = baseTranslate + translateX;
 
-    // Стили для контейнера меню
+    // Menu container styles
     const containerStyle: React.CSSProperties = {
         position: 'fixed',
         top: '50%',
@@ -128,12 +135,12 @@ const StickerMenu: React.FC = () => {
             onClick={handleClick}
         >
             <div style={{ padding: '10px' }}>
-                <h3>Меню</h3>
+                <h3>Menu</h3>
                 {isOpen && (
                     <ul style={{ listStyle: 'none', padding: 0 }}>
-                        <li>Пункт 1</li>
-                        <li>Пункт 2</li>
-                        <li>Пункт 3</li>
+                        <li>Item 1</li>
+                        <li>Item 2</li>
+                        <li>Item 3</li>
                     </ul>
                 )}
             </div>

@@ -1,5 +1,5 @@
-// TS-зеркало дизайн-токенов (src/style/tokens.css). Значения должны совпадать с CSS.
-// Для inline-стилей, ag-grid тем (styleGrid.ts, grid/agGrid4/theme.ts) и слоёв (z-index).
+// TS mirror of design tokens (src/style/tokens.css). Values must match CSS.
+// For inline styles, ag-grid themes (styleGrid.ts, grid/agGrid4/theme.ts), and layers (z-index).
 
 export const tokens = {
     color: {
@@ -26,10 +26,10 @@ export const tokens = {
         sizeBase: '12px',
     },
     zIndex: {
-        /** CSS-переменная --wenay-z-modal; fallback в ModalProvider */
+        /** CSS variable --wenay-z-modal; fallback in ModalProvider */
         modal: 9999,
     },
-    /** Параметры ag-grid темы — единые для GridStyleDefault (легаси) и agGrid4 buildAgTheme */
+    /** ag-grid theme params shared by GridStyleDefault (legacy) and agGrid4 buildAgTheme */
     grid: {
         fontFamily: 'Roboto',
         textColor: 'rgba(214,214,214,0.9)',

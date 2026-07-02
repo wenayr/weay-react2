@@ -18,15 +18,15 @@ const datumMiniConst = {
     last: [] as tLogs[]
 }
 const getSettingLogs = () => ({
-    minVarLogs: {name:"мин. важность для оповещения", range: {min: 0 , max: 25, step: 1}, value: 0},
-    minVarMessage: {name:"мин. важность для таблицы логов", range: {min: 0 , max: 25, step: 1}, value: 0},
-    timeShow: {name:"время отображение на экране", range: {min: 1, max: 20, step: 1}, value: 2},
-    show: {name: "отображать", value: true as boolean}
+    minVarLogs: {name:"min. importance for notifications", range: {min: 0 , max: 25, step: 1}, value: 0},
+    minVarMessage: {name:"min. importance for log table", range: {min: 0 , max: 25, step: 1}, value: 0},
+    timeShow: {name:"screen display time", range: {min: 1, max: 20, step: 1}, value: 2},
+    show: {name: "show", value: true as boolean}
 }) satisfies Params.IParams
 const settingLogs = {params: Params.GetSimpleParams(getSettingLogs())}
 
 type tColum2<TData extends any = any> = (ColDef<TData> | ColGroupDef<TData>)
-// varMin - минимальная важность
+// varMin - minimum importance
 export function getLogsApi<T extends object = {}>(
     setting: {
         limit?: number,
@@ -40,21 +40,10 @@ export function getLogsApi<T extends object = {}>(
     }
     let num = 0
 
-    const SettingLogsReact = ({}:{}) => <ParametersReact
-        // @ts-ignore
-        params={Params.mergeParamValuesToInfos(getSettingLogs(), datum.params)}
-        onChange = {(e)=>{
-            datum.params = Params.GetSimpleParams(e)
-            renderBy(datum)
-        }}/>
-
-
-
-
     return {
         addLogs(a: tLogsInput<T>){
             const item = {...a, num: num++}
-            addToArr(datumMiniConst.last, item, 50)
+            addToArr(datumMiniConst.last, item, setting.limit ?? 50)
             addToArr(datumConst.map.get(a.id) ?? datumConst.map.set(a.id,[]).get(a.id)!, item, setting.limitPer)
             renderBy(datumConst)
             renderBy(datumMiniConst)
@@ -70,7 +59,7 @@ export function getLogsApi<T extends object = {}>(
 
         },
         React: {
-            Setting: SettingLogsReact,
+            Setting: InputSettingLogs,
             Message: MessageEventLogs,
             PageLogs: PageLogs
         }
@@ -91,10 +80,7 @@ function InputSettingLogs({}:{update?: number}) {
 
 export function PageLogs({update}: {update?: number}) {
     const datumFull = datumConst
-    const rowData = [...datumFull.map.values()].flatMap(e=>e.map(e=>({
-        ...e,
-        time: (e.time)
-    })))
+    const rowData = [...datumFull.map.values()].flat()
     type el = ArrayElementType<typeof rowData >
     const datum = datumMiniConst
     const setting = staticGetAdd("settingLogs",settingLogs)
@@ -119,12 +105,7 @@ export function PageLogs({update}: {update?: number}) {
         const data = datum.last[0]
         if (data) { // data.time timeLocalToStr_yyyymmdd_hhmmss_ms
             apiGrid.current?.api.applyTransactionAsync({
-                add: [
-                    {
-                        ...data,
-                        time: data.time
-                    }
-                ]
+                add: [{...data}]
             })
         }
     })
@@ -227,7 +208,7 @@ function Message({logs}: {logs: tLogs}) {
                 style={{ width:"200px", color:"rgb(255,255,255)", height:"auto", marginTop:"10px", borderRight:"5px solid #5D9FFA", background: `rgb(${red},73,35)`}}
         //key={id}
     >
-        <p style = {{textAlign:"center", fontSize: "10px", marginBottom:"1px"}}>{"оповещение"}</p>
+        <p style = {{textAlign:"center", fontSize: "10px", marginBottom:"1px"}}>{"notification"}</p>
         <hr style = {{
             backgroundImage: "linear-gradient(to right, transparent, rgba(255, 255, 255, 1), transparent)",
             border: 0,
@@ -244,12 +225,11 @@ function Message({logs}: {logs: tLogs}) {
 const tt: {[key: string]: React.ReactElement} = {}
 let r = 0
 export function MessageEventLogs({zIndex} :{zIndex?: number}) {
-    let max = 8
-
     const setting = staticGetAdd("settingLogs",settingLogs)
     updateBy(tt)
     updateBy(datumMiniConst, ()=>{
         const last = datumMiniConst.last[0]
+        if (!last) return;
         if (setting.params.minVarMessage && (!last.var || last.var < setting.params.minVarMessage)) return;
 
         let key = String(r++)
@@ -259,7 +239,7 @@ export function MessageEventLogs({zIndex} :{zIndex?: number}) {
         setTimeout(()=>{
             if (tt[key]) {
                 delete tt[key];
-                if (Object.values(tt).length < max) renderBy(tt)
+                renderBy(tt, 100)
             }
         }, setting.params.timeShow ? setting.params.timeShow * 1000 : 2000)
         renderBy(tt)
@@ -267,15 +247,15 @@ export function MessageEventLogs({zIndex} :{zIndex?: number}) {
     const tr = [...Object.values(tt)].reverse().slice(0,10)
 
     return <div style={{maxHeight: "50vh", position: "absolute", right: "1px", zIndex}}>
-        {tr && <div
+        <div
             onClick={()=>{setting.params.show = !setting.params.show; renderBy(tt)}}
             style={{margin: 3, padding: 3, right: 0, position: "absolute", zIndex: 120,
                 ...setting.params.show ?
                     {background: "rgb(58,58,58)", fontSize: "25px"} :
                     {background: "rgb(144,60,60)"}
-        }}>{setting.params.show ? "X" : "log"}</div>}
+        }}>{setting.params.show ? "X" : "log"}</div>
 
-        {tr && <div>{setting.params.show ? [...Object.values(tt)].reverse().slice(0,10) : null}</div>}
+        <div>{setting.params.show ? tr : null}</div>
 
          </div>
 }

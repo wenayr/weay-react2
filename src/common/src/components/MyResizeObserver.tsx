@@ -1,6 +1,6 @@
 export type ObserveID = { readonly [Symbol.species]: ObserveID };
 
-// Класс для отслеживания изменения размеров элементов
+// Class for tracking element size changes
 
 export class CResizeObserver {
     #idMap = new WeakMap<ObserveID, { element: Element, func: () => void }>();
@@ -22,9 +22,7 @@ export class CResizeObserver {
             this.#observer?.observe(element);
         }
         functions.push(onResize);
-        let id: ObserveID = new class {
-            [Symbol.species] = this; //{} as ObserveID
-        }();
+        const id = {} as ObserveID; // unique WeakMap key; the branded type only exists at compile time
         this.#idMap.set(id, {element, func: onResize});
         return id;
     }
@@ -48,21 +46,21 @@ const global_resizeObserver = new CResizeObserver();
 
 const resizeableElementMap = new WeakMap<HTMLElement, ObserveID>();
 
-// Задаём автоматическое изменение размеров элемента в зависимости от размеров родительского элемента
+// Set automatic element resizing based on the parent element size
 //
 export function setResizeableElement(el: HTMLElement) {
     const parent = el.parentElement;
     if (!parent) return;
-    const parentParent = parent.parentElement!; // на один уровень выше
+    const parentParent = parent.parentElement; // one level higher
     if (!parentParent) return;
-    const lastEl = parent.lastElementChild! as HTMLElement;
+    const lastEl = parent.lastElementChild as HTMLElement | null;
     if (!lastEl) return;
     let defaultWidth: number | undefined;
     const existing = resizeableElementMap.get(el);
     if (existing) global_resizeObserver.delete(existing);
     const observerId = global_resizeObserver.add(parentParent, () => {
-        // Прыгаем сразу на величину рассинхрона (раньше — по 1px с reflow на каждый шаг);
-        // несколько итераций только на дозатяжку, верхняя граница спасает от вечного цикла
+        // Jump directly by the mismatch amount (previously 1px with reflow on each step);
+        // a few iterations are only for final adjustment, the upper bound prevents an infinite loop
         let lastRangeDelta = 0;
         for (let width = el.clientWidth, i = 0; i < 8; i++) {
             const rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentParent.getBoundingClientRect().right);

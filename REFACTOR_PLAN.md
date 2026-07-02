@@ -1,317 +1,316 @@
-# План доработок и исправлений `wenay-react2`
+# Improvement and Fix Plan for `wenay-react2`
 
-> Статус: **исполнение начато** (2026-06-06). Безопасная пачка внесена — см. «Выполнено».
+> Status: **execution started** (2026-06-06). The safe batch has been applied; see "Done".
 >
-> Библиотека — **legacy**, используется в других проектах. **Главный принцип: не ломать публичный API.** Все экспортируемые методы остаются; если правка меняет публичное поведение — новый функционал под старой сигнатурой + `@deprecated` «скоро перестанет работать».
+> The library is **legacy** and is used by other projects. **Main rule: do not break the public API.** All exported methods remain. If a fix changes public behavior, the new functionality must stay behind the old signature plus an `@deprecated` note saying it will stop working soon.
 >
-> **ОБЯЗАТЕЛЬНО:** каждая правка проверяется на QA-стенде (`src/common/testUseReact/qa.tsx`, `npm run testReact` → `localhost:3010`). Если правка невидима (утечка/внутреннее) — это явно отмечается, и она проверяется через `tsc --noEmit` + код-ревью.
+> **REQUIRED:** every fix is verified on the QA stand (`src/common/testUseReact/qa.tsx`, `npm run testReact` -> `localhost:3010`). If a fix is invisible (leak/internal), state that explicitly and verify it with `tsc --noEmit` plus code review.
 >
-> В коде — **минимум комментариев** (практически без них). Deprecation — см. раздел 6.
+> Keep **minimal comments** in code, almost none. For deprecation, see section 6.
 
-> Здесь только **оставшаяся** работа — выполненное удалено из списков (что сделано — в истории git/коммитах). Остаток — практически весь **сложный**: K2 (переписывания, перф/утечки — на стенде не видны), K3 (продуктовые решения вроде пароля `"111"`/`keySave`, глобальное состояние), KB (сборка: дубль React, ESM/CJS), Часть II (редизайны). Лёгкий безопасный пласт выработан.
-
----
-
-## Как читать этот документ
-
-Правки разбиты на категории по возрастанию риска:
-
-| Кат. | Название | Тесты | Описание |
-|------|----------|-------|----------|
-| **K0** | Минимальные (безвредные) | не нужны | косметика, мёртвый код, `console.log`, комментарии, опечатки в типах. Не меняют поведение. |
-| **K1** | Лёгкие (низкий риск) | беглая ручная проверка | локальные правки: cleanup в `useEffect`, `key`, мелкие guard'ы. Поведение почти не меняется. |
-| **K2** | Сложные (осторожно) | нужны тесты | переписывание хуков/эффектов, рефакторинг подписок, производительность, риск регрессии. |
-| **K3** | Меняющие бизнес-логику / публичный API | тесты + согласование + проверка потребителей | чинят сломанные фичи (меняют наблюдаемое поведение), трогают сигнатуры экспортов, глобальное состояние, формат данных. |
-| **KB** | Сборка / публикация / deprecation | проверка сборки и установки | конфигурация пакета, формат модулей, пометка об устаревании. |
-
-Для каждой правки: `файл:строка` · суть проблемы · что сделать.
+> This document contains only the **remaining** work. Completed items were removed from the lists; completed details are in git history/commits. The remaining work is almost entirely **complex**: K2 (rewrites, perf/leaks not visible on the stand), K3 (product decisions like password `"111"`/`keySave`, global state), KB (build: duplicate React, ESM/CJS), and Part II (redesigns). The easy safe layer has been exhausted.
 
 ---
 
-## K0 — Минимальные (безвредные, тесты не требуются)
+## How to Read This Document
 
-> ✅ **Выполнено 2026-06-12** (мёртвый код LeftModal, комментарии inputAutoStep, AXIS_THICKNESS, onWheel-касты, константы myChart). Остаток:
+Fixes are grouped by increasing risk:
 
-- `copyCompiledFiles.mjs:12-16,39` — ветки `if (0)` и обёртка `if (1)`. **Убрать.** (Файл сборки — по договорённости KB не трогаем без обсуждения.)
-- ~~`cache.ts:31` — лишний неиспользуемый generic `<T>` у `delete`.~~ **ПЕРЕНЕСЕНО в K3** — метод на экспортируемых классах, удаление generic ломает компиляцию у потребителей, делающих `delete<X>(key)`.
+| Cat. | Name | Tests | Description |
+|------|------|-------|-------------|
+| **K0** | Minimal (harmless) | not needed | Cosmetics, dead code, `console.log`, comments, type typos. Do not change behavior. |
+| **K1** | Easy (low risk) | quick manual check | Local fixes: `useEffect` cleanup, `key`, small guards. Behavior barely changes. |
+| **K2** | Complex (careful) | tests needed | Hook/effect rewrites, subscription refactoring, performance, regression risk. |
+| **K3** | Business logic / public API changes | tests + approval + consumer checks | Fix broken features (change observable behavior), touch export signatures, global state, or data format. |
+| **KB** | Build / publishing / deprecation | build and install checks | Package config, module format, deprecation marking. |
 
----
-
-## K1 — Лёгкие (низкий риск, беглая проверка)
-
-> ✅ **Выполнено 2026-06-12** (утечки cleanup, deps drag-эффектов, onStop-гейт Drag2, dirty-флаг renderLoop обоих движков, controlled value, map.has, styleGrid, menuR порядок, RightMenu guard, touchstart, стабильные key MiniButton/menu/RightMenu). Остаток:
-
-- `Other.tsx:36` (`key={i}`) — оставлено намеренно: список параметров не переупорядочивается, стабильного id у элементов нет.
-- `logs`-гриды — индексных key грепом не найдено (видимо, уже починено ранее).
+For each fix: `file:line` - problem summary - what to do.
 
 ---
 
-## K2 — Сложные (нужны тесты, риск регрессии)
+## K0 - Minimal (Harmless, No Tests Required)
 
-> ✅ **Выполнено 2026-06-12** (проверено временными jest-тестами, прогнаны и удалены): useDraggable переписан; DivRnd3 без useMemo-в-колбэке; StickerMenu подписка один раз; menu.tsx stale-guard в async-эффектах (deps намеренно не меняли); chartEngine×2 — бинарный поиск диапазона, dirty-флаг, minMaxChunks-геттер; MyResizeObserver батч; updateBy чистый getSnapshot; inputAutoStep addEventListener+disposer и устойчивое определение степени 0.1. Остаток:
+> **Done 2026-06-12** (dead LeftModal code, inputAutoStep comments, AXIS_THICKNESS, onWheel casts, myChart constants). Remaining:
 
-- ~~`menu.tsx:386-401` дрейф `useLayoutEffect`~~ — ✅ **сделано 2026-06-12**: идемпотентный пересчёт «от базы» (coordinate), накопления нет. Проверить на стенде меню у нижнего/правого края (карточки 3, 4-архив).
-- ~~`myChart.ts` destroy при temp-detach~~ — ✅ **сделано 2026-06-12**: grace-период 10с (пауза → reconnect → принудительная перерисовка); авто-destroy после таймаута сохранён.
-- `logs.tsx:132-218` — `Main = useCallback(..., [true])` замораживает компонент, закрывая `rowData/setting` с первого рендера (stale closure). Работает только потому, что данные текут через транзакционный API. **Не чинить по месту** — закрыть через Часть II (`react/logs` на `core/store`); по месту потребуются постоянные тесты, что противоречит политике временных.
-- `ParametersEngine.tsx:205-214,244` — `_inputNumStrMap` (WeakMap по идентичности `range`): кэш недопечатанного значения теряется при пересоздании `range`. **Отложено**: `InputNumber` — плоская функция без идентичности поля; правильное решение — компонентизация (Часть II §F).
+- `copyCompiledFiles.mjs:12-16,39` - `if (0)` branches and the `if (1)` wrapper. **Remove.** (Build file; by KB agreement, do not touch it without discussion.)
+- ~~`cache.ts:31` - extra unused generic `<T>` on `delete`.~~ **MOVED to K3** - method is on exported classes, and removing the generic breaks compilation for consumers that call `delete<X>(key)`.
 
 ---
 
-## K3 — Меняющие бизнес-логику / публичный API (согласование + тесты + проверка потребителей)
+## K1 - Easy (Low Risk, Quick Check)
 
-> Внимание: пункты ниже **чинят сломанные фичи** — то есть меняют наблюдаемое поведение. Возможно, потребители уже подстроились под текущее (сломанное) поведение. **Перед правкой проверить реальное использование в проектах-потребителях.**
+> **Done 2026-06-12** (cleanup leaks, drag-effect deps, Drag2 onStop gate, dirty flag in both render loops, controlled value, map.has, styleGrid, menuR order, RightMenu guard, touchstart, stable keys in MiniButton/menu/RightMenu). Remaining:
 
-### Сломанные фичи (сейчас не работают)
-- ~~`useOutside.tsx` keySave~~ — ✅ **сделано 2026-06-12**: статус пишется в `saveStatus` при каждом переключении (in-memory персист в рамках сессии), восстановление учитывает и `false`.
-- ~~`RNDFunc.tsx:27` (Drag2) swap x/y~~ — ✅ **сделано 2026-06-12**: дефолт `{x, y}`. Поведенчески почти ненаблюдаемо (mousedown/layout-effect перезаписывали ref), но если потребитель компенсировал — заметит.
-- `LeftModal.tsx` — три разных элемента пишут в один и тот же ref `viewportSize.current` → математика анимации использует «кто последний отрендерился»; тернарник проверяет `viewportSize.current`, но использует `viewportWidth`. **Отложено**: чинить можно только с QA-карточкой LeftModal (Modal2 — полноэкранный оверлей, в текущую сетку стенда не встаёт; нужен отдельный hash-роут стенда).
-- `LeftModal.tsx` (`LeftMenuComponent`) — проп `api(setMenu)` объявлен, но не вызывается → контракт мёртв (сейчас no-op). **Отложено** вместе с предыдущим пунктом (требует решения, что api должен уметь).
-- ~~`LeftModal.tsx` (Modal2) сев `setMenu` во время рендера~~ — ✅ **сделано 2026-06-12**: перенесён в `useEffect` + `renderBy`.
-
-### Глобальное состояние / сайд-эффекты при импорте
-> ⏸ Пункты про глобальное состояние/мутации чужих данных (RNDFunc3 `k`/`openWindows`, мутация `it.status` в menu.tsx, `elements` в RightMenu, `HostName`/`ObjectStringToDate` в cache.ts) — **отложены по решению пользователя 2026-06-12** (закрывать через Часть II).
-
-- ~~`Modal.tsx` (`confirmModal`) пароль `"111"`~~ — ✅ **сделано 2026-06-12**: опциональный параметр `password` (дефолт `"111"` для совместимости; свой пароль в подсказке не светится).
-- `RNDFunc3.tsx:97,116-121,236-243` — module-global `k`/`openWindows`, `updateBy(...)` во время рендера, мутация общих объектов `size/position`. Глобальное состояние между всеми инстансами/бандлами. **Изолировать состояние** (большой риск регрессии; возможно оставить с документированием).
-- `menu.tsx:262-265` — `onMouseEnter` мутирует `it.status` на объектах, переданных потребителем (`fullArray`). **Не мутировать props** (или явно задокументировать контракт).
-- `RightMenu.tsx:227-234` — `set/delete` мутируют общий closure-массив `elements`, `render?.(elements)` отдаёт ту же ссылку (React может пропустить рендер); состояние делится между всеми `<Render/>`. **Иммутабельные обновления + свежий массив в render.**
-- `cache.ts:9` — `const HostName = location.toString()` на уровне модуля: падает в SSR/Node; ключ зависит от hash/query. **Guard `typeof location` + `location.origin+pathname`.** (Меняет значение ключа → влияет на попадания кэша.)
-- `cache.ts:92-99` (`ObjectStringToDate`) — агрессивно конвертирует любую ISO-строку в `Date` при загрузке. **Сузить/задокументировать** (меняет форму данных).
-
-### Сигнатуры / двойные реализации
-- **`chartEngine.ts` ↔ `chartEngineReact.tsx`** — ✅ **выяснено 2026-06-12: chartEngine.ts НЕ публичный** — его никто не импортирует (ни api.tsx, ни стенд), в сборку он не входит и tsc библиотеки его не проверяет. Помечен `@deprecated` в шапке файла, кандидат на удаление при слиянии в `core/chart`. Публичный движок один — `chartEngineReact.tsx`.
-- `applyTransactionAsyncUpdate.tsx:43,46` — `remove` отправляется и в add-, и в async-update-транзакцию; при пустых `arrNew` и `arr` удаление молча теряется. **Выполнять удаление ровно один раз, независимо от add/update.**
-- `applyTransactionAsyncUpdate.tsx:15,52,72` — `getId: (...a: any[]) => string` (слишком широкая сигнатура). Сужение до `(row: Partial<T>) => string` **может сломать** loosely-typed вызовы → оставить как есть либо в major.
-- `cache.ts:31,56` — вырожденный generic `<T extends object>` у `delete` на **экспортируемых** классах `CSaveToCache`/`CSaveToLocalStorage` (`T` нигде не используется). Удаление generic — type-breaking для потребителей с `delete<X>(key)`. **Оставить как есть либо убрать только в мажоре** (можно пометить избыточность комментарием). Интерфейс `IServerSaveBasePromise.delete` уже без generic — расхождение классов с интерфейсом.
-- `arrayPromise.tsx:7-15` — счётчики `ok/countError` корректны только при строго последовательном выполнении thunk'ов; при `Promise.all` — гонка. **Задокументировать контракт** (или вычислять из settled-результатов — поведенческое изменение).
+- `Other.tsx:36` (`key={i}`) - intentionally left as is: the parameter list is not reordered and items have no stable id.
+- `logs` grids - indexed keys were not found by grep; apparently already fixed earlier.
 
 ---
 
-## KB — Сборка, публикация, формат модулей
+## K2 - Complex (Tests Needed, Regression Risk)
 
-> Самый высокий приоритет по влиянию: пакет в текущем виде может не работать у части потребителей.
+> **Done 2026-06-12** (checked with temporary jest tests, run and removed): useDraggable rewritten; DivRnd3 without useMemo-in-callback; StickerMenu subscribes once; menu.tsx stale guard in async effects (deps intentionally unchanged); chartEngine x2 - binary range search, dirty flag, minMaxChunks getter; MyResizeObserver batch; updateBy clean getSnapshot; inputAutoStep addEventListener+disposer and robust 0.1 power detection. Remaining:
 
-- **Формат модулей (критично).** `lib/index.js` эмитится как **ESM** (`export`/`import`), но в `package.json` **нет `"type": "module"`**, а `main`/`types` указывают на CJS-путь. `tsconfig_lib.json` (`module:"commonJS"`) копируется в `lib/tsconfig.json`, но **реальной сборкой (`tsc --build` с корневым `tsconfig.json`, `module:ESNext`) не используется** — он фактически заброшен. Node-потребители в CJS-режиме получат ошибку. **Решить:** либо `"type":"module"` + ESM, либо собирать в CJS (`module:"CommonJS"`) в рабочем tsconfig; убрать неиспользуемый `tsconfig_lib.json`.
-- `package.json:6-7 vs 84-86` — `main`/`types` → `dist/index.js`/`dist/index.d.ts`, а `exports["."]` → `./lib/index.js`. После `_afterBuild` публикуется содержимое `dist` (где есть `lib/`), значит `dist/index.js` не существует. **Привести `main`/`types` к `./lib/index.js` / `./lib/index.d.ts`.**
-- `src/index.ts:2,4` (и `lib/index.js`) — `import {test} ...; test()`: сайд-эффект при каждом импорте пакета. **Удалить вызов** (экспорт `test` можно оставить ради совместимости).
-- `api.tsx:2-3` — top-level импорт CSS (`menuRight.css`, `style.css`): ломает SSR/Node, мешает tree-shaking. **Оставить импорты, но добавить `"sideEffects": ["**/*.css"]`** в package.json (бандлеры не выкинут CSS, но JS будет tree-shake-able). Альтернатива: отдельный вход `wenay-react2/styles`.
-- `package.json` — **нет `"sideEffects"`.** При CSS-импортах + `export *`-barrel бандлеры не могут безопасно tree-shake'ить. **Добавить `"sideEffects": ["**/*.css"]`.**
-- `package.json:34-41` — `react`/`react-dom` одновременно в `dependencies` **и** `peerDependencies` → две копии React у потребителя (invalid hook call / рассинхрон контекста). **Убрать из `dependencies`, оставить только peer.** Проверить так же `ag-grid-*` (оставить как dep только если реально бандлится).
-- `package.json:16,19` — дубль скриптов `_publish`/`publish`; `publish` — зарезервированное имя npm-lifecycle (повторный триггер при `npm publish`). **Переименовать `publish` → `release`.**
-- `package.json:73` — `engines.vscode: "^1.22.0"` бессмысленно для npm-библиотеки (npm ругается). **Удалить.**
-- **Исключить тестовые файлы из публикации.** Сейчас `src/test.ts`, `src/testReact.tsx`, `src/common/testUseReact/**` не попадают в бандл только потому, что `tsconfig.json` имеет `files:["src/index.ts"]`. **Подстраховаться:** добавить `exclude` в tsconfig (`src/test*.{ts,tsx}`, `src/common/testUseReact/**`) и/или `.npmignore`, на случай будущих изменений графа сборки.
-- `copyCompiledFiles.mjs` — `maxRetries:1` у `rmSync` на Windows может флакать; ветки-заглушки `if(0)/if(1)` (см. K0).
+- ~~`menu.tsx:386-401` `useLayoutEffect` drift~~ - **done 2026-06-12**: idempotent recalculation "from base" (coordinate), no accumulation. Verify menu placement near bottom/right edges on the stand (cards 3, 4-archive).
+- ~~`myChart.ts` destroy on temp-detach~~ - **done 2026-06-12**: 10s grace period (pause -> reconnect -> forced redraw); auto-destroy after timeout preserved.
+- `logs.tsx:132-218` - `Main = useCallback(..., [true])` freezes the component, closing over `rowData/setting` from the first render (stale closure). It works only because data flows through the transaction API. **Do not fix locally**; close it through Part II (`react/logs` on `core/store`). A local fix would need permanent tests, which conflicts with the temporary-test policy.
+- `ParametersEngine.tsx:205-214,244` - `_inputNumStrMap` (WeakMap by `range` identity): the cache of a partially typed value is lost when `range` is recreated. **Deferred**: `InputNumber` is a flat function without field identity; the correct solution is componentization (Part II section F).
 
 ---
 
-## 6. Deprecation — стратегия «пометить, что скоро уйдёт»
+## K3 - Business Logic / Public API Changes (Approval + Tests + Consumer Checks)
 
-Цель: дать потребителям сигнал «обновляйтесь / мигрируйте», не ломая текущие сборки.
+> Warning: the items below **fix broken features**, so they change observable behavior. Consumers may already have adapted to the current broken behavior. **Before fixing, check real usage in consumer projects.**
 
-Многоуровневая пометка (от мягкой к жёсткой):
+### Broken Features (Currently Not Working)
+- ~~`useOutside.tsx` keySave~~ - **done 2026-06-12**: status is written to `saveStatus` on every toggle (in-memory session persistence), restore handles `false` too.
+- ~~`RNDFunc.tsx:27` (Drag2) swapped x/y~~ - **done 2026-06-12**: default `{x, y}`. Behavior is almost unobservable (mousedown/layout-effect overwrote the ref), but consumers that compensated for it will notice.
+- `LeftModal.tsx` - three different elements write to the same `viewportSize.current` ref, so animation math uses "who rendered last"; the ternary checks `viewportSize.current` but uses `viewportWidth`. **Deferred**: can only be fixed with a LeftModal QA card (Modal2 is a fullscreen overlay and does not fit the current stand grid; a separate hash route is needed).
+- `LeftModal.tsx` (`LeftMenuComponent`) - prop `api(setMenu)` is declared but not called, so the contract is dead (currently no-op). **Deferred** together with the previous item; requires deciding what `api` must be able to do.
+- ~~`LeftModal.tsx` (Modal2) setMenu during render~~ - **done 2026-06-12**: moved to `useEffect` + `renderBy`.
 
-1. **Registry-level (рекомендуется):** после публикации
+### Global State / Import Side Effects
+> Items about global state / mutation of foreign data (RNDFunc3 `k`/`openWindows`, `it.status` mutation in menu.tsx, `elements` in RightMenu, `HostName`/`ObjectStringToDate` in cache.ts) are **deferred by user decision 2026-06-12** and should be closed through Part II.
+
+- ~~`Modal.tsx` (`confirmModal`) password `"111"`~~ - **done 2026-06-12**: optional `password` parameter (default `"111"` for compatibility; the custom password is not shown in the prompt).
+- `RNDFunc3.tsx:97,116-121,236-243` - module-global `k`/`openWindows`, `updateBy(...)` during render, mutation of shared `size/position` objects. Global state is shared between all instances/bundles. **Isolate state** (high regression risk; maybe leave with documentation).
+- `menu.tsx:262-265` - `onMouseEnter` mutates `it.status` on objects passed by the consumer (`fullArray`). **Do not mutate props** (or explicitly document the contract).
+- `RightMenu.tsx:227-234` - `set/delete` mutate the shared closure array `elements`, and `render?.(elements)` passes the same reference (React may skip rerender); state is shared between all `<Render/>` instances. **Use immutable updates + a fresh array in render.**
+- `cache.ts:9` - `const HostName = location.toString()` at module level: fails in SSR/Node; key depends on hash/query. **Guard with `typeof location` + `location.origin+pathname`.** (Changes the key value -> affects cache hits.)
+- `cache.ts:92-99` (`ObjectStringToDate`) - aggressively converts any ISO string to `Date` on load. **Narrow/document it** (changes data shape).
+
+### Signatures / Duplicate Implementations
+- **`chartEngine.ts` <-> `chartEngineReact.tsx`** - **confirmed 2026-06-12: chartEngine.ts is NOT public**. Nobody imports it (neither api.tsx nor the stand), it is not included in the build, and library tsc does not check it. Marked `@deprecated` in the file header, candidate for removal when merging into `core/chart`. The public engine is only `chartEngineReact.tsx`.
+- `applyTransactionAsyncUpdate.tsx:43,46` - `remove` is sent in both the add transaction and async-update transaction; when both `arrNew` and `arr` are empty, deletion is silently lost. **Run deletion exactly once, independent of add/update.**
+- `applyTransactionAsyncUpdate.tsx:15,52,72` - `getId: (...a: any[]) => string` (too broad). Narrowing to `(row: Partial<T>) => string` **may break** loosely typed calls -> keep as is or change only in a major version.
+- `cache.ts:31,56` - degenerate generic `<T extends object>` on `delete` in **exported** classes `CSaveToCache`/`CSaveToLocalStorage` (`T` is unused). Removing the generic is type-breaking for consumers using `delete<X>(key)`. **Leave as is or remove only in a major version** (can mark redundancy in a comment). Interface `IServerSaveBasePromise.delete` is already non-generic, so classes diverge from the interface.
+- `arrayPromise.tsx:7-15` - counters `ok/countError` are correct only under strictly sequential thunk execution; with `Promise.all` there is a race. **Document the contract** (or compute from settled results, which changes behavior).
+
+---
+
+## KB - Build, Publishing, Module Format
+
+> Highest impact priority: the package in its current form may not work for some consumers.
+
+- **Module format (critical).** `lib/index.js` is emitted as **ESM** (`export`/`import`), but `package.json` has no `"type": "module"`, while `main`/`types` point to a CJS path. `tsconfig_lib.json` (`module:"commonJS"`) is copied to `lib/tsconfig.json`, but it is **not used by the real build** (`tsc --build` with root `tsconfig.json`, `module:ESNext`) and is effectively abandoned. Node consumers in CJS mode will get an error. **Decide:** either `"type":"module"` + ESM, or build CJS (`module:"CommonJS"`) in the active tsconfig; remove unused `tsconfig_lib.json`.
+- `package.json:6-7 vs 84-86` - `main`/`types` -> `dist/index.js`/`dist/index.d.ts`, while `exports["."]` -> `./lib/index.js`. After `_afterBuild`, the contents of `dist` are published (where `lib/` exists), so `dist/index.js` does not exist. **Align `main`/`types` to `./lib/index.js` / `./lib/index.d.ts`.**
+- `src/index.ts:2,4` (and `lib/index.js`) - `import {test} ...; test()`: side effect on every package import. **Remove the call** (export `test` can remain for compatibility).
+- `api.tsx:2-3` - top-level CSS imports (`menuRight.css`, `style.css`): breaks SSR/Node and hurts tree-shaking. **Keep imports but add `"sideEffects": ["**/*.css"]`** to package.json (bundlers will not drop CSS, while JS remains tree-shakeable). Alternative: separate `wenay-react2/styles` entry.
+- `package.json` - **no `"sideEffects"`.** With CSS imports + `export *` barrel, bundlers cannot safely tree-shake. **Add `"sideEffects": ["**/*.css"]`.**
+- `package.json:34-41` - `react`/`react-dom` are both in `dependencies` **and** `peerDependencies` -> two React copies for the consumer (invalid hook call / context desync). **Remove from `dependencies`, keep only peer.** Check `ag-grid-*` the same way (keep as dep only if really bundled).
+- `package.json:16,19` - duplicate scripts `_publish`/`publish`; `publish` is a reserved npm lifecycle name (re-trigger on `npm publish`). **Rename `publish` -> `release`.**
+- `package.json:73` - `engines.vscode: "^1.22.0"` is meaningless for an npm library (npm warns). **Remove.**
+- **Exclude test files from publishing.** Currently `src/test.ts`, `src/testReact.tsx`, `src/common/testUseReact/**` do not enter the bundle only because `tsconfig.json` has `files:["src/index.ts"]`. **Add a safety net:** add `exclude` in tsconfig (`src/test*.{ts,tsx}`, `src/common/testUseReact/**`) and/or `.npmignore`, in case the build graph changes later.
+- `copyCompiledFiles.mjs` - `maxRetries:1` on `rmSync` can flake on Windows; placeholder branches `if(0)/if(1)` (see K0).
+
+---
+
+## 6. Deprecation - "Mark It as Going Away Soon" Strategy
+
+Goal: signal consumers to update/migrate without breaking current builds.
+
+Layered marking, from soft to hard:
+
+1. **Registry-level (recommended):** after publishing
    ```
-   npm deprecate wenay-react2@"*" "Пакет устаревает и скоро не будет обновляться. Мигрируйте на <замену>."
+   npm deprecate wenay-react2@"*" "Package is becoming obsolete and will soon stop receiving updates. Migrate to <replacement>."
    ```
-   Это **не поле в package.json** — команда помечает версии в реестре, потребители видят warning при `npm install`. Не ломает установку.
-2. **README-баннер** вверху файла: «⚠️ DEPRECATED — пакет в режиме поддержки, новые проекты не должны его использовать. Дата окончания обновлений: <…>.» (создать `README.md` — сейчас его нет, copyCompiledFiles его копирует если есть).
-3. **JSDoc `@deprecated`** на самых проблемных/устаревших экспортах (особенно одна из двух версий `chartEngine`, `test`, `DropdownMenuTest`, тестовые компоненты) — IDE будет зачёркивать использование, не ломая рантайм.
-4. **Одноразовый `console.warn`** при первом импорте (опционально, аккуратно — не превращать вход в шумный сайд-эффект):
+   This is **not a package.json field**; the command marks versions in the registry, and consumers see a warning on `npm install`. It does not break installation.
+2. **README banner** at the top: "DEPRECATED - package is in maintenance mode, new projects should not use it. End-of-updates date: <...>." (create `README.md`; currently it does not exist, and copyCompiledFiles copies it if present).
+3. **JSDoc `@deprecated`** on the most problematic/obsolete exports (especially one of the two `chartEngine` versions, `test`, `DropdownMenuTest`, test components). IDEs will strike through usage without breaking runtime.
+4. **One-time `console.warn`** on first import (optional, carefully; do not turn the entry into a noisy side effect):
    ```ts
-   // единожды, с флагом-гвардом
    if (!globalThis.__wenayReact2DeprecationWarned) {
      globalThis.__wenayReact2DeprecationWarned = true;
-     console.warn("[wenay-react2] устаревает; см. README.");
+     console.warn("[wenay-react2] is becoming obsolete; see README.");
    }
    ```
-   Замечание: текущая стратегия KB как раз делает вход **side-effect-free** — этот warn вступает в противоречие, поэтому либо принять контролируемый warn, либо ограничиться п.1-3.
-5. **Версионирование:** все breaking-изменения из K3/KB выпускать **только мажорной версией** (semver), с CHANGELOG и migration-нотами.
+   Note: the current KB strategy makes the entry **side-effect-free**; this warning conflicts with that, so either accept a controlled warning or limit deprecation to items 1-3.
+5. **Versioning:** release all breaking changes from K3/KB **only as a major version** (semver), with CHANGELOG and migration notes.
 
 ---
 
-## 7. Рекомендованный порядок работ
+## 7. Recommended Work Order
 
-1. **KB** (сборка/публикация) — без этого остальное не доедет до потребителей корректно. Сначала решить ESM/CJS и `main`/`exports`, убрать сайд-эффект `test()`, добавить `sideEffects`, развести react/peerDeps.
-2. **K0** — массовая безопасная чистка (можно одним PR, ревью быстрое).
-3. **K1** — локальные исправления утечек/perf, по модулям, с беглой проверкой.
-4. **Завести тесты** (jest уже настроен) на ключевые узлы перед K2/K3: `updateBy`, `applyTransactionAsyncUpdate`, drag-хуки, logs-гриды, chart engine.
-5. **K2** — под покрытием тестами, по одному узлу.
-6. **K3** — только после аудита использования в проектах-потребителях; релиз мажором с migration-гайдом.
-7. **Deprecation** (раздел 6) — параллельно: README + `npm deprecate` можно сделать уже сейчас; `@deprecated`-аннотации — по мере выявления «уходящих» API.
-
----
-
-## 8. Топ-приоритеты (сводка реальных багов)
-
-| # | Находка | Файл:строка | Кат. |
-|---|---------|-------------|------|
-| 1 | ESM-эмит без `"type":"module"` / битый `main` | package.json + tsconfig | KB |
-| 2 | `react` в deps и peerDeps (дубль React) | package.json:34-41 | KB/K3 |
-| 3 | сайд-эффект `test()` при импорте | index.ts:4 | KB |
-| 4 | `useDraggable` re-subscribe + leak таймеров/listeners | useDraggable.tsx | K2 |
-| 5 | `getSnapshot` с сайд-эффектом в ядре реактивности | updateBy.ts:74-104 | K2 |
-| 6 | Drag2 меняет x/y местами в дефолте | RNDFunc.tsx:27 | K3 |
-| 7 | две расходящиеся копии chart engine | chartEngine.ts / chartEngineReact.tsx | K3 |
+1. **KB** (build/publishing) - without this, the rest will not reach consumers correctly. First resolve ESM/CJS and `main`/`exports`, remove the `test()` side effect, add `sideEffects`, and separate react/peerDeps.
+2. **K0** - large safe cleanup, can be one PR with quick review.
+3. **K1** - local leak/perf fixes by module, with a quick check.
+4. **Add tests** (jest is already configured) for key nodes before K2/K3: `updateBy`, `applyTransactionAsyncUpdate`, drag hooks, logs grids, chart engine.
+5. **K2** - under test coverage, one node at a time.
+6. **K3** - only after usage audit in consumer projects; release as a major with a migration guide.
+7. **Deprecation** (section 6) - in parallel: README + `npm deprecate` can be done now; `@deprecated` annotations as obsolete APIs are identified.
 
 ---
+
+## 8. Top Priorities (Real Bug Summary)
+
+| # | Finding | File:line | Cat. |
+|---|---------|-----------|------|
+| 1 | ESM emit without `"type":"module"` / broken `main` | package.json + tsconfig | KB |
+| 2 | `react` in deps and peerDeps (duplicate React) | package.json:34-41 | KB/K3 |
+| 3 | `test()` side effect on import | index.ts:4 | KB |
+| 4 | `useDraggable` re-subscribe + timer/listener leaks | useDraggable.tsx | K2 |
+| 5 | `getSnapshot` with side effect in the reactivity core | updateBy.ts:74-104 | K2 |
+| 6 | Drag2 swaps x/y in default | RNDFunc.tsx:27 | K3 |
+| 7 | two diverging chart engine copies | chartEngine.ts / chartEngineReact.tsx | K3 |
+
+---
 ---
 
-# Часть II — Сверх-рефакторинг (идеальная архитектура)
+# Part II - Super Refactor (Ideal Architecture)
 
-> Это **отдельный трек**, не пересекающийся с K0–K3 по способу выполнения. K0–K3 правят существующий код «по месту». Часть II — это **«как должно быть»**: целевая архитектура и стратегия перехода через **временное дублирование** (паттерн *Strangler Fig* + адаптеры).
+> This is a **separate track** with a different execution model from K0-K3. K0-K3 fix existing code **in place**. Part II describes **the target state**: target architecture and migration strategy through **temporary duplication** (Strangler Fig pattern + adapters).
 >
-> **Принцип:** сначала пишем «по-новому» рядом со «старым», не трогая старое → покрываем новое тестами → сводим старые сигнатуры на новое ядро через тонкие адаптеры → выпускаем мажор, где старое работает, но помечено `@deprecated` («скоро будет удалено»). Удаление старого — в следующем мажоре.
+> **Principle:** first write the "new way" next to the "old way" without touching the old code -> cover the new code with tests -> route old signatures to the new core through thin adapters -> release a major where the old API still works but is marked `@deprecated` ("will be removed soon"). Remove the old code in the next major.
 
 ---
 
-## 9. Целевая архитектура (идеал)
+## 9. Target Architecture (Ideal)
 
-### 9.0. Системные пороки текущего кода (что именно лечим)
-1. **Глобальное мутабельное состояние на уровне модулей** (`KeyDown`, `openWindows`, `saveStatus`, `k`, singleton-API в `LeftModal`, `RightMenu`, `menuMouse`) — делится между всеми инстансами и бандлами, ломается в StrictMode и при нескольких копиях пакета.
-2. **Мутация чужих объектов как «фича»** (`mapMemory`, `Resizable`, `RNDFunc3`, `menu.tsx`, `applyTransactionAsyncUpdate`) — побочные эффекты на данных потребителя.
-3. **Две (и более) копии одного и того же** (`chartEngine.ts` ↔ `chartEngineReact.tsx`, `logs.tsx` ↔ `logs3.tsx`, `Parameters` ↔ `ParametersEngine`, `RNDFunc` ↔ `RNDFunc3`).
-4. **Ручная работа с DOM-событиями и подписками** вместо идиоматичного React (`inputAutoStep` через `on*`, hand-rolled drag, re-subscribe на каждый тик).
-5. **Сайд-эффекты при импорте и в рендере** (`test()`, CSS top-level, сев тестового меню, `setMenu` в рендере, нечистый `getSnapshot`).
-6. **Слабая типизация** (`any`, `(...a:any[])`, `{}`-типы).
-7. **Сборка**: ESM-эмит под CJS-обёрткой, нет dual-build, нет нормального `exports`.
+### 9.0. Systemic Flaws in the Current Code (What We Are Fixing)
+1. **Global mutable module-level state** (`KeyDown`, `openWindows`, `saveStatus`, `k`, singleton APIs in `LeftModal`, `RightMenu`, `menuMouse`) - shared between all instances and bundles, breaks in StrictMode and with multiple package copies.
+2. **Mutation of foreign objects as a "feature"** (`mapMemory`, `Resizable`, `RNDFunc3`, `menu.tsx`, `applyTransactionAsyncUpdate`) - side effects on consumer data.
+3. **Two or more copies of the same thing** (`chartEngine.ts` <-> `chartEngineReact.tsx`, `logs.tsx` <-> `logs3.tsx`, `Parameters` <-> `ParametersEngine`, `RNDFunc` <-> `RNDFunc3`).
+4. **Manual DOM event/subscription handling** instead of idiomatic React (`inputAutoStep` through `on*`, hand-rolled drag, re-subscribe on every tick).
+5. **Import and render side effects** (`test()`, top-level CSS, seeded test menu, `setMenu` in render, impure `getSnapshot`).
+6. **Weak typing** (`any`, `(...a:any[])`, `{}` types).
+7. **Build**: ESM emit under a CJS wrapper, no dual-build, no proper `exports`.
 
-### 9.1. Целевая структура каталогов
+### 9.1. Target Directory Structure
 ```
 src/
-  core/                      # framework-agnostic, без React, без DOM-сайд-эффектов
-    store/                   # реактивный стор (замена updateBy)
-    chart/                   # ядро графика (математика, рендер в canvas-context)
-    storage/                 # интерфейс хранилищ (memory/localStorage/custom)
-    grid/                    # обёртки над ag-grid (транзакции, форматтеры)
-  react/                     # тонкие React-биндинги к core
+  core/                      # framework-agnostic, no React, no DOM side effects
+    store/                   # reactive store (replacement for updateBy)
+    chart/                   # chart core (math, render into canvas context)
+    storage/                 # storage interfaces (memory/localStorage/custom)
+    grid/                    # ag-grid wrappers (transactions, formatters)
+  react/                     # thin React bindings to core
     hooks/                   # useStore, useDrag, useResizable, useElementSize, useDebouncedCallback, useOutside
-    components/              # Parameters, Modal, Menu, Inputs, Chart — управляемые, иммутабельные
-    logs/                    # единый LogsStore + presentational-компоненты
-  compat/                    # АДАПТЕРЫ: старые имена/сигнатуры → core/react (всё @deprecated)
-  styles/                    # CSS как отдельный вход (опциональный импорт)
-  index.ts                   # публичный barrel (новое API)
-  index.compat.ts            # ре-экспорт старого API (для exports "./compat" и обратной совместимости)
+    components/              # Parameters, Modal, Menu, Inputs, Chart - controlled, immutable
+    logs/                    # single LogsStore + presentational components
+  compat/                    # ADAPTERS: old names/signatures -> core/react (all @deprecated)
+  styles/                    # CSS as a separate entry (optional import)
+  index.ts                   # public barrel (new API)
+  index.compat.ts            # old API re-export (for exports "./compat" and backward compatibility)
 ```
 
-### 9.2. Идеал по подсистемам
+### 9.2. Ideal by Subsystem
 
-**A. Реактивность (`core/store`) — замена `updateBy.ts`**
-- Целевое API: `const store = createStore(initial)` → `store.getState()`, `store.setState(patch|fn)`, `store.subscribe(cb)`; React-биндинг `useStore(store, selector?)` на `useSyncExternalStore` с **чистым** `getSnapshot` и иммутабельным версионированием.
-- Никакой мутации объектов потребителя; подписки не создают состояние во время рендера; селекторы для точечных ре-рендеров.
+**A. Reactivity (`core/store`) - replacement for `updateBy.ts`**
+- Target API: `const store = createStore(initial)` -> `store.getState()`, `store.setState(patch|fn)`, `store.subscribe(cb)`; React binding `useStore(store, selector?)` on `useSyncExternalStore` with **clean** `getSnapshot` and immutable versioning.
+- No mutation of consumer objects; subscriptions do not create state during render; selectors enable targeted rerenders.
 
-**B. Графики (`core/chart` + `react`) — слияние двух движков**
-- Одно ядро, не знающее про React: входные данные + контекст canvas → отрисовка. DPR-aware, dirty-флаг (рисуем только при изменениях), бинарный поиск видимого диапазона (без `filter` на кадр), корректный LOD (min+max на пиксель), единая константа `AXIS_THICKNESS`.
-- React-биндинг `<Chart/>` / `useChart(ref, options)`: владеет `ResizeObserver` (один, переиспользуемый), RAF, и `destroy()` на unmount; корректно различает temp-detach и unmount.
-- Единая модель `Panel` (один способ задавать высоту), один `addPanel/resizePanel`.
+**B. Charts (`core/chart` + `react`) - merge the two engines**
+- One core that knows nothing about React: input data + canvas context -> drawing. DPR-aware, dirty flag (draw only on changes), binary search of visible range (no `filter` per frame), correct LOD (min+max per pixel), one `AXIS_THICKNESS` constant.
+- React binding `<Chart/>` / `useChart(ref, options)`: owns `ResizeObserver` (single, reused), RAF, and `destroy()` on unmount; correctly distinguishes temp-detach from unmount.
+- Unified `Panel` model (one way to define height), one `addPanel/resizePanel`.
 
-**C. DnD/Resize (`react/hooks`) — слияние `RNDFunc`/`RNDFunc3`/`useDraggable`/`Resizable`**
-- `usePointerDrag({onStart,onMove,onEnd})` на **Pointer Events** + `AbortController`; позиция в ref, колбэки в ref → подписка навешивается **один раз**, без re-subscribe на тик. Гарантированная очистка таймеров/listeners на unmount.
-- `useResizable` / `useElementSize` (общий `ResizeObserver`-хук, заменяет `MyResizeObserver`-цикл).
-- Никакого глобального `openWindows`/`k` — z-index/реестр окон через контекст-провайдер `<WindowLayerProvider/>`.
-- Где разумно — опереться на уже присутствующие `react-rnd`/`re-resizable` вместо самописа.
+**C. DnD/Resize (`react/hooks`) - merge `RNDFunc`/`RNDFunc3`/`useDraggable`/`Resizable`**
+- `usePointerDrag({onStart,onMove,onEnd})` based on **Pointer Events** + `AbortController`; position in ref, callbacks in ref -> subscription is attached **once**, no re-subscribe on tick. Guaranteed timer/listener cleanup on unmount.
+- `useResizable` / `useElementSize` (shared `ResizeObserver` hook, replaces the `MyResizeObserver` loop).
+- No global `openWindows`/`k`; z-index/window registry through `<WindowLayerProvider/>` context.
+- Where reasonable, rely on existing `react-rnd`/`re-resizable` instead of hand-written logic.
 
-**D. Хранилища (`core/storage`) — слияние `cache.ts` + `mapMemory.tsx`**
-- Интерфейс `Storage<T>` с реализациями `memoryStorage`, `localStorageStorage(serialize/deserialize)`, `customStorage`. SSR-safe (guard `typeof window`), без неявной конвертации дат (опционально reviver), поиск через `has` (не `||`).
-- React-биндинг `usePersistentState(key, default, storage)`. Чинит мёртвый `staticGetById`.
+**D. Storage (`core/storage`) - merge `cache.ts` + `mapMemory.tsx`**
+- `Storage<T>` interface with implementations `memoryStorage`, `localStorageStorage(serialize/deserialize)`, `customStorage`. SSR-safe (`typeof window` guard), no implicit date conversion (optional reviver), lookup through `has` (not `||`).
+- React binding `usePersistentState(key, default, storage)`. Fixes dead `staticGetById`.
 
-**E. Логи (`react/logs`) — слияние `logs.tsx` + `logs3.tsx` + `miniLogs.tsx`**
-- Единый `LogsStore` (на `core/store`) + презентационные `<LogsGrid/>`, `<MiniLogs/>`, `<LogToast/>` через контекст. Корректные `valueFormatter`, единый `num`, очистка таймеров, состояние per-provider (а не module-global).
+**E. Logs (`react/logs`) - merge `logs.tsx` + `logs3.tsx` + `miniLogs.tsx`**
+- Single `LogsStore` (on `core/store`) + presentational `<LogsGrid/>`, `<MiniLogs/>`, `<LogToast/>` through context. Correct `valueFormatter`, unified `num`, timer cleanup, per-provider state instead of module-global state.
 
-**F. Параметры (`react/components/Parameters`) — слияние `Parameters` + `ParametersEngine`**
-- Полностью **управляемый** `<Parameters value onChange/>`: иммутабельные обновления (без `deepClone+Refresh`-счётчика), схема-описание полей, `useDebouncedCallback` (корректный debounce с очисткой), размеры через `useElementSize`. Без мутации входных `params`.
+**F. Parameters (`react/components/Parameters`) - merge `Parameters` + `ParametersEngine`**
+- Fully **controlled** `<Parameters value onChange/>`: immutable updates (no `deepClone+Refresh` counter), field schema, `useDebouncedCallback` (correct debounce with cleanup), sizing through `useElementSize`. No mutation of input `params`.
 
-**G. Grid/транзакции (`core/grid`) — `applyTransactionAsyncUpdate`**
-- Чистая функция расчёта транзакции (add/update/remove считаются один раз и независимо), типобезопасный `getId: (row: T) => string`, без скрытого дублирования remove.
+**G. Grid/Transactions (`core/grid`) - `applyTransactionAsyncUpdate`**
+- Pure transaction calculation function (add/update/remove are computed once and independently), type-safe `getId: (row: T) => string`, no hidden duplicate remove.
 
-**H. Сборка/типы**
-- Dual-build (ESM+CJS) через `tsup`/`rollup`; `exports` с `import`/`require`/`types` + отдельный `./styles`; `"sideEffects":["**/*.css"]`; ноль сайд-эффектов при импорте; строгие дженерики, ноль `any` в публичных сигнатурах.
-
----
-
-## 10. Механика перехода: «было → стало» через временное дублирование
-
-### Паттерн
-1. Новое пишется в `src/core/**` и `src/react/**` — **рядом**, старое в `src/common/**` не трогаем.
-2. На время перехода **оба** набора скомпилированы. Новое экспортируется из `index.ts`, старое — из `index.compat.ts`.
-3. Когда новое покрыто тестами и достигнут паритет — старые публичные символы **переписываются как тонкие адаптеры** поверх нового (`src/compat/**`), сохраняя сигнатуру.
-4. Дублирование снимается: старая реализация удаляется, остаётся адаптер → новое ядро.
-
-### Шаблон «Было / Стало» (заполняется на каждый модуль)
-
-**Пример B — графики**
-- *Было (старое):* `createChartEngine(canvas)` в двух файлах с разными `Panel`/`addPanel` (px vs %), RAF без dirty-флага, `filter` на кадр, LOD теряет пики, утечки observer.
-- *Стало (новое):* `core/chart/createChart(ctx, opts)` (чистое ядро) + `react`-биндинг `<Chart/>`/`useChart`. Один `Panel`, dirty-render, бинарный поиск диапазона, min/max-LOD, управляемый ResizeObserver, `destroy()`.
-- *Адаптер:* обе старые сигнатуры `createChartEngine` реализуются как обёртки над `createChart`, помечаются `@deprecated`.
-
-**Пример A — реактивность**
-- *Было:* `updateBy(obj, cb)` мутирует `obj`, `renderBy(obj)`, нечистый `getSnapshot`, dual-mode.
-- *Стало:* `createStore`/`useStore`, чистые снапшоты, иммутабельность.
-- *Адаптер:* `updateBy`/`renderBy` — обёртки, внутри держат `createStore` и проксируют; внешняя сигнатура та же.
-
-**Пример C — drag**
-- *Было:* `Drag2`, `Drag22`, `ExRNDMap3`, `useDraggable` — каждый свой, global `openWindows`, re-subscribe на тик, утечки.
-- *Стало:* `usePointerDrag` + `useResizable` + `<WindowLayerProvider/>`.
-- *Адаптер:* старые компоненты рендерят новые хуки внутри, props-сигнатуры сохранены.
-
-> Для каждого модуля A–H завести такую тройку «Было / Стало / Адаптер» в отдельном issue/чеклисте.
-
-### Важное решение по каждому сломанному поведению (K3)
-При написании адаптера для фич, которые **сейчас сломаны** (`staticGetById`, `EditParams3`, формат времени, swap x/y, debounce), решить per-item:
-- **(a)** адаптер сразу отдаёт *исправленное* поведение (риск: потребитель подстроился под баг) — пометить как breaking в CHANGELOG; **или**
-- **(b)** старый адаптер сохраняет *старое (сломанное)* поведение + `@deprecated`, а новое API даёт корректное → потребитель чинит при миграции.
-Рекомендация: для багов с потерей данных (`EditParams3`, формат времени) — **(a)**; для «странного, но стабильного» (swap x/y, пароль `111`) — **(b)** с явной пометкой.
+**H. Build/Types**
+- Dual-build (ESM+CJS) through `tsup`/`rollup`; `exports` with `import`/`require`/`types` + separate `./styles`; `"sideEffects":["**/*.css"]`; zero import side effects; strict generics, zero `any` in public signatures.
 
 ---
 
-## 11. Адаптеры обратной совместимости
+## 10. Migration Mechanics: "Old -> New" Through Temporary Duplication
 
-Каждый старый публичный экспорт после перехода выглядит так (схема):
+### Pattern
+1. New code is written in `src/core/**` and `src/react/**` **next to** old code; do not touch `src/common/**`.
+2. During migration, **both** sets are compiled. New API is exported from `index.ts`, old API from `index.compat.ts`.
+3. Once the new code is covered by tests and reaches parity, old public symbols are **rewritten as thin adapters** over the new code (`src/compat/**`), preserving signatures.
+4. Duplication is removed: old implementation is deleted, adapter remains -> new core.
+
+### "Old / New" Template (Fill for Each Module)
+
+**Example B - charts**
+- *Old:* `createChartEngine(canvas)` in two files with different `Panel`/`addPanel` models (px vs %), RAF without dirty flag, `filter` per frame, LOD loses peaks, observer leaks.
+- *New:* `core/chart/createChart(ctx, opts)` (clean core) + `react` binding `<Chart/>`/`useChart`. One `Panel`, dirty-render, binary range search, min/max LOD, managed ResizeObserver, `destroy()`.
+- *Adapter:* both old `createChartEngine` signatures are implemented as wrappers over `createChart` and marked `@deprecated`.
+
+**Example A - reactivity**
+- *Old:* `updateBy(obj, cb)` mutates `obj`, `renderBy(obj)`, impure `getSnapshot`, dual-mode.
+- *New:* `createStore`/`useStore`, clean snapshots, immutability.
+- *Adapter:* `updateBy`/`renderBy` wrappers hold `createStore` internally and proxy; external signature stays the same.
+
+**Example C - drag**
+- *Old:* `Drag2`, `Drag22`, `ExRNDMap3`, `useDraggable` - each has its own implementation, global `openWindows`, re-subscribe on tick, leaks.
+- *New:* `usePointerDrag` + `useResizable` + `<WindowLayerProvider/>`.
+- *Adapter:* old components render the new hooks inside, with prop signatures preserved.
+
+> For each module A-H, create this "Old / New / Adapter" triple in a separate issue/checklist.
+
+### Important Decision for Each Broken Behavior (K3)
+When writing an adapter for features that are **currently broken** (`staticGetById`, `EditParams3`, time format, swap x/y, debounce), decide per item:
+- **(a)** adapter immediately returns *fixed* behavior (risk: consumer adapted to the bug) - mark as breaking in CHANGELOG; **or**
+- **(b)** old adapter preserves *old broken* behavior + `@deprecated`, while the new API provides correct behavior -> consumer fixes it during migration.
+Recommendation: for data-loss bugs (`EditParams3`, time format), use **(a)**; for "strange but stable" behavior (swap x/y, password `111`), use **(b)** with an explicit note.
+
+---
+
+## 11. Backward-Compatibility Adapters
+
+Each old public export should look like this after migration (schematic):
 ```ts
 // src/compat/updateBy.ts
 import { createStore, useStore } from "../core/store";
 
 /**
- * @deprecated Будет удалено в v3. Используйте `createStore`/`useStore` из "wenay-react2".
- * Миграция: см. MIGRATION.md §updateBy.
+ * @deprecated Will be removed in v3. Use `createStore`/`useStore` from "wenay-react2".
+ * Migration: see MIGRATION.md section updateBy.
  */
 export function updateBy(obj, cb) {
-  // обёртка над новым стором; внешняя сигнатура не изменилась
+  // wrapper over the new store; external signature is unchanged
   ...
 }
 ```
-Правила адаптеров:
-- **Сигнатура и имя — байт-в-байт** как раньше (включая `as any`-точки, порядок аргументов, опциональные параметры).
-- Все адаптеры помечены `@deprecated` с указанием замены и ссылкой на `MIGRATION.md`.
-- Сохранить устаревшие алиасы (`DivOutsideClick2`, `MiniButton3`, `ButtonOutClick` и пр.) — тоже как `@deprecated`-реэкспорты.
-- Адаптеры собраны в `index.compat.ts` и доступны как через корневой barrel (для бесшовности), так и через под-вход `wenay-react2/compat`.
+Adapter rules:
+- **Signature and name are byte-for-byte** as before, including `as any` points, argument order, and optional parameters.
+- All adapters are marked `@deprecated` with the replacement and a link to `MIGRATION.md`.
+- Preserve obsolete aliases (`DivOutsideClick2`, `MiniButton3`, `ButtonOutClick`, etc.) as `@deprecated` re-exports too.
+- Adapters are collected in `index.compat.ts` and are available through both the root barrel (for smoothness) and the `wenay-react2/compat` sub-entry.
 
 ---
 
-## 12. Релизный план и таймлайн deprecation
+## 12. Release Plan and Deprecation Timeline
 
-| Релиз | Что входит | Состояние старого API |
-|-------|-----------|------------------------|
-| **vX.next (minor/pre)** | KB + K0 + K1 (см. Часть I). Сборка починена, чистка, локальные баги. | Без изменений сигнатур. |
-| **v(X+1) — «новое ядро» (major)** | `core/**` + `react/**` опубликованы как **основное** API. Старое API работает через адаптеры (`compat/**`), **всё помечено `@deprecated` «скоро будет удалено»**. README/MIGRATION обновлены. `npm deprecate` на реально уходящих символах (test-компоненты, одна из копий chart engine). | Работает, помечено deprecated. |
-| **v(X+2) — удаление (major)** | Удаление `compat/**` и старых реализаций. Остаётся только новое API. | Удалено (с заметками миграции). |
+| Release | Contents | Old API State |
+|---------|----------|---------------|
+| **vX.next (minor/pre)** | KB + K0 + K1 (see Part I). Build fixed, cleanup, local bugs. | No signature changes. |
+| **v(X+1) - "new core" (major)** | `core/**` + `react/**` published as the **main** API. Old API works through adapters (`compat/**`), **all marked `@deprecated` "will be removed soon"**. README/MIGRATION updated. `npm deprecate` for symbols that truly go away (test components, one chart engine copy). | Works, marked deprecated. |
+| **v(X+2) - removal (major)** | Remove `compat/**` and old implementations. Only the new API remains. | Removed, with migration notes. |
 
-Сопутствующее:
-- **MIGRATION.md** — таблица «старый символ → новый символ → пример замены» для каждого A–H.
-- **CHANGELOG.md** — по semver; все breaking из K3 и удаления — только в major.
-- **Тесты-паритет**: на этапе vX+1 держать тест-набор, прогоняющий старый адаптер и новое API на одинаковых сценариях (гарантия, что адаптер не изменил наблюдаемое поведение, кроме явно объявленных fix'ов).
-- **Метрика deprecation**: опционально `console.warn` (один раз, с guard) в самых тяжёлых адаптерах — чтобы потребитель видел, что трогает уходящее (согласовать с side-effect-free политикой из KB).
+Related:
+- **MIGRATION.md** - table "old symbol -> new symbol -> replacement example" for each A-H.
+- **CHANGELOG.md** - semver-based; all breaking changes from K3 and removals only in major.
+- **Parity tests**: at vX+1, keep a test suite that runs the old adapter and new API on identical scenarios (guarantees the adapter did not change observable behavior except explicitly declared fixes).
+- **Deprecation metric**: optional `console.warn` (once, with guard) in the heaviest adapters so consumers see they touch outgoing API (align with the side-effect-free policy from KB).
 
 ---
 
-## 13. Рекомендованный порядок Части II
+## 13. Recommended Order for Part II
 
-1. Завести `src/core/store` (реактивность) — фундамент для logs/parameters. Тесты.
-2. `core/storage` + `react/hooks` (useStore, useElementSize, useDebouncedCallback, usePointerDrag, useOutside). Тесты.
-3. `core/chart` + `<Chart/>` — слить две копии движка. Тесты (математика LOD, диапазоны).
-4. `react/logs`, `react/components/Parameters`, DnD-компоненты — поверх ядра. Тесты.
-5. `core/grid` (транзакции). Тесты.
-6. Написать `compat/**` адаптеры под все старые сигнатуры (+ `@deprecated`). Прогнать тесты-паритет.
-7. Настроить dual-build и `exports` (KB-целевое из §9.2.H).
-8. Релиз v(X+1): новое — основное, старое — deprecated. `npm deprecate` + MIGRATION.md.
-9. Спустя цикл поддержки — v(X+2): удалить `compat/**`.
+1. Create `src/core/store` (reactivity) - foundation for logs/parameters. Tests.
+2. `core/storage` + `react/hooks` (useStore, useElementSize, useDebouncedCallback, usePointerDrag, useOutside). Tests.
+3. `core/chart` + `<Chart/>` - merge the two engine copies. Tests (LOD math, ranges).
+4. `react/logs`, `react/components/Parameters`, DnD components - on top of the core. Tests.
+5. `core/grid` (transactions). Tests.
+6. Write `compat/**` adapters for all old signatures (+ `@deprecated`). Run parity tests.
+7. Configure dual-build and `exports` (KB target from section 9.2.H).
+8. Release v(X+1): new API is main, old API is deprecated. `npm deprecate` + MIGRATION.md.
+9. After a support cycle, release v(X+2): remove `compat/**`.

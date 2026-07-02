@@ -1,26 +1,26 @@
-/* Единые дизайн-токены библиотеки. Значения собраны из style.css и menuRight.css
-   без изменений. TS-зеркало для inline-стилей и ag-grid тем — src/common/src/styles/tokens.ts */
+/* Shared library design tokens. Values are collected from style.css and menuRight.css
+   without changes. TS mirror for inline styles and ag-grid themes - src/common/src/styles/tokens.ts */
 :root {
-  /* Основные фоновые цвета */
+  /* Main background colors */
   --color-bg-dark: #131821;
   --color-bg-light: #17202e;
 
-  /* Скролл */
+  /* Scroll */
   --color-scrollbar-track: rgba(255, 255, 255, 0);
   --color-scrollbar-thumb: #1d262c;
-  /* альтернатива для MSTradeScroll */
+  /* alternative for MSTradeScroll */
   --color-scrollbar-thumb-alt: #4c4562;
 
-  /* Основные текстовые/обводки */
+  /* Main text/outline colors */
   --color-text-base: #c4c4c4;
   --color-text-theme: #5D9FFA;
   --color-border-common: rgb(50, 62, 71);
 
-  /* База для меню */
+  /* Menu base */
   --base-border: 1px solid rgba(255, 255, 255, 0.41);
   --base-color-hover: #fff;
 
-  /* Меню */
+  /* Menu */
   --menu-bg-color: rgba(12, 12, 12, 0.91);
   --menu-blur: 10px;
   --menu-border: var(--base-border);
@@ -29,6 +29,6 @@
   --menu-item-hover-color: #101010;
   --menu-item-hover-bg-color: var(--base-color-hover);
 
-  /* Слои */
+  /* Layers */
   --wenay-z-modal: 9999;
 }

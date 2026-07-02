@@ -1,14 +1,14 @@
 /*************************************************************
  * chartEngine.tsx
- * Обновлённый пример, где:
- *  - Ширина панелей = 100% от Canvas
- *  - Высота панелей задаётся в процентах (heightPct)
- *  - Последняя панель всегда "дотягивает" до 100%
+ * Updated example where:
+ *  - Panel width = 100% of Canvas
+ *  - Panel height is defined in percent (heightPct)
+ *  - The last panel always fills up to 100%
  *************************************************************/
 import React, { useRef, useEffect } from 'react';
 
 /**
- * Базовые типы данных
+ * Base data types
  */
 export interface DataPoint {
     x: number;
@@ -53,7 +53,7 @@ export interface CreateDataSetParams {
 }
 
 /**
- * Фабрика DataSet
+ * DataSet factory
  */
 export function createDataSet(params: CreateDataSetParams): DataSet {
     const {
@@ -76,20 +76,23 @@ export function createDataSet(params: CreateDataSetParams): DataSet {
     let internalData = data.slice();
     let minMaxChunks: MinMaxChunk[] = [];
 
+    function computeChunk(chunkIndex: number): MinMaxChunk {
+        const start = chunkIndex * chunkSize;
+        const end = Math.min(start + chunkSize, internalData.length);
+        let minY = Infinity;
+        let maxY = -Infinity;
+        for (let i = start; i < end; i++) {
+            const y = internalData[i].y;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        }
+        return { xStart: internalData[start].x, xEnd: internalData[end - 1].x, minY, maxY };
+    }
+
     function buildMinMaxChunks() {
         minMaxChunks = [];
-        if (internalData.length === 0) return;
-        for (let i = 0; i < internalData.length; i += chunkSize) {
-            const chunkData = internalData.slice(i, i + chunkSize);
-            let minY = Infinity;
-            let maxY = -Infinity;
-            const xStart = chunkData[0].x;
-            const xEnd = chunkData[chunkData.length - 1].x;
-            for (const dp of chunkData) {
-                if (dp.y < minY) minY = dp.y;
-                if (dp.y > maxY) maxY = dp.y;
-            }
-            minMaxChunks.push({ xStart, xEnd, minY, maxY });
+        for (let c = 0; c * chunkSize < internalData.length; c++) {
+            minMaxChunks.push(computeChunk(c));
         }
     }
     buildMinMaxChunks();
@@ -114,23 +117,14 @@ export function createDataSet(params: CreateDataSetParams): DataSet {
 
     function addData(newPoints: DataPoint | DataPoint[]) {
         const arr = Array.isArray(newPoints) ? newPoints : [newPoints];
+        if (arr.length === 0) return;
+        const oldLength = internalData.length;
         internalData.push(...arr);
-        const remainder = internalData.length % chunkSize;
-        if (remainder <= arr.length) {
-            buildMinMaxChunks();
-        } else {
-            const lastChunkIndex = Math.floor((internalData.length - 1) / chunkSize);
-            const startIndex = lastChunkIndex * chunkSize;
-            const chunkData = internalData.slice(startIndex, startIndex + chunkSize);
-            let minY = Infinity;
-            let maxY = -Infinity;
-            for (const d of chunkData) {
-                if (d.y < minY) minY = d.y;
-                if (d.y > maxY) maxY = d.y;
-            }
-            const xStart = chunkData[0].x;
-            const xEnd = chunkData[chunkData.length - 1].x;
-            minMaxChunks[lastChunkIndex] = { xStart, xEnd, minY, maxY };
+        // recompute only the tail: previously crossing a chunk boundary rebuilt ALL chunks (O(n) per boundary)
+        const firstChunk = Math.floor(oldLength / chunkSize);
+        const lastChunk = Math.floor((internalData.length - 1) / chunkSize);
+        for (let c = firstChunk; c <= lastChunk; c++) {
+            minMaxChunks[c] = computeChunk(c);
         }
     }
 
@@ -140,7 +134,7 @@ export function createDataSet(params: CreateDataSetParams): DataSet {
         data: internalData,
         style: mergedStyle,
         chunkSize,
-        // buildMinMaxChunks переприсваивает локальный массив — геттер вместо stale-снимка
+        // buildMinMaxChunks reassigns the local array, so use a getter instead of a stale snapshot
         get minMaxChunks() { return minMaxChunks; },
         getMinMaxInRange,
         addData
@@ -194,32 +188,34 @@ export function createDataModel(): DataModel {
 
 /**
  * PanelManager
- * Вместо pixel-высоты, используем heightPct (процент).
+ * Use heightPct (percent) instead of pixel height.
  */
 export interface Panel {
     id: string;
     left: number;       // px
-    top: number;        // px (будет рассчитываться)
-    width: number;      // px (здесь = canvas.width)
-    height: number;     // px (будет рассчитываться)
-    heightPct: number;  // доля от 100 (кроме последней, которая может "добирать")
+    top: number;        // px (calculated)
+    width: number;      // px (here = canvas.width)
+    height: number;     // px (calculated)
+    heightPct: number;  // share of 100 (except the last panel, which may fill the rest)
     dataSets: DataSet[];
     verticalRange: { minY: number; maxY: number };
     autoFocusY: boolean;
     resizable?: boolean;
 }
 
+export interface PanelConfig {
+    id: string;
+    /** Height percent: 0..100; the last panel fills the remainder */
+    heightPct?: number;
+    dataSets: DataSet[];
+    autoFocusY?: boolean;
+    resizable?: boolean;
+}
+
 export interface PanelManager {
     panels: Panel[];
 
-    addPanel(config: {
-        id: string;
-        /** Процент высоты: 0..100, последняя панель добирает остаток */
-        heightPct?: number;
-        dataSets: DataSet[];
-        autoFocusY?: boolean;
-        resizable?: boolean;
-    }): void;
+    addPanel(config: PanelConfig): void;
 
     layoutPanels(containerWidth: number, containerHeight: number): void;
     resizePanel(panelId: string, deltaPx: number, containerHeight: number): void;
@@ -228,20 +224,14 @@ export interface PanelManager {
 export function createPanelManager(): PanelManager {
     const panels: Panel[] = [];
 
-    function addPanel(config: {
-        id: string;
-        heightPct?: number;
-        dataSets: DataSet[];
-        autoFocusY?: boolean;
-        resizable?: boolean;
-    }) {
+    function addPanel(config: PanelConfig) {
         const p: Panel = {
             id: config.id,
             left: 0,
             top: 0,
             width: 0,
             height: 0,
-            heightPct: config.heightPct ?? 20, // по умолчанию 20% (или любой другой)
+            heightPct: config.heightPct ?? 20, // default 20% (or any other value)
             dataSets: config.dataSets,
             verticalRange: { minY: 0, maxY: 1 },
             autoFocusY: config.autoFocusY !== false,
@@ -252,29 +242,29 @@ export function createPanelManager(): PanelManager {
 
     /**
      * layoutPanels:
-     *  - Суммируем heightPct всех панелей (кроме последней).
-     *  - Последняя панель = 100% - сумма предыдущих (если вдруг сумма < 100).
-     *  - Переводим проценты в px, рассчитываем top/height.
+     *  - Sum heightPct for all panels except the last one.
+     *  - Last panel = 100% - sum of previous panels (if the sum is below 100).
+     *  - Convert percents to px and calculate top/height.
      */
     function layoutPanels(containerWidth: number, containerHeight: number) {
-        // Сумма процентов у всех панелей, кроме последней
+        // Percent sum for all panels except the last one
         if (panels.length === 0) return;
 
-        // Рассчитываем сумму “заданных” процентов (кроме последней)
+        // Calculate the sum of assigned percents (except the last one)
         let totalAssignedPct = 0;
         for (let i = 0; i < panels.length - 1; i++) {
             totalAssignedPct += panels[i].heightPct;
         }
-        if (totalAssignedPct > 100) totalAssignedPct = 100; // ограничим
+        if (totalAssignedPct > 100) totalAssignedPct = 100; // clamp
 
-        // Последней панели даём остаток
+        // Give the remaining space to the last panel
         const lastPanel = panels[panels.length - 1];
         lastPanel.heightPct = 100 - totalAssignedPct;
 
-        // Теперь вычисляем top/height
+        // Now calculate top/height
         let currentTopPx = 0;
         for (const p of panels) {
-            // Преобразуем процент в px
+            // Convert percent to px
             const hPx = (p.heightPct / 100) * containerHeight;
             p.left = 0;
             p.top = currentTopPx;
@@ -286,22 +276,22 @@ export function createPanelManager(): PanelManager {
     }
 
     /**
-     * resizePanel: меняем процент высоты одной панели при “перетаскивании”.
-     * deltaPx — изменение высоты в px, превращаем в проценты.
+     * resizePanel: change one panel height percent while dragging.
+     * deltaPx is the height change in px, converted to percent.
      */
     function resizePanel(panelId: string, deltaPx: number, containerHeight: number) {
         const idx = panels.findIndex((p) => p.id === panelId);
-        if (idx < 0 || idx >= panels.length) return;
+        if (idx < 0) return;
         const p = panels[idx];
 
-        // Текущий процент
+        // Current percent
         const oldPct = p.heightPct;
         // px -> pct
         const deltaPct = (deltaPx / containerHeight) * 100;
         const newPct = p.heightPct + deltaPct;
 
-        // Ограничим чтобы не уходило в отрицательные значения
-        if (newPct < 5) { // Минимум 5% (условно)
+        // Clamp to avoid negative values
+        if (newPct < 5) { // Minimum 5% (arbitrary)
             p.heightPct = 5;
         } else if (newPct > 95) {
             p.heightPct = 95;
@@ -319,7 +309,7 @@ export function createPanelManager(): PanelManager {
 }
 
 /**
- * Renderer (ось Y справа, LOD для линий)
+ * Renderer (right Y axis, LOD for lines)
  */
 export interface Renderer {
     drawPanel(
@@ -339,11 +329,16 @@ export interface Transform {
     scaleY?: number;
 }
 
-// Ширина оси Y справа — единая константа на файл
+// Right Y-axis width, a single file-level constant
 const AXIS_THICKNESS = 40;
 
-// Данные отсортированы по x: границы видимого диапазона бинарным поиском,
-// без filter-аллокаций на каждый кадр. Возвращает [start, end) по индексам.
+// Visible world-X range for a drawing area of the given pixel width
+function visibleXRange(width: number, transform: Transform): [number, number] {
+    return [transform.offsetX, transform.offsetX + (width - AXIS_THICKNESS) / transform.scaleX];
+}
+
+// Data is sorted by x: find visible-range boundaries with binary search,
+// without filter allocations on each frame. Returns [start, end) by indexes.
 function visibleRange(data: DataPoint[], xMin: number, xMax: number): [number, number] {
     let lo = 0, hi = data.length;
     while (lo < hi) {
@@ -364,12 +359,8 @@ export function createRenderer(): Renderer {
         const range = maxVal - minVal || 1;
         const roughStep = range / count;
         const mag = Math.pow(10, Math.floor(Math.log10(roughStep)));
-        let norm = roughStep / mag;
-        let step = 1;
-        if (norm < 2) step = 1;
-        else if (norm < 5) step = 2;
-        else step = 5;
-        step *= mag;
+        const norm = roughStep / mag;
+        const step = (norm < 2 ? 1 : norm < 5 ? 2 : 5) * mag;
 
         const niceMin = Math.floor(minVal / step) * step;
         const niceMax = Math.ceil(maxVal / step) * step;
@@ -386,7 +377,7 @@ export function createRenderer(): Renderer {
 
     function yToPixY(yVal: number, panel: Panel, transform: Transform) {
         // autoFocusY => [minY, maxY]
-        // иначе offsetY/scaleY
+        // otherwise offsetY/scaleY
         if (panel.autoFocusY) {
             const { minY, maxY } = panel.verticalRange;
             const range = maxY - minY || 1;
@@ -471,9 +462,7 @@ export function createRenderer(): Renderer {
         const gradientFill = style.gradientFill ?? true;
         const lineWidth = style.lineWidth ?? 2;
 
-        const xMinVisible = transform.offsetX;
-        const xMaxVisible = transform.offsetX + (panel.width - AXIS_THICKNESS) / transform.scaleX;
-
+        const [xMinVisible, xMaxVisible] = visibleXRange(panel.width, transform);
         const [start, end] = visibleRange(data, xMinVisible, xMaxVisible);
         if (end - start < 2) return;
 
@@ -552,19 +541,18 @@ export function createRenderer(): Renderer {
         style: DataSetStyle
     ) {
         const barColor = style.barColor ?? '#66cc66';
-        const xMinVisible = transform.offsetX;
-        const xMaxVisible = transform.offsetX + (panel.width - AXIS_THICKNESS) / transform.scaleX;
+        const [xMinVisible, xMaxVisible] = visibleXRange(panel.width, transform);
         const [start, end] = visibleRange(data, xMinVisible, xMaxVisible);
         if (end === start) return;
 
         ctx.save();
         ctx.fillStyle = barColor;
         const barWidth = 5;
+        const pyBase = yToPixY(panel.verticalRange.minY, panel, transform);
         for (let i = start; i < end; i++) {
             const pt = data[i];
             const px = xToPixX(pt.x, transform, panel);
             const py = yToPixY(pt.y, panel, transform);
-            const pyBase = yToPixY(panel.verticalRange.minY, panel, transform);
             ctx.fillRect(px - barWidth / 2, py, barWidth, pyBase - py);
         }
         ctx.restore();
@@ -708,10 +696,12 @@ export function createInteraction(
         const localY = e.clientY - rect.top;
         crosshairPos = { x: localX, y: localY };
 
-        // Проверка границы между панелями (для ресайза)
+        // Check the boundary between panels (for resize)
         const panels = getPanels();
         for (const p of panels) {
             if (!p.resizable) continue;
+            // last panel takes the leftover height in layoutPanels - its bottom border is not draggable
+            if (p === panels[panels.length - 1]) continue;
             const bottom = p.top + p.height;
             if (Math.abs(localY - bottom) < 5) {
                 dragMode = DragMode.ResizePanel;
@@ -721,7 +711,7 @@ export function createInteraction(
             }
         }
 
-        // Ищем панель
+        // Find panel
         activePanel = findPanel(localX, localY, panels);
         if (!activePanel) {
             dragMode = DragMode.None;
@@ -730,7 +720,7 @@ export function createInteraction(
 
         const axisRightX = activePanel.left + activePanel.width - AXIS_THICKNESS;
         if (localX >= axisRightX) {
-            // масштаб по Y, если autoFocusY=false
+            // Scale by Y if autoFocusY=false
             dragMode = DragMode.ScaleY;
         } else {
             // pan
@@ -758,11 +748,13 @@ export function createInteraction(
 
         const t = getTransform();
 
-        // Режим ресайза панели
+        // Panel resize mode
         if (dragMode === DragMode.ResizePanel && resizingPanelId) {
             // deltaPx = dy
-            const { height: cH } = getContainerSize();
+            const { width: cW, height: cH } = getContainerSize();
             panelManager.resizePanel(resizingPanelId, dy, cH);
+            // recalc px top/height right away - previously it only happened on container resize
+            panelManager.layoutPanels(cW, cH);
             onTransformChanged();
             return;
         }
@@ -784,13 +776,6 @@ export function createInteraction(
             }
         }
         onTransformChanged();
-    }
-
-    function onMouseUp(e: MouseEvent) {
-        isMouseDown = false;
-        dragMode = DragMode.None;
-        activePanel = null;
-        resizingPanelId = null;
     }
 
     function onGlobalMouseUp(e: MouseEvent) {
@@ -878,13 +863,7 @@ export interface ChartEngine {
     attachToContainer(container: HTMLElement): void;
 
     createDataSet(params: CreateDataSetParams): DataSet;
-    addPanel(config: {
-        id: string;
-        dataSets: DataSet[];
-        heightPct?: number;
-        autoFocusY?: boolean;
-        resizable?: boolean;
-    }): void;
+    addPanel(config: PanelConfig): void;
 
     canvas: HTMLCanvasElement;
     dataModel: DataModel;
@@ -893,7 +872,7 @@ export interface ChartEngine {
 }
 
 /**
- * Фабричная функция движка
+ * Engine factory function
  */
 export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
     const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
@@ -914,9 +893,9 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
     let containerWidth = 0;
     let containerHeight = 0;
 
-    // Dirty-флаг: рисуем только при изменениях. Хуки инвалидации покрывают interaction
-    // (включая кроссхейр), addData/addPanel/resize; stamp в renderLoop ловит прямые
-    // мутации через dataModel/panelManager (длины данных, геометрия панелей, размер canvas).
+    // Dirty flag: render only when something changes. Invalidation hooks cover interaction
+    // (including crosshair), addData/addPanel/resize; stamp in renderLoop catches direct
+    // mutations through dataModel/panelManager (data lengths, panel geometry, canvas size).
     let needsRender = true;
     let lastStamp = NaN;
     function invalidate() { needsRender = true; }
@@ -929,8 +908,6 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         }
         return s;
     }
-
-    const isYRightAxis = true;
 
     function setTransform(t: Transform) {
         transform = t;
@@ -954,20 +931,26 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         getTransform,
         setTransform,
         getPanels,
-        () => { invalidate(); updatePanels(); },
+        // invalidate is enough: renderLoop runs updatePanels once per dirty frame,
+        // calling it here doubled the min/max scan on every mouse event
+        invalidate,
         (p) => toggleAutoFocusY(p),
         panelManager,
         getContainerSize
     );
 
     function updatePanels() {
-        const x1 = transform.offsetX;
-        const x2 = transform.offsetX + (canvas.width - AXIS_THICKNESS) / transform.scaleX;
+        const [x1, x2] = visibleXRange(canvas.width, transform);
         for (const p of panelManager.panels) {
             if (p.autoFocusY) {
-                const { minY, maxY } = dataModel.getGlobalMinMaxY(
-                    x1, x2, (ds) => p.dataSets.includes(ds)
-                );
+                let minY = Infinity;
+                let maxY = -Infinity;
+                for (const ds of p.dataSets) {
+                    const r = ds.getMinMaxInRange(x1, x2);
+                    if (r.minY < minY) minY = r.minY;
+                    if (r.maxY > maxY) maxY = r.maxY;
+                }
+                if (minY === Infinity || maxY === -Infinity) { minY = 0; maxY = 1; }
                 p.verticalRange.minY = minY;
                 p.verticalRange.maxY = maxY;
             } else {
@@ -993,12 +976,11 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
             needsRender = false;
             updatePanels();
 
-            const xMin = transform.offsetX;
-            const xMax = transform.offsetX + (canvas.width - AXIS_THICKNESS) / transform.scaleX;
+            const [xMin, xMax] = visibleXRange(canvas.width, transform);
             const crosshair = interaction.getCrosshairPos();
 
             for (const p of panelManager.panels) {
-                renderer.drawPanel(ctx, p, transform, { xMin, xMax }, crosshair, isYRightAxis);
+                renderer.drawPanel(ctx, p, transform, { xMin, xMax }, crosshair, true);
             }
         }
 
@@ -1014,8 +996,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         destroyed = true;
         cancelAnimationFrame(animationFrameId);
         interaction.destroy();
-        if (resizeObserver && containerEl) {
-            resizeObserver.unobserve(containerEl);
+        if (resizeObserver) {
             resizeObserver.disconnect();
         }
         containerEl = null;
@@ -1033,7 +1014,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
                     if (canvas.width !== w || canvas.height !== h) {
                         canvas.width = w;
                         canvas.height = h;
-                        invalidate(); // смена размера canvas стирает битмап — перерисовать обязательно
+                        invalidate(); // changing canvas size clears the bitmap, so redraw is required
                     }
                     containerWidth = w;
                     containerHeight = h;
@@ -1052,13 +1033,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         return ds;
     }
 
-    function addPanelFn(config: {
-        id: string;
-        dataSets: DataSet[];
-        heightPct?: number;
-        autoFocusY?: boolean;
-        resizable?: boolean;
-    }) {
+    function addPanelFn(config: PanelConfig) {
         panelManager.addPanel(config);
         invalidate();
     }
@@ -1077,7 +1052,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
 }
 
 /**
- * Пример генерации данных
+ * Data generation example
  */
 export function generateIncrementalData(
     startX: number,
@@ -1099,7 +1074,7 @@ export function generateIncrementalData(
 }
 
 /**
- * Пример React-компонента MyChart
+ * MyChart React component example
  */
 export const MyChartEngine: React.FC<{ style?: React.CSSProperties }> = ({ style }) => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -1116,7 +1091,7 @@ export const MyChartEngine: React.FC<{ style?: React.CSSProperties }> = ({ style
         engine.attachToContainer(container);
         engine.init();
 
-        // Создаём DataSets
+        // Create DataSets
         const lineData = generateIncrementalData(0, 50, 100, 10);
         const lineDS = engine.createDataSet({
             id: 'line1',
@@ -1133,8 +1108,8 @@ export const MyChartEngine: React.FC<{ style?: React.CSSProperties }> = ({ style
             style: { barColor: '#66aa66' }
         });
 
-        // Добавляем панели — указываем heightPct
-        // Последняя панель автоматически заберёт остаток до 100%.
+        // Add panels and specify heightPct
+        // The last panel automatically takes the remaining space up to 100%.
         engine.addPanel({
             id: 'mainPanel',
             dataSets: [lineDS],
@@ -1151,7 +1126,7 @@ export const MyChartEngine: React.FC<{ style?: React.CSSProperties }> = ({ style
             resizable: true
         });
 
-        // Имитация добавления
+        // Simulate adding data
         let lineX = lineData[lineData.length - 1].x;
         let lineY = lineData[lineData.length - 1].y;
         let barX = barData[barData.length - 1].x;
@@ -1167,7 +1142,7 @@ export const MyChartEngine: React.FC<{ style?: React.CSSProperties }> = ({ style
             barY += dBar; if (barY < 0) barY = 0;
             barX++;
             barDS.addData({ x: barX, y: barY });
-        }, 1);
+        }, 50); // demo stream; 1ms flooded the dataset at max timer rate
 
         return () => {
             clearInterval(intervalId);

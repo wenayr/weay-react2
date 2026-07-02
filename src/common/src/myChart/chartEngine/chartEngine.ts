@@ -1,20 +1,20 @@
 /**
- * @deprecated НЕ ИСПОЛЬЗУЕТСЯ: файл не импортируется никем (ни api.tsx, ни стендом) и в сборку
- * библиотеки не входит. Канонический движок — chartEngineReact.tsx (он публичный).
- * Файл — кандидат на удаление при слиянии движков в core/chart (Часть II плана).
- * До тех пор правки движка дублируются сюда вручную; tsc библиотеки его НЕ проверяет.
+ * @deprecated UNUSED: the file is not imported anywhere (neither api.tsx nor the stand) and is not included
+ * in the library build. The canonical engine is chartEngineReact.tsx (it is public).
+ * This file is a removal candidate when engines are merged into core/chart (part II of the plan).
+ * Until then, engine changes are duplicated here manually; the library tsc does NOT check it.
  */
 
-/** Точка данных (x,y) */
+/** Data point (x,y) */
 export interface DataPoint {
     x: number;
     y: number;
 }
 
-/** Тип графика: линия или бары */
+/** Chart type: line or bars */
 export type ChartType = 'line' | 'bar';
 
-/** Стили набора данных */
+/** Data set styles */
 export interface DataSetStyle {
     strokeColor?: string;
     fillColor?: string;
@@ -23,7 +23,7 @@ export interface DataSetStyle {
     gradientFill?: boolean;
 }
 
-/** Структура для быстрого min/max */
+/** Structure for fast min/max */
 export interface MinMaxChunk {
     xStart: number;
     xEnd: number;
@@ -31,7 +31,7 @@ export interface MinMaxChunk {
     maxY: number;
 }
 
-/** Набор данных (серия для графика) */
+/** Data set (chart series) */
 export interface DataSet {
     id: string;
     type: ChartType;
@@ -44,7 +44,7 @@ export interface DataSet {
     addData(newPoints: DataPoint | DataPoint[]): void;
 }
 
-/** Параметры для создания DataSet */
+/** Parameters for creating a DataSet */
 export interface CreateDataSetParams {
     id: string;
     type?: ChartType;
@@ -54,7 +54,7 @@ export interface CreateDataSetParams {
 }
 
 /**
- * Фабрика DataSet
+ * DataSet factory
  */
 export function createDataSet(params: CreateDataSetParams): DataSet {
     const {
@@ -65,7 +65,7 @@ export function createDataSet(params: CreateDataSetParams): DataSet {
         chunkSize = 100
     } = params;
 
-    // Мягкие цвета по умолчанию
+    // Soft default colors
     const defaultStyle: DataSetStyle = {
         strokeColor: '#2299dd',
         fillColor: 'rgba(34,153,221,0.2)',
@@ -140,7 +140,7 @@ export function createDataSet(params: CreateDataSetParams): DataSet {
         data: internalData,
         style: mergedStyle,
         chunkSize,
-        // buildMinMaxChunks переприсваивает локальный массив — геттер вместо stale-снимка
+        // buildMinMaxChunks reassigns the local array, so use a getter instead of a stale snapshot
         get minMaxChunks() { return minMaxChunks; },
         getMinMaxInRange,
         addData
@@ -208,9 +208,9 @@ export interface Panel {
     dataSets: DataSet[];
     verticalRange: { minY: number; maxY: number };
     autoFocusY: boolean;
-    /** Можно разрешить ресайз */
+    /** Whether resize can be enabled */
     resizable?: boolean;
-    /** Доля высоты для auto layout (при resizeObserver) */
+    /** Height fraction for auto layout (under resizeObserver) */
     heightFraction?: number;
 }
 
@@ -260,23 +260,23 @@ export function createPanelManager(): PanelManager {
     }
 
     /**
-     * layoutPanels — вызывается при изменении размеров контейнера
-     * “Сохраняем” пропорции высот, пересчитываем top/height.
+     * layoutPanels is called when the container size changes
+     * Preserve height proportions and recalculate top/height.
      */
     function layoutPanels(containerWidth: number, containerHeight: number) {
-        // 1) выяснить суммарную высоту всех панелей (как было)
+        // 1) determine the total height of all panels (as before)
         let totalH = 0;
         for (const p of panels) {
             totalH += p.height;
         }
         if (totalH <= 0) totalH = 1;
 
-        // 2) высчитать fraction = panel.height / totalH
+        // 2) calculate fraction = panel.height / totalH
         for (const p of panels) {
             p.heightFraction = p.height / totalH;
         }
 
-        // 3) теперь распределим новую высоту, заданную containerHeight
+        // 3) distribute the new height defined by containerHeight
         let currentTop = 0;
         for (const p of panels) {
             const newH = (p.heightFraction ?? 0) * containerHeight;
@@ -289,8 +289,8 @@ export function createPanelManager(): PanelManager {
     }
 
     /**
-     * resizePanel — меняет высоту конкретной панели,
-     * и сдвигает панели ниже.
+     * resizePanel changes a specific panel height
+     * and shifts panels below it.
      */
     function resizePanel(panelId: string, newHeight: number) {
         const idx = panels.findIndex((p) => p.id === panelId);
@@ -300,7 +300,7 @@ export function createPanelManager(): PanelManager {
         const delta = newHeight - panel.height;
         panel.height = newHeight;
 
-        // Сдвигаем все панели ниже
+        // Shift all panels below it
         for (let i = idx + 1; i < panels.length; i++) {
             panels[i].top += delta;
         }
@@ -330,7 +330,7 @@ export interface Renderer {
     ): void;
 }
 
-/** Трансформация */
+/** Transform */
 export interface Transform {
     offsetX: number;
     scaleX: number;
@@ -338,11 +338,11 @@ export interface Transform {
     scaleY?: number;
 }
 
-// Ширина оси Y справа — единая константа на файл
+// Right Y-axis width, a single file-level constant
 const AXIS_THICKNESS = 40;
 
-// Данные отсортированы по x: границы видимого диапазона бинарным поиском,
-// без filter-аллокаций на каждый кадр. Возвращает [start, end) по индексам.
+// Data is sorted by x: find visible-range boundaries with binary search,
+// without filter allocations on each frame. Returns [start, end) by indexes.
 function visibleRange(data: DataPoint[], xMin: number, xMax: number): [number, number] {
     let lo = 0, hi = data.length;
     while (lo < hi) {
@@ -380,7 +380,7 @@ export function createRenderer(): Renderer {
     }
 
     function xToPixX(xVal: number, transform: Transform, panel: Panel) {
-        // без учёта оси снизу, просто panel.left + ...
+        // Without accounting for the bottom axis, just panel.left + ...
         return panel.left + (xVal - transform.offsetX) * transform.scaleX;
     }
 
@@ -388,11 +388,11 @@ export function createRenderer(): Renderer {
         if (panel.autoFocusY) {
             const { minY, maxY } = panel.verticalRange;
             const range = maxY - minY || 1;
-            // высота панели = panel.height
+            // Panel height = panel.height
             const ratio = (yVal - minY) / range;
             return panel.top + panel.height - ratio * panel.height;
         } else {
-            // ручной offsetY/scaleY
+            // Manual offsetY/scaleY
             const offsetY = transform.offsetY ?? 0;
             const scaleY = transform.scaleY ?? 1;
             return panel.top + panel.height - (yVal - offsetY) * scaleY;
@@ -412,21 +412,21 @@ export function createRenderer(): Renderer {
         ctx.fillStyle = '#666';
         ctx.lineWidth = 1;
 
-        // Ось Y справа
+        // Right Y axis
         const yAxisX = panel.left + panel.width - AXIS_THICKNESS / 2;
-        // Рисуем вертикальную линию
+        // Draw vertical line
         ctx.beginPath();
         ctx.moveTo(yAxisX, panel.top);
         ctx.lineTo(yAxisX, panel.top + panel.height);
         ctx.stroke();
 
-        // Ось X (примерно снизу)
+        // X axis (roughly at the bottom)
         ctx.beginPath();
         ctx.moveTo(panel.left, panel.top + panel.height - 0.5);
         ctx.lineTo(panel.left + panel.width, panel.top + panel.height - 0.5);
         ctx.stroke();
 
-        // Тики по X
+        // X ticks
         const xTicks = getNiceTicks(xMin, xMax, 6);
         xTicks.forEach((val) => {
             const xPix = xToPixX(val, transform, panel);
@@ -439,7 +439,7 @@ export function createRenderer(): Renderer {
             ctx.fillText(Math.round(val).toString(), xPix - 5, baseY + 12);
         });
 
-        // Тики по Y
+        // Y ticks
         let minY: number, maxY: number;
         if (panel.autoFocusY) {
             minY = panel.verticalRange.minY;
@@ -465,7 +465,7 @@ export function createRenderer(): Renderer {
     }
 
     /**
-     * LOD для line chart
+     * LOD for line chart
      */
     function drawLineChartLOD(
         ctx: CanvasRenderingContext2D,
@@ -480,13 +480,13 @@ export function createRenderer(): Renderer {
         const gradientFill = style.gradientFill ?? true;
         const lineWidth = style.lineWidth ?? 2;
 
-        // Видимый X
+        // Visible X
         const xMinVisible = transform.offsetX;
         const xMaxVisible = transform.offsetX + (panel.width - AXIS_THICKNESS) / transform.scaleX;
         const [start, end] = visibleRange(data, xMinVisible, xMaxVisible);
         if (end - start < 2) return;
 
-        // Простейший LOD: если xToPixX(pt.x) совпадает (округляется) с предыдущим, пропускаем
+        // Simple LOD: if xToPixX(pt.x) rounds to the same value as the previous point, skip it
         const result: DataPoint[] = [];
         let lastPixX = -1;
 
@@ -518,7 +518,7 @@ export function createRenderer(): Renderer {
         }
         ctx.stroke();
 
-        // Градиент
+        // Gradient
         if (gradientFill) {
             const last = result[result.length - 1];
             const pxLast = xToPixX(last.x, transform, panel);
@@ -582,13 +582,13 @@ export function createRenderer(): Renderer {
         ctx.strokeStyle = '#888';
         ctx.setLineDash([4, 4]);
 
-        // Вертикальная линия
+        // Vertical line
         ctx.beginPath();
         ctx.moveTo(crosshair.x, panel.top);
         ctx.lineTo(crosshair.x, panel.top + panel.height);
         ctx.stroke();
 
-        // Горизонтальная линия
+        // Horizontal line
         ctx.beginPath();
         ctx.moveTo(panel.left, crosshair.y);
         ctx.lineTo(panel.left + panel.width, crosshair.y);
@@ -598,9 +598,9 @@ export function createRenderer(): Renderer {
         ctx.font = '12px sans-serif';
         ctx.fillStyle = '#333';
 
-        // Мировой X
+        // World X
         const worldX = (crosshair.x - panel.left) / transform.scaleX + transform.offsetX;
-        // Мировой Y
+        // World Y
         let worldY = 0;
         if (panel.autoFocusY) {
             const { minY, maxY } = panel.verticalRange;
@@ -613,11 +613,11 @@ export function createRenderer(): Renderer {
             worldY = offsetY + (panel.top + panel.height - crosshair.y) / scaleY;
         }
 
-        // Подпись X (снизу)
+        // X label (bottom)
         const labelX = Math.round(worldX).toString();
         ctx.fillText(labelX, crosshair.x - 10, panel.top + panel.height - 8);
 
-        // Подпись Y (у оси справа)
+        // Y label (near the right axis)
         const labelY = Math.round(worldY).toString();
         const rightX = panel.left + panel.width - 38;
         ctx.fillRect(rightX, crosshair.y - 8, 38, 16);
@@ -642,10 +642,10 @@ export function createRenderer(): Renderer {
         ctx.rect(panel.left, panel.top, panel.width, panel.height);
         ctx.clip();
 
-        // Оси / тики
+        // Axes / ticks
         drawAxesAndTicks(ctx, panel, transform, globalTimeRange.xMin, globalTimeRange.xMax, isYRightAxis);
 
-        // Рендер DataSet
+        // Render DataSet
         for (const ds of panel.dataSets) {
             if (ds.type === 'line') {
                 drawLineChartLOD(ctx, ds.data, panel, transform, isYRightAxis, ds.style);
@@ -691,7 +691,7 @@ export function createInteraction(
     getPanels: () => Panel[],
     onTransformChanged: () => void,
     onToggleAutoFocusY: (panel: Panel) => void,
-    panelManager: PanelManager // чтобы вызывать resizePanel
+    panelManager: PanelManager // to call resizePanel
 ): Interaction {
     let crosshairPos: { x: number; y: number } | null = null;
 
@@ -708,7 +708,7 @@ export function createInteraction(
     let activePanel: Panel | null = null;
     let attached = false;
 
-    // Состояние для resizePanel
+    // State for resizePanel
     let resizingPanelId: string | null = null;
     let startHeight = 0;
     let startMouseY = 0;
@@ -723,7 +723,7 @@ export function createInteraction(
         const localY = e.clientY - rect.top;
         crosshairPos = { x: localX, y: localY };
 
-        // Проверяем, не попали ли мы в “границу” для resize панелей
+        // Check whether we hit a panel resize boundary
         const panels = getPanels();
         for (const p of panels) {
             if (!p.resizable) continue;
@@ -738,8 +738,8 @@ export function createInteraction(
             }
         }
 
-        // Ищем, попали ли мы на ось Y (справа)?
-        // (Чтобы масштабировать Y) - ось Y начинается ~ panel.width-40
+        // Check whether we hit the Y axis (right side).
+        // For Y scaling, the Y axis starts around panel.width - 40.
         activePanel = findPanel(localX, localY);
         if (!activePanel) {
             dragMode = DragMode.None;
@@ -748,7 +748,7 @@ export function createInteraction(
 
         const axisRightX = activePanel.left + activePanel.width - AXIS_THICKNESS;
         if (localX >= axisRightX) {
-            // масштаб по Y (если autoFocusY = false)
+            // Scale by Y (if autoFocusY = false)
             dragMode = DragMode.ScaleY;
         } else {
             // pan
@@ -765,7 +765,7 @@ export function createInteraction(
         crosshairPos = { x: localX, y: localY };
 
         if (!isMouseDown) {
-            onTransformChanged(); // только кроссхейр
+            onTransformChanged(); // crosshair only
             return;
         }
 
@@ -787,17 +787,17 @@ export function createInteraction(
         if (!activePanel) return;
 
         if (dragMode === DragMode.Pan) {
-            // сдвиг offsetX
+            // Shift offsetX
             const newOffsetX = t.offsetX - dx / t.scaleX;
             setTransform({ ...t, offsetX: newOffsetX });
         } else if (dragMode === DragMode.ScaleY) {
-            // масштаб по Y (только если autoFocusY=false)
+            // Scale by Y (only if autoFocusY=false)
             if (!activePanel.autoFocusY) {
                 const oldScaleY = t.scaleY ?? 1;
                 const factor = (dy < 0) ? 1.02 : 0.98;
                 const newScaleY = oldScaleY * factor;
                 const offsetY = t.offsetY ?? 0;
-                // фиксируем точку под курсором
+                // Pin the point under the cursor
                 const worldY = offsetY + (activePanel.top + activePanel.height - localY) / oldScaleY;
                 const newOffsetY = worldY - (activePanel.top + activePanel.height - localY) / newScaleY;
                 setTransform({ ...t, scaleY: newScaleY, offsetY: newOffsetY });
@@ -836,7 +836,7 @@ export function createInteraction(
         onTransformChanged();
     }
 
-    // dblclick => если на правой оси => toggle autoFocusY
+    // dblclick => if on the right axis, toggle autoFocusY
     function onDblClick(e: MouseEvent) {
         const rect = canvas.getBoundingClientRect();
         const localX = e.clientX - rect.left;
@@ -937,9 +937,9 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
     let containerEl: HTMLElement | null = null;
     let resizeObserver: ResizeObserver | null = null;
 
-    // Dirty-флаг: рисуем только при изменениях. Хуки инвалидации покрывают interaction
-    // (включая кроссхейр), addData/addPanel/resize; stamp в renderLoop ловит прямые
-    // мутации через dataModel/panelManager (длины данных, геометрия панелей, размер canvas).
+    // Dirty flag: render only when something changes. Invalidation hooks cover interaction
+    // (including crosshair), addData/addPanel/resize; stamp in renderLoop catches direct
+    // mutations through dataModel/panelManager (data lengths, panel geometry, canvas size).
     let needsRender = true;
     let lastStamp = NaN;
     function invalidate() { needsRender = true; }
@@ -953,7 +953,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         return s;
     }
 
-    // Ось Y справа
+    // Right Y axis
     const isYRightAxis = true;
 
     function setTransform(t: Transform) {
@@ -966,7 +966,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         return panelManager.panels;
     }
 
-    // Переключаем autoFocusY
+    // Toggle autoFocusY
     function toggleAutoFocusY(panel: Panel) {
         panel.autoFocusY = !panel.autoFocusY;
     }
@@ -977,7 +977,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         setTransform,
         getPanels,
         () => {
-            // onTransformChanged => перерисовать
+            // onTransformChanged => redraw
             invalidate();
             updatePanels();
         },
@@ -997,7 +997,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
                 panel.verticalRange.minY = minY;
                 panel.verticalRange.maxY = maxY;
             } else {
-                // ручной offsetY/scaleY
+                // Manual offsetY/scaleY
                 const offsetY = transform.offsetY ?? 0;
                 const scaleY = transform.scaleY ?? 1;
                 const y2 = offsetY + panel.height / scaleY;
@@ -1028,7 +1028,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
             const xMax = transform.offsetX + (canvas.width - AXIS_THICKNESS) / transform.scaleX;
             const crosshair = interaction.getCrosshairPos();
 
-            // Рендер каждой панели
+            // Render each panel
             for (const panel of panelManager.panels) {
                 renderer.drawPanel(ctx, panel, transform, { xMin, xMax }, crosshair, isYRightAxis);
             }
@@ -1071,9 +1071,9 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
                     if (canvas.width !== newW || canvas.height !== newH) {
                         canvas.width = newW;
                         canvas.height = newH;
-                        // пересчитать layoutPanels
+                        // Recalculate layoutPanels
                         panelManager.layoutPanels(newW, newH);
-                        invalidate(); // смена размера canvas стирает битмап — перерисовать обязательно
+                        invalidate(); // changing canvas size clears the bitmap, so redraw is required
                     }
                 }
             }

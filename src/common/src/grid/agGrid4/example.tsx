@@ -1,4 +1,4 @@
-// Образцы использования agGrid4. Не подключается в прод.
+// agGrid4 usage samples. Not included in production.
 import React, { useEffect } from 'react'
 import type { ColDef } from 'ag-grid-community'
 import { useAgGrid, AgGridMy, type BufferTable } from './index'
@@ -9,58 +9,58 @@ type Row = {
     price: number
 }
 
-// Специфичный конфиг → satisfies: проверка по ColDef<Row>, литеральный тип сохраняется.
+// Specific config -> satisfies: checked against ColDef<Row>, literal type is preserved.
 const columns = [
-    { field: 'name', headerName: 'Название' },
-    { field: 'price', headerName: 'Цена' },
+    { field: 'name', headerName: 'Name' },
+    { field: 'price', headerName: 'Price' },
 ] satisfies ColDef<Row>[]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. Главный паттерн: контроллер + <AgGridMy controller>. Тема/memo/resize/selection —
-//    дефолты внутри AgGridMy; любой проп AgGridReact можно передать и переопределить.
+// 1. Main pattern: controller + <AgGridMy controller>. Theme/memo/resize/selection
+//    defaults live inside AgGridMy; any AgGridReact prop can be passed and overridden.
 export function StreamingExample() {
     const grid = useAgGrid<Row>()
 
-    // данные из сокета — неважно, готов ли грид: буфер ловит, attach→sync догоняет
-    useEffect(() => subscribeSocket(rows => grid.updateData({ newData: rows })), [grid])
+    // Socket data can arrive before the grid is ready: the buffer catches it, attach->sync catches up.
+    useEffect(() => subscribeSocket(rows => grid.update({ newData: rows })), [grid])
 
     return <AgGridMy<Row> controller={grid} columnDefs={columns} />
 }
 
-// 2. Декларативный режим — без контроллера вовсе.
+// 2. Declarative mode, with no controller at all.
 export function DeclarativeExample({ rows }: { rows: Row[] }) {
     return <AgGridMy<Row> data={rows} columnDefs={columns} />
 }
 
-// 3. Внешний буфер: обычный объект на уровне модуля (как datum.tableArr в проде) —
-//    ушёл с роута → вернулся → грид досинхронизируется из буфера.
+// 3. External buffer: a plain object at module level (like datum.tableArr in production).
+//    Leave the route, come back, and the grid syncs from the buffer.
 const ordersBuffer: BufferTable<Row> = {}
 
 export function PersistAcrossRouteExample() {
     const grid = useAgGrid<Row>({ externalBuffer: ordersBuffer })
-    useEffect(() => subscribeSocket(rows => grid.updateData({ newData: rows })), [grid])
+    useEffect(() => subscribeSocket(rows => grid.update({ newData: rows })), [grid])
     return <AgGridMy<Row> controller={grid} columnDefs={columns} />
 }
 
-// 4. Точечное удаление + прямой доступ к api (фильтры, размер, передача в хелперы).
+// 4. Point removal + direct api access (filters, sizing, passing to helpers).
 export function ImperativeApiExample() {
     const grid = useAgGrid<Row>({ getId: r => `row-${r.id}` })
     return (
         <>
-            <button onClick={() => grid.apiRef.current?.sizeColumnsToFit()}>Подогнать</button>
+            <button onClick={() => grid.fit()}>Fit</button>
             <AgGridMy<Row>
                 controller={grid}
                 columnDefs={columns}
-                onCellClicked={e => grid.updateData({ removeData: [{ id: e.data!.id }] })}
+                onCellClicked={e => grid.remove([{ id: e.data!.id }])}
             />
         </>
     )
 }
 
-// 5. Headless без AgGridMy: спред gridProps на голый <AgGridReact> (режим agGrid3
-//    остаётся доступен — AgGridMy лишь обёртка над тем же контроллером):
+// 5. Headless without AgGridMy: spread gridProps onto a bare <AgGridReact> (agGrid3 mode
+//    remains available; AgGridMy is only a wrapper over the same controller):
 //
-//    <AgGridReact<Row> {...grid.gridProps} columnDefs={columns} />
+//    <AgGridReact<Row> {...grid.props} columnDefs={columns} />
 
-// заглушка для примера
+// example stub
 declare function subscribeSocket(cb: (rows: Row[]) => void): () => void

@@ -9,7 +9,7 @@ import React, {
 import { PromiseArrayListen, sleepAsync } from "wenay-common2";
 
 /*******************************************************
- * Типы данных для меню
+ * Menu data types
  *******************************************************/
 export type tMenuReactStrictly<T = any> = {
     name: string | ((status?: T) => string);
@@ -19,11 +19,11 @@ export type tMenuReactStrictly<T = any> = {
     ) => void | undefined | null | ((void | undefined | null | Promise<any> | (() => Promise<any>))[]) | Promise<any>) | null;
     active?: (() => boolean) | null;
     status?: boolean;
-    // Поддержка синхронного и асинхронного возвращения массива меню
+    // Supports returning a menu array synchronously or asynchronously
     next?: (() => (tMenuReact<any> | false)[] | Promise<(tMenuReact<any> | false)[]>) | null;
-    // Поддержка синхронного и асинхронного возвращения React-элемента
+    // Supports returning a React element synchronously or asynchronously
     func?: (() => React.ReactElement | Promise<React.ReactElement>) | null;
-    // Поддержка синхронного и асинхронного возвращения массива меню для onFocus
+    // Supports returning an onFocus menu array synchronously or asynchronously
     onFocus?: (() => tMenuReact<any>[] | Promise<tMenuReact<any>[]>) | null;
     menuElement?: typeof MenuElement;
 };
@@ -31,17 +31,15 @@ export type tMenuReactStrictly<T = any> = {
 export type tMenuReact<T = any> = tMenuReactStrictly<T> | false | null | undefined;
 
 /*******************************************************
- * Вспомогательный тип
+ * Helper type
  *******************************************************/
 type tCounters = { ok?: number; error?: number; count?: number };
 
 /*******************************************************
- * Отображает счётчик/прогресс (анимация, кол-во ok/error)
+ * Displays counter/progress with animation and ok/error counts
  *******************************************************/
 function TimeNum({ data }: { data: tCounters }): ReactElement {
-    const refCounter = useRef(0);
-    const [count, setCount] = useState(refCounter.current);
-    refCounter.current = count;
+    const [count, setCount] = useState(0);
 
     const formatLabel = (): string | number => {
         if (!data.ok && !data.error) return count;
@@ -72,7 +70,7 @@ function TimeNum({ data }: { data: tCounters }): ReactElement {
 }
 
 /*******************************************************
- * Основной элемент меню (пункт с onClick, счётчиками и т.д.)
+ * Main menu element with onClick and counters
  *******************************************************/
 function MenuElement({
                          data: item,
@@ -89,7 +87,7 @@ function MenuElement({
     const unsubErr = useRef<null | (() => any)>(null);
 
     useEffect(() => {
-        // При размонтировании отписываемся
+        // Unsubscribe on unmount
         return () => {
             unsubOk.current?.();
             unsubErr.current?.();
@@ -114,43 +112,46 @@ function MenuElement({
                     update();
                     return;
                 }
-                // Если это массив "задач" (промисов или функций)
+                // If this is an array of tasks, promises, or functions
                 if (Array.isArray(result)) {
                     const tasks = result.filter(Boolean) as (
                         | Promise<any>
                         | (() => Promise<any>)
                         )[];
-                    const pa = PromiseArrayListen(tasks); // Допустим, внешняя функция
+                    const pa = PromiseArrayListen(tasks); // External helper function
                     setProgress({});
                     unsubOk.current?.();
                     unsubErr.current?.();
+                    // clear progress when all tasks settle, same as the single-promise path;
+                    // previously the counter (and its 30ms interval) lived until unmount
+                    const onTick = async (countOk: number, countError: number, count: number) => {
+                        setProgress({ ok: countOk, error: countError, count });
+                        if (countOk + countError >= count) {
+                            unsubOk.current?.();
+                            unsubErr.current?.();
+                            unsubOk.current = null;
+                            unsubErr.current = null;
+                            await sleepAsync(500);
+                            setProgress(null);
+                        }
+                    };
                     unsubOk.current = pa.listenOk(
-                        (
-                            data: any,
-                            i: number,
-                            countOk: number,
-                            countError: number,
-                            count: number
-                        ) => setProgress({ ok: countOk, error: countError, count })
+                        (data: any, i: number, countOk: number, countError: number, count: number) =>
+                            onTick(countOk, countError, count)
                     );
                     unsubErr.current = pa.listenError(
-                        (
-                            error: any,
-                            i: number,
-                            countOk: number,
-                            countError: number,
-                            count: number
-                        ) => setProgress({ ok: countOk, error: countError, count })
+                        (error: any, i: number, countOk: number, countError: number, count: number) =>
+                            onTick(countOk, countError, count)
                     );
                 }
-                // Если это один промис
+                // If this is a single promise
                 else if (result instanceof Promise) {
                     setProgress({});
                     result
                         .then(async (val) => {
                             if (Array.isArray(val) && val.length) {
-                                // Если вернулся массив из Promise.allSettled
-                                // Считаем кол-во ok/error
+                                // If an array from Promise.allSettled was returned
+                                // Count ok/error results
                                 if (val[0]?.status === "fulfilled" || val[0]?.status === "rejected") {
                                     const t = { ok: 0, error: 0 } as tCounters;
                                     val.forEach((res: any) => {
@@ -184,8 +185,8 @@ function MenuElement({
 }
 
 /*******************************************************
- * Компонент MenuItemWrapper обрабатывает каждый пункт меню,
- * добавляя поддержку асинхронных значений для next, func и onFocus.
+ * MenuItemWrapper processes each menu item,
+ * adding async value support for next, func, and onFocus.
  *******************************************************/
 type MenuItemWrapperProps = {
     item: tMenuReactStrictly;
@@ -214,7 +215,7 @@ const MenuItemWrapper = ({
 
     useEffect(() => {
         if (item.status && item.next) {
-            let alive = true; // guard: не сеттим стейт после размонтирования/смены item
+            let alive = true; // guard: do not set state after unmount or item change
             const result = item.next();
             if (result instanceof Promise) {
                 result.then((val) => {
@@ -335,22 +336,22 @@ const MenuItemWrapper = ({
 };
 
 /*******************************************************
- * Компонент MenuBase отвечает за отрисовку всплывающего меню с поддержкой
- * вложенных подменю и управления их состоянием.
+ * MenuBase renders the popup menu with support for
+ * nested submenus and their state management.
  *
- * @param {Object} props - Пропсы компонента.
- * @param {Object} [props.coordinate] - Координаты и параметры отображения меню.
- * @param {number} props.coordinate.x - Координата X для размещения меню.
- * @param {number} props.coordinate.y - Координата Y для размещения меню.
- * @param {boolean} [props.coordinate.toLeft=false] - Указывает, должно ли меню быть смещено влево.
- * @param {number} [props.coordinate.left=0] - Дополнительное смещение влево, если меню отображается с вложенными элементами.
- * @param {tMenuReactStrictly[]} props.data - Массив объектов, описывающих элементы меню.
- * @param {number} [props.zIndex] - Z-index меню для управления видимостью при перекрытии.
- * @param {Function} [props.menu] - Функция, которая генерирует кастомный React элемент для отображения всего меню.
- * @param {Function} [props.menuElement] - Функция для генерации кастомного React элемента для отображения отдельного элемента меню.
- * @param {Function} [props.className] - Функция для задания CSS-классов для элементов меню.
+ * @param {Object} props - Component props.
+ * @param {Object} [props.coordinate] - Menu coordinates and display parameters.
+ * @param {number} props.coordinate.x - X coordinate for menu placement.
+ * @param {number} props.coordinate.y - Y coordinate for menu placement.
+ * @param {boolean} [props.coordinate.toLeft=false] - Whether the menu should be shifted left.
+ * @param {number} [props.coordinate.left=0] - Additional left offset when the menu has nested items.
+ * @param {tMenuReactStrictly[]} props.data - Array of objects describing menu items.
+ * @param {number} [props.zIndex] - Menu z-index for overlap visibility.
+ * @param {Function} [props.menu] - Function that generates a custom React element for the whole menu.
+ * @param {Function} [props.menuElement] - Function that generates a custom React element for one menu item.
+ * @param {Function} [props.className] - Function for assigning CSS classes to menu items.
  *
- * @returns {ReactElement} Визуальный элемент меню.
+ * @returns {ReactElement} Visual menu element.
  */
 type MenuBaseProps = {
     menu?: (arr: tMenuReact[]) => ReactElement;
@@ -379,7 +380,7 @@ export function MenuBase({
     const refMenu = useRef<HTMLDivElement | null>(null);
 
     const dataMemo = useMemo(
-        () => data.filter((e) => e as tMenuReactStrictly) as tMenuReactStrictly[],
+        () => data.filter(Boolean) as tMenuReactStrictly[],
         [data, data.length]
     );
 
@@ -389,8 +390,8 @@ export function MenuBase({
     const [isLeftAligned, setIsLeftAligned] = useState(!!coordinate.toLeft);
     const [xOffset, setXOffset] = useState(0);
 
-    // Зеркало применённого top — вертикальный снап пересчитывается «от базы» (coordinate.y),
-    // а не от prev: дельтовая формула setTop(prev + ...) накапливалась между запусками → дрейф
+    // Mirror of applied top: vertical snap is recalculated from the base coordinate.y,
+    // not from prev; the setTop(prev + ...) delta formula accumulated between runs and drifted.
     const appliedTop = useRef(top);
     appliedTop.current = top;
 
@@ -400,14 +401,14 @@ export function MenuBase({
         const w = window.innerWidth,
             h = window.innerHeight;
 
-        // вертикаль: тот же снап низа к краю вьюпорта, но идемпотентно — от базы
+        // Vertical: same bottom snap to viewport edge, but idempotently from the base.
         const baseBottom = rect.bottom - (appliedTop.current - coordinate.y);
         setTop(h - baseBottom < 8 ? coordinate.y + (h - baseBottom) : coordinate.y);
 
         setLeftPos(rect.x);
         setMenuWidth(rect.width);
-        // горизонталь: исходная sticky-логика (отразились один раз — без отката),
-        // она самостабильна и не накапливается
+        // Horizontal: original sticky logic; reflect once without rollback,
+        // it is self-stabilizing and does not accumulate.
         if (!coordinate.toLeft && w - rect.right < 8 && rect.width < (coordinate.left ?? 0)) {
             setXOffset(rect.x - (coordinate.left ?? 0));
             setIsLeftAligned(true);
@@ -423,9 +424,7 @@ export function MenuBase({
 
     return (
         <div
-            ref={(el) => {
-                if (el) refMenu.current = el;
-            }}
+            ref={refMenu}
             style={{
                 position: "absolute",
                 zIndex,

@@ -8,7 +8,7 @@ export function ChartDemo() {
     useEffect(() => {
         if (!containerRef.current) return;
 
-        // Создаём график
+        // Create chart
         const chart = createChartCanvas({
             container: containerRef.current,
             width: 600,
@@ -19,7 +19,7 @@ export function ChartDemo() {
         });
         chartRef.current = chart;
 
-        // Добавим тестовые данные
+        // Add test data
         const now = Date.now();
         const demoData: IChartPoint[] = [];
         for (let i = 0; i < 50; i++) {
@@ -31,7 +31,7 @@ export function ChartDemo() {
         chart.appendData(demoData);
         chart.jumpToEnd();
 
-        // Пример «потокового» добавления новых точек
+        // Example of streaming new points
         const timer = setInterval(() => {
             const last = demoData[demoData.length - 1];
             const newPoint: IChartPoint = {

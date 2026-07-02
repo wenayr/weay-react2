@@ -2,48 +2,48 @@ import React, {useEffect, useRef} from "react";
 import {MenuBase, tMenuReact, tMenuReactStrictly} from "./menu";
 import {DivOutsideClick} from "../hooks/useOutside";
 
-// Функция-обёртка для создания компонента MenuR и управления глобальной переменной `bb`
+// Wrapper function for creating MenuR and managing the global `bb` variable.
 export function GetMenuR(){
-    let bb = false; // Глобальная переменная, предотвращающая множественное открытие меню (флаг активности)
+    let bb = false; // Global activity flag that prevents opening multiple menus.
 
-    // Основной компонент MenuR
+    // Main MenuR component
     function MenuR({children, other = () => [], statusOn = true, onUnClick, onConsume, zIndex, className}: {
-        children: React.ReactElement,                        // Дочерний компонент
-        zIndex?: number,                                     // Значение z-index для контекстного меню
-        other?: () => (tMenuReact)[],                        // Дополнительные элементы меню
-        statusOn?: boolean,                                  // Включение/выключение меню
-        onUnClick?: (e: boolean) => void,                    // Колбэк при закрытии меню
-        onConsume?: () => void,                              // вызывается при открытии после снятия снимка пунктов
-        className?: (active?: boolean) => string,            // CSS-класс для меню
+        children: React.ReactElement,                        // Child component
+        zIndex?: number,                                     // Context menu z-index value
+        other?: () => (tMenuReact)[],                        // Additional menu items
+        statusOn?: boolean,                                  // Enable or disable the menu
+        onUnClick?: (e: boolean) => void,                    // Callback when the menu closes
+        onConsume?: () => void,                              // Called on open after snapshotting items
+        className?: (active?: boolean) => string,            // CSS class for the menu
     }) {
-        const data = {x: 0, y: 0}; // Текущая позиция элемента, где происходит взаимодействие
+        const data = {x: 0, y: 0}; // Current position of the interaction element
         const [show, setShow] = React.useState<{
-            status: boolean,                                 // Статус: показывать меню или нет
-            plusMenu?: tMenuReactStrictly[],                 // Дополнительное меню
-            menu?: tMenuReactStrictly[],                     // Основное меню
-            coordinate?: {x: number, y: number}              // Координаты, где откроется меню
+            status: boolean,                                 // Whether to show the menu
+            plusMenu?: tMenuReactStrictly[],                 // Additional menu
+            menu?: tMenuReactStrictly[],                     // Main menu
+            coordinate?: {x: number, y: number}              // Coordinates where the menu opens
         }>({status: false});
 
         useEffect(() => {
             return () => {
-                bb = false; // Сбрасываем флаг активности при размонтировании компонента
+                bb = false; // Reset activity flag when the component unmounts
             };
         }, []);
 
-        const timeEvent = useRef(Date.now()); // Временная метка для отслеживания двойных кликов
-        let x = 0, y = 0;                     // Текущие координаты касания
-        const touchTime = useRef<null | number>(null); // Время начала касания
+        const timeEvent = useRef(Date.now()); // Timestamp for tracking double clicks
+        const touchXY = useRef({x: 0, y: 0}); // Current touch coordinates (ref: survives rerenders mid-gesture)
+        const touchTime = useRef<null | number>(null); // Touch start time
 
         return (
             <div className={"maxSize"} style={{position: "relative"}}
-                // Для отключения стандартного контекстного меню
+                // Disable the native context menu
                  onContextMenu={e => {
                      if (statusOn) {
                          e.preventDefault();
                          e.stopPropagation();
                      }
                  }}
-                // Определение позиции взаимодействия для текущего элемента (например, контейнера)
+                // Determine the interaction position for the current element
                  ref={(e) => {
                      if (e) {
                          const r = e.getBoundingClientRect();
@@ -51,30 +51,30 @@ export function GetMenuR(){
                          data.y = r.y;
                      }
                  }}
-                // Запоминаем начальные координаты касания
+                // Store initial touch coordinates
                  onTouchStart={(e) => {
-                     if (x == 0) x = e.touches[0].screenX;
-                     if (y == 0) y = e.touches[0].screenY;
+                     if (touchXY.current.x == 0) touchXY.current.x = e.touches[0].screenX;
+                     if (touchXY.current.y == 0) touchXY.current.y = e.touches[0].screenY;
                      touchTime.current = Date.now();
                  }}
-                // Проверка на значительное смещение (чтобы не показывать меню при скролле)
+                // Check for significant movement to avoid showing the menu while scrolling
                  onTouchMove={(e) => {
                      let x2 = e.touches[0].screenX;
                      let y2 = e.touches[0].screenY;
                      let pX = e.touches[0].pageX;
                      let pY = e.touches[0].pageY;
-                     if ((Math.abs(x2 - x) / pX > 0.05) || (Math.abs(y2 - y) / pY > 0.05)) {
-                         touchTime.current = null; // Если смещение слишком большое, отключаем показ меню
+                     if ((Math.abs(x2 - touchXY.current.x) / pX > 0.05) || (Math.abs(y2 - touchXY.current.y) / pY > 0.05)) {
+                         touchTime.current = null; // If movement is too large, disable menu display
                      }
                  }}
-                // Определяем долгое касание для вызова контекстного меню
+                // Detect long touch for opening the context menu
                  onTouchEnd={(e) => {
                      if (statusOn) {
                          if (touchTime.current && Date.now() - touchTime.current > 300) {
-                             // Если прошло больше 300 мс — считываем как долгое нажатие
+                             // More than 300 ms counts as a long press
                              touchTime.current = null;
-                             x = y = 0;
-                             if (bb) return; // Если меню уже активно, выходим
+                             touchXY.current.x = touchXY.current.y = 0;
+                             if (bb) return; // Menu is already active
                              bb = true;
                              const menu = other().filter(el => el) as tMenuReactStrictly[];
                              onConsume?.();
@@ -89,15 +89,15 @@ export function GetMenuR(){
                          }
                      }
                  }}
-                // Отслеживаем двойной клик
+                // Track double click
                  onDoubleClick={(event) => {
                      timeEvent.current = Date.now();
                  }}
-                // Обрабатываем клик правой кнопкой мыши или двойной клик
+                // Handle right mouse click or double click
                  onMouseUp={(event) => {
                      if (statusOn) {
                          if (event.button == 2 || Date.now() - timeEvent.current < 300) {
-                             if (bb) return; // Если меню уже активно, ничего не делаем
+                             if (bb) return; // Menu is already active
                              bb = true;
                              const menu = other().filter(el => el) as tMenuReactStrictly[];
                              onConsume?.();
@@ -106,15 +106,15 @@ export function GetMenuR(){
                      }
                  }}
             >
-                {children /* Дочерний элемент, внутри которого отслеживаются события */}
+                {children /* Child element whose events are tracked */}
                 {show.status && statusOn && (
-                    // Показываем контекстное меню
+                    // Show the context menu
                     <DivOutsideClick
                         outsideClick={() => {
-                            if (!bb) return; // Меню уже неактивно — обработчик закрытия не дёргаем
-                            bb = false; // Меню больше не активно
-                            onUnClick?.(false); // Вызов обработчика при закрытии меню
-                            setShow({status: false}); // Скрываем меню
+                            if (!bb) return; // Menu is already inactive; do not call close handler
+                            bb = false; // Menu is no longer active
+                            onUnClick?.(false); // Call close handler
+                            setShow({status: false}); // Hide the menu
                         }}
                     >
                         <MenuBase
@@ -123,8 +123,8 @@ export function GetMenuR(){
                                 ...(show.plusMenu ?? []),
                                 ...(show.menu ?? [])
                             ]}
-                            coordinate={{...show.coordinate!}} // Указываем текущие координаты меню
-                            zIndex={zIndex}                   // Передаём z-index
+                            coordinate={{...show.coordinate!}} // Pass current menu coordinates
+                            zIndex={zIndex}                   // Pass z-index
                         />
                     </DivOutsideClick>
                 )}
@@ -134,14 +134,14 @@ export function GetMenuR(){
 
     return {
         /**
-         * Управление глобальной переменной `bb`, предотвращающей множественное
-         * открытие меню.
+         * Manage the global `bb` variable that prevents opening multiple
+         * menus.
          */
         bb(b?: boolean) {
             if (b != undefined) {
                 bb = b;
             } else return bb;
         },
-        MenuR // Возвращаем созданный компонент
+        MenuR // Return the created component
     };
 }

@@ -1,130 +1,100 @@
 import React from "react";
 import {renderBy, updateBy} from "../../../updateBy";
 import {InputPageModal} from "../Input";
+import type {ModalApi} from "./ModalContextProvider";
+
+type LegacyModalSetter = (jsx: React.ReactNode | null) => void;
+type ModalTarget = LegacyModalSetter | ModalApi;
+
+function setModalTarget(target: ModalTarget, jsx: React.ReactNode | null) {
+    if (typeof target == "function") target(jsx);
+    else target.replace(jsx);
+}
 
 export function inputModal({setModalJSX, func, name, txt}: {
     txt?: string,
     name?: string,
-    /** Любой сеттер модалки: setState или setModal из useModal (ModalProvider) */
-    setModalJSX: (jsx: React.JSX.Element | null) => void,
+    /** Any modal setter: setState/useModal or ModalApi from useModal */
+    setModalJSX: ModalTarget,
     func: (txt: string) => void
 }) {
-    setModalJSX(<InputPageModal callback={txt => {
+    setModalTarget(setModalJSX, <InputPageModal callback={txt => {
         func(txt)
-        setModalJSX(null)
-    }} outClick={() => setModalJSX(null)} name={name ?? "name"} txt={txt}/>)
+        setModalTarget(setModalJSX, null)
+    }} outClick={() => setModalTarget(setModalJSX, null)} name={name ?? "name"} txt={txt}/>)
 }
 
 export function confirmModal({setModalJSX, func, password = "111"}: {
-    /** Любой сеттер модалки: setState или setModal из useModal (ModalProvider) */
-    setModalJSX: (jsx: React.JSX.Element | null) => void,
+    /** Any modal setter: setState/useModal or ModalApi from useModal */
+    setModalJSX: ModalTarget,
     func: () => any,
-    /** Кодовое слово подтверждения. Дефолт "111" оставлен для совместимости; задайте своё. */
+    /** Confirmation code word. Default "111" is kept for compatibility; pass your own. */
     password?: string
 }) {
-    // свой пароль в подсказке не светим; легаси-дефолт показываем как раньше
+    // Do not expose custom passwords in the hint; show the legacy default as before.
     const hint = password == "111" ? "password 111" : "password"
-    setModalJSX(<InputPageModal callback={txt => {
+    setModalTarget(setModalJSX, <InputPageModal callback={txt => {
         if (txt == password) func()
-        setModalJSX(null)
-    }} outClick={() => setModalJSX(null)} name={hint}/>)
+        setModalTarget(setModalJSX, null)
+    }} outClick={() => setModalTarget(setModalJSX, null)} name={hint}/>)
+}
+// Shared store for GetModalJSX/GetModalFuncJSX: identical logic, the only
+// difference is how a stored value turns into an element (renderItem)
+function createJsxStore<J extends object>(renderItem: (jsx: J) => React.JSX.Element | null) {
+    let _jsx = null as J | null
+    let _jsxArr = [] as {jsx: J | null, key: number}[]
+    let key = 0
+    const check = (jsx: J | null) => _jsxArr.findIndex(e => e.jsx == jsx)
+    const data = {
+        set(jsx: J | null) {
+            _jsx = jsx
+            renderBy(data)
+        },
+        set JSX(jsx: J | null) {
+            _jsx = jsx
+            renderBy(data)
+        },
+        get JSX() {return _jsx},
+        Render(){
+            updateBy(data)
+            return _jsx && renderItem(_jsx)
+        },
+        addJSX<A extends J | null>(jsx: A): A {
+            if (check(jsx) == -1) {
+                _jsxArr.push({jsx, key: key++});
+                renderBy(data)
+            }
+            return jsx
+        },
+        dellBy(jsx: J | null) {
+            const c = check(jsx)
+            if (c != -1) {
+                _jsxArr.splice(c,1)
+                renderBy(data)
+            }
+        },
+        get arrJSX() {return _jsxArr.map(e=> e.jsx && <div key={e.key}>{renderItem(e.jsx)}</div>)},
+        RenderArr(){
+            updateBy(data)
+            return data.arrJSX
+        }
+    }
+    return data
 }
 
 /**
- * @deprecated Императивное хранилище JSX на updateBy/renderBy.
- * Используйте `ModalProvider`/`useModal` (ModalContextProvider) — контекст + портал.
+ * @deprecated Imperative JSX storage based on updateBy/renderBy.
+ * Use `ModalProvider`/`useModal` (ModalContextProvider): context plus portal.
  */
 export function GetModalJSX(){
-    const data = (() => {
-        let _jsx = null as React.JSX.Element | null
-        let _jsxArr =[] as {jsx: React.JSX.Element, key: number}[]
-        let key = 0
-        const check = (jsx: React.JSX.Element) => _jsxArr.findIndex(e => e.jsx == jsx)
-        return {
-            set(jsx: React.JSX.Element | null) {
-                _jsx = jsx
-                renderBy(data)
-            },
-            set JSX(jsx: React.JSX.Element | null) {
-                _jsx = jsx
-                renderBy(data)
-            },
-            get JSX() {return _jsx},
-            Render(){
-                updateBy(data)
-                return _jsx
-            },
-            addJSX(jsx: React.JSX.Element) {
-                const c = check(jsx)
-                if (c == -1) {
-                    _jsxArr.push({jsx, key: key++});
-                    renderBy(data)
-                }
-                return jsx
-            },
-            dellBy(jsx: React.JSX.Element) {
-                const c = check(jsx)
-                if (c != -1) {
-                    _jsxArr.splice(c,1)
-                    renderBy(data)
-                }
-            },
-            get arrJSX() {return _jsxArr.map(e=><div key={e.key}>{e.jsx}</div>)},
-            RenderArr(){
-                updateBy(data)
-                return _jsxArr.map(e=><div key={e.key}>{e.jsx}</div>)
-            }
-        }
-    })()
-    return data
+    return createJsxStore<React.JSX.Element>(jsx => jsx)
 }
-type t1 = (()=>React.JSX.Element | null) | null
+
 /**
- * @deprecated Императивное хранилище JSX на updateBy/renderBy.
- * Используйте `ModalProvider`/`useModal` (ModalContextProvider) — контекст + портал.
+ * @deprecated Imperative JSX storage based on updateBy/renderBy.
+ * Use `ModalProvider`/`useModal` (ModalContextProvider): context plus portal.
  */
 export function GetModalFuncJSX(){
-    const data = (() => {
-        let _jsx: t1 = null
-        let _jsxArr =[] as {jsx: t1, key: number}[]
-        let key = 0
-        const check = (jsx: t1) => _jsxArr.findIndex(e => e.jsx == jsx)
-        return {
-            set(jsx: t1) {
-                _jsx = jsx
-                renderBy(data)
-            },
-            set JSX(jsx: t1) {
-                _jsx = jsx
-                renderBy(data)
-            },
-            get JSX() {return _jsx},
-            Render(){
-                updateBy(data)
-                return _jsx? _jsx () : null
-            },
-            addJSX(jsx: t1) {
-                const c = check(jsx)
-                if (c == -1) {
-                    _jsxArr.push({jsx, key: key++});
-                    renderBy(data)
-                }
-                return jsx
-            },
-            dellBy(jsx: t1) {
-                const c = check(jsx)
-                if (c != -1) {
-                    _jsxArr.splice(c,1)
-                    renderBy(data)
-                }
-            },
-            get arrJSX() {return _jsxArr.map(e=> e.jsx && <div key={e.key}>{e.jsx()}</div>)},
-            RenderArr(){
-                updateBy(data)
-                return _jsxArr.map(e=> e.jsx && <div key={e.key}>{e.jsx()}</div>)
-            }
-        }
-    })()
-    return data
+    return createJsxStore<() => React.JSX.Element | null>(f => f())
 }
 

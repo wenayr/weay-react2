@@ -41,13 +41,13 @@ hook, and `<AgGridMy>` — an opinionated grid component with project defaults b
 // controller + component (main pattern)
 const grid = useAgGrid<Row>({ getId })
 <AgGridMy<Row> controller={grid} columnDefs={cols} />
-grid.updateData({ newData })
+grid.update({ newData })
 
 // declarative (no controller)
 <AgGridMy<Row> data={rows} columnDefs={cols} />
 
 // headless (no AgGridMy) — agGrid3 mode still works
-<AgGridReact<Row> {...grid.gridProps} columnDefs={cols} />
+<AgGridReact<Row> {...grid.props} columnDefs={cols} />
 
 // outside React (worker, tests): the core alone
 const core = createGridBuffer<Row>({ getId })
@@ -66,7 +66,7 @@ it lands in the buffer; `attach` → `sync` brings the grid up to date. An exter
 
 ## Type checking
 
-Модуль входит в граф библиотеки (экспортируется через `src/common/api.tsx`):
+The module is part of the library graph (exported through `src/common/api.tsx`):
 
 ```sh
 npx tsc --noEmit -p tsconfig.json
@@ -74,6 +74,6 @@ npx tsc --noEmit -p tsconfig.json
 
 ## Module registration
 
-ag-grid v35 требует регистрации модулей. `useAgGrid`/`AgGridMy` регистрируют
-`AllCommunityModule` лениво при первом вызове хука (идемпотентно, импорт пакета
-остаётся side-effect-free). Отдельный вызов `GridStyleDefault()` больше не обязателен.
+ag-grid v35 requires module registration. `useAgGrid`/`AgGridMy` register
+`AllCommunityModule` lazily on the first hook call (idempotently, while package imports
+stay side-effect-free). A separate `GridStyleDefault()` call is no longer required.

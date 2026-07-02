@@ -34,7 +34,7 @@ export function DropdownMenu({
     const [isFixed, setIsFixed] = useState(false);
     const [select, setSelect] = useState<number | null>(null);
     const data = useRef({ m1: false, m2: false });
-    // Получаем JSX-функции модального окна
+    // Get modal JSX functions
     const jsx = useMemo(GetModalFuncJSX, []);
     const jsxRender = useMemo(() => <jsx.Render />, [jsx]);
 
@@ -44,7 +44,7 @@ export function DropdownMenu({
 
     const handleDragEnd = useCallback(
         (finalPosition: Position) => {
-            // Обработка горизонтального смещения
+            // Handle horizontal offset
             if (position === 'left') {
                 positionLast.current.x += finalPosition.x;
                 if (positionLast.current.x > window.innerWidth * 0.6) {
@@ -58,7 +58,7 @@ export function DropdownMenu({
                     setPosition('left');
                 }
             }
-            // Обработка вертикального смещения
+            // Handle vertical offset
             if (isTop) {
                 positionLast.current.y += finalPosition.y;
                 if (positionLast.current.y > document.documentElement.clientHeight * 0.6) {
@@ -78,7 +78,7 @@ export function DropdownMenu({
 
     const { position: pos, dragProps } = useDraggable(0, 0, 50, handleDragEnd, () => {});
 
-    // Обработчики кликов и наведения
+    // Click and hover handlers
     const handleClickOutside = useCallback(() => {
         setIsOpen(false);
     }, []);
@@ -119,7 +119,7 @@ export function DropdownMenu({
         }
     }, [jsx]);
 
-    // Отрисовка выпадающего меню (dop)
+    // Render dropdown menu (dop)
     const dop = (isFixed || isOpen) && (
         <div
             onMouseEnter={handleContentMouseEnter}
@@ -161,7 +161,7 @@ export function DropdownMenu({
         </div>
     );
 
-    // Вычисление смещений
+    // Calculate offsets
     const computedX =
         position === 'left'
             ? positionLast.current.x + pos.x
@@ -170,14 +170,14 @@ export function DropdownMenu({
         ? positionLast.current.y + pos.y
         : positionLast.current.y - pos.y;
 
-    // Вычисление стилей контейнера меню
+    // Calculate menu container styles
     const containerStyle = useMemo<React.CSSProperties>(() => {
         const computedStyle: React.CSSProperties = {
             ...style,
             display: 'flex'
         };
 
-        // Горизонтальное позиционирование
+        // Horizontal positioning
         if (position === 'left') {
             computedStyle.left = Math.max(0, Math.min(computedX, window.innerWidth - 50));
             computedStyle.right = 'auto';
@@ -185,7 +185,7 @@ export function DropdownMenu({
             computedStyle.right = Math.max(0, Math.min(computedX, window.innerWidth - 50));
             computedStyle.left = 'auto';
         }
-        // Вертикальное позиционирование
+        // Vertical positioning
         if (isTop) {
             computedStyle.top = Math.max(0, Math.min(computedY, window.innerHeight - 50));
             computedStyle.bottom = 'auto';

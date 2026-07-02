@@ -1,5 +1,5 @@
 import {ColDef, GridReadyEvent} from "ag-grid-community";
-// обертка для упрощения работы с гридом через точку памяти
+// Wrapper to simplify working with the grid through a memory point
 const optionsDef = {
     update: true,
     add: true,
@@ -20,7 +20,7 @@ function applyTransactionAsyncUpdate3<T>({getId, bufTable, option, newData, grid
     const op = {...optionsDef, ...(option ?? {})};
     if (!grid?.api.getRowNode) return
 
-    // определяем какие строки надо добавить, а какие только обновить
+    // Determine which rows must be added and which only need updates
     const arrNew: T[] = [];
     const arr = newData.map(e => {
         const id = getId(e);
@@ -40,18 +40,18 @@ function applyTransactionAsyncUpdate3<T>({getId, bufTable, option, newData, grid
         return
     }
 
-    // remove применяем один раз и независимо: иначе при пустых add/update удаление терялось, а при обоих — дублировалось
+    // Apply remove once and independently: otherwise removal was lost with empty add/update and duplicated with both
     if ((arrNew.length && op.add) || remove?.length)
         grid.api.applyTransaction({add: (arrNew.length && op.add) ? arrNew : [], remove: remove as any});
 
     if (arr.length && op.update)
         grid.api.applyTransactionAsync({update: arr});
 }
-// тут нет удаления но эта версия может использовать где то
+// There is no removal here, but this version may still be used somewhere
 /**
- * @deprecated v1: не поддерживает удаление строк и молча теряет данные, пока грид не готов.
- * Используйте `useAgGrid`/`createGridBuffer` (grid/agGrid4) — буфер + attach/sync,
- * либо как минимум `applyTransactionAsyncUpdate2`.
+ * @deprecated v1: does not support row removal and silently loses data while the grid is not ready.
+ * Use `useAgGrid`/`createGridBuffer` (grid/agGrid4) - buffer + attach/sync,
+ * or at least `applyTransactionAsyncUpdate2`.
  */
 export function applyTransactionAsyncUpdate<T>(
     grid: GridReadyEvent<T, any> | null | undefined,
@@ -63,6 +63,7 @@ export function applyTransactionAsyncUpdate<T>(
     return applyTransactionAsyncUpdate3({getId, option, newData, grid, bufTable})
 }
 
+/** @deprecated No-op stub: always returns {}. Never implemented; will be removed in a major version. */
 export function getUpdateTable<T>(
     grid: GridReadyEvent<T, any> | null | undefined,
     newData: (Partial<T>)[],
@@ -112,7 +113,7 @@ export function applyTransactionAsyncUpdate2<T>(params: params<T>) {
 
     if (g && params.onlyMemo!=true) {
         if (params.synchronization) {
-            // === СИНХРОНИЗАЦИЯ: bufTable — истина ===
+            // === SYNCHRONIZATION: bufTable is the source of truth ===
             const bufIds = new Set(Object.keys(bufTable));
             const gridIds = new Set<string>();
             const arrAdd: T[] = [];
@@ -165,19 +166,20 @@ type UnUndefined<T extends (any | undefined)> = T extends undefined ? never : T
 type t1<T = any> = ColDef<T>["comparator"]
 type paramsCompare<TData = any> = Parameters<Extract<UnUndefined<t1>, (...args: any) => any>>
 
+/** @deprecated Duplicate of `numericComparator` from grid/agGrid4 (core.ts) - use that instead. */
 export function getComparatorGrid<T = any>(func?: (...param: paramsCompare<T>) => [a: number, b: number]): t1 {
     return (...param) => {
-        const [a1, b1, modeA, modeB, inv] = param; // Распаковка параметров в функцию
-        const [a, b] = func ? func(...param) : [a1, b1]; // Использование преобразующей функции func, если передана
+        const [a1, b1, modeA, modeB, inv] = param; // Unpack parameters into the function
+        const [a, b] = func ? func(...param) : [a1, b1]; // Use the transforming func if provided
         return (
             (typeof a == "number" && !Number.isNaN(a)) &&
             (typeof b == "number" && !Number.isNaN(b))
-        ) // Если оба a и b - валидные числа
-            ? a - b // Разница между числами
+        ) // If both a and b are valid numbers
+            ? a - b // Difference between numbers
             : a == b
-                ? 0 // Если значения равны, возвращаем 0
+                ? 0 // If values are equal, return 0
                 : (!Number.isNaN(b) && b != undefined)
-                    ? (inv ? -1 : 1) // Если b существует: порядок определяется inv
-                    : (inv ? 1 : -1); // Если b отсутствует: порядок определяется inv
+                    ? (inv ? -1 : 1) // If b exists: order is determined by inv
+                    : (inv ? 1 : -1); // If b is missing: order is determined by inv
     }
 }

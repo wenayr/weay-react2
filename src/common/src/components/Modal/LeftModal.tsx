@@ -97,16 +97,22 @@ function SidebarMenuComponent({y_, x_, api, arr, zIndex}: {
         </div>
     ));
 
-    // Smooth animation function to target position
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
+
+    // Smooth animation function to target position; cancels on unmount,
+    // and the returned promise now resolves at the end (recursion was not awaited)
     const animateToPosition = async (target: number) => {
         lastPosition.current.auto = true;
         const step = 40;
 
-        const animate = async () => {
-            if (!lastPosition.current.auto || currentPosition.current.x === target) return;
-
+        while (lastPosition.current.auto && currentPosition.current.x !== target) {
             const direction = target > currentPosition.current.x ? 1 : -1;
             await sleepAsync(10);
+            if (!mountedRef.current || !lastPosition.current.auto) return;
             const nextPos = currentPosition.current.x + direction * step;
 
             if (Math.abs(target - nextPos) < step) {
@@ -119,10 +125,7 @@ function SidebarMenuComponent({y_, x_, api, arr, zIndex}: {
 
             currentPosition.current.x = nextPos;
             setX(nextPos);
-            animate();
-        };
-
-        await animate();
+        }
     };
     useEffect(() => {
         const menuApi: Parameters<typeof api>[0] = {
@@ -349,7 +352,8 @@ export function getApiLeftMenu() {
 
     const setMenu = (items: (MenuItemPartial | MenuItem)[], key = "base") => {
         const colorGen = colorGenerator2({min: 0, max: 90});
-        const currentMenuLength = getAllMenuItems().length;
+        // exclude this key's old items, otherwise a repeated setMenu shifts default colors
+        const currentMenuLength = getAllMenuItems().length - (menuStore.get(key)?.length ?? 0);
         const baseColors: ColorString[] = [];
 
         for (let i = 0; i < currentMenuLength + items.length; i++) {
@@ -374,19 +378,25 @@ export function getApiLeftMenu() {
         return [...menuStore.values()].flat();
     }
 
-    function Modal2({menu, zIndex, zIndex0, key}: {
+    function Modal2({menu, zIndex, zIndex0, menuKey}: {
         zIndex: number,
         zIndex0?: number,
-        key?: string,
+        /** Store key for this menu; the former `key` prop never worked (React strips it from props). */
+        menuKey?: string,
         menu?: (MenuItemPartial | MenuItem)[]
     }) {
-        // сев в эффекте, а не в рендере: иначе двойной сев в StrictMode и сайд-эффект при каждом рендере
+        const lastSet = useRef<{menu: (MenuItemPartial | MenuItem)[], menuKey?: string} | null>(null);
+        // Set in an effect, not during render: otherwise StrictMode sets twice and every render has a side effect.
         useEffect(() => {
-            if (menu) {
-                setMenu(menu, key);
-                renderBy(menuStore);
-            }
-        }, [menu, key]);
+            if (!menu) return;
+            const prev = lastSet.current;
+            // shallow compare: skip the store rewrite when an inline array has the same items
+            if (prev && prev.menuKey === menuKey && prev.menu.length === menu.length
+                && prev.menu.every((el, i) => el === menu[i])) return;
+            lastSet.current = {menu, menuKey};
+            setMenu(menu, menuKey);
+            renderBy(menuStore);
+        }, [menu, menuKey]);
         updateBy(menuStore);
         return (
             <div className={"maxSize"} style={{position: "absolute", zIndex: zIndex0}}>
@@ -409,7 +419,7 @@ export function getApiLeftMenu() {
 
 export const ApiLeftMenu = getApiLeftMenu()
 export function TestLeft333() {
-    // тест-меню перенесено сюда из уровня модуля — раньше ApiLeftMenu.setMenu(...) выполнялся при импорте и протекал всем потребителям
+    // Test menu moved here from module scope; previously ApiLeftMenu.setMenu(...) ran on import and leaked to all consumers.
     return <ApiLeftMenu.Modal2 zIndex={20} menu={[
         {button: <div style={{width: 200, height: 50, background: "rgb(92,50,213)"}}>1</div>, el: () => <div>1</div>, color: "rgb(92,50,213)"},
         {button: <div style={{width: 200, height: 50, background: "rgb(98,149,58)"}}>2</div>, el: () => <div>2</div>},

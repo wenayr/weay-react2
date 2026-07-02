@@ -1,20 +1,21 @@
-import {FC, useEffect, useRef, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 
-const ANIMATION_DURATION = 500; // длительность анимации в мс
+const ANIMATION_DURATION = 500; // animation duration in ms
+/** @deprecated Demo component with hardcoded content; used only by the test SubMenu. Will be removed in a major version. */
 export function DraggableOutlineDiv(){
     const [isDragging, setIsDragging] = useState(false);
     const [animationFinished, setAnimationFinished] = useState(false);
     const timerRef = useRef<number | null>(null);
 
     const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-        // Проверяем, что нажата именно левая кнопка мыши
+        // Check that the left mouse button was pressed
         if (e.button !== 0) return;
         setIsDragging(true);
         setAnimationFinished(false);
 
-        // Запускаем анимацию - по истечении времени флаг animationFinished становится true
+        // Start the animation - after the timeout, animationFinished becomes true
         timerRef.current = window.setTimeout(() => {
-            setAnimationFinished(true); // Анимация завершена – обводка остается
+            setAnimationFinished(true); // Animation is complete - the outline remains
             timerRef.current = null;
         }, ANIMATION_DURATION);
     };
@@ -22,7 +23,7 @@ export function DraggableOutlineDiv(){
     const handleMouseUp = () => {
         setIsDragging(false);
         setAnimationFinished(false);
-        // Если анимация еще не завершилась, отменяем таймер и убираем обводку
+        // If the animation has not finished yet, cancel the timer and remove the outline
         if (timerRef.current) {
             window.clearTimeout(timerRef.current);
             timerRef.current = null;
@@ -38,7 +39,7 @@ export function DraggableOutlineDiv(){
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
         >
-            Содержимое дива
+            Div content
         </div>
     );
 };

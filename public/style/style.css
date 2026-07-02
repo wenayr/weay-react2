@@ -1,32 +1,32 @@
 :root {
-  /* Основные фоновые цвета */
+  /* Main background colors */
   --color-bg-dark: #131821;
   --color-bg-light: #17202e;
 
-  /* Скролл */
+  /* Scroll */
   --color-scrollbar-track: rgba(255, 255, 255, 0);
   --color-scrollbar-thumb: #1d262c;
   --color-scrollbar-thumb-alt: #4c4562;
   --scrollbar-size: 12px;
 
-  /* Кнопки */
+  /* Buttons */
   --color-red-button: #881b1b;
   --color-red-button-hover: #c72929;
   --color-black-button: #1c1b1b;
   --color-black-button-hover: #444444;
 
-  /* Основные текстовые/обводки */
+  /* Main text/outline colors */
   --color-text-base: #c4c4c4;
   --color-text-theme: #5D9FFA;
   --color-border-common: rgb(50, 62, 71);
 
 
-  /* Типографика */
+  /* Typography */
   --font-family-base: 'Roboto', serif;
   --font-size-base: 12px;
   --text-transform-base: uppercase;
 
-  /* Кнопки */
+  /* Buttons */
   --button-height: 30px;
   --button-padding: 8px 10px;
 
@@ -38,7 +38,7 @@
   --ms-trade-color-active: #bdbdbd;
 }
 
-/* Сбрасываем box-sizing */
+/* Reset box-sizing */
 *,
 *::before,
 *::after {
@@ -47,7 +47,7 @@
   box-sizing: border-box;
 }
 
-/* Основные фоны */
+/* Main backgrounds */
 html,
 .fon {
   background: var(--color-bg-dark);
@@ -56,19 +56,19 @@ html,
   background: var(--color-bg-light);
 }
 
-/* Стили прокрутки (scrollbar) */
+/* Scrollbar styles */
 body::-webkit-scrollbar {
-  width: var(--scrollbar-size); /* ширина scrollbar */
+  width: var(--scrollbar-size); /* scrollbar width */
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-scrollbar-track); /* цвет дорожки */
+  background: var(--color-scrollbar-track); /* track color */
 }
 ::-webkit-scrollbar-thumb {
-  background-color: var(--color-scrollbar-thumb); /* цвет плашки */
-  border-radius: 20px; /* закругления плашки */
+  background-color: var(--color-scrollbar-thumb); /* thumb color */
+  border-radius: 20px; /* thumb rounding */
 }
 
-/* Дублирующие селекторы scrollbar, если нужна поддержка под некоторыми движками */
+/* Duplicate scrollbar selectors for engines that need them */
 *::-webkit-scrollbar {
   width: var(--scrollbar-size);
 }
@@ -80,7 +80,7 @@ body::-webkit-scrollbar {
   border-radius: 20px;
 }
 
-/* Кнопки */
+/* Buttons */
 .defButton {
   padding: 20px;
   display: block;
@@ -105,17 +105,17 @@ html {
   height: 100vh;
 }
 
-/* Тексты, цвет и отступы */
+/* Text, color, and spacing */
 .toLine {
   display: flex;
 }
 
-/* инпуты */
+/* Inputs */
 input:invalid {
   box-shadow: 0 0 5px 1px red;
 }
 
-/* Блоки-кнопки, миниэлементы */
+/* Button blocks, mini elements */
 .toButton,
 .toButtonA {
   text-align: center;
@@ -123,7 +123,7 @@ input:invalid {
   cursor: default;
 }
 
-/* Заполнение последнего дива на всю оставшуюся часть */
+/* Fill the remaining space with the last div */
 .toSpace,
 .toSpaceColum {
   display: flex;
@@ -138,7 +138,7 @@ input:invalid {
   flex: 1 1 100%;
 }
 
-/* Кнопки */
+/* Buttons */
 .toButton {
   padding: var(--button-padding);
   height: var(--button-height);
@@ -151,7 +151,7 @@ input:invalid {
   display: block;
 }
 
-/* Меню */
+/* Menu */
 .maxSize {
   height: 100%;
   width: 100%;
@@ -169,7 +169,7 @@ input:invalid {
   border-bottom: solid 1px var(--color-border-common);
 }
 
-/* Наведение/активность */
+/* Hover/activity */
 .to,
 .toButtonA {
   user-select: none;
@@ -193,7 +193,7 @@ input:invalid {
   color: #ffffff;
 }
 
-/* Кнопки формы */
+/* Form buttons */
 button[type="submit"] {
   background: #86b32d;
   border-bottom: 1px solid #5d7d1f;
@@ -209,7 +209,7 @@ input[type="color"] {
   display: block;
 }
 
-/* Основное тело */
+/* Main body */
 body {
   color: var(--color-text-base);
   vertical-align: middle;
@@ -224,7 +224,7 @@ body {
   display: flex;
 }
 
-/* Доп. стили .msTradeAlt */
+/* Additional .msTradeAlt styles */
 .msTradeAlt {
   font-size: var(--font-size-base);
   cursor: default;
@@ -249,7 +249,7 @@ body {
   background: var(--ms-trade-bg-active);
 }
 
-/* Подключение шрифта */
+/* Font face */
 @font-face {
   font-family: 'Roboto';
   font-style: normal;

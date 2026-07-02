@@ -5,7 +5,7 @@ import {CParameter, FNameButton} from "./Parameters";
 import {SetAutoStepForElement} from "../utils";
 
 function timeToStr(time: number | string | const_Date, step?: number) {
-    function getTimeStep<T>(time: number) {
+    function getTimeStep(time: number) {
         return [TF.D1.msec, TF.M1.msec, TF.S1.msec, 1].find(period => time % period == 0)!;
     }
     let t = new Date(time.valueOf());
@@ -37,11 +37,11 @@ function CButton({name, className, status: statusDef, header, onExpand, children
     </>
 }
 
-//класс наведение на объект, если на вели на оболочку над children то появиться onFocusUp/focusDw
+// Hover wrapper: when the wrapper around children is hovered, focus state is exposed.
 function DivHover({children, className, style}: {
     children: (hover: boolean) => ReactElement,
     className?: string,
-    style?: any
+    style?: React.CSSProperties
 }) {
     const [hover, setHover] = useState(false)
     return <div
@@ -74,15 +74,8 @@ function InputString(set: (data: string)=>void, val :string, style?: React.CSSPr
         }}
     />
 }
-function InputTime(set: (data: string) => void, value: string | const_Date, range?: Params.UserTimeRange) { //, type? :number|"time") { //}, validRange? :Partial<NumRange>){
-    //const data= this._inputNumStrMap.get(range);
-    //let val= value;
-    //if (1) return null;
+function InputTime(set: (data: string) => void, value: string | const_Date, range?: Params.UserTimeRange) {
     let {min, max} = range ?? {};
-    // (data?.value==value)
-    //     ? data
-    //     : { min: range.min, max: range.max, step: range.defaultStep??range.step, val: value };
-    //this._inputNumStrMap.delete(range);
     const timeSplits = typeof value == "string" ? value.split(":").length : 2;
     const hasDot = typeof value == "string" ? value.includes(".") : false;
     const step = range?.step ?? (timeSplits <= 1 ? TF.D1.msec : timeSplits == 2 ? TF.M1.msec : hasDot ? 1 : TF.S1.msec);
@@ -107,18 +100,15 @@ function InputTime(set: (data: string) => void, value: string | const_Date, rang
                 step % TF.S1.msec ==0 ? timeLocalToStr_yyyymmdd_hhmmss(new Date(val_)) : timeLocalToStr_yyyymmdd_hhmmss_ms(new Date(val_));
         return timeStr.replace(" ", "T");
     }
-    //function toInputVal(val: string | const_Date | undefined) { return val ? new Date(val).valueOf() : undefined; }
-
-    //const inputType : React.InputHTMLAttributes.type = ;
     let _ref: HTMLInputElement | null = null;
     return <>
         <input type="range"
-               min={toNum(range?.defaultMin ?? range?.min ?? "2015.01.01")}
-               max={toNum(range?.defaultMax ?? range?.max ?? new Date().toString())}
+               min={toNum(range?.defaultMin ?? range?.min ?? "2015-01-01")}
+               max={toNum(range?.defaultMax ?? range?.max ?? new Date())}
                step={range?.defaultStep ?? step}
                value={toNum(value) ?? ""}
                onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                   setVal(Number((e.currentTarget as HTMLInputElement).value));
+                   setVal(Number(e.currentTarget.value));
                }}
                ref={(ref) => {
                    if (ref) {
@@ -135,11 +125,10 @@ function InputTime(set: (data: string) => void, value: string | const_Date, rang
                    min={toInputStr(min)}
                    max={toInputStr(max)}
                    step={step % TF.D1.msec == 0 ? step / TF.D1.msec : step / TF.S1.msec}
-                   value={toInputStr(normalizedValue)} //.toISOString().slice(0, -1)}
-                //onMouseOver={()=>{ console.log("over"); _ref?.dispatchEvent(new MouseEvent("mouseenter", { 'bubbles': true }));  _ref?.dispatchEvent(new MouseEvent("mouseover", { 'bubbles': true }))}}
+                   value={toInputStr(normalizedValue)}
                    onMouseEnter={() => {
                        _ref?.focus();
-                   }} //return; console.log("enter", _ref?"true":"false"); _ref?.dispatchEvent(new MouseEvent("mouseover", { 'bubbles': true })); _ref?.focus(); }}
+                   }}
                    onMouseLeave={() => {
                        _ref?.blur()
                    }}
@@ -148,15 +137,13 @@ function InputTime(set: (data: string) => void, value: string | const_Date, rang
         <input required className="toNumberInput inputCan"
                type="number"
                style={{width: 18, marginLeft: -13, marginRight: 0}}
-               min={toNum(min)} // ?? (range.step ? Math.round((range.step%1==0 ? Number.MIN_SAFE_INTEGER : -Number.MAX_VALUE) / range.step) * range.step  : undefined)} // ?? (range.step && range.step%1==0 ? Number.MIN_SAFE_INTEGER : Number.MIN_VALUE)}
-               max={toNum(max)} // ?? (range.step && range.step%1==0 ? Number.MAX_SAFE_INTEGER : Number.MAX_VALUE)}
-               step={step} //range.step ?? Math.min((range.defaultStep??1), 1e-8)
+               min={toNum(min)}
+               max={toNum(max)}
+               step={step}
                value={toNum(value) ?? ""}
                onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                   const target = e.currentTarget as HTMLInputElement;
-                   setVal(Number(target.value));
+                   setVal(Number(e.currentTarget.value));
                }}
-            //onMouseEnter={()=>console.log("!!!", deepClone(_ref?.classList))}
                ref={(ref) => {
                    if (ref) {
                        _ref = ref;
@@ -203,10 +190,8 @@ function InputList<T extends number | string | boolean | const_Date>(set: (data:
 }
 
 const _inputNumStrMap = new WeakMap<Readonly<Params.UserNumRange>, { min: string, max: string, step: string, val: string, value: number }>();
-function InputNumber(set: (data: number)=>void, value: number, range: Readonly<Params.UserNumRange>) { //}, validRange? :Partial<NumRange>){
-    //if (1) return null;
+function InputNumber(set: (data: number)=>void, value: number, range: Readonly<Params.UserNumRange>) {
     const data = _inputNumStrMap.get(range);
-    //let val= value;
     let {min, max, step, val} =
         (data?.value == value)
             ? data
@@ -221,9 +206,8 @@ function InputNumber(set: (data: number)=>void, value: number, range: Readonly<P
                step={range.defaultStep ?? range.step}
                value={String(value)}
                onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                   const current = e.currentTarget as HTMLInputElement;
-                   set(Number(current.value));
-                   if (_ref) _ref.step = current.step;
+                   set(Number(e.currentTarget.value));
+                   if (_ref) _ref.step = e.currentTarget.step;
                }}
                ref={(ref) => {
                    if (ref) {
@@ -233,14 +217,13 @@ function InputNumber(set: (data: number)=>void, value: number, range: Readonly<P
         />
         <input required className="toNumberInput inputCan"
                type="number"
-               min={min} // ?? (range.step ? Math.round((range.step%1==0 ? Number.MIN_SAFE_INTEGER : -Number.MAX_VALUE) / range.step) * range.step  : undefined)} // ?? (range.step && range.step%1==0 ? Number.MIN_SAFE_INTEGER : Number.MIN_VALUE)}
-               max={max} // ?? (range.step && range.step%1==0 ? Number.MAX_SAFE_INTEGER : Number.MAX_VALUE)}
-               step={step} //range.step ?? Math.min((range.defaultStep??1), 1e-8)
+               min={min}
+               max={max}
+               step={step}
                value={val}
                onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                   const target = e.currentTarget as HTMLInputElement;
+                   const target = e.currentTarget;
                    let value2 = target.value != "" ? Number(target.value) : value;
-                   //if (target.value=="") console.log(value, range);
                    _inputNumStrMap.set(range, {
                        val: target.value,
                        min: target.min,
@@ -250,10 +233,8 @@ function InputNumber(set: (data: number)=>void, value: number, range: Readonly<P
                    });
                    if (target.value != "") set(Number(target.value)); else {
                        target.reportValidity();
-                       // this.Refresh();
                    }
                }}
-            //onBlur={ (a)=>{ console.log("blur"); if (! a.currentTarget.checkValidity()) set(Number(a.currentTarget.value)); } }
                ref={(ref) => {
                    if (ref) {
                        _ref = ref;
@@ -305,14 +286,18 @@ export function ParametersReact<TParams extends Params.IParamsExpandableReadonly
     params: TParams,
     expandStatus?: boolean,
     expandStatusLvl?: number,
-    onChange: (params: TParams) => void,  // при изменении значения
-    onExpand?: (params: TParams) => void  // при развёртывании
+    onChange: (params: TParams) => void,  // when a value changes
+    onExpand?: (params: TParams) => void  // when expanded
 }) {
-    const params = useRef<(typeof data.params) | null>(null);
+    // callbacks live in a ref: useMemo below intentionally freezes the element until
+    // params identity changes, and would otherwise freeze a stale onChange/onExpand with it
+    const callbacks = useRef({onChange: data.onChange, onExpand: data.onExpand});
+    callbacks.current = {onChange: data.onChange, onExpand: data.onExpand};
     const result = useMemo(() => {
-        params.current = data.params
-        return <ParametersBaseReact params={data.params} onChange={data.onChange} onExpand={data.onExpand} expandStatus={data.expandStatus} expandStatusLvl={data.expandStatusLvl}/>
-
+        return <ParametersBaseReact params={data.params}
+                                    onChange={(p) => callbacks.current.onChange(p)}
+                                    onExpand={(p) => callbacks.current.onExpand?.(p)}
+                                    expandStatus={data.expandStatus} expandStatusLvl={data.expandStatusLvl}/>
     }, [data.params]);
     return result
 }
@@ -320,18 +305,16 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
     params: TParams,
     expandStatus?: boolean,
     expandStatusLvl?: number,
-    onChange: (params: TParams) => void,  // при изменении значения
-    onExpand?: (params: TParams) => void  // при развёртывании
+    onChange: (params: TParams) => void,  // when a value changes
+    onExpand?: (params: TParams) => void  // when expanded
 }) {
     const [_, setUpdate] = useState(0)
     function Refresh() {setUpdate(e=>++e)}
     const styleColorDisable = "rgb(146,146,146)";
     const p = useMemo(() => deepCloneMutable(data.params), [data.params]);
     const myParams = useRef(p);
-    useEffect(() => {
-        myParams.current = p
-        Refresh()
-    }, [p]);
+    // sync during render: the effect+Refresh variant committed a frame of stale params first
+    if (myParams.current !== p) myParams.current = p;
     const timeoutId = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => () => { if (timeoutId.current != null) clearTimeout(timeoutId.current); }, []);
     function refreshIndicator() {
@@ -364,9 +347,8 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
         Refresh();
         if (enabled)
             if (typeof value == "number" || value instanceof Date || (value instanceof Array && (typeof value[0] == "number" || value[0] instanceof Date)))
-                refreshIndicatorDelayed();  // обрабатываем с задержкой
-            else refreshIndicator();  // обрабатываем без задержки
-        //SessionSave();
+                refreshIndicatorDelayed();  // process with delay
+            else refreshIndicator();  // process without delay
     }
 
     function onExpandA(param: Params.IParam, flag: boolean) {
@@ -375,15 +357,15 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
 
     function ListParams(obj: Params.IParamsExpandable, parentEnabled: boolean | undefined = true, expandLevel: number = 0) {
         return Object.entries(obj).map(([key, param]: [string, Params.IParamExpandable]) => {
-            //изменения параметров индикатора
+            // Indicator parameter changes
             const onSetValue = (value: unknown, currentEnabled = true) => {
                 onSetValueA(param, value, parentEnabled && currentEnabled)
             }
 
             if (!Array.isArray(obj))
                 if (typeof(param)=="boolean" || typeof(param)=="string") {
-                    const set = (data: any) => {
-                        obj[key] = data;
+                    const set = (data: boolean | number | string | const_Date) => {
+                        obj[key] = data as boolean | string; // this branch only renders boolean/string params
                         onSetValue(data);
                     }
                     return <CParameter key={key + "#"+typeof(param)} name={key} enabled={parentEnabled}>
@@ -403,7 +385,6 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                 const nameT = <p className={"toPTextIndicator"}>{name}</p>
 
                 const set = (a: typeof value) => {
-                    //if (typeof a=="boolean") {a=!value;}
                     const aa = param.value instanceof Date ? new Date(a as any) : a;
                     param.value = aa;
                     onSetValue(aa, param.enabled ?? true);
@@ -427,7 +408,6 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                                     onSetValue(flag);
                                 },
                                 enabled,
-                                //{opacity: 1}
                             )
                             : undefined
                         }
@@ -453,7 +433,7 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                             </div>
                             : null;
 
-                    // если есть вложение, то делам рекурсию со сдвигом
+                    // If there are nested parameters, recurse with an offset.
                     if (!Array.isArray(value)) {
 
                         const enabledD = enabled != false && parentEnabled != false;
@@ -473,7 +453,7 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                     }
                     if (Array.isArray(value)) {
                         let arr = value;
-                        if (Array.isArray(range)) {  // значит рисуем выпадающий список
+                        if (Array.isArray(range)) {  // render a dropdown list
                             if (typeof arr[0] == "boolean") throw "boolean range is not supported!";
                             let arr2 = arr as Exclude<typeof value, boolean[]>;
 
@@ -490,11 +470,10 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                                 type= itemType;
                         }
                         const elements = arr.map((itemVal, index: number, array) => {
-                                //работа с массивом отображения и добавления
+                                // Render and add array elements.
                                 const name_ = name + " #" + String(index + 1);
                                 const nameElement = <div key={name_ + "#$3"}>{name_}</div>;
                                 const enabledElements= Array.isArray(param.elementsEnabled) ? param.elementsEnabled : undefined;
-                                //const onHoverElement = <div style={{position: "absolute", left: -30, top: 0, display: "flex"}}>
                                 const onHoverElement = <div style={{marginLeft: -18, marginTop: -7}}>
                                     <div className={"toButtonEasy"} style={{width: "15px", fontSize: "medium", marginRight: 3}}
                                          onClick={() => {
@@ -529,9 +508,7 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                                                     param.elementsEnabled[index]= flag;
                                                     onSetValue(value, enabled && flag);
                                                 },
-                                                Array.isArray(param.elementsEnabled) ? param.elementsEnabled[index] : param.elementsEnabled
-                                                ,
-                                                //{opacity: 1}
+                                                Array.isArray(param.elementsEnabled) ? param.elementsEnabled[index] : param.elementsEnabled,
                                             )
                                             : undefined
                                         }
@@ -543,11 +520,7 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                                         status={expanded} header={enableHTML} onExpand={onExpand}>
                             <div className="" style={{overflow: "hidden", paddingLeft: nestedMarginLeft}}>
                                 <div style={{animation: "0.1s ease 0s 1 normal none running moveDown"}}>
-                                    <div className="" style={{
-                                        //marginLeft: widthStr,
-                                        //width: "calc(100%-" + widthStr + ")",
-                                        color: "inherit"
-                                    }}>{elements}
+                                    <div className="" style={{color: "inherit"}}>{elements}
                                     </div>
                                     {
                                         !param.constLength &&
@@ -568,9 +541,7 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                         </CButton>;
                     }
                 }
-                {
-                    return simpleParameter(Param(set, value, undefined, range, (param as Params.IParamEnum).labels));
-                }
+                return simpleParameter(Param(set, value, undefined, range, (param as Params.IParamEnum).labels));
             }
             return null;
         })

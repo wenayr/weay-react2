@@ -81,7 +81,7 @@ export const GridExample = () => {
     // Container: Defines the grid's theme & dimensions.
     return (
         <div style={{ width: "100%", height: "100%" }}>
-    <button onClick={() => applyTransactionAsyncUpdate2<IRow>({gridRef: gridApi, getId: e => e.make, bufTable: {}, removeData: [{make: "Tesla"}]})}>удалить Tesla</button>
+    <button onClick={() => applyTransactionAsyncUpdate2<IRow>({gridRef: gridApi, getId: e => e.make, bufTable: {}, removeData: [{make: "Tesla"}]})}>remove Tesla</button>
     <AgGridReact
         onGridReady={e=> {
             gridApi.current = e

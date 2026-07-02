@@ -9,5 +9,5 @@
     border: 1px solid lightgray;
     border-radius: 4px;
     z-index: 10;
-    pointer-events: none; /* Чтобы мышь не взаимодействовала с комментарием */
+    pointer-events: none; /* Prevent the mouse from interacting with the comment */
 }

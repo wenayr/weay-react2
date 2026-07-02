@@ -1,8 +1,6 @@
 import React, {
-    memo,
     ReactNode,
     useEffect, useLayoutEffect,
-    useMemo,
     useRef,
     useState
 } from "react";
@@ -12,11 +10,18 @@ import {renderBy, updateBy} from "../../../updateBy";
 type tPosition = { x: number; y: number };
 type tSize = { height: number | string; width: number | string };
 type tRND = { position: tPosition; size: tSize };
+export type tRndUpdate = {
+    e: MouseEvent | TouchEvent;
+    dir: string;
+    elementRef: HTMLElement;
+    delta: { width: number; height: number };
+    position: tPosition;
+};
 type tDivRndBase = {
     zIndex?: number;
     disableDragging?: () => boolean;
     keyForSave?: string;
-    onUpdate?: (data: any) => void;
+    onUpdate?: (data: tRndUpdate) => void;
     position?: tPosition;
     size?: tSize;
     moveOnlyHeader?: boolean;
@@ -32,15 +37,15 @@ type tDivRndBase = {
     className?: string;
 };
 
-// Карта всех размеров всплывающих окон
+// Map of all popup window sizes
 export const ExRNDMap3 = new Map<string, tRND>();
 
 // limit={{x:{min:0}, y:{min:0}}}
 let k = 0;
 const openWindows: { ar: { k: number }[] } = { ar: [] };
 
-// Замораживает поддерево до смены update (намеренно игнорирует смену render-замыкания) —
-// прежняя семантика useMemo-в-колбэке, но без вызова хука из произвольного места
+// Freezes the subtree until update changes (intentionally ignores render closure changes) -
+// the previous useMemo-in-callback semantics, but without calling a hook from an arbitrary place
 const MemoChild = React.memo(
     ({ update, render }: { update: number; render: (u: number) => React.ReactElement }) => render(update),
     (prev, next) => prev.update === next.update
@@ -52,13 +57,13 @@ export const DivRnd3: typeof DivRndBase3 = (a) => {
         typeof a.children === "function" ? a.children(update) : (a.children as React.ReactElement);
     const ff = (update: number) => <MemoChild update={isFunc ? update : 0} render={renderChild} />;
 
-    return DivRndBase3({ ...a, children: ff });
+    return <DivRndBase3 {...a} children={ff} />;
 };
 
 
 /**
- * Компонент-обёртка над react-rnd.
- * Обеспечивает перетаскивание и изменение размеров, опциональный заголовок и кнопку закрытия.
+ * Wrapper component around react-rnd.
+ * Provides dragging and resizing, an optional header, and a close button.
  */
 export function DivRndBase3({
                                 children,
@@ -83,18 +88,13 @@ export function DivRndBase3({
     const positionDef: tPosition = { x: 0, y: 0, ...(position ?? {}) };
     const sizeDef: tSize = { height: 0, width: 0, ...(size ?? {}) };
 
-    // Если есть ключ — данные положения и размера храним в карте
+    // If there is a key, store position and size data in the map
     let map: tRND | undefined;
     if (ks) {
         map = ExRNDMap3.get(ks) ?? ExRNDMap3.set(ks, { size: sizeDef, position: positionDef }).get(ks);
     }
     position = map?.position ?? positionDef;
     size = map?.size ?? sizeDef;
-
-    // Если нужно вписаться в окно по размеру
-    if (sizeByWindow) {
-        // ...здесь можно добавить логику проверки/коррекции на window.innerWidth, window.innerHeight и т.д.
-    }
 
     const id2 = useRef({ k: k++ });
     const id = id2.current;
@@ -105,16 +105,16 @@ export function DivRndBase3({
     const [a, setA] = useState(false);
     const [b, setB] = useState(false);
 
-    const [x, setX] = useState(position?.x ?? 0);
-    const [y, setY] = useState(position?.y ?? 30);
-    const [width, setWidth] = useState(size?.width ?? 400);
-    const [height, setHeight] = useState(size?.height ?? 400);
+    const [x, setX] = useState(position.x);
+    const [y, setY] = useState(position.y);
+    const [width, setWidth] = useState(size.width);
+    const [height, setHeight] = useState(size.height);
     const [update, setUpdate] = useState(0);
 
     const zindex = useRef(zIndexX);
     zindex.current = zIndexX;
 
-    // Обновляем zIndex окна, если оно поднято сверху
+    // Update the window zIndex if it was brought to the top
     updateBy(openWindows, () => {
         const z = openWindows.ar.findIndex((v) => v.k === id.k);
         if (z >= 0 && z !== zindex.current) {
@@ -122,24 +122,20 @@ export function DivRndBase3({
         }
     });
 
-    // limit через ref: inline-объект в props не должен переподписывать document-listeners на каждый рендер
+    // limit via ref: an inline object in props must not resubscribe document listeners on every render
     const limitRef = useRef(limit);
     useLayoutEffect(() => { limitRef.current = limit; });
 
     /**
-     * Хук для перетаскивания мышкой (a) и перетаскивания на тач-устройствах (b).
-     * Снимаем подписки при размонтировании и при изменении зависимостей (a/b).
+     * Hook for mouse dragging (a) and touch-device dragging (b).
+     * Remove subscriptions on unmount and when dependencies change (a/b).
      */
     useEffect(() => {
-        // Мышь
+        // Mouse
         const mouseMoveHandler = (e: MouseEvent) => {
             e.stopPropagation();
-            if (lastC.current == null) {
-                lastC.current = {
-                    x: e.clientX,
-                    y: e.clientY
-                };
-            }
+            // mousedown always sets lastC before this subscription exists
+            if (lastC.current == null) return;
             const data = lastC.current;
             if (e.buttons === 1) {
                 let newX = e.clientX + data.x;
@@ -165,7 +161,7 @@ export function DivRndBase3({
             setA(false);
         };
 
-        // Тач
+        // Touch
         const touchMoveHandler = (e: TouchEvent) => {
             const data = lastT.current;
             if (!data) return touchEndHandler(e);
@@ -207,18 +203,18 @@ export function DivRndBase3({
             }
         };
 
-        // Если активирован режим перетаскивания мышью
+        // If mouse dragging mode is active
         if (a) {
             document.addEventListener("mousemove", mouseMoveHandler);
             document.addEventListener("mouseup", mouseUpHandler);
         }
-        // Если активирован режим перетаскивания для тач-событий
+        // If touch-event dragging mode is active
         if (b) {
             document.addEventListener("touchmove", touchMoveHandler);
             document.addEventListener("touchend", touchEndHandler);
         }
 
-        // Возвращаем функцию очистки для размонтирования и при изменениях a/b:
+        // Return the cleanup function for unmount and a/b changes:
         return () => {
             document.removeEventListener("mousemove", mouseMoveHandler);
             document.removeEventListener("mouseup", mouseUpHandler);
@@ -227,7 +223,7 @@ export function DivRndBase3({
         };
     }, [a, b]);
 
-    // При первой отрисовке добавляем "окно" в массив, при размонтировании — удаляем
+    // On the first render, add the window to the array; remove it on unmount
     useEffect(() => {
         openWindows.ar.push(id);
         renderBy(openWindows);
@@ -240,7 +236,7 @@ export function DivRndBase3({
         };
     }, []);
 
-    // Обновляем в карте координаты и размер, если задан keyForSave
+    // Update coordinates and size in the map if keyForSave is set
     if (size) {
         size.height = height;
         size.width = width;
@@ -250,23 +246,26 @@ export function DivRndBase3({
         position.y = y;
     }
 
+    const headerRef = useRef<HTMLDivElement | null>(null);
+    // clamp to the viewport in a layout effect: an inline ref-callback ran twice per render
+    // (null + element) with a forced reflow from getBoundingClientRect on each call
+    useLayoutEffect(() => {
+        const el = headerRef.current;
+        if (!el || !sizeByWindow) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.x < 0) setX(x - rect.x);
+        if (rect.y < 0) setY(y - rect.y);
+        if (typeof width === "number" && width > window.innerWidth) {
+            setWidth(window.innerWidth);
+        }
+        if (typeof height === "number" && height > window.innerHeight) {
+            setHeight(window.innerHeight);
+        }
+    }, [x, y, width, height, sizeByWindow]);
+
     const headerD = (
         <div
-            ref={(el) => {
-                if (el && sizeByWindow) {
-                    const rect = el.getBoundingClientRect();
-                    if (rect.x < 0) setX(x - rect.x);
-                    if (rect.y < 0) setY(y - rect.y);
-
-                    // Пример небольшой коррекции, если окно слишком большое
-                    if (typeof width === "number" && width > window.innerWidth) {
-                        setWidth(window.innerWidth);
-                    }
-                    if (typeof height === "number" && height > window.innerHeight) {
-                        setHeight(window.innerHeight);
-                    }
-                }
-            }}
+            ref={headerRef}
             onTouchStart={(e) => {
                 const t = e.changedTouches[0];
                 if (t) {
@@ -313,8 +312,9 @@ export function DivRndBase3({
             onResizeStop={(e, dir, elementRef, delta, { x: nx, y: ny }) => {
                 setX(nx);
                 setY(ny);
-                setHeight(+height + delta.height);
-                setWidth(+width + delta.width);
+                // actual element size: `+height + delta.height` gave NaN for string sizes like "100%"
+                setHeight(elementRef.offsetHeight);
+                setWidth(elementRef.offsetWidth);
                 setUpdate(update + 1);
             }}
             onResize={(e, dir, elementRef, delta, pos) => {
@@ -337,7 +337,7 @@ export function DivRndBase3({
                     flex: "auto"
                 }}
                 onMouseDown={() => {
-                    // Поднимаем окно наверх
+                    // Bring the window to the top
                     const z = openWindows.ar.findIndex((v) => v === id);
                     if (z !== openWindows.ar.length - 1 || zindex.current !== z) {
                         const buf = openWindows.ar[z];
@@ -364,7 +364,7 @@ export function DivRndBase3({
                     <div
                         key="323"
                         className="wenayCloseBtn"
-                        title="Закрыть"
+                        title="Close"
                         style={{
                             position: "absolute",
                             right: -12,
@@ -387,32 +387,32 @@ export function DivRndBase3({
 // Use Drag22 for functional draggable behavior
 
 export type Drag2Props = {
-    /** Элемент-«ребёнок», который хотим сделать перетаскиваемым */
+    /** Child element that should be draggable */
     children: ReactNode;
 
-    /** Коллбек при изменении координаты X */
+    /** Callback when the X coordinate changes */
     onX?: (val: number) => void;
 
-    /** Коллбек при изменении координаты Y */
+    /** Callback when the Y coordinate changes */
     onY?: (val: number) => void;
 
-    /** Начальное (или контролируемое) значение X */
+    /** Initial (or controlled) X value */
     x?: number;
 
-    /** Начальное (или контролируемое) значение Y */
+    /** Initial (or controlled) Y value */
     y?: number;
-    /** вести отчет с правого края*/
+    /** Count from the right edge */
     right?: boolean;
     /**
-     * Внешний ref для хранения координат.
-     * Если передан, компонент будет обновлять ref при каждом движении.
+     * External ref for storing coordinates.
+     * If provided, the component updates the ref on each movement.
      */
     last?: React.RefObject<{ x: number; y: number }>;
 
-    /** Вызывается при начале перетаскивания (мышь или touch) */
+    /** Called when dragging starts (mouse or touch) */
     onStart?: () => void;
 
-    /** Вызывается при окончании перетаскивания (мышь и touch) */
+    /** Called when dragging ends (mouse and touch) */
     onStop?: () => void;
 
     dragging?: boolean;
@@ -423,11 +423,11 @@ export type Drag2Props = {
 
 
 /**
- * Компонент-обёртка, позволяющий перетаскивать вложенный элемент
- * как мышью, так и касаниями (touch).
+ * Wrapper component that lets a nested element be dragged
+ * with both mouse and touch input.
  *
- * Функция исключительно как хук на изменения параметров при движении - хоть и имеет свой компонент (для отсчета)
- * возвращает пройденное расстояние при перемещении дочернего элемента
+ * Function only as a hook for parameter changes during movement, although it has its own component (for offset counting).
+ * Returns the distance traveled when moving the child element.
  */
 export function Drag22({
                            children,
@@ -446,6 +446,9 @@ export function Drag22({
     const [draggingMouse, setDraggingMouse] = useState(false);
     const [draggingTouch, setDraggingTouch] = useState(false);
     const posRef = useRef<{ x: number; y: number }>(last?.current ?? { x, y });
+    const wasDragging = useRef(false);
+    const callbacksRef = useRef({ onX, onY, onStart, onStop });
+    callbacksRef.current = { onX, onY, onStart, onStop };
 
     useLayoutEffect(() => {
         posRef.current.x = x;
@@ -454,17 +457,22 @@ export function Drag22({
 
     useEffect(() => {
         if (!draggingMouse && !draggingTouch) {
-            onStop?.();
+            // onStop only after a real drag - previously it also fired on initial mount
+            if (wasDragging.current) {
+                wasDragging.current = false;
+                callbacksRef.current.onStop?.();
+            }
             return;
         }
+        wasDragging.current = true;
 
         if (draggingMouse) {
             const handleMouseMove = (e: MouseEvent) => {
                 const newX = e.clientX + offsetMouse.current.x;
                 const newY = e.clientY + offsetMouse.current.y;
                 posRef.current = { x: newX, y: newY };
-                onX?.(newX);
-                onY?.(newY);
+                callbacksRef.current.onX?.(newX);
+                callbacksRef.current.onY?.(newY);
             };
 
             const handleMouseUp = () => {
@@ -477,7 +485,7 @@ export function Drag22({
 
             document.addEventListener("mousemove", handleMouseMove);
             document.addEventListener("mouseup", handleMouseUp);
-            onStart?.();
+            callbacksRef.current.onStart?.();
 
             return () => {
                 document.removeEventListener("mousemove", handleMouseMove);
@@ -496,8 +504,8 @@ export function Drag22({
                 const newX = theTouch.clientX + offsetTouch.current.x;
                 const newY = theTouch.clientY + offsetTouch.current.y;
                 posRef.current = { x: newX, y: newY };
-                onX?.(newX);
-                onY?.(newY);
+                callbacksRef.current.onX?.(newX);
+                callbacksRef.current.onY?.(newY);
             };
 
             const handleTouchEnd = (e: TouchEvent) => {
@@ -515,14 +523,14 @@ export function Drag22({
 
             document.addEventListener("touchmove", handleTouchMove);
             document.addEventListener("touchend", handleTouchEnd);
-            onStart?.();
+            callbacksRef.current.onStart?.();
 
             return () => {
                 document.removeEventListener("touchmove", handleTouchMove);
                 document.removeEventListener("touchend", handleTouchEnd);
             };
         }
-    }, [draggingMouse, draggingTouch, onX, onY, onStart, onStop]);
+    }, [draggingMouse, draggingTouch]);
 
     useLayoutEffect(() => {
         if (last) {
@@ -534,10 +542,7 @@ export function Drag22({
         e.preventDefault();
         posRef.current.x = 0;
         posRef.current.y = 0;
-        offsetMouse.current = {
-            x: posRef.current.x - e.clientX,
-            y: posRef.current.y - e.clientY
-        };
+        offsetMouse.current = { x: -e.clientX, y: -e.clientY };
         setDraggingMouse(true);
     };
 
@@ -545,11 +550,10 @@ export function Drag22({
         const t = e.changedTouches[0];
         if (!t) return;
 
-        offsetTouch.current = {
-            x: posRef.current.x - t.clientX,
-            y: posRef.current.y - t.clientY,
-            id: t.identifier
-        };
+        // same per-gesture reset as mouse - without it repeated touch drags accumulated offset
+        posRef.current.x = 0;
+        posRef.current.y = 0;
+        offsetTouch.current = { x: -t.clientX, y: -t.clientY, id: t.identifier };
         setDraggingTouch(true);
     };
 

@@ -1,10 +1,10 @@
 import React, {ReactElement} from "react";
 
-//вид кнопки
+// Button view
 export function FButton(name :string|ReactElement){
     return <div className="" style={{width:"100%"}}> {name}</div>
 }
-//стрелка для кнопки
+// Arrow for the button
 export function FNameButton(type :boolean, name:string|ReactElement) {return FButton(<p className={"toPTextIndicator"}>{(type?"▼ ":"▶ ")+name}</p>);}
 
 export function CParameter(props: {
@@ -12,9 +12,9 @@ export function CParameter(props: {
     children?: React.ReactNode | readonly React.ReactNode[], //ReactElement|JSX.Element|null,
     style?: React.CSSProperties | undefined,
     enabled?: boolean,
-    commentary?: string[] // Добавлено комментарий
+    commentary?: string[] // Added comment text
 }) {
-    const [hovered, setHovered] = React.useState(false); // Состояние для отслеживания наведения мышки
+    const [hovered, setHovered] = React.useState(false); // Tracks mouse hover state
 
     return (
         <div
@@ -22,15 +22,15 @@ export function CParameter(props: {
             style={{position: "relative"}}
         >
             <div className="toLine" style={{width: "auto", ...props.style}}
-                 onMouseEnter={() => setHovered(true)} // Показываем комментарий
-                 onMouseLeave={() => setHovered(false)} // Скрываем комментарий
+                 onMouseEnter={() => setHovered(true)} // Show comment
+                 onMouseLeave={() => setHovered(false)} // Hide comment
             >
                 {props.name}
             </div>
             <div className="toLine toRight" style={props.enabled === false ? {opacity: 0.5} : {}}>
                 {props.children}
             </div>
-            {/* Комментарий отображается только при наведении */}
+            {/* Comment is displayed only on hover */}
             {hovered && props.commentary && props.commentary.length > 0 && (
                 <div
                     className="commentary"
@@ -38,14 +38,15 @@ export function CParameter(props: {
                         marginTop: "5px",
                         fontSize: "12px",
                         color: "gray",
-                        position: "absolute", // Можно сделать абсолютно спозиционированным
-                        bottom: "-20px", // Сдвигаем вниз, чтобы не перекрывать основной контент
+                        position: "absolute", // Can be absolutely positioned
+                        bottom: "-20px", // Shift down to avoid covering the main content
                         left: "0",
-                        backgroundColor: "white", // Чтобы выделялось на фоне
+                        backgroundColor: "white", // Make it stand out from the background
                         padding: "2px 4px",
                         border: "1px solid lightgray",
                         borderRadius: "4px",
                         zIndex: 10,
+                        whiteSpace: "pre-line", // otherwise "\n" collapses into spaces
                     }}
                 >
                     {props.commentary.join("\n")}

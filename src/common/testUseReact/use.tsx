@@ -230,35 +230,35 @@ const UseTest = () => {
     return <div>{r}</div>
 }
 
-// Функция имитирует асинхронный процесс (например, получение данных с сервера)
+// Simulates an async process, for example fetching data from a server.
 const fetchData = async (): Promise<string> => {
     console.log("!444")
     return new Promise((resolve) => {
         setTimeout(() => {
             console.log("!111")
-            resolve("Данные успешно загружены!")
-        }, 2000); // Задержка 2 секунды
+            resolve("Data loaded successfully!")
+        }, 2000); // 2-second delay
     });
 };
 
-// Компонент, использующий хук use для ожидания асинхронной операции
+// Component that uses the use hook to wait for an async operation.
 const FetchExample = () => {
-    // Важно: хук use может быть вызван только на верхнем уровне компонента,
-    // он возвращает результат асинхронной функции.
+    // Important: the use hook can only be called at the top level of a component;
+    // it returns the result of the async function.
     const data = use(fetchData());
 
-    // React "подвешивает" компонент, пока Promises (переданные в use) не будут разрешены.
+    // React suspends the component until the Promises passed to use are resolved.
     return <div>{data}</div>;
 };
 const FetchExample2 = () => {
     console.log("dsdsds")
-    // Важно: хук use может быть вызван только на верхнем уровне компонента,
-    // он возвращает результат асинхронной функции.
+    // Important: the use hook can only be called at the top level of a component;
+    // it returns the result of the async function.
     return useMemo(()=><FetchExample/>,[])
 };
 
 const Ztr = createContext({a: 4 as number},)
-// Главный компонент приложения
+// Main application component.
 const Ttt2 = () => {
     console.log("Rrrrrrrrrrr")
     return useMemo(()=><Ttt3/>,[true])

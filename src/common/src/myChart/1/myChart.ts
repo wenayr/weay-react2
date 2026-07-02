@@ -1,10 +1,10 @@
-// Отступы графика и цвет линии (значения прежние, вынесены из тела отрисовки)
+// Chart margins and line color (same values, extracted from the render body)
 const CHART_MARGIN_TOP = 20;
 const CHART_MARGIN_BOTTOM = 20;
 const CHART_LINE_COLOR = "rgb(0,180,0)";
 
 /**
- * Точка на графике: время (time) и цена (price).
+ * Chart point: time and price.
  */
 export interface IChartPoint {
     time: number;
@@ -12,20 +12,20 @@ export interface IChartPoint {
 }
 
 /**
- * Настройки канваса.
+ * Canvas settings.
  */
 export interface IChartConfig {
-    container: HTMLElement;   // контейнер, в который вставим canvas
+    container: HTMLElement;   // container where canvas will be inserted
     width?: number;
     height?: number;
-    autoScaleY?: boolean;     // автоматически подгонять масштаб по оси Y
+    autoScaleY?: boolean;     // automatically fit the Y scale
     showTimeAxis?: boolean;
     showPriceAxis?: boolean;
 }
 
 /**
- * Интерфейс объекта, который возвращает createChartCanvas:
- * методы управления зумом, прокруткой и т.д.
+ * Interface returned by createChartCanvas:
+ * methods for zoom, scrolling, etc.
  */
 export interface IChartCanvas {
     appendData(points: IChartPoint | IChartPoint[]): void;
@@ -43,20 +43,20 @@ export interface IChartCanvas {
 }
 
 /**
- * Создаём функциональный канвас с возможностью зума колёсиком.
+ * Creates a functional canvas with wheel zoom support.
  */
 export function createChartCanvas(config: IChartConfig): IChartCanvas {
-    // Создаём <canvas> и вставляем в container
+    // Create <canvas> and insert it into container
     const canvas = document.createElement("canvas");
     config.container.appendChild(canvas);
 
-    // Состояние (state) в замыкании
+    // State captured in the closure
     let state = {
         width: (config.width ?? config.container.offsetWidth) || 800,
         height: (config.height ?? config.container.offsetHeight) || 400,
         data: [] as IChartPoint[],
         offsetX: 0,
-        scaleX: 5,       // пикселей на «шаг» (индекс точки)
+        scaleX: 5,       // pixels per step (point index)
         autoScaleY: config.autoScaleY ?? true,
         showTimeAxis: config.showTimeAxis ?? true,
         showPriceAxis: config.showPriceAxis ?? true,
@@ -75,7 +75,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
     }
     resizeCanvas();
 
-    // ~~~ Отрисовка ~~~
+    // ~~~ Rendering ~~~
     function draw() {
         if (!state.needsRender) return;
         state.needsRender = false;
@@ -87,7 +87,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
             return;
         }
 
-        // Рассчитываем, какие индексы данных видны на экране
+        // Calculate which data indexes are visible on screen
         const minIndex = Math.floor(-state.offsetX / state.scaleX);
         const maxIndex = Math.ceil((state.width - state.offsetX) / state.scaleX);
         const startIndex = Math.max(0, minIndex);
@@ -98,23 +98,17 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
             return;
         }
 
-        // Ищем minY и maxY для видимых точек (если autoScaleY=true)
-        let minY = Infinity;
-        let maxY = -Infinity;
-        for (let i = startIndex; i <= endIndex; i++) {
-            const p = state.data[i];
-            if (p.price < minY) minY = p.price;
-            if (p.price > maxY) maxY = p.price;
-        }
-        if (minY === Infinity) {
-            // Нет видимых точек
-            drawAxes();
-            return;
-        }
-        if (!state.autoScaleY) {
-            // Допустим, зафиксируем 0..100, если не хотим авто
-            minY = 0;
-            maxY = 100;
+        // Fixed 0..100 range unless auto scaling; the scan runs only when its result is used
+        let minY = 0;
+        let maxY = 100;
+        if (state.autoScaleY) {
+            minY = Infinity;
+            maxY = -Infinity;
+            for (let i = startIndex; i <= endIndex; i++) {
+                const p = state.data[i];
+                if (p.price < minY) minY = p.price;
+                if (p.price > maxY) maxY = p.price;
+            }
         }
         const rangeY = maxY - minY || 1;
         const marginTop = CHART_MARGIN_TOP;
@@ -128,7 +122,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
             return marginTop + chartHeight - ((price - minY) / rangeY) * chartHeight;
         }
 
-        // Рисуем линию
+        // Draw the line
         ctx.beginPath();
         let first = true;
         for (let i = startIndex; i <= endIndex; i++) {
@@ -146,7 +140,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Рисуем оси и подписи
+        // Draw axes and labels
         drawAxes(minY, maxY, startIndex, endIndex, toScreenX, toScreenY);
     }
 
@@ -163,14 +157,14 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.font = "12px sans-serif";
 
-        // Ось X (внизу)
+        // X axis (bottom)
         if (state.showTimeAxis) {
             ctx.beginPath();
             ctx.moveTo(0, state.height - 0.5);
             ctx.lineTo(state.width, state.height - 0.5);
             ctx.stroke();
 
-            // Подписи времени
+            // Time labels
             if (startIndex != null && endIndex != null && toX) {
                 const step = Math.max(1, Math.floor((endIndex - startIndex) / 5));
                 for (let i = startIndex; i <= endIndex; i += step) {
@@ -187,7 +181,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
             }
         }
 
-        // Ось Y (слева)
+        // Y axis (left)
         if (state.showPriceAxis) {
             ctx.beginPath();
             ctx.moveTo(0.5, 0);
@@ -197,13 +191,13 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
             if (minY !== undefined && maxY !== undefined && toY) {
                 const yMin = toY(minY);
                 const yMax = toY(maxY);
-                ctx.fillText(String(minY.toFixed(2)), 5, yMin - 2);
+                ctx.fillText(minY.toFixed(2), 5, yMin - 2);
                 ctx.beginPath();
                 ctx.moveTo(0, yMin);
                 ctx.lineTo(5, yMin);
                 ctx.stroke();
 
-                ctx.fillText(String(maxY.toFixed(2)), 5, yMax - 2);
+                ctx.fillText(maxY.toFixed(2), 5, yMax - 2);
                 ctx.beginPath();
                 ctx.moveTo(0, yMax);
                 ctx.lineTo(5, yMax);
@@ -217,8 +211,8 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
     let animationFrameId: number | null = null;
     let destroyed = false;
     let docListenersActive = false;
-    // temp-detach (портал, перенос узла) — не повод самоуничтожаться: ждём reconnect
-    // с grace-периодом; настоящий unmount без destroy() добьёт авто-очистка по таймауту
+    // temp-detach (portal, node move) is not a reason to self-destroy: wait for reconnect
+    // with a grace period; a real unmount without destroy() is handled by timeout auto-cleanup
     const DETACH_DESTROY_MS = 10_000;
     let disconnectedSince: number | null = null;
     function animate() {
@@ -234,7 +228,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
         }
         if (disconnectedSince != null) {
             disconnectedSince = null;
-            state.needsRender = true; // после reconnect перерисовать принудительно
+            state.needsRender = true; // force redraw after reconnect
         }
         if (state.needsRender) {
             draw();
@@ -243,7 +237,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
     }
     animate();
 
-    // ~~~ Методы API ~~~
+    // ~~~ API methods ~~~
 
     function appendData(points: IChartPoint | IChartPoint[]) {
         if (!Array.isArray(points)) points = [points];
@@ -263,13 +257,13 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
     }
 
     function zoomX(factor: number, centerPx = state.width / 2) {
-        // Определяем, какой индекс сейчас под centerPx
+        // Determine which index is currently under centerPx
         const i = (centerPx - state.offsetX) / state.scaleX;
         state.scaleX *= factor;
-        // Ограничиваем масштаб
+        // Clamp scale
         if (state.scaleX < 0.1) state.scaleX = 0.1;
         if (state.scaleX > 2000) state.scaleX = 2000;
-        // Сдвигаем offsetX так, чтобы та же точка осталась под курсором
+        // Shift offsetX so the same point stays under the cursor
         state.offsetX = centerPx - i * state.scaleX;
         state.needsRender = true;
     }
@@ -310,12 +304,12 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
     }
 
     function drawManually() {
-        // Принудительный вызов отрисовки
+        // Force render call
         state.needsRender = true;
         draw();
     }
 
-    // ~~~ События мыши ~~~
+    // ~~~ Mouse events ~~~
     const addDocListeners = () => {
         if (docListenersActive) return;
         document.addEventListener("mousemove", onMouseMove);
@@ -338,7 +332,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
         if (state.isDragging) {
             const dx = e.clientX - state.lastDragX;
             state.lastDragX = e.clientX;
-            scrollX(dx); // тянем график
+            scrollX(dx); // drag the chart
         }
     };
     const onMouseUp = () => {
@@ -346,11 +340,11 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
         removeDocListeners();
     };
 
-    // ===> Привязка зума к скроллу мышки <===
+    // ===> Bind zoom to mouse wheel <===
     const onWheel = (e: WheelEvent) => {
         e.preventDefault();
-        // e.deltaY > 0 => крутим вниз => factor < 1 => отдаляем
-        // e.deltaY < 0 => крутим вверх => factor > 1 => приближаем
+        // e.deltaY > 0 => wheel down => factor < 1 => zoom out
+        // e.deltaY < 0 => wheel up => factor > 1 => zoom in
         const factor = e.deltaY < 0 ? 1.1 : 0.9;
 
         const rect = canvas.getBoundingClientRect();
@@ -377,7 +371,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
         }
     }
 
-    // Собираем и возвращаем API
+    // Build and return API
     return {
         appendData,
         clearData,

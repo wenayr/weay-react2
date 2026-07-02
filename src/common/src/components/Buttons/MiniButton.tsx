@@ -42,5 +42,5 @@ export function MiniButton2({name, children, statusDef, className = "newButtonSi
     </Button>
 }
 
-// Deprecated: Use MiniButton2 instead
+/** @deprecated Use MiniButton2 instead */
 export const MiniButton3 = MiniButton2;

@@ -24,23 +24,27 @@ export function Drag2({
     const lastT = useRef<{ x: number; y: number; id: number } | null>(null);
     const [a, setA] = useState(false);
     const [b, setB] = useState(false);
-    // дефолт был {y: x, x: y} — координаты местами; исправлено (K3, см. CHANGELOG/план)
+    // Default was {y: x, x: y} - coordinates were swapped; fixed (K3, see CHANGELOG/plan)
     const lastD = useRef<{ x: number; y: number }>(last?.current ?? { x, y });
     const wasDragging = useRef(false);
+    // callbacks via ref: with them in the effect deps an inline callback from the consumer
+    // resubscribed document listeners and re-fired onStart on every drag tick
+    const callbacksRef = useRef({ onX, onY, onStart, onStop });
+    callbacksRef.current = { onX, onY, onStart, onStop };
 
-    // Обновляем значения `lastD` при изменении `x` или `y`
+    // Update `lastD` values when `x` or `y` changes
     useLayoutEffect(() => {
         lastD.current.x = x;
         lastD.current.y = y;
     }, [x, y]);
 
-    // Основная логика обработки событий перемещения
+    // Main movement event handling logic
     useEffect(() => {
         if (!(a || b)) {
-            // onStop только после реального drag — раньше срабатывал и на первичном маунте
+            // onStop only after a real drag - previously it also fired on initial mount
             if (wasDragging.current) {
                 wasDragging.current = false;
-                onStop?.();
+                callbacksRef.current.onStop?.();
             }
             return;
         }
@@ -48,17 +52,15 @@ export function Drag2({
 
         if (a) {
             const handleMouseMove = (e: MouseEvent) => {
-                if (!lastC.current) {
-                    lastC.current = { x: e.clientX, y: e.clientY };
-                }
-
+                // mousedown always sets lastC before this subscription exists
+                if (!lastC.current) return;
                 const data = lastC.current;
 
-                // Вычисляем и обновляем координаты
+                // Calculate and update coordinates
                 lastD.current.x = e.clientX + data.x;
                 lastD.current.y = e.clientY + data.y;
-                onX?.(lastD.current.x);
-                onY?.(lastD.current.y);
+                callbacksRef.current.onX?.(lastD.current.x);
+                callbacksRef.current.onY?.(lastD.current.y);
 
                 e.stopPropagation();
             };
@@ -73,7 +75,7 @@ export function Drag2({
             document.body.addEventListener("mousemove", handleMouseMove);
             document.body.addEventListener("mouseup", handleMouseUp);
 
-            onStart?.();
+            callbacksRef.current.onStart?.();
 
             return () => {
                 document.body.removeEventListener("mousemove", handleMouseMove);
@@ -89,11 +91,11 @@ export function Drag2({
                 const touch = Array.from(e.changedTouches).find((t) => t.identifier === data.id);
                 if (!touch) return;
 
-                // Вычисляем и обновляем координаты
+                // Calculate and update coordinates
                 lastD.current.x = touch.clientX + data.x;
                 lastD.current.y = touch.clientY + data.y;
-                onX?.(lastD.current.x);
-                onY?.(lastD.current.y);
+                callbacksRef.current.onX?.(lastD.current.x);
+                callbacksRef.current.onY?.(lastD.current.y);
 
                 e.stopPropagation();
             };
@@ -118,16 +120,16 @@ export function Drag2({
             document.body.addEventListener("touchmove", handleTouchMove);
             document.body.addEventListener("touchend", handleTouchEnd);
 
-            onStart?.();
+            callbacksRef.current.onStart?.();
 
             return () => {
                 document.body.removeEventListener("touchmove", handleTouchMove);
                 document.body.removeEventListener("touchend", handleTouchEnd);
             };
         }
-    }, [a, b, onX, onY, onStart, onStop]);
+    }, [a, b]);
 
-    // Создаем элемент для перемещения
+    // Create an element for dragging
     return useMemo(
         () => (
             <div

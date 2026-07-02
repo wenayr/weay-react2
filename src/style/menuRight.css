@@ -1,4 +1,4 @@
-/* Токены вынесены в tokens.css (значения те же) */
+/* Tokens moved to tokens.css (same values) */
 @import "./tokens.css";
 
 .menu-container{
@@ -61,8 +61,8 @@
 .submenu {
   background: var(--menu-bg-color);
 
-  backdrop-filter: blur(var(--menu-blur)); /* Размытие */
-  -webkit-backdrop-filter: blur(var(--menu-blur)); /* Для Safari */
+  backdrop-filter: blur(var(--menu-blur)); /* Blur */
+  -webkit-backdrop-filter: blur(var(--menu-blur)); /* For Safari */
 
   border: var(--menu-border);
   min-width: 200px;
@@ -72,11 +72,11 @@
   /*padding: 20px;*/
   /*margin: 20px;*/
   /*background-color: #fff;*/
-  /*border: 1px solid #ddd; !* базовая граница, можно убрать *!*/
+  /*border: 1px solid #ddd; !* base border, can be removed *!*/
   cursor: pointer;
 }
 
-/* Псевдоэлемент для отрисовки обводки */
+/* Pseudo-element for drawing the outline */
 .draggable-div::after {
   content: "";
   position: absolute;
@@ -89,19 +89,19 @@
   box-sizing: border-box;
 }
 
-/* Запуск анимации, когда зажата кнопка мыши */
+/* Start the animation while the mouse button is held */
 .draggable-div.outline-animation::after {
   animation: running-line 0.5s linear forwards;
 }
 
-/* Если анимация успела завершиться, обводка остается */
+/* If the animation completed, the outline remains */
 .draggable-div.outline-complete::after {
   border-color: #007bff;
-  /* Чтобы псевдоэлемент точно отображал полную обводку */
+  /* Ensure the pseudo-element shows the full outline */
   clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
 }
 
-/* Анимация «бегущей линии» */
+/* Running line animation */
 @keyframes running-line {
   0% {
     border-color: transparent;
@@ -109,15 +109,15 @@
   }
   25% {
     border-color: #007bff;
-    /* Рисуем верхнюю линию */
+    /* Draw the top line */
     clip-path: polygon(0 0, 100% 0, 100% 0, 0 0);
   }
   50% {
-    /* Добавляем правую сторону */
+    /* Add the right side */
     clip-path: polygon(0 0, 100% 0, 100% 100%, 100% 100%);
   }
   75% {
-    /* Добавляем нижнюю сторону */
+    /* Add the bottom side */
     clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
   }
   100% {

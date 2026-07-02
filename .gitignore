@@ -10,7 +10,7 @@ yarn-error.log*
 
 .vscode/*
 
-# артефакты сборки
+# build artifacts
 /lib
 /dist
 *.tgz

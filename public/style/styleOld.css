@@ -37,36 +37,36 @@ html,.fon {
   background: var(--color-bg-light);
 }
 body::-webkit-scrollbar {
-  width: var(--scrollbar-size);               /* ширина scrollbar */
+  width: var(--scrollbar-size);               /* scrollbar width */
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-scrollbar-track);        /* цвет дорожки */
+  background: var(--color-scrollbar-track);        /* track color */
 }
 ::-webkit-scrollbar-thumb {
-  background-color: var(--color-scrollbar-thumb);    /* цвет плашки */
-  border-radius: 20px;       /* закругления плашки */
-  /*border: 3px solid orange;  !* padding вокруг плашки *!*/
+  background-color: var(--color-scrollbar-thumb);    /* thumb color */
+  border-radius: 20px;       /* thumb rounding */
+  /*border: 3px solid orange;  !* padding around the thumb *!*/
 }
 
 .MSTradeScroll .ag-body-viewport::-webkit-scrollbar-track {
-  background: var(--color-scrollbar-track);        /* цвет дорожки */
+  background: var(--color-scrollbar-track);        /* track color */
 }
 
 .MSTradeScroll .ag-body-viewport::-webkit-scrollbar-thumb {
-  background-color: var(--color-scrollbar-thumb-alt) !important;    /* цвет плашки */
-  border-radius: 20px;       /* закругления плашки */
+  background-color: var(--color-scrollbar-thumb-alt) !important;    /* thumb color */
+  border-radius: 20px;       /* thumb rounding */
 }
 
 *::-webkit-scrollbar {
-  width: var(--scrollbar-size);               /* ширина scrollbar */
+  width: var(--scrollbar-size);               /* scrollbar width */
 }
 *::-webkit-scrollbar-track {
-  background: var(--color-scrollbar-track);        /* цвет дорожки */
+  background: var(--color-scrollbar-track);        /* track color */
 }
 *::-webkit-scrollbar-thumb {
-  background-color: var(--color-scrollbar-thumb);    /* цвет плашки */
-  border-radius: 20px;       /* закругления плашки */
-  /*border: 3px solid orange;  !* padding вокруг плашки *!*/
+  background-color: var(--color-scrollbar-thumb);    /* thumb color */
+  border-radius: 20px;       /* thumb rounding */
+  /*border: 3px solid orange;  !* padding around the thumb *!*/
 }
 .defButton {
   padding: 20px;
@@ -222,7 +222,7 @@ input:invalid {
   font-size: 12px;
 }
 
-/*для заполнение последниго дива на всю оставшуюся часть*/
+/* Fill the remaining space with the last div */
 .toSpace,.toSpaceColum {
   display: flex;
 }
@@ -373,7 +373,7 @@ input:invalid {
 }
 
 .classWindowsDefault {
-  border: 1px solid #9d9d9d; /* Параметры границы */
+  border: 1px solid #9d9d9d; /* Border parameters */
   background: #1d262c;
 }
 
@@ -615,7 +615,7 @@ body{
 /*}*/
 
 
-/*стрелки*/
+/* Arrows */
 .toSymbolTableST{
   display: block;
   margin-right: 5px;
@@ -642,7 +642,7 @@ body{
 }
 
 /*
-для React анимация появления и удаления
+React enter and exit animations
 */
 .example-enter {
   opacity: 0;
@@ -690,19 +690,19 @@ body{
   background: #2D3840;
   border-color: #2D3840;
   font-size: 11px;
-  outline: none; /*убираем стандартную обводку браузера */
+  outline: none; /* remove the default browser outline */
 }
 .msTradeIconDown{
   /*background-image: url(icon/action/arrow_drop_down_24px.png);*/
-  background-repeat: no-repeat; /*Убираем повтор изображения*/
-  background-position: calc(100% - 8px);  /*Позиционируем*/
-  outline: none; /*убираем стандартную обводку браузера*/
+  background-repeat: no-repeat; /* prevent image repeat */
+  background-position: calc(100% - 8px);  /* position */
+  outline: none; /* remove the default browser outline */
 }
 .msTradeSearchStyleIcon{
   /*background-image: url(icon/action/search_24px.png);*/
-  background-repeat: no-repeat; /*Убираем повтор изображения*/
-  background-position: calc(100% - 8px);  /*Позиционируем*/
-  outline: none; /*убираем стандартную обводку браузера*/
+  background-repeat: no-repeat; /* prevent image repeat */
+  background-position: calc(100% - 8px);  /* position */
+  outline: none; /* remove the default browser outline */
 }
 .msTradeMenu{
   height: 32px;
@@ -717,16 +717,16 @@ body{
 
 
 .bubble {
-  position: relative; /* относительное позиционирование */
-  width: 300px; /* ширина блока */
+  position: relative; /* relative positioning */
+  width: 300px; /* block width */
   text-align: center;
   line-height: 1.4em;
-  margin: 40px auto; /* отступ между блоками */
+  margin: 40px auto; /* spacing between blocks */
   background-color: #fff;
   border: 8px solid #960ccc;
   border-radius: 30px;
   font-family: sans-serif;
-  padding: 20px; /* поле между текстом и рамкой */
+  padding: 20px; /* space between text and border */
   font-size: 18px;
 }
 .bubble:before,

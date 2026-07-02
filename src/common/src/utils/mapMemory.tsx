@@ -40,15 +40,14 @@ export function deepMergeWithMap(target: any, source: any, visited = new Map<any
 }
 
 
-const map = new Map<object, boolean>()
+// WeakSet: a strict Map kept every def object alive forever
+const merged = new WeakSet<object>()
 
 export function staticGetAdd<T extends object>(key: any, def: T, options: {abs?: boolean, deepAutoMerge?: boolean, reversDeep?: boolean} = {reversDeep: false}) {
-    if (options.deepAutoMerge && !map.get(def)) {
-        map.set(def, true)
-        if (options.deepAutoMerge) {
-            if (!options.reversDeep) staticProps.set(key, deepMergeWithMap(staticProps.get(key) ?? {}, def))
-            else staticProps.set(key, deepMergeWithMap(deepClone(def), staticProps.get(key) ?? {}))
-        }
+    if (options.deepAutoMerge && !merged.has(def)) {
+        merged.add(def)
+        if (!options.reversDeep) staticProps.set(key, deepMergeWithMap(staticProps.get(key) ?? {}, def))
+        else staticProps.set(key, deepMergeWithMap(deepClone(def), staticProps.get(key) ?? {}))
     }
     if (options.abs) staticProps.set(key, def)
     const t = (staticProps.has(key) ? staticProps.get(key) : staticProps.set(key, def).get(key)!) as T

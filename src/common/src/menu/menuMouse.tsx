@@ -24,7 +24,9 @@ function GetMouseMenuApi(data?: {name?: string}){
     function ReactMouse(agr: Parameters<typeof MenuR>[0]) {
         const datum = menuMouse.value //staticGetAdd(menuMouse.name, menuMouse.value
 
-        return MenuR({...(agr ?? {}), other: agr.other ? agr.other : other, statusOn: datum.status, onConsume: ()=> { map.clear() }})
+        // JSX instead of a direct call: MenuR's hooks must live in its own fiber,
+        // a direct call ties them to whichever component renders ReactMouse
+        return <MenuR {...agr} other={agr.other ?? other} statusOn={datum.status} onConsume={()=> { map.clear() }}/>
     }
 
     return {

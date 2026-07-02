@@ -1,21 +1,40 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {DivOutsideClick} from "../../hooks/useOutside";
 import {tokens} from "../../styles/tokens";
 
-// Контекст хранит только функцию setModal
-const ModalContext = createContext<(jsx: ReactNode | null) => void>(() => {});
+export type ModalApi = {
+    show(node: ReactNode): void;
+    open(node: ReactNode): void;
+    close(): void;
+    replace(node: ReactNode | null): void;
+    set(node: ReactNode | null): void;
+};
+
+export type ModalController = ((jsx: ReactNode | null) => void) & ModalApi;
+
+const noopModal = Object.assign(() => {}, {show() {}, open() {}, close() {}, replace() {}, set() {}}) as ModalController;
+const ModalContext = createContext<ModalController>(noopModal);
 
 export type ModalProviderProps = {
     children: ReactNode;
-    /** Закрывать по клику вне модалки. По умолчанию true (прежнее поведение). */
+    /** Close on click outside the modal. Defaults to true for legacy behavior. */
     closeOnOutsideClick?: boolean;
-    /** Закрывать по Escape. По умолчанию true. */
+    /** Close on Escape. Defaults to true. */
     closeOnEscape?: boolean;
 };
 
 export const ModalProvider = ({ children, closeOnOutsideClick = true, closeOnEscape = true }: ModalProviderProps) => {
     const [modal, setModal] = useState<ReactNode | null>(null);
+    const modalApi = useMemo<ModalController>(() => {
+        const api = ((node: ReactNode | null) => setModal(node)) as ModalController;
+        api.show = (node) => setModal(node);
+        api.open = api.show;
+        api.close = () => setModal(null);
+        api.replace = (node) => setModal(node);
+        api.set = api.replace;
+        return api;
+    }, []);
 
     useEffect(() => {
         if (!modal || !closeOnEscape) return;
@@ -27,7 +46,7 @@ export const ModalProvider = ({ children, closeOnOutsideClick = true, closeOnEsc
     }, [modal, closeOnEscape]);
 
     return (
-        <ModalContext.Provider value={setModal}>
+        <ModalContext.Provider value={modalApi}>
             {children}
             {modal && createPortal(
                 <div style={{
@@ -45,5 +64,13 @@ export const ModalProvider = ({ children, closeOnOutsideClick = true, closeOnEsc
     );
 };
 
-// Тот самый компактный хук
+// Callable for legacy code, controller-style for new code.
 export const useModal = () => useContext(ModalContext);
+
+/** @deprecated Use `useModal()`; it is callable and also has show/open/close/set methods. */
+export const useModalOld = () => useContext(ModalContext);
+
+/** @deprecated Use `useModal()` directly. */
+export function useModalApi(): ModalApi {
+    return useContext(ModalContext);
+}

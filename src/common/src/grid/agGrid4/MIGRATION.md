@@ -1,132 +1,96 @@
-# План миграции фронта clientBacktest на agGrid4
+# Migration Plan for the clientBacktest Frontend to agGrid4
 
-Канон библиотеки — `exampleAGrid/agGrid4` (см. README.md). Здесь — проектный план: что, в каком
-порядке, с каким риском. Инвентарь собран аудитом всего `src/front` (2026-06-12).
+The library canon is `exampleAGrid/agGrid4` (see README.md). This is the project plan: what to migrate, in what order, and with what risk. The inventory was collected by auditing all of `src/front` (2026-06-12).
 
-## Инвентарь: 20+ гридов в 13 файлах
+## Inventory: 20+ Grids in 13 Files
 
-| # | Место | Гридов | Путь данных сейчас | getRowId | Буфер |
-|---|-------|--------|--------------------|----------|-------|
-| 1 | `pages/clientPage/main.tsx:866` | 1 (главная таблица) | applyTransactionAsyncUpdate2 ×6, стримы | есть | `datum.tableArr` (модуль) |
-| 2 | `components/selectSymbols/selectSymbol.tsx:870` | 1 (+1 мелкий :1134) | **локальный v1** ×24, стримы | есть / нет | `bufTable` (модуль) |
-| 3 | `pages/clientPage/mini/services.tsx:68` | 1 | **v1 из wenay-react2** ×2, события | есть | `object` (useRef) |
-| 4 | `pages/clientPage/exchange/binance.tsx:860` | 1 (модалка History Transfer) | v2 ×2 | есть | `bufferTableHistory` (модуль) |
-| 5 | `pages/clientPage/exchange/gateio.tsx:577` | 1 (модалка займов) | rowData декларативно | есть | — |
-| 6 | `pages/clientPage/portfolioTable.tsx:233` | 1 | rowData + setRows | есть | — |
-| 7 | `pages/clientPage/elements.tsx:15` | 1 (TableSymbols) | rowData проп | **нет** | — |
-| 8 | `components/selectHistory.tsx:298,400,599` | 3 | rowData + setRows | есть | Map (модуль) |
-| 9 | `components/graph.tsx:391,453,495` | 3 | rowData + setGridOption | есть/нет | WeakMap |
-| 10 | `components/SelectStrategy.tsx:104` | 1 | rowData + setRows | **нет** | — |
-| 11 | `components/selectSymbols/selectTable.tsx:23` | 1 | setGridOption("rowData") | **нет** | — |
-| 12 | `components/selectSymbols/utilsReact.tsx:93` | 1 | rowData пересборка | **нет** | — |
-| 13 | `pages/pageTest2.tsx:82`, `pageTest3.tsx:15` | 2 | статика | нет | — |
+| # | Location | Grids | Current data path | getRowId | Buffer |
+|---|----------|-------|-------------------|----------|--------|
+| 1 | `pages/clientPage/main.tsx:866` | 1 (main table) | applyTransactionAsyncUpdate2 x6, streams | yes | `datum.tableArr` (module) |
+| 2 | `components/selectSymbols/selectSymbol.tsx:870` | 1 (+1 small :1134) | **local v1** x24, streams | yes / no | `bufTable` (module) |
+| 3 | `pages/clientPage/mini/services.tsx:68` | 1 | **v1 from wenay-react2** x2, events | yes | `object` (useRef) |
+| 4 | `pages/clientPage/exchange/binance.tsx:860` | 1 (History Transfer modal) | v2 x2 | yes | `bufferTableHistory` (module) |
+| 5 | `pages/clientPage/exchange/gateio.tsx:577` | 1 (loans modal) | declarative rowData | yes | - |
+| 6 | `pages/clientPage/portfolioTable.tsx:233` | 1 | rowData + setRows | yes | - |
+| 7 | `pages/clientPage/elements.tsx:15` | 1 (TableSymbols) | rowData prop | **no** | - |
+| 8 | `components/selectHistory.tsx:298,400,599` | 3 | rowData + setRows | yes | Map (module) |
+| 9 | `components/graph.tsx:391,453,495` | 3 | rowData + setGridOption | yes/no | WeakMap |
+| 10 | `components/SelectStrategy.tsx:104` | 1 | rowData + setRows | **no** | - |
+| 11 | `components/selectSymbols/selectTable.tsx:23` | 1 | setGridOption("rowData") | **no** | - |
+| 12 | `components/selectSymbols/utilsReact.tsx:93` | 1 | rowData rebuild | **no** | - |
+| 13 | `pages/pageTest2.tsx:82`, `pageTest3.tsx:15` | 2 | static | no | - |
 
-Обёртка `components/customAgGrid3.tsx` — текущий прод-хелпер, после миграции под снос.
+The `components/customAgGrid3.tsx` wrapper is the current production helper; after migration it should be removed.
 
-## Найденные дефекты (аудит, сверено по строкам)
+## Found Defects (Audit, Line-Checked)
 
-1. **selectSymbol.tsx:31-49 — локальный v1 теряет данные.** Всё тело под `if (grid?.api.getRowNode)`:
-   грид не готов → апдейт молча выброшен (даже в буфер не пишется). `applyTransaction({add})`
-   закомментирован (:43-46) → новые строки никогда не доезжают транзакцией. 24 колл-сайта (:357-575).
-2. **binance.tsx History Transfer — рассинхрон ключей буфера.** Заполнение: `getId: e=>e.timestamp`
-   (:855), синхронизация: `getId: e=>String(e.id)` (:868), `getRowId: e.data.id` (:874). Буфер ключуется
-   по timestamp, sync ищет по id → sync сравнивает не те ключи. Плюс `id: (a++).toString()` (:854) —
-   id недетерминированы между загрузками.
-3. **Гриды без getRowId** (идентификация по индексу, транзакции невозможны/опасны):
-   elements.tsx TableSymbols, SelectStrategy, selectTable, utilsReact, selectSymbol:1134, graph buffer-гриды.
-4. **main.tsx `useAgGrid()` (:254) не используется** — `Grid`/`updateData` мертвы; страница рендерит голый
-   AgGridReact. Удалить вместе с импортом customAgGrid3.
-5. **main.tsx `TableA = useMemo(..., [true])` (:864)** — замыкание заморожено навсегда; `colDefsMain`
-   пересчитывается каждый рендер (:858), но в грид не попадает — колонки добавляются императивно
-   `setGridOption("columnDefs")` (:690). При миграции: либо стабилизировать columnDefs через useMemo,
-   либо сохранить императивный путь — НО не отдавать в memo-компонент новый массив каждый рендер.
-6. **elements.tsx EmptyColumn/ShowQuote** зовут `grid.current.api` без null-гарда; зовутся и из
-   onGridReady, и с кнопок.
-7. **selectTable.tsx:16-22** — два одинаковых updateBy-вотчера (дубль).
-8. **Ничейный destroy**: кроме main.tsx, ни один грид не зануляет свой ref на onGridPreDestroyed.
-9. **Мёртвый код**: main.tsx :401-412 (loadSymbols), :488-546, :768-788, :823-852 (старые v1-блоки);
-   selectSymbol :839-867; graph getTableMaiBuffer закомментирован в UI.
-10. **Тема**: прод-гриды НЕ передают theme (v35 даёт дефолтную Quartz / легаси-CSS через
-    GridStyleDefault из wenay-react2, импорт в src/index.ts). AgGridMy ставит Alpine dark —
-    **внешний вид изменится**. Решить на пилоте: либо принять Alpine, либо прокинуть текущую тему.
+1. **selectSymbol.tsx:31-49: local v1 loses data.** The whole body sits under `if (grid?.api.getRowNode)`: when the grid is not ready, the update is silently dropped and is not even written to the buffer. `applyTransaction({add})` is commented out (:43-46), so new rows never arrive through a transaction. There are 24 call sites (:357-575).
+2. **binance.tsx History Transfer: buffer key mismatch.** Fill path: `getId: e=>e.timestamp` (:855), sync path: `getId: e=>String(e.id)` (:868), `getRowId: e.data.id` (:874). The buffer is keyed by timestamp, but sync looks by id, so sync compares the wrong keys. Also `id: (a++).toString()` (:854) is not deterministic across loads.
+3. **Grids without getRowId** (index identity, transactions impossible or unsafe): elements.tsx TableSymbols, SelectStrategy, selectTable, utilsReact, selectSymbol:1134, graph buffer grids.
+4. **main.tsx `useAgGrid()` (:254) is unused**: `Grid`/`updateData` are dead; the page renders a bare AgGridReact. Remove this together with the customAgGrid3 import.
+5. **main.tsx `TableA = useMemo(..., [true])` (:864)**: the closure is frozen forever. `colDefsMain` is recomputed on every render (:858), but never reaches the grid; columns are added imperatively through `setGridOption("columnDefs")` (:690). During migration: either stabilize columnDefs with useMemo and real deps, or keep the imperative path, but do not pass a new array to a memo component on each render.
+6. **elements.tsx EmptyColumn/ShowQuote** call `grid.current.api` with no null guard; they are called from both onGridReady and buttons.
+7. **selectTable.tsx:16-22** has two identical updateBy watchers (duplicate).
+8. **Unowned destroy**: except for main.tsx, no grid clears its ref on onGridPreDestroyed.
+9. **Dead code**: main.tsx :401-412 (loadSymbols), :488-546, :768-788, :823-852 (old v1 blocks); selectSymbol :839-867; graph getTableMaiBuffer is commented out in UI.
+10. **Theme**: production grids do NOT pass theme (v35 gives default Quartz / legacy CSS through GridStyleDefault from wenay-react2, imported in src/index.ts). AgGridMy sets Alpine dark, so **the appearance will change**. Decide in the pilot: either accept Alpine or pass through the current theme.
 
-## Этапы
+## Stages
 
-Порядок — по принципу inject → verify → improve → tighten; реструктуризация и снос — в конце.
-Сложность: Н/С/В. Риск: Н/С/В.
+Order: inject -> verify -> improve -> tighten; restructuring and removal happen at the end. Complexity: L/M/H. Risk: L/M/H.
 
-### Этап 0. Подключение библиотеки [Сложность Н, Риск Н]
-- Перенести `exampleAGrid/agGrid4/` → `src/front/components/agGrid4/` (exampleAGrid вне tsconfig include).
-- Смоук на песочнице `pageTest3.tsx` (мусорный статический грид): `<AgGridMy data=...>` —
-  проверить тему, resize, selection вживую.
-- Здесь же решить вопрос темы (дефект 10): сверить вид AgGridMy против текущего прод-грида.
+### Stage 0. Connect the Library [Complexity L, Risk L]
+- Move `exampleAGrid/agGrid4/` -> `src/front/components/agGrid4/` (`exampleAGrid` is outside tsconfig include).
+- Smoke test on the sandbox `pageTest3.tsx` (throwaway static grid): `<AgGridMy data=...>`; check theme, resize, and selection live.
+- Decide the theme question here (defect 10): compare AgGridMy against the current production grid.
 
-### Этап 1. Пилот: selectSymbol.tsx [Сложность С, Риск С]
-Самый гонко-нагруженный + чинит реальную потерю данных (дефект 1).
-- `useAgGrid({ getId: getRowIdSymbols, externalBuffer: bufTable })`; 24 вызова локального v1 →
-  `grid.updateData({newData})`. Механическая замена (сигнатуры близки).
-- **Поведенческий риск**: v1 не делал add. С agGrid4 новые строки начнут появляться. Если текущая
-  семантика «только апдейты по уже загруженным строкам» намеренная — первый проход с
-  `option: {add: false}`, включение add — отдельным осознанным шагом.
-- Грид :870 → `<AgGridMy controller>`; rowData-useState (:238) оставить как initial → потом убрать
-  в пользу буфера (вторая итерация).
-- Локальную v1-функцию удалить (экспортируется — проверить внешние импорты; main.tsx импортирует
-  только в комментариях).
+### Stage 1. Pilot: selectSymbol.tsx [Complexity M, Risk M]
+The most race-heavy grid, and it fixes real data loss (defect 1).
+- `useAgGrid({ getId: getRowIdSymbols, externalBuffer: bufTable })`; 24 local v1 calls -> `grid.update({newData})`. Mechanical replacement (signatures are close).
+- **Behavioral risk**: v1 did not add rows. With agGrid4, new rows will start appearing. If the current "updates only for already loaded rows" semantics is intentional, do the first pass with `option: {add: false}` and enable add as a separate deliberate step.
+- Grid :870 -> `<AgGridMy controller>`; keep rowData-useState (:238) as initial state, then remove it in favor of the buffer in a second iteration.
+- Remove the local v1 function (it is exported, so check external imports; main.tsx imports it only in comments).
 
-### Этап 2. Главная таблица: main.tsx [Сложность В, Риск В]
-Наибольший эффект, больше всего потребителей.
+### Stage 2. Main Table: main.tsx [Complexity H, Risk H]
+Largest impact and the most consumers.
 - `useAgGrid<tRow>({ getId: getIdMainTable, externalBuffer: datum.tableArr })`.
-- `updateTable`/`updateTableByBaseAsset` → `grid.updateData({newData, option:{sync}})` (6 колл-сайтов).
-- Голый AgGridReact → `<AgGridMy controller>`: свои onGridReady-сайд-эффекты (фильтр-модель,
-  tableReady, EmptyColumn, renderBy) остаются — чейнятся после связки; ручной sync и ручное
-  зануление ref удалить (lifecycle в обёртке).
-- **Самая трудоёмкая часть — потребители ref**: `stParams` (:1031), EmptyColumn, ShowQuote/ShowColumn/
-  ShowEmptyRows/ShowEmptyColumn (elements.tsx), getMenuR, PageShow — переводятся с
-  `RefObject<GridReadyEvent>` на `grid.apiRef` (`RefObject<GridApi>`); внутри `*.current.api.X` → `*.current.X`.
-  Плюс добавить null-гарды (дефект 6).
-- columnDefs: стабилизировать (дефект 5) — либо useMemo с настоящими deps + декларативные колонки,
-  либо явно оставить императивный addColumn и заморозку (задокументировать выбор).
-- Удалить мёртвое: `useAgGrid()` (:254) + импорт, v1-комментарии, loadSymbols.
-- `rowData={getRowData()}` → не передавать (буфер вливается через attach→sync).
-- Проверка: фильтр quoteAsset на старте, чекбоксы selection, пустые строки/колонки, меню по
-  selected rows, стримы всех 4 бирж, уход/возврат на роут (буфер модульный — должен догнать).
+- `updateTable`/`updateTableByBaseAsset` -> `grid.update({newData, option:{sync}})` (6 call sites).
+- Bare AgGridReact -> `<AgGridMy controller>`: keep existing onGridReady side effects (filter model, tableReady, EmptyColumn, renderBy), chaining them after the wiring; remove manual sync and manual ref clearing (lifecycle is in the wrapper).
+- **Most labor-intensive part: ref consumers**: `stParams` (:1031), EmptyColumn, ShowQuote/ShowColumn/ShowEmptyRows/ShowEmptyColumn (elements.tsx), getMenuR, PageShow are moved from `RefObject<GridReadyEvent>` to `grid.apiRef` (`RefObject<GridApi>`); inside, `*.current.api.X` -> `*.current.X`. Also add null guards (defect 6).
+- columnDefs: stabilize (defect 5). Either useMemo with real deps + declarative columns, or explicitly keep the imperative addColumn path and the frozen array (document the choice).
+- Remove dead code: `useAgGrid()` (:254) + import, v1 comments, loadSymbols.
+- `rowData={getRowData()}` -> do not pass it (the buffer flows through attach->sync).
+- Check: initial quoteAsset filter, checkbox selection, empty rows/columns, selected-row menus, streams from all 4 exchanges, route leave/return (module buffer should catch up).
 
-### Этап 3. services.tsx [Сложность Н, Риск Н]
-- Последний потребитель v1 из wenay-react2 → `useAgGrid({ getId, externalBuffer: object.current })`,
-  2 вызова → `updateData`. Грид → AgGridMy. Снимает зависимость от v1 целиком.
+### Stage 3. services.tsx [Complexity L, Risk L]
+- Last consumer of v1 from wenay-react2 -> `useAgGrid({ getId, externalBuffer: object.current })`; 2 calls -> `update`. Grid -> AgGridMy. This removes the v1 dependency entirely.
 
-### Этап 4. Модальные гриды бирж [Сложность Н, Риск Н]
-- binance.tsx History Transfer: → controller + AgGridMy; починить ключи (дефект 2): единый
-  `getId: e=>String(e.tranId)` (стабильный природный ключ) вместо timestamp/`a++`.
-- gateio.tsx займы: декларативный `<AgGridMy data={getRowData()}>` либо просто AgGridMy-обёртка;
-  занулять ref через controller (сейчас не зануляется).
+### Stage 4. Exchange Modal Grids [Complexity L, Risk L]
+- binance.tsx History Transfer: -> controller + AgGridMy; fix keys (defect 2): a single `getId: e=>String(e.tranId)` (stable natural key) instead of timestamp/`a++`.
+- gateio.tsx loans: declarative `<AgGridMy data={getRowData()}>` or just the AgGridMy wrapper; clear refs through the controller (currently not cleared).
 
-### Этап 5. Статические/декларативные гриды [Сложность Н, Риск Н, объём ~10 гридов]
-selectTable, utilsReact, SelectStrategy, selectHistory ×3, portfolioTable, elements TableSymbols,
-graph ×3, pageTest2.
-- Везде: `<AgGridMy data={rows} columnDefs=...>` (или controller, где есть императив);
-  добавить getRowId, где нет (дефект 3); убрать самодельные ResizeObserver/sizeColumnsToFit.
-- Попутные мелкие фиксы: дубль-вотчеры selectTable (дефект 7), remount-паттерны
-  (`getTable`-стрелки/useCallback с пустыми deps), graph — синхронизацию selection вынести в эффект.
-- Можно дробить по одному файлу — независимые шаги.
+### Stage 5. Static/Declarative Grids [Complexity L, Risk L, Volume ~10 Grids]
+selectTable, utilsReact, SelectStrategy, selectHistory x3, portfolioTable, elements TableSymbols, graph x3, pageTest2.
+- Everywhere: `<AgGridMy data={rows} columnDefs=...>` (or controller where imperative access exists); add getRowId where missing (defect 3); remove custom ResizeObserver/sizeColumnsToFit.
+- Small fixes along the way: duplicate selectTable watchers (defect 7), remount patterns (`getTable` arrows/useCallback with empty deps), graph selection sync moved into an effect.
+- Can be split by file; the steps are independent.
 
-### Этап 6. Снос и зачистка [Сложность Н, Риск Н — только после этапов 1-5]
-- Удалить `customAgGrid3.tsx` (последний потребитель — мёртвый деструктуринг main.tsx из этапа 2).
-- Удалить локальный v1 selectSymbol (этап 1), импорты `applyTransactionAsyncUpdate*` из wenay-react2.
-- Снести мёртвые комментарии-блоки (дефект 9).
-- Решить судьбу agGrid2/agGrid3 в exampleAGrid (оставить как историю или снести).
+### Stage 6. Removal and Cleanup [Complexity L, Risk L, Only After Stages 1-5]
+- Remove `customAgGrid3.tsx` (the last consumer is the dead destructuring in main.tsx from stage 2).
+- Remove local v1 in selectSymbol (stage 1), and imports of `applyTransactionAsyncUpdate*` from wenay-react2.
+- Remove dead commented blocks (defect 9).
+- Decide the fate of agGrid2/agGrid3 in exampleAGrid (keep as history or remove).
 
-## Сводка рисков
+## Risk Summary
 
-| Риск | Где | Митигация |
-|------|-----|-----------|
-| Смена внешнего вида (тема Alpine dark vs текущая) | все гриды | Этап 0: сверка на песочнице; AgGridMy принимает `theme` |
-| Включение add меняет видимый набор строк | selectSymbol | `option:{add:false}` на первом проходе |
-| Потребители grid-ref (GridReadyEvent → GridApi) | main.tsx + elements/getMenuR/menuPages | механическая замена `.api.X` → `.X`, но много мест — отдельный коммит |
-| Memo + нестабильные columnDefs = сброс колонок | main.tsx | стабилизировать useMemo'м до смены обёртки |
-| Поведение фильтров/selection при ремаунте роута | main.tsx | ручная проверка сценария уход/возврат |
-| v1-семантика «молча терять» кем-то ожидается | selectSymbol, services | пилот + наблюдение, буфер логировать при расхождениях |
+| Risk | Where | Mitigation |
+|------|-------|------------|
+| Appearance change (Alpine dark vs current theme) | all grids | Stage 0: sandbox comparison; AgGridMy accepts `theme` |
+| Enabling add changes the visible row set | selectSymbol | `option:{add:false}` on the first pass |
+| grid-ref consumers (GridReadyEvent -> GridApi) | main.tsx + elements/getMenuR/menuPages | mechanical `.api.X` -> `.X`, but many sites, so use a separate commit |
+| Memo + unstable columnDefs = column reset | main.tsx | stabilize with useMemo before replacing the wrapper |
+| Filter/selection behavior on route remount | main.tsx | manual leave/return scenario check |
+| v1 "silently drop" semantics might be expected by someone | selectSymbol, services | pilot + observe, log buffer mismatches |
 
-## Порядок коммитов
-Каждый этап — отдельный коммит (этап 2 — два: «потребители ref» и «сам грид»). После каждого:
-`npx tsc` по проекту + ручной смоук затронутой страницы.
+## Commit Order
+Each stage is a separate commit (stage 2 becomes two: "ref consumers" and "the grid itself"). After each stage: `npx tsc` for the project + manual smoke test of the affected page.

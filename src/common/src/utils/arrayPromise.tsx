@@ -1,9 +1,9 @@
 
 /**
- * Оборачивает массив thunk'ов промисов колбэками прогресса.
- * КОНТРАКТ: счётчики countOk/countError корректны только при СТРОГО ПОСЛЕДОВАТЕЛЬНОМ
- * запуске thunk'ов (один за другим). При параллельном запуске (Promise.all)
- * значения счётчиков в колбэках — гонка, полагаться на них нельзя.
+ * Wraps an array of promise thunks with progress callbacks.
+ * CONTRACT: countOk/countError counters are correct only when thunks are run
+ * STRICTLY SEQUENTIALLY (one after another). During parallel execution (Promise.all),
+ * counter values in callbacks are a race and must not be relied on.
  */
 export function ArrayPromise<T = unknown>({arr, catchF, thenF}: {
     arr: (() => Promise<T>)[],
@@ -18,7 +18,7 @@ export function ArrayPromise<T = unknown>({arr, catchF, thenF}: {
     }
     const b = (error: unknown, i: number) => {
         ++countError;
-        if (catchF) return catchF?.(error, i, ok, countError, count)
+        if (catchF) return catchF(error, i, ok, countError, count)
         else throw error
     }
     return arr.map((e, i) => () => e().then(r => a(r, i)).catch((er: unknown) => b(er, i)))

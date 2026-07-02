@@ -41,7 +41,7 @@ export function InputPage({callback, name = "", txt =""}: {callback: (txt: strin
         <input type={"text"} style={{width:"100%"}}
                defaultValue={txtName.current}
                onChange={(e) => {
-                   txtName.current = (e.target as HTMLInputElement).value
+                   txtName.current = e.target.value
                }}/>
         <div style={{marginTop: 20}} className={"msTradeAlt msTradeActive"} onClick={()=>{callback(txtName.current)}}>send</div>
     </div>

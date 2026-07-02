@@ -1,27 +1,85 @@
-import React, {HTMLAttributes, ReactElement, useEffect, useRef, useState} from "react";
+import React, {HTMLAttributes, ReactElement, useEffect, useMemo, useRef, useState} from "react";
 
 export const StyleOtherRow: React.CSSProperties = {display: "flex", flexDirection: "row", flex: "auto 1 1"}
 export const StyleOtherColum: React.CSSProperties = {display: "flex", flexDirection: "column", flex: "auto 0 1"}
 
-export function useOutside({outsideClick, ref, status = true}: {ref?: React.RefObject<HTMLDivElement|null>, outsideClick: () => void, status?: boolean}) {
-    const internalRef = useRef<HTMLDivElement|null>(null); // useRef всегда в теле, не в дефолте параметра — иначе нарушаются Rules of Hooks
-    const r = ref ?? internalRef;
-    useEffect(() => {
-        if (status) {
-            function handleClickOutside(event: MouseEvent | TouchEvent) {
-                if (r.current && event.target instanceof Node && !r.current.contains(event.target)) outsideClick();
-            }
-            document.addEventListener("mousedown", handleClickOutside);
-            document.addEventListener("touchstart", handleClickOutside);
-            return () => {
-                document.removeEventListener("mousedown", handleClickOutside);
-                document.removeEventListener("touchstart", handleClickOutside);
-            }
-        }
-    }, [r, status, outsideClick]);
-    return r
+export type UseOutsideOptions<T extends HTMLElement = HTMLDivElement> = {
+    ref?: React.RefObject<T | null>;
+    outsideClick?: () => void;
+    onOutside?: () => void;
+    status?: boolean;
+    enabled?: boolean;
 }
 
+export type UseOutsideApi<T extends HTMLElement = HTMLDivElement> = {
+    current: T | null;
+    ref: React.RefObject<T | null>;
+    props: { ref: React.Ref<T> };
+    bind: { ref: React.Ref<T> };
+    contains(target: EventTarget | null): boolean;
+    enable(): void;
+    disable(): void;
+    readonly enabled: boolean;
+}
+
+export function useOutsideApi<T extends HTMLElement = HTMLDivElement>(options: UseOutsideOptions<T>): UseOutsideApi<T> {
+    const {outsideClick, onOutside, ref, status = options.enabled ?? true} = options;
+    const internalRef = useRef<T|null>(null); // useRef is always inside the body, not in a default parameter - otherwise it breaks the Rules of Hooks
+    const r = ref ?? internalRef;
+    const outsideClickRef = useRef(outsideClick ?? onOutside);
+    const [enabled, setEnabled] = useState(status);
+    const enabledRef = useRef(enabled);
+
+    outsideClickRef.current = outsideClick ?? onOutside;
+    enabledRef.current = enabled;
+
+    useEffect(() => {
+        setEnabled(status);
+    }, [status]);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent | TouchEvent) {
+            if (!enabledRef.current) return;
+            if (r.current && event.target instanceof Node && !r.current.contains(event.target)) outsideClickRef.current?.();
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        document.addEventListener("touchstart", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+            document.removeEventListener("touchstart", handleClickOutside);
+        }
+    }, [r]);
+
+    const props = useMemo(() => ({ref: r as React.Ref<T>}), [r]);
+    return useMemo(() => {
+        const api = {
+            ref: r,
+            props,
+            bind: props,
+            contains(target: EventTarget | null) {
+                return !!(r.current && target instanceof Node && r.current.contains(target));
+            },
+            enable() { setEnabled(true); },
+            disable() { setEnabled(false); },
+            get enabled() { return enabledRef.current; },
+        } as UseOutsideApi<T>;
+        Object.defineProperty(api, "current", {
+            configurable: true,
+            get: () => r.current,
+            set: (node: T | null) => { r.current = node; },
+        });
+        return api;
+    }, [props, r]);
+}
+
+export function useOutside<T extends HTMLElement = HTMLDivElement>(options: UseOutsideOptions<T>) {
+    return useOutsideApi(options);
+}
+
+/** @deprecated Use `useOutside(options)` and read `api.ref`, `api.props`, or `api.current`. */
+export function useOutsideOld<T extends HTMLElement = HTMLDivElement>(options: UseOutsideOptions<T>) {
+    return useOutsideApi(options).ref;
+}
 type key = React.Key | null | undefined
 type tChildrenFunc = (api: {onClose: () => void}) => ReactElement | React.JSX.Element
 type tChildrenEl = ReactElement | React. ReactNode
@@ -48,19 +106,18 @@ export const DivOutsideClick = React.forwardRef<HTMLDivElement, HTMLAttributes<H
     const style2 = zIndex ? {...style, zIndex} : style
     const internalRef = useOutside({outsideClick: outsideClick, status});
 
-    // Combine refs if forwardedRef is provided
-    const ref = forwardedRef
-        ? (node: HTMLDivElement | null) => {
-            internalRef.current = node;
-            if (typeof forwardedRef === 'function') {
-                forwardedRef(node);
-            } else if (forwardedRef) {
-                forwardedRef.current = node;
-            }
+    // Combine refs if forwardedRef is provided; stable identity, otherwise React
+    // re-runs the ref (null + node) on every render
+    const combinedRef = React.useCallback((node: HTMLDivElement | null) => {
+        internalRef.current = node;
+        if (typeof forwardedRef === 'function') {
+            forwardedRef(node);
+        } else if (forwardedRef) {
+            forwardedRef.current = node;
         }
-        : internalRef;
+    }, [forwardedRef, internalRef]);
 
-    return <div ref={ref} style={style2} {...other}>{children}</div>;
+    return <div ref={forwardedRef ? combinedRef : internalRef} style={style2} {...other}>{children}</div>;
 });
 
 // Deprecated: Use DivOutsideClick instead
@@ -77,8 +134,8 @@ function ButtonBase({children, button, style = {}, className = "", state: [a, se
 
 const saveStatus: {[key: string]: boolean} = {}
 export function Button({keySave, statusDef, outClick, ...data}: tButton) {
-    // фича keySave была мертва: saveStatus читался, но не писался. Теперь статус
-    // персистится (in-memory, в рамках сессии) при каждом переключении.
+    // The keySave feature was dead: saveStatus was read but not written. Now status
+    // persists in memory for the session on each toggle.
     if (keySave && saveStatus[keySave] != null) statusDef = saveStatus[keySave]
     const [status, setStatusRaw] = useState(statusDef ?? false)
     const setStatus: typeof setStatusRaw = (v) => {
@@ -109,7 +166,7 @@ export function ButtonHover(props: tButtonBase){
     return <div
         onMouseEnter={()=>setHover(true)}
         onMouseLeave={()=>setHover(false)}
-        style={{position: "relative"}}
+        style={{position: "relative", width: "min-content"}}
     >
         {typeof props.button == "function" ? props.button(hover) : props.button}
         {hover &&
