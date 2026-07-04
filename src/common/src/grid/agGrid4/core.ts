@@ -6,7 +6,7 @@
 //    updateData, instead of duplicating buffer/grid branching in the hook;
 //  - in-place row merge (Object.assign), with no new object allocated for each update
 //    (important on streams: less garbage for GC);
-//  - add vs update is decided by a Set of delivered ids, without api.getRowNode per row.
+//  - mirror add vs update is decided by a Set of delivered ids; overlay checks the grid by row id.
 
 export type RowId = string
 
@@ -23,14 +23,19 @@ export type GridTransaction<T> = {
 
 /** Minimal grid api contract (the real GridApi is structurally compatible). */
 export type GridApiLike<T> = {
+    /** Used by overlay mode: row ownership belongs to rowData, not to this buffer. */
+    getRowNode?(id: RowId): { data?: T } | undefined
     forEachNode(callback: (node: { data?: T }) => void): void
     applyTransaction(tx: GridTransaction<T>): unknown
     applyTransactionAsync(tx: GridTransaction<T>): void
 }
 
+export type GridBufferMode = 'mirror' | 'overlay'
+
 export type PushOptions = {
     add?: boolean
     update?: boolean
+    remove?: boolean
     /** add+update in one SYNCHRONOUS transaction. Default: add is sync, update is async (batched). */
     sync?: boolean
 }
@@ -43,21 +48,47 @@ export type UpdateArgs<T> = {
     option?: PushOptions
 }
 
+export type CleanArgs = {
+    /** Only clear the buffer; do not remove rows from a mirror-owned grid. */
+    onlyMemo?: boolean
+}
+
+export type CreateGridBufferOptions<T> = {
+    getId: GetId<T>
+    /** External buffer (object above the component) survives route remounts. Otherwise use an internal one. */
+    externalBuffer?: BufferTable<T>
+    /**
+     * mirror (default): the buffer is the source of truth; sync adds, updates and removes grid rows.
+     * overlay: external rowData owns rows; sync only refreshes rows that already exist in the grid.
+     */
+    mode?: GridBufferMode
+    /** Delivery defaults for updateData, e.g. { add: false } for rowData-owned streaming overlays. */
+    pushDefaults?: PushOptions
+}
+
 /**
  * Table core: buffer + delivery to the grid. Lifecycle:
  *  1. updateData at any time: the buffer is always updated, the grid only if attached;
  *  2. attach(api) on onGridReady: sync catches up with everything that arrived earlier;
  *  3. detach() on grid destroy: the core accumulates in the buffer again until the next attach.
  */
-export function createGridBuffer<T>(deps: {
-    getId: GetId<T>
-    /** External buffer (object above the component) survives route remounts. Otherwise use an internal one. */
-    externalBuffer?: BufferTable<T>
-}) {
-    const { getId } = deps
+export function createGridBuffer<T>(deps: CreateGridBufferOptions<T>) {
+    const { getId, mode = 'mirror', pushDefaults } = deps
     const buf: BufferTable<T> = deps.externalBuffer ?? {}
     const inGrid = new Set<RowId>() // ids already delivered to the grid
     let api: GridApiLike<T> | null = null
+
+    function gridHas(id: RowId) {
+        if (!api) return false
+        if (mode == 'mirror') return inGrid.has(id)
+        const node = api.getRowNode?.(id)
+        if (node) return !!node.data
+        let found = false
+        api.forEachNode(rowNode => {
+            if (!found && rowNode.data && getId(rowNode.data) == id) found = true
+        })
+        return found
+    }
 
     // --- Buffer ----------------------------------------------------------------
 
@@ -78,13 +109,16 @@ export function createGridBuffer<T>(deps: {
 
         if (onlyMemo || !api) return
 
-        const opt = { add: true, update: true, sync: false, ...option }
+        const opt = { add: true, update: true, remove: true, sync: false, ...pushDefaults, ...option }
         const toAdd: T[] = []
         const toUpdate: T[] = []
+        const seen = new Set<RowId>()
         for (const row of newData ?? []) {
             const id = getId(row)
+            if (seen.has(id)) continue
+            seen.add(id)
             const merged = buf[id] as T
-            if (inGrid.has(id)) toUpdate.push(merged)
+            if (gridHas(id)) toUpdate.push(merged)
             else toAdd.push(merged)
         }
 
@@ -93,7 +127,13 @@ export function createGridBuffer<T>(deps: {
         // Mark as delivered only the rows that are actually sent to the grid.
         for (const row of add) inGrid.add(getId(row))
         // ag-grid finds rows for remove through getRowId, so partial data is enough.
-        const remove = removeData?.filter(row => inGrid.delete(getId(row))) as T[] | undefined
+        const remove = opt.remove
+            ? removeData?.filter(row => {
+                const id = getId(row)
+                const delivered = inGrid.delete(id)
+                return mode == 'overlay' ? gridHas(id) : delivered
+            }) as T[] | undefined
+            : undefined
 
         if (opt.sync) {
             api.applyTransaction({ add, update, remove })
@@ -107,9 +147,22 @@ export function createGridBuffer<T>(deps: {
     /**
      * Bring the whole grid in line with the buffer (the buffer is the source of truth).
      * Missing from the buffer -> remove; missing from the grid -> add; everything else -> update.
+     * In overlay mode, rowData is the source of truth, so sync only updates row intersection.
      */
     function sync() {
         if (!api) return
+
+        if (mode == 'overlay') {
+            const update: T[] = []
+            api.forEachNode(function refresh(node) {
+                if (!node.data) return
+                const id = getId(node.data)
+                if (buf[id]) update.push(buf[id] as T)
+            })
+            if (update.length) api.applyTransaction({ update })
+            return
+        }
+
         const add: T[] = []
         const update: T[] = []
         const remove: T[] = []
@@ -132,6 +185,19 @@ export function createGridBuffer<T>(deps: {
             api.applyTransaction({ add, update, remove })
     }
 
+    /** Clear the buffer. In mirror mode, also remove all current grid rows unless onlyMemo is set. */
+    function clean(args: CleanArgs = {}) {
+        const remove: T[] = []
+        if (!args.onlyMemo && api && mode == 'mirror') {
+            api.forEachNode(node => {
+                if (node.data) remove.push(node.data)
+            })
+        }
+        for (const id in buf) delete buf[id]
+        inGrid.clear()
+        if (remove.length) api?.applyTransaction({ remove })
+    }
+
     // --- Lifecycle -------------------------------------------------------------
 
     function attach(gridApi: GridApiLike<T>) {
@@ -148,7 +214,7 @@ export function createGridBuffer<T>(deps: {
         // for the React binding (or another grid owner)
         control: { attach, detach },
         // public consumer api
-        api: { updateData, sync, getId, buffer: buf },
+        api: { updateData, clean, sync, getId, buffer: buf },
     }
 }
 

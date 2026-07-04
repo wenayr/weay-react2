@@ -1,79 +1,127 @@
-# agGrid4 — headless core + opinionated component
+# agGrid4 - buffered ag-grid layer
 
-Buffered ag-grid binding: a pure buffer core (anti-race "memory point"), a headless React
-hook, and `<AgGridMy>` — an opinionated grid component with project defaults baked in.
-
-## Why this shape (lessons from agGrid2 / agGrid3)
-
-- **agGrid2** (hook returns a bound `Grid` component, primitive injection) — the convenience
-  is real, but generics don't flow through the factory (casts everywhere), and in practice
-  real pages outgrow a pre-bound component: they need full prop control and a shared grid api.
-- **agGrid3** (headless hook + `gridProps` spread) — idiomatic, zero casts. Kept as the base.
-- **agGrid4** = agGrid3 + the agGrid2 convenience returned safely: instead of producing a
-  component from the hook, the component takes the hook's result as a `controller` prop.
-  Types stay intact, wiring is one prop.
+`agGrid4` is the shared table layer for wenay apps: a pure row buffer core, a headless React controller, an opinionated `AgGridMy` wrapper, dynamic column buffering, and common column defaults.
+[WRAPPER.md](./WRAPPER.md) documents the hard boundary between generic primitives and app-level wrappers.
 
 ## Layers
 
-| File | deps | What |
-|------|------|------|
-| `core.ts` | none | `createGridBuffer` closure factory: buffer, add/update/remove delivery, `sync`, `attach`/`detach` lifecycle |
-| `agGrid4.tsx` | ag-grid | `useAgGrid` (headless hook over the core) + `AgGridMy` (memoized component with defaults) |
-| `theme.ts` | ag-grid | `buildAgTheme` (pure) + `useAgGridTheme` |
+| File | What |
+|------|------|
+| `core.ts` | `createGridBuffer`: row buffer, add/update/remove delivery, attach/detach/sync lifecycle |
+| `agGrid4.tsx` | `useAgGrid` controller + `AgGridMy` component defaults |
+| `columnBuffer.ts` | `createColumnBuffer`: persisted exact set of dynamic names + grid lifecycle replay |
+| `gridUtils.ts` | `colDefCentered`, `colDefWrap`, `numericComparator` |
+| `theme.ts` | cached ag-grid theme builder/hook |
 
-## Optimizations vs agGrid2/3
+## Row Buffer
 
-- **Single update path.** The hook no longer duplicates the buffer-vs-grid branch — the core's
-  `updateData` always updates the buffer and delivers to the grid only when attached.
-- **In-place row merge.** `Object.assign(buf[id] ?? {}, row)` instead of spreading a fresh
-  object per update — no per-tick garbage under a streaming feed. Safe: ag-grid resolves the
-  row by `getRowId`, so passing the mutated buffer object to `update` is fine.
-- **`inGrid: Set` instead of `api.getRowNode` per row.** Add-vs-update is decided by set
-  membership; the core's grid contract shrinks accordingly.
-- **Lifecycle is owned.** `attach` (onGridReady) syncs the grid to the buffer; `detach`
-  (onGridPreDestroyed) clears the api ref — no manual `ref.current = null` at call sites.
-- **Update batching** is delegated to the grid itself (`applyTransactionAsync` +
-  `asyncTransactionWaitMillis`, set by `AgGridMy`).
+```ts
+const table = createGridBuffer<Row>({ getId: row => row.id })
+table.api.updateData({ newData: rows })
+table.api.updateData({ removeData: [{ id: 'a' }] })
+table.control.attach(api)
+table.control.detach()
+```
 
-## Usage
+Modes:
+
+- `mirror` (default): the buffer is the source of truth. `sync()` adds missing rows, updates existing rows and removes rows that are no longer in the buffer.
+- `overlay`: external `rowData` owns the row set. `sync()` only updates rows that already exist in the grid and never adds/removes rows.
+
+`pushDefaults` changes delivery defaults for `updateData`:
+
+```ts
+const table = createGridBuffer<Row>({
+    getId: row => row.id,
+    mode: 'overlay',
+    pushDefaults: { add: false },
+})
+```
+
+Use `pushDefaults: { add: false }` for streams over declarative `rowData` when updates must not create new rows by themselves.
+
+Updates are merged into the buffer by stable `getId`. Rows inside one `updateData` batch are deduped by id before they are sent to ag-grid, so one id cannot be added twice in the same transaction. `removeData` also resolves rows through the same stable id. `clean()` clears the buffer; in mirror mode it also removes current grid rows, while overlay mode leaves externally owned `rowData` rows alone.
+
+## React Controller
 
 ```tsx
-// controller + component (main pattern)
 const grid = useAgGrid<Row>({ getId })
+
 <AgGridMy<Row> controller={grid} columnDefs={cols} />
+
 grid.update({ newData })
-
-// declarative (no controller)
-<AgGridMy<Row> data={rows} columnDefs={cols} />
-
-// headless (no AgGridMy) — agGrid3 mode still works
-<AgGridReact<Row> {...grid.props} columnDefs={cols} />
-
-// outside React (worker, tests): the core alone
-const core = createGridBuffer<Row>({ getId })
-core.api.updateData({ newData })
-core.control.attach(gridApi)
+grid.remove([{ id }])
+grid.fit()
 ```
 
-`AgGridMy` defaults (all overridable via props): dark alpine theme, `memo`, auto column
-sizing via `ResizeObserver`, `multiRow` selection, `suppressCellFocus`,
-`asyncTransactionWaitMillis: 50`, `sortable/resizable/filter` in `defaultColDef`,
-`getRowId` wired to the controller.
+A module-level store can be shared with React:
 
-Anti-race guarantee (unchanged from agGrid2/3): data may arrive before the grid exists —
-it lands in the buffer; `attach` → `sync` brings the grid up to date. An external buffer
-(plain object above the component) survives route remounts.
+```ts
+export const mainTable = createGridBuffer<Row>({ getId, externalBuffer })
+```
 
-## Type checking
+```tsx
+const grid = useAgGrid({ core: mainTable })
+<AgGridMy<Row> controller={grid} columnDefs={cols} />
+```
 
-The module is part of the library graph (exported through `src/common/api.tsx`):
+The controller keeps the existing aliases: `update`, `updateData`, `remove`, `clean`, `sync`, `fit`, `flush`, `sizeColumnsToFit`, `flushAsyncTransactions`, `apiRef`, `props`, `gridProps`, `getApi`, and `withApi`.
+
+## AgGridMy
+
+`AgGridMy` keeps the current component API and forwards normal `AgGridReact` props. With `controller`, it uses that external controller. Without `controller`, it creates an internal overlay-safe controller so a plain `rowData` grid is not cleared during `attach -> sync`.
+
+For declarative `rowData`, prefer either:
+
+```tsx
+<AgGridMy<Row> rowData={rows} columnDefs={cols} />
+```
+
+Plain `rowData` without a controller does not require or force `getRowId`: user-provided `getRowId` is forwarded as-is, and when absent AgGridReact default behavior is preserved. A stable key is required only when using buffered transaction updates (`controller`, `data`, or `createGridBuffer`).
+
+or, when stream patches must overlay React-owned rows:
+
+```tsx
+const core = useState(() => createGridBuffer<Row>({ getId, mode: 'overlay', pushDefaults: { add: false } }))[0]
+const grid = useAgGrid({ core })
+
+useEffect(() => core.api.sync(), [rows])
+
+<AgGridMy<Row> controller={grid} rowData={rows} columnDefs={cols} getRowId={p => getId(p.data)} />
+```
+
+The legacy `data` prop is still an upsert convenience through the buffer:
+
+```tsx
+<AgGridMy<Row> data={rows} columnDefs={cols} />
+```
+
+## Dynamic Columns
+
+```ts
+const columns = createColumnBuffer<Row>()
+
+function buildColumnDefs(names: readonly string[]) {
+    return base.map(col =>
+        'children' in col && col.groupId == 'dynamic-metrics'
+            ? { ...col, children: names.map(name => ({ colId: `dynamic:${name}`, field: name, headerName: name })) }
+            : col,
+    )
+}
+
+columns.api.setNames(['s1', 's2'])
+columns.control.attach(api, {
+    apply: ({ api, names }) => api.setGridOption('columnDefs', buildColumnDefs(names)),
+})
+columns.control.detach()
+```
+
+`setNames()` means exactly that dynamic name set and dedupes while preserving order. `attach()` applies the saved names to the current grid through the caller-provided `apply`. `api.apply()` replays the current names through the last attached callback when wrapper policy changes without names changing. `detach()` drops the grid reference but keeps names so route remounts keep the dynamic state.
+
+The base utility deliberately knows nothing about groups, `columnDefs` shape, business names, or where dynamic columns live. Put that policy in a page/project wrapper above it.
+
+## Type Checking
 
 ```sh
-npx tsc --noEmit -p tsconfig.json
+npm run build
 ```
-
-## Module registration
-
-ag-grid v35 requires module registration. `useAgGrid`/`AgGridMy` register
-`AllCommunityModule` lazily on the first hook call (idempotently, while package imports
-stay side-effect-free). A separate `GridStyleDefault()` call is no longer required.

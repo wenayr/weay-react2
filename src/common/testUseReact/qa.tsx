@@ -1,14 +1,14 @@
 /* qa.tsx - ONE board for manual library checks.
  *
- * Run:  npm run testReact   (vite → http://localhost:3000)
+ * Run:  npm run testReact -- --host 127.0.0.1 --port 3002
  * Each card: a live element + what to do + what is expected.
  * Use the ✓/✗ buttons to mark results as you go. These are also the acceptance criteria for changes from REFACTOR_PLAN.md.
  */
 
 import React, { useState, useMemo, useEffect } from "react";
-import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact, ModalProvider, useModal, useKeyDown, keyDownApi, useAgGrid, AgGridMy, type BufferTable } from "../api";
-import type { ColDef } from "ag-grid-community";
-import { Params } from "wenay-common2";
+import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact, ModalProvider, useModal, useKeyDown, keyDownApi, useAgGrid, AgGridMy, createGridBuffer, createColumnBuffer, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, type BufferTable } from "../api";
+import type { ColDef, ColGroupDef } from "ag-grid-community";
+import { ListenNext, ObserveAll2, Params } from "wenay-common2";
 import { Button, ButtonHover, DivOutsideClick } from "../src/hooks";
 import { DivRnd3 } from "../src/components";
 import { MyChartEngine } from "../src/myChart/chartEngine/chartEngineReact";
@@ -166,6 +166,327 @@ const AgGrid4Demo = () => {
     );
 };
 
+/* ---------- 15. agGrid4: overlay over declarative rowData ---------- */
+type tOverlayRow = { id: string; name: string; price?: number; note?: string };
+const overlayColumns = [
+    { field: "id", width: 90 },
+    { field: "name" },
+    { field: "price", headerName: "Stream price" },
+    { field: "note" },
+] satisfies ColDef<tOverlayRow>[];
+
+const AgGrid4OverlayDemo = () => {
+    const [showC, setShowC] = useState(false);
+    const [core] = useState(() => createGridBuffer<tOverlayRow>({
+        getId: row => String(row.id),
+        mode: "overlay",
+        pushDefaults: { add: false },
+    }));
+    const grid = useAgGrid({ core });
+    const rows = useMemo<tOverlayRow[]>(() => [
+        { id: "a", name: "Alpha", note: "owned by rowData" },
+        { id: "b", name: "Beta", note: "owned by rowData" },
+        ...(showC ? [{ id: "c", name: "Gamma", note: "appears only after rowData adds it" }] : []),
+    ], [showC]);
+
+    useEffect(() => {
+        core.api.sync();
+    }, [core, rows]);
+
+    return (
+        <div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                <button onClick={() => core.api.updateData({ newData: [{ id: "a", price: rndPrice() }] })}>stream update A</button>
+                <button onClick={() => core.api.updateData({ newData: [{ id: "c", price: 777 }] })}>stream C before rowData</button>
+                <button onClick={() => setShowC(v => !v)}>{showC ? "remove C from rowData" : "add C to rowData"}</button>
+                <button onClick={() => grid.sync()}>sync overlay</button>
+            </div>
+            <div style={{ height: 230 }}>
+                <AgGridMy<tOverlayRow>
+                    controller={grid}
+                    rowData={rows}
+                    columnDefs={overlayColumns}
+                    getRowId={p => p.data.id}
+                />
+            </div>
+        </div>
+    );
+};
+
+/* ---------- 16. agGrid4: dynamic column buffer ---------- */
+type tDynamicRow = { id: string; symbol: string; [key: string]: string | number };
+const dynamicRows: tDynamicRow[] = [
+    { id: "btc", symbol: "BTCUSDT", alpha: 11, beta: 21, gamma: 31 },
+    { id: "eth", symbol: "ETHUSDT", alpha: 12, beta: 22, gamma: 32 },
+];
+const dynamicBaseCols = [
+    { field: "symbol", width: 130 },
+    { headerName: "Dynamic", groupId: "qa-dynamic", children: [] },
+] satisfies (ColDef<tDynamicRow> | ColGroupDef<tDynamicRow>)[];
+
+const buildDynamicCol = (name: string): ColDef<tDynamicRow> => ({
+    colId: `dynamic:${name}`,
+    field: name,
+    headerName: name,
+    width: 100,
+});
+
+function buildDynamicColumnDefs(names: readonly string[]) {
+    return dynamicBaseCols.map(col =>
+        "children" in col && col.groupId == "qa-dynamic"
+            ? { ...col, children: names.map(buildDynamicCol) }
+            : col,
+    );
+}
+
+const AgGrid4ColumnBufferDemo = () => {
+    const [columns] = useState(() => createColumnBuffer<tDynamicRow>());
+
+    return (
+        <div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                <button onClick={() => columns.api.setNames(["alpha"])}>alpha</button>
+                <button onClick={() => columns.api.setNames(["alpha", "beta"])}>alpha + beta</button>
+                <button onClick={() => columns.api.setNames(["gamma", "alpha", "gamma"])}>gamma + alpha</button>
+                <button onClick={() => columns.api.setNames([])}>clear dynamic</button>
+            </div>
+            <div style={{ height: 230 }}>
+                <AgGridMy<tDynamicRow>
+                    rowData={dynamicRows}
+                    getRowId={p => p.data.id}
+                    columnDefs={dynamicBaseCols}
+                    onGridReady={event => columns.control.attach(event.api, {
+                        apply: ({ api, names }) => api.setGridOption("columnDefs", buildDynamicColumnDefs(names)),
+                    })}
+                    onGridPreDestroyed={() => columns.control.detach()}
+                />
+            </div>
+        </div>
+    );
+};
+
+
+/* ---------- 18. ObserveAll2 local store/listen hooks ---------- */
+type tObserveLocalState = {
+    count: number;
+    meta: { status: string };
+    items: Record<string, number>;
+};
+
+const observeLocalMask = { count: true, meta: { status: true }, items: { a: true } } as const;
+
+const ObserveStoreLocalDemo = () => {
+    const store = useMemo(() => ObserveAll2.createStore<tObserveLocalState>({
+        count: 0,
+        meta: { status: "idle" },
+        items: { a: 1, b: 2 },
+    }), []);
+    const count = useStoreNode<number>(store.node.at("count"));
+    const status = useStoreNode(store.node.meta.status);
+    const itemKeys = useStoreKeys(store.node.items);
+    const selection = useStoreSelect(useMemo(() => store.update(observeLocalMask), [store]), { drain: "micro" });
+    const [emit, listen] = useMemo(() => ListenNext.UseListen<[number, string]>(), []);
+    const listenArgs = useListenArgs(listen, { initial: [0, "initial"] });
+    const listenValue = useListenValue<number, [number, string]>(listen, { initial: 0, map: (n) => n });
+
+    function mutatePlainState() {
+        store.state.meta.status = "plain " + new Date().toLocaleTimeString();
+        void ObserveAll2.flushReactive(store.state);
+    }
+
+    return <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => count.replace((count.value ?? 0) + 1)}>node.at("count") +1</button>
+            <button onClick={() => status.replace("replace " + new Date().toLocaleTimeString())}>replace status</button>
+            <button onClick={() => { store.state.items.c = Date.now(); void ObserveAll2.flushReactive(store.state); }}>add key c</button>
+            <button onClick={() => { delete store.state.items.b; void ObserveAll2.flushReactive(store.state); }}>delete key b</button>
+            <button onClick={mutatePlainState}>plain state mutation + flush</button>
+            <button onClick={() => emit(Date.now(), status.value ?? "-")}>emit listen</button>
+            <button onClick={() => store.replace({ count: 0, meta: { status: "reset" }, items: { a: 1, b: 2 } })}>replace whole store</button>
+        </div>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
+            <span>count exists: <b>{String(count.exists)}</b></span>
+            <span>count value: <b>{count.value}</b></span>
+            <span>status: <b>{status.value}</b></span>
+            <span>item keys: <b>{itemKeys.stringKeys.join(",")}</b></span>
+            <span>listen value: <b>{listenValue}</b></span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <pre style={{ background: "#f6f8fa", padding: 8, borderRadius: 6, overflow: "auto", fontSize: 11 }}>selection\n{JSON.stringify(selection.value, null, 2)}</pre>
+            <pre style={{ background: "#f6f8fa", padding: 8, borderRadius: 6, overflow: "auto", fontSize: 11 }}>listen args\n{JSON.stringify(listenArgs, null, 2)}</pre>
+        </div>
+    </div>;
+};
+/* ---------- 17. ObserveAll2 store mirror hooks over HTTP/SSE ---------- */
+type tObserveQaState = {
+    value: number;
+    nested: { label: string };
+    updatedAt: string;
+    events: number;
+    bag: Record<string, number>;
+    deep: {
+        level1: {
+            level2: {
+                leaf: string;
+                counters: Record<string, number>;
+            };
+        };
+    };
+};
+
+const observeMirrorMask = { value: true, nested: { label: true }, updatedAt: true, events: true, bag: true, deep: { level1: { level2: { leaf: true, counters: true } } } } as const;
+const observeLabelMask = { nested: { label: true }, events: true } as const;
+
+function createSseChangedListen(url: string) {
+    const listeners = new Set<() => void>();
+    let source: EventSource | null = null;
+
+    function notify() {
+        listeners.forEach(listener => listener());
+    }
+
+    function ensureSource() {
+        if (source || typeof EventSource == "undefined") return;
+        source = new EventSource(url);
+        source.addEventListener("changed", notify);
+        source.onerror = () => {
+            // EventSource reconnects itself; the visible QA state comes from fetch errors/successes.
+        };
+    }
+
+    return {
+        on(cb: () => void) {
+            listeners.add(cb);
+            ensureSource();
+            return () => {
+                listeners.delete(cb);
+                if (listeners.size == 0) {
+                    source?.close();
+                    source = null;
+                }
+            };
+        },
+    };
+}
+
+
+function createSseChangedPathsListen(url: string) {
+    const listeners = new Set<(change: { paths: PropertyKey[][] }) => void>();
+    let source: EventSource | null = null;
+
+    function ensureSource() {
+        if (source || typeof EventSource == "undefined") return;
+        source = new EventSource(url);
+        source.addEventListener("changedPaths", event => {
+            const change = JSON.parse((event as MessageEvent).data) as { paths: PropertyKey[][] };
+            listeners.forEach(listener => listener(change));
+        });
+        source.onerror = () => {};
+    }
+
+    return {
+        on(cb: (change: { paths: PropertyKey[][] }) => void) {
+            listeners.add(cb);
+            ensureSource();
+            return () => {
+                listeners.delete(cb);
+                if (listeners.size == 0) {
+                    source?.close();
+                    source = null;
+                }
+            };
+        },
+    };
+}
+async function postObserveMutation(body: object) {
+    const res = await fetch("/__qa/observe-store/mutate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+const ObserveStoreMirrorDemo = () => {
+    const remote = useMemo(() => {
+        const changed = createSseChangedListen("/__qa/observe-store/events");
+        const changedPaths = createSseChangedPathsListen("/__qa/observe-store/events-paths");
+        return {
+            changed,
+            changedPaths,
+            async get(mask?: any) {
+                const url = new URL("/__qa/observe-store/get", window.location.origin);
+                if (mask !== undefined) url.searchParams.set("mask", JSON.stringify(mask));
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(await res.text());
+                return res.json() as Promise<tObserveQaState>;
+            },
+        };
+    }, []);
+    const initial = useMemo<tObserveQaState>(() => ({
+        value: 0,
+        nested: { label: "client initial" },
+        updatedAt: "",
+        events: 0,
+        bag: {},
+        deep: { level1: { level2: { leaf: "client deep initial", counters: {} } } },
+    }), []);
+    const mirror = useStoreMirror<tObserveQaState, typeof observeMirrorMask>(remote, initial, { mask: observeMirrorMask, current: true, drain: 50 });
+    const value = useStoreNode(mirror.store.node.value);
+    const label = useStoreNode(mirror.store.node.nested.label);
+    const bagKeys = useStoreKeys(mirror.store.node.bag);
+    const deepLeaf = useStoreNode(mirror.store.node.deep.level1.level2.leaf);
+    const deepCounterKeys = useStoreKeys(mirror.store.node.deep.level1.level2.counters);
+    const labelSelection = useStoreSelect(useMemo(() => mirror.store.update(observeLabelMask), [mirror.store]), { drain: 50 });
+    const pathEvents = useStoreChangedPaths(remote.changedPaths);
+    const [pushes, setPushes] = useState(0);
+    const [lastPost, setLastPost] = useState("-");
+
+    useListenEffect(remote.changed, () => setPushes(v => v + 1));
+
+    async function mutate(body: object) {
+        setLastPost("posting...");
+        try {
+            const data = await postObserveMutation(body);
+            setLastPost(JSON.stringify(data));
+        } catch (e) {
+            setLastPost(String(e));
+        }
+    }
+
+    return <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <button onClick={() => mutate({ type: "inc" })}>server +1</button>
+            <button onClick={() => mutate({ type: "label", label: "srv " + new Date().toLocaleTimeString() })}>server label</button>
+            <button onClick={() => mutate({ type: "bag-add", key: "c", value: Date.now() })}>server add key c</button>
+            <button onClick={() => mutate({ type: "bag-delete", key: "b" })}>server delete key b</button>
+            <button onClick={() => mutate({ type: "deep-leaf", value: "deep " + new Date().toLocaleTimeString() })}>server deep leaf</button>
+            <button onClick={() => mutate({ type: "deep-add", key: "z", value: Date.now() })}>server deep add z</button>
+            <button onClick={() => mutate({ type: "deep-delete", key: "y" })}>server deep delete y</button>
+            <button onClick={() => mutate({ type: "reset" })}>server reset</button>
+            <button onClick={() => value.replace((value.value ?? 0) + 1000)}>local mirror +1000</button>
+            <button onClick={() => mirror.sync()}>manual sync</button>
+            <button onClick={() => mirror.stop()}>stop sync</button>
+        </div>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
+            <span>ready: <b>{String(mirror.ready)}</b></span>
+            <span>syncing: <b>{String(mirror.syncing)}</b></span>
+            <span>SSE pushes: <b>{pushes}</b></span>
+            <span>path pushes: <b>{pathEvents.count}</b></span>
+            <span>node value: <b>{value.value}</b></span>
+            <span>node label: <b>{label.value}</b></span>
+            <span>bag keys: <b>{bagKeys.stringKeys.join(",")}</b></span>
+            <span>deep leaf: <b>{deepLeaf.value}</b></span>
+            <span>deep keys: <b>{deepCounterKeys.stringKeys.join(",")}</b></span>
+        </div>
+        {mirror.error && <div style={{ color: "#cf222e" }}>error: {String(mirror.error)}</div>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <pre style={{ background: "#f6f8fa", padding: 8, borderRadius: 6, overflow: "auto", fontSize: 11 }}>mirror.value\n{JSON.stringify(mirror.value, null, 2)}</pre>
+            <pre style={{ background: "#f6f8fa", padding: 8, borderRadius: 6, overflow: "auto", fontSize: 11 }}>label selection\n{JSON.stringify(labelSelection.value, null, 2)}\n\nchanged paths\n{JSON.stringify(pathEvents.paths)}\n\nlast POST\n{lastPost}</pre>
+        </div>
+    </div>;
+};
 /* ---------- 13. ModalProvider / useModal ---------- */
 const ModalOpener = () => {
     const modal = useModal();
@@ -263,6 +584,35 @@ function ActiveChecks() {
                 <AgGrid4Demo />
             </Check>
 
+            <Check n={15} title="agGrid4 - overlay rowData"
+                   do="Click stream C before rowData. C must not appear. Then add C to rowData: C appears and receives the buffered stream price. Stream A updates A only."
+                   expect="Overlay sync updates only rowData-owned rows, never adds stream-only rows and never removes rowData rows."
+                   note="This covers selectHistory/portfolio/symbol tables where React state owns the row set."
+                   tall>
+                <AgGrid4OverlayDemo />
+            </Check>
+
+            <Check n={16} title="agGrid4 - dynamic column buffer"
+                   do="Switch alpha / alpha+beta / gamma+alpha / clear. Reloading the stand should keep the component API path clean; detach itself does not clear names."
+                   expect="The explicit dynamic group shows exactly the selected columns, deduped and in order. Base columns remain intact."
+                   note="This covers dynamic add/remove columns without any business-specific default in the shared utility."
+                   tall>
+                <AgGrid4ColumnBufferDemo />
+            </Check>
+            <Check n={18} title="ObserveAll2 hooks - local store and listen"
+                   do="Click node.at(count) +1, replace status, plain state mutation + flush, emit listen, and replace whole store."
+                   expect="Leaf node, selection, direct state mutation after flush, add/delete object keys, and listen hooks all rerender. The count key is read through node.at(count), so it does not conflict with node.count()."
+                   note="This isolates the React adapter from transport: no fetch/SSE/RPC involved."
+                   tall>
+                <ObserveStoreLocalDemo />
+            </Check>
+            <Check n={17} title="ObserveAll2 hooks - store mirror over HTTP/SSE"
+                   do="Click server +1, label, add/delete key, deep leaf/deep add/deep delete, local mirror +1000, stop sync, then manual sync."
+                   expect="Server buttons POST to the Vite QA server, including add/delete object keys and deep mutations. SSE pushes changedPaths; mirror pulls only the intersecting mask when possible. Local mirror edits render immediately and are overwritten by the next server sync."
+                   note="This checks the React adapter only in wenay-react2: common2 remains React-free; transport policy stays outside the hook."
+                   tall>
+                <ObserveStoreMirrorDemo />
+            </Check>
             <Check n={13} title="ModalProvider / useModal - Escape and outside click"
                    do="Click open modal. Close it with Escape. Open it again and close with an outside click. Open it again and close with the close button."
                    expect="All three methods close it. The dimmed backdrop is above everything (z-index from token --wenay-z-modal)."

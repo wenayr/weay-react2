@@ -6,7 +6,7 @@ import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { AgGridReact, AgGridReactProps } from 'ag-grid-react'
 import type { GridApi, GetRowIdParams, GridPreDestroyedEvent, GridReadyEvent } from 'ag-grid-community'
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
-import { createGridBuffer, type BufferTable, type GetId } from './core'
+import { createGridBuffer, type BufferTable, type GetId, type GridBufferCore, type GridBufferMode, type PushOptions } from './core'
 import { useAgGridTheme } from './theme'
 
 // ag-grid v35 requires module registration. Do it lazily and once, on the first hook
@@ -24,6 +24,12 @@ export type UseAgGridOptions<T> = {
     getId?: GetId<T>
     /** External buffer: a plain object above the component (like datum.tableArr) that survives route remounts. */
     externalBuffer?: BufferTable<T>
+    /** mirror (default): buffer owns rows. overlay: rowData owns rows and sync only refreshes intersection. */
+    mode?: GridBufferMode
+    /** Default delivery policy for updateData. Useful for overlay streams: { add: false }. */
+    pushDefaults?: PushOptions
+    /** Ready-made module-level core/store; getId/externalBuffer/mode are already captured inside it. */
+    core?: GridBufferCore<T>
 }
 
 /**
@@ -31,6 +37,7 @@ export type UseAgGridOptions<T> = {
  * to the React and grid lifecycle:
  *
  *   const grid = useAgGrid<Row>({ getId })
+ *   const grid = useAgGrid({ core: mainTable })
  *   <AgGridMy<Row> controller={grid} columnDefs={cols} />
  *   grid.update({ newData })
  */
@@ -40,8 +47,14 @@ export function useAgGrid<T>(options?: UseAgGridOptions<T>) {
 
     // The core is created once; dependencies live in its closure, with no useCallback chains.
     const [core] = useState(function createCore() {
+        if (options?.core) return options.core
         const getId: GetId<T> = options?.getId ?? (data => String((data as any)?.id))
-        return createGridBuffer<T>({ getId, externalBuffer: options?.externalBuffer })
+        return createGridBuffer<T>({
+            getId,
+            externalBuffer: options?.externalBuffer,
+            mode: options?.mode,
+            pushDefaults: options?.pushDefaults,
+        })
     })
 
     const gridProps = useMemo(() => ({
@@ -65,12 +78,20 @@ export function useAgGrid<T>(options?: UseAgGridOptions<T>) {
             api.sizeColumnsToFit()
             return true
         }
+        const flush = () => {
+            const api = apiRef.current
+            if (!api) return false
+            api.flushAsyncTransactions()
+            return true
+        }
         return {
             update: core.api.updateData,
             remove(rows: Partial<T>[]) {
                 core.api.updateData({ removeData: rows })
             },
+            clean: core.api.clean,
             fit,
+            flush,
             updateData: core.api.updateData,
             sync: core.api.sync,
             getId: core.api.getId,
@@ -86,6 +107,7 @@ export function useAgGrid<T>(options?: UseAgGridOptions<T>) {
                 return api ? fn(api) : undefined
             },
             sizeColumnsToFit: fit,
+            flushAsyncTransactions: flush,
         }
     }, [core, gridProps])
 }
@@ -114,14 +136,18 @@ function AgGridMyInner<T>(props: AgGridMyProps<T>) {
         ...rest
     } = props
 
-    // Own controller for declarative mode (without an external controller); the hook is unconditional.
-    const own = useAgGrid<T>()
+    // Own controller is overlay-safe: rowData grids without a controller must not be cleared on attach.
+    const own = useAgGrid<T>({
+        getId: getRowId ? data => getRowId({ data: data as T } as GetRowIdParams<T>) : undefined,
+        mode: 'overlay',
+        pushDefaults: { add: false, remove: false },
+    })
     const grid = controller ?? own
     const defaultTheme = useAgGridTheme()
     const containerRef = useRef<HTMLDivElement>(null)
 
     useEffect(function pushData() {
-        if (data) grid.update({ newData: data })
+        if (data) grid.update({ newData: data, option: { add: true } })
     }, [data, grid])
 
     useEffect(function observeResize() {
@@ -146,6 +172,7 @@ function AgGridMyInner<T>(props: AgGridMyProps<T>) {
         () => ({ sortable: true, resizable: true, filter: true, ...defaultColDef }),
         [defaultColDef],
     )
+    const wiredGetRowId = getRowId ?? (controller || data ? grid.props.getRowId : undefined)
 
     return (
         <div ref={containerRef} style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
@@ -158,7 +185,7 @@ function AgGridMyInner<T>(props: AgGridMyProps<T>) {
                 defaultColDef={mergedColDef}
                 // getRowId after the spread: undefined from rest must not erase the wiring,
                 // otherwise the grid falls back to index-based row identity.
-                getRowId={getRowId ?? grid.props.getRowId}
+                getRowId={wiredGetRowId}
                 onGridReady={function ready(event) {
                     grid.props.onGridReady(event)
                     if (autoSizeColumns) event.api.sizeColumnsToFit()

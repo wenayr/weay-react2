@@ -5,24 +5,34 @@
 > overloads, return). Short names are **canonical**; older long names are `@deprecated` (listed as `// alias:`).
 > Full surface → **`wenay-common2-rare.md`**. Code style → `CLAUDE.md`. Full RPC guide → `rpc.md`.
 
-## ⭐ events — `UseListen` (the workhorse pub/sub)
+## ⭐ events — `ListenNext` / `Listen2`
 ```
-UseListen<T>(opts?) -> [emit, listen]            // T = tuple of args; single value ok: UseListen<number>()
-emit(...args: T)                                 // dispatch to all listeners; args = the tuple T spread (UseListen<number> -> emit(5))
-listen.on(cb: (...args: T) => void, {key?: string, cbClose?: () => void}) -> off: () => void   // subscribe (RxJS/EE idiom); key overwrites by key
-listen.once(cb: (...args: T) => void, {key?: string}) -> off: () => void                       // one event, then auto-off
-listen.onClose(cb: () => void) -> off            // subscribe to stream close
-listen.close()                                   // complete: clear listeners + fire onClose + teardown producer
-listen.count() -> number                         // live subscriber count (0<->1 transitions drive the lazy source)
-listen.isRun() -> boolean
-opts: { fast? = true, event?(t: 'add'|'remove', count: number, api), addListenClose? }   // event = lazy source attach/detach
-// deprecated aliases kept only for old code: addListen->on · removeListen->off() · eventClose->onClose
+import { ListenNext } from "wenay-common2"                 // namespace export, no conflict with old Listen.ts
+import { UseListenStore } from "wenay-common2/listen2"      // direct v2 subpath
+
+ListenNext.UseListen<T>(opts?) -> [emit, listen]            // pure event list: no local value storage, no current replay
+emit(...args: T)                                            // dispatch event only
+listen.on(cb: (...args: T) => void, {key?, cbClose?}) -> off
+listen.once(cb, {key?}) -> off                              // one future event
+listen.onClose(cb: () => void) -> off
+listen.close()                                              // clear listeners + fire close hooks + teardown producer
+listen.count() -> number
+
+ListenNext.UseListenStore<T>({current, ...opts}) -> [emit, listen]
+  // store wrapper: current() reads external store by reference; the listener does not keep its own value copy
+listen.on(cb, {current: true}) -> off                       // current store value first, then future events
+listen.on(cb) -> off                                        // future events only
+listen.once(cb, {current: true}) -> off                     // one value from current store, if present; otherwise waits future event
+listen.once(cb) -> off                                      // one future event
+listen.on(cb, {current: () => argsOrUndefined}) -> off      // per-subscription current getter overrides wrapper current
+
+opts: { fast? = true, event?(t: 'add'|'remove', count, api), addListenClose? }
+// Old root `UseListen` from `Listen.ts` is kept for compatibility/comparison. New store-current work lives in `ListenNext` / `listen2`.
 ```
 ```
 UseListenTransform<TIn, TOut>(src, map: (...a: TIn) => TOut | null, opts?) -> [emit, listen]   // map+filter (null skips); lazy subscribe
 joinListens(listens | ports, keyExtractor?) -> { listen, add(port, key?), pending: number, clear(tid?) }   // zip by key
 ```
-
 ## ⭐ sleep
 ```
 sleepAsync(ms = 0) -> Promise<void>
@@ -120,40 +130,56 @@ l.ticks.once(v => console.log(v))                         // one event, then aut
 // full guide + examples → rpc.md
 ```
 
-## 🔁 Observable — in-house reactive lib (the everyday reactive API)
-> `import { Observable } from "wenay-common2"` → `Observable.createCell(...)` (a namespace). 0-dep.
-> Cheap-until-subscribed (0 listeners = a closure + a field). Every node is also a real Listen via `.listen()`
-> → drops into RPC / `listen-deep` unchanged.
+## 🔁 ObserveAll2 — reactive state + store/mirror API
+> `import { ObserveAll2 } from "wenay-common2"` or `import * as ObserveAll2 from "wenay-common2/observe-all2"`.
+> This is the documented v2 reactive/store surface.
 ```
-// primitives — a value you read/write like plain data that is ALSO a subscription source
-createCell<T>(initial: T, { equals?, recycle? }) -> Cell<T>
-  .get() -> T · .set(v: T) -> changed: boolean · .update(fn: (prev: T) => T) · .subscribe(cb: (v: T) => void, { current? }) -> off
-  .map<R>(fn: (v: T) => R, { equals? }) -> Computed<R> · .count() -> number · .listen() -> Listen (RPC) · .close()
-createRObject<T>(initial: T) -> RObject<T>          // per-key streams + a whole-object [key, value] stream
-  .get(k) · .set(k, v) -> boolean · .update(k, fn) · .snapshot() -> T · .key(k) -> per-key view (Cell-like, cb is (value))
-  .subscribe(cb: (key, value) => void, { current? }) -> off · .listen() · .close()
-createRMap<K,V>(entries?: Iterable<[K,V]>) -> RMap<K,V>      // same model over a real Map; a delete emits undefined (-> null over the wire)
-  .get(k) · .has(k) · .set(k, v) · .delete(k) · .update(k, fn) · get size · .keys() · .entries() · .snapshot()
-  .key(k) -> per-key view (cb is (value)) · .subscribe(cb: (k, v) => void, { current? }) -> off · .listen() · .close()
+// coarse reactive object: subscribe to the fact that a subtree changed, then re-read current state
+ObserveAll2.reactive<T extends object>(obj, opts?) -> T
+ObserveAll2.onUpdate(node, cb: () => void) -> off
+ObserveAll2.onUpdatePaths(node, cb: ({paths}) => void) -> off   // optional dirty paths, relative to node
+ObserveAll2.flushReactive(node) -> Promise<void>
+ObserveAll2.toRaw(node) -> raw value behind the proxy              // snapshots/serialization without touching lazy nodes
+ObserveAll2.listenUpdate(node) -> Listen<void>                  // RPC bridge for coarse change notifications
+ObserveAll2.listenUpdatePaths(node) -> Listen<{paths: PropertyKey[][]}>
+opts: { drain?: "immediate"|"micro"|number|((flush)=>void), depth?, eager? }
+
+// path-addressed store facade over reactive()
+ObserveAll2.createStore<T extends object>(initial, opts?) -> Store<T>
+store.state                                                   // reactive data object; write normally
+store.node.path.to.leaf.get()/snapshot()/replace(v)           // set(v) is a deprecated alias of replace(v)
+store.node.path.to.leaf.on((value, ctx) => {}, {current?, drain?, key?}) -> off
+store.node.path.to.leaf.once(cb, opts?) -> off
+store.update(mask, opts?) -> selection                         // typed selected snapshot
+selection.get() · selection.on((snap, ctx)=>{}, opts?) -> off · selection.onEach((value, ctx)=>{}, opts?) -> off
+store.count() -> number
+
+// network shape: backend exposes snapshots + changed Listen; frontend mirrors selected masks locally
+ObserveAll2.exposeStore(store, opts?) -> { get(mask?), set(path,value), replace(path,value), changed, changedPaths, patches?, changedData? }
+ObserveAll2.createStoreMirror(remote, initial, opts?) -> store & { sync(mask, opts?) -> Promise<off>; syncPatches(mask, opts?) -> Promise<off>; syncChangedData(mask, opts?) -> Promise<off> }
+// changedPaths is optional optimization: mirror pulls mask ∩ dirty paths; fallback is changed -> get(mask).
+// Optional push-data mode: exposeStore(store,{push:true}) + syncPatches/syncChangedData; details in rare docs.
+// Object add/delete/deep set are paths. Array mutation dirties the whole array branch, not splice internals.
 ```
 ```
-// derived — graph stays COLD (no upstream cost) until a leaf subscriber appears
-combine<R>(sources: Source[], compute: (values) => R, { equals? }) -> Computed<R>     // .get() recomputes even with no listeners
-computed<T,R>(source, fn: (v: T) => R, { equals? }) -> Computed<R>                     // = combine over one source
-computedAuto<R>(fn: (use) => R) -> ComputedAuto<R>            // auto-tracked: use(s) returns s.get() AND tracks it; use.untrack(s) reads w/o tracking
-// a Computed is a full reactive Source: .get() · .subscribe(cb)->off · .map(fn) · .listen() · .count() · .close() — pass to an effect's use(), or subscribe directly
+type Market = {data: {BTC?: number; ETH?: number}; meta: {status?: string}}
+const market = ObserveAll2.createStore<Market>({data: {BTC: 1, ETH: 2}, meta: {status: "ok"}})
+
+market.state.data.BTC = 3                                      // plain local mutation
+market.node.data.BTC.on((v, ctx) => {}, {current: true})        // ctx.path = ["data", "BTC"]
+market.node.data.on(data => {}, {current: true, drain: 50})     // branch snapshot, per-sub drain
+market.update({data: {BTC: true, ETH: true}}, {current: true}).on(snap => {})
+
+// backend facade over RPC
+const api = ObserveAll2.exposeStore(market)
+
+// frontend mirror: UI subscribes to local mirror, not RPC directly
+const mirror = ObserveAll2.createStoreMirror<Market>(api, {data: {}, meta: {}})
+const stop = await mirror.sync({data: {BTC: true}, meta: {status: true}}, {current: true, drain: 250})  // uses changedPaths when available
+mirror.node.data.BTC.on(v => {}, {current: true})
+stop()
 ```
-```
-// effects — first run is SYNCHRONOUS (establishes deps), then re-runs on any tracked-dep change
-createEffect(fn: (use) => void) -> { dispose }       // use(s) tracks the dep + returns its value; use.untrack(s) reads without tracking
-onCleanup(cb: () => void)  ·  createRoot<T>(fn: (dispose) => T) -> { result: T, dispose }   // teardown · own (and dispose) a subtree of effects
-batch<T>(fn: () => T) -> T                           // coalesce: N changes inside fn => one re-run / one emit
-```
-```
-// store — path-addressed reactive tree; replace a whole branch, only the changed leaves fire. NOT generic (no <T>)
-createTransportStore(initial?: object | Map) -> TransportStore         // one uniform node facade at every depth
-  reads:  .get(k?) · .snapshot() · .has(k) · .keys()    writes: .set(k, v) · .replace(v) · .setIn(path: string[], v) · .delete(k)
-  nav:    .key(k) -> node · .at(path: string[]) -> node
-  subscribe: .value(cb: (v) => void, {current?}) (element) · .entries(cb: (k, v) => void, {current?}) (category) · .deep(cb: (path: string[], v) => void, {current?}) (anywhere)
-  .listen() -> Listen                                  // the level stream, for RPC
-```
+Runnable example: `npx tsx observable2/store-mirror.example.ts`.
+
+
+
