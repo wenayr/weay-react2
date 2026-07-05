@@ -11,6 +11,7 @@ import {type Position, useDraggable} from "../../hooks/useDraggable";
 import {DivOutsideClick} from "../../hooks/useOutside";
 import { DraggableOutlineDiv } from "../Dnd/DraggableOutlineDiv";
 import { GetModalFuncJSX } from "../Modal/Modal";
+import { markDirty } from "../../utils/cacheDirty";
 import {
     mapRightMenu,
     type MenuRightPosition,
@@ -109,6 +110,7 @@ export function DropdownMenu({
                 position2: toTop ? 'top' : 'bottom',
                 offset: { ...nextOffset }
             });
+            markDirty("mapRightMenu", keyForSave);
         }
     }, [isTop, keyForSave, position]);
     const { position: pos, dragProps } = useDraggable(0, 0, 50, handleDragEnd, () => {});

@@ -166,6 +166,11 @@ RPC Listen surface on client: stream.on(cb)->off · stream.once(cb)->off · stre
   // off is callable + thenable: off() unsubscribes; await off waits for stream end. Legacy .callback/.removeCallback/.unsubscribe exist for old code only.
   // *First/*All/*Smart differ only in callback arity: first arg / all args / single-vs-tuple smart.
 matchKeys(a,b) · matchKeysList(a, keys) · deepMapByKeys · deepMapByKeysList
+// wire serialization (rpc-walk): Date/Map/Set/RegExp/BigInt are marked+restored; functions -> callback refs.
+//   TypedArray/DataView/Buffer/ArrayBuffer pass through as BINARY leaves (socket.io carries them natively;
+//   never rebuilt into {0:…,1:…} dicts — raw canvas/video byte payloads are wire-safe and cheap).
+RpcLimits (opt, per server/client): maxDepth 32 · maxKeys 1000 · maxArgs 64 · maxArrayLen 10k
+  · maxStringLen 1M · maxCallbacks 100 · maxPathLen 16 · maxBinaryLen 8MB (bytes per binary leaf)
 // modes: func (proxy) · strict (schema-safe) · pipe (whole chain in one packet) · space (fire-and-forget)
 // legacy (oldCommonsServer.ts, @deprecated forwarders onto oldСommonsServerMini — identical wire):
 //   funcPromiseServer->promiseServer · funcForWebSocket->wsWrapper · funcScreenerClient2->createClientProxy
@@ -317,6 +322,19 @@ npx tsx observable2/store-mirror.example.ts
 > The old `observable/` tree remains in the repo for regression/sandbox work only.
 > Do not document it as package API and do not teach it in new examples. Use root-exported `ObserveAll2` instead.
 > Existing tests may still import `observable/*` directly while the replacement surface settles.
+
+## 🎞️ Replay sandbox (`replay/`, not public API yet)
+> Snapshot + sequenced delta line: keyframe + seq-numbered deltas + recovery via a fresh keyframe —
+> one pattern for store sync, ticks and video-like frame streams. Design: `REPLAY-PLAN.md`, status: `replay/PLAN.md`.
+```
+withReplayListen(base, {current?, history?, getSince?, onJournal?}) · UseReplayListen   // layer A: journal {seq, ts, event}; on(cb, {since, onSeq}); head()/getSince()/keyframe()
+exposeReplay(replay)  <->  replaySubscribe(remote, cb, {since?, onSeq?}) -> off         // wire pair over the EXISTING rpc: line = plain Listen, since/keyframe = plain methods
+  // off.ready (catch-up done) · off.seq() (reconnect point); reconnect = call again with {since: prev.seq()}
+exposeStoreReplay(store, opts?)  <->  syncStoreReplay(mirror, remote, opts?)            // layer B: patch line; keyframe = root patch ({path: [], value: snapshot})
+```
+> Killer property: a lagging/late consumer never gets a queue backlog — evicted seq -> fresh keyframe + live.
+> Oracles: `npx ts-node replay/<f>.ts` — replay-listen / store-replay / socket-replay / canvas-socket (raw bytes) / video-socket.demo.
+> Moves into `src/` at assembly (Listen3 additions are additive); do not import from `replay/` in package code.
 
 ## 🔁 ObserveAll2 — coarse reactive object (`ObserveAll2`, fact-based)
 > `import { ObserveAll2 } from "wenay-common2"` → `ObserveAll2.reactive(...)`.

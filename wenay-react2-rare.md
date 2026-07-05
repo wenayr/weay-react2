@@ -91,8 +91,9 @@ UI slot:
 createUiSlot({key, places, def}) -> {Slot, PlacementSetting, getPlace, setPlace}
 <slot.PlacementSetting className? activeClassName? />   // defaults .wenaySegBtn / .wenaySegBtnActive
 ```
-State lives in `staticGetAdd(key)` -> persisted with the rest of staticProps by the APP calling
-`Cash.load()/save()` (the library never calls Cash.save itself, same as window state).
+State lives in `staticGetAdd(key)` -> persisted with the rest of staticProps; `setPlace` calls
+`markDirty("staticProps", key)` and the APP decides when to save via `Cash.onDirty`
+(the library never writes storage itself, same as window state).
 A stored place that no longer exists in `places` falls back to `def`. `getPlace()` is not reactive;
 Slot/PlacementSetting subscribe internally via updateBy.
 
@@ -263,10 +264,16 @@ ObjectStringToDate(obj)
 CacheFuncMapBase(entries, save)
 CacheFuncMap(entries)
 
+markDirty(scope?, key?)             // dirty channel (cacheDirty.ts, module-global);
+onDirty(cb) -> off                  // also exposed as Cash.markDirty / onDirty / isDirty
+isDirty()
+
 staticSet(key, data)
 staticGet(key)
 staticGetAdd(key, def, options?)
 staticGetById(key, def, id)
+staticUpdate(key, mutate)
+staticMarkDirty(key)
 deepMergeWithMap(target, source)
 Cash
 MemoryMap
@@ -278,6 +285,18 @@ SetAutoStepForElement(input, {minStep?, maxStep?})
 ```
 
 Cache helpers are process/browser storage utilities, not React state management.
+
+Dirty/save contract: `markDirty` only announces "persisted state changed" - it never saves.
+The dirty scope/key are event metadata; WHAT gets written is decided by the save-side
+serialized-snapshot diff, so a missed markDirty degrades to "saved later" and an extra one
+to a no-op write. Emit points inside the library (all committed user changes, never
+render/init paths): DivRnd3 drag/resize stop, FResizableReact resize stop (keyForSave),
+right-menu drag end, createUiSlot.setPlace. `Cash.load()` suppresses dirty while loading
+and resets it after; a save cycle resets the flag at its START so a markDirty arriving
+mid-write survives. For manual mutations of objects taken from `staticGetAdd` use
+`staticUpdate(key, mutate)` (mutate + renderBy + markDirty) or `staticMarkDirty(key)`.
+Caveat: `flush()` is async - on pagehide localStorage writes usually complete but are not
+guaranteed (Cache API is not); prefer visibilitychange->hidden as the primary final save.
 
 ## Resize Observer
 ```

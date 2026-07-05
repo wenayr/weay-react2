@@ -1,5 +1,6 @@
 import React from "react";
 import {Resizable, ResizableProps} from "re-resizable";
+import {markDirty} from "../../utils/cacheDirty";
 
 type tSaveMap = {height?: number|string, width?: number|string}
 // Memory for all column sizes
@@ -41,6 +42,7 @@ export function FResizableReact(
                               if (typeof obj.height == "number") obj.height += delta.height;
                               else {obj.height = elementRef.style.height}
                           // onResize?.(size)
+                          if (keyForSave) markDirty("mapResiReact", keyForSave)
                           onResizeStop?.(obj)
                           // this.Refresh()
                       }}

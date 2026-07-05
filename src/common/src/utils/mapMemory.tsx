@@ -1,8 +1,10 @@
 import { deepClone } from "wenay-common2";
+import { renderBy } from "../../updateBy";
 import { ExRNDMap3 } from "../components/Dnd/RNDFunc3";
 import { mapResiReact } from "../components/Dnd/Resizable";
 import { mapRightMenu } from "../components/Menu/RightMenuStore";
 import {CacheFuncMap} from "./cache";
+import { markDirty } from "./cacheDirty";
 
 const staticProps = new Map<string,object>()
 
@@ -53,6 +55,24 @@ export function staticGetAdd<T extends object>(key: any, def: T, options: {abs?:
     if (options.abs) staticProps.set(key, def)
     const t = (staticProps.has(key) ? staticProps.get(key) : staticProps.set(key, def).get(key)!) as T
     return t// Object.assign(def, t) // t //
+}
+
+/** Mark a persisted staticProps entry dirty after a direct mutation of an object taken
+ *  from staticGetAdd - such mutations are invisible to the library, someone must announce
+ *  them. staticSet/staticGetAdd themselves stay silent: they only initialize/merge. */
+export function staticMarkDirty(key: any) {
+    markDirty("staticProps", typeof key == "string" ? key : undefined)
+}
+
+/** App-facing change of a persisted staticProps entry in one call:
+ *  mutate + rerender subscribers + mark the cache dirty. No-op if the key is absent. */
+export function staticUpdate<T extends object>(key: any, mutate: (cur: T) => void): T | undefined {
+    const cur = staticProps.get(key) as T | undefined
+    if (cur === undefined) return undefined
+    mutate(cur)
+    renderBy(cur)
+    staticMarkDirty(key)
+    return cur
 }
 
 export function staticGetById<T extends object>(key: any, def: T, id: string|number){

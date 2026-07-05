@@ -6,6 +6,7 @@ import React, {
 } from "react";
 import { Rnd } from "react-rnd";
 import {renderBy, updateBy} from "../../../updateBy";
+import {markDirty} from "../../utils/cacheDirty";
 
 type tPosition = { x: number; y: number };
 type tSize = { height: number | string; width: number | string };
@@ -161,6 +162,9 @@ export function DivRndBase3({
             document.removeEventListener("mousemove", mouseMoveHandler);
             lastC.current = null;
             setA(false);
+            // drag end commits persisted geometry; a no-move click also lands here,
+            // but the save-side snapshot diff turns that into a no-op write
+            if (ks) markDirty("ExRNDMap3", ks);
         };
 
         // Touch
@@ -202,6 +206,7 @@ export function DivRndBase3({
                 document.removeEventListener("touchend", touchEndHandler);
                 document.removeEventListener("touchmove", touchMoveHandler);
                 setB(false);
+                if (ks) markDirty("ExRNDMap3", ks);
             }
         };
 
@@ -306,6 +311,7 @@ export function DivRndBase3({
                 setHeight(elementRef.offsetHeight);
                 setWidth(elementRef.offsetWidth);
                 setUpdate(update + 1);
+                if (ks) markDirty("ExRNDMap3", ks);
             }}
             onResize={(e, dir, elementRef, delta, pos) => {
                 onUpdate?.({ e, dir, elementRef, delta, position: pos });

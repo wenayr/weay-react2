@@ -40,7 +40,25 @@ staticGetAdd(key, def, {abs?, deepAutoMerge?, reversDeep?}) -> def-or-stored
 staticGetById(key, def, id) -> stored only while id is the same
 staticSet(key, data)
 staticGet(key)
+staticUpdate(key, mutate) -> cur?               // mutate + rerender + markDirty in one call
+staticMarkDirty(key)                            // announce a manual mutation of a staticGetAdd object
 MemoryMap                                       // rnd / resize / other maps
+```
+
+Persistence contract (Cash): the library NEVER writes storage by itself. Committed user
+changes (DivRnd3 drag/resize stop, FResizableReact resize stop with keyForSave, right-menu
+drag end, createUiSlot.setPlace) only mark the cache dirty; the app owns the write policy:
+```
+Cash.load()                                      // once on start; remembers the saved snapshot
+Cash.onDirty((scope?, key?) => ...) -> off       // dirty channel; also Cash.markDirty(scope?, key?)
+Cash.saveDebounced(ms?) / save() / flush()       // write only payloads that differ from the snapshot
+Cash.isDirty()                                   // cheap hint, e.g. a beforeunload guard
+
+Cash.load()
+const off = Cash.onDirty(() => Cash.saveDebounced(800))
+document.addEventListener("visibilitychange",
+    () => { if (document.visibilityState == "hidden") void Cash.flush() })
+window.addEventListener("pagehide", () => { void Cash.flush() })  // backstop: flush is async
 ```
 
 ## Outside Click / Buttons
@@ -105,7 +123,7 @@ registerSettingsSection({key, name, render}) -> unregister   // external section
 const slot = createUiSlot({key, places: {top: "Top bar", side: "Sidebar"}, def: "top"})
 
 <slot.Slot place="top">{content}</slot.Slot>     // each mount point decides by itself
-<slot.PlacementSetting />                        // segmented place switcher; place persists
+<slot.PlacementSetting />                        // segmented place switcher; setPlace marks Cash dirty
 ```
 
 ## Callback Hub

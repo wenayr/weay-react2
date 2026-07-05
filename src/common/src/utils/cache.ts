@@ -1,4 +1,5 @@
 import {renderBy} from "../../updateBy";
+import {isDirty, markDirty, onDirty, resetDirty, suppressDirty} from "./cacheDirty";
 
 export interface IServerSaveBasePromise {
     set(key: string, value: object): Promise<boolean>
@@ -116,6 +117,8 @@ export function CacheFuncMapBase(arr: [k: string, v: Map<string, unknown>][], Sa
         saveTimer = null
     }
     const saveChangedPayloads = async () => {
+        // reset at cycle START: a markDirty arriving mid-write must survive for the next save
+        resetDirty()
         for (const [key, payload] of getPayloads()) {
             if (savedPayloadByKey.get(key) === payload) continue
             if (await Save.set(key, JSON.parse(payload) as object)) {
@@ -137,13 +140,18 @@ export function CacheFuncMapBase(arr: [k: string, v: Map<string, unknown>][], Sa
 
     return {
         async load(){
-            for (let [k,v] of arr) {
-                const t = await Save.get<[k: string, v: unknown][]>(k)
-                if (!t) continue
-                ObjectStringToDate(t)
-                addDataToMap(t, v)
-            }
+            // load mutations are not user changes: renderBy inside addDataToMap may run
+            // subscriber code synchronously - none of it may mark the cache dirty
+            await suppressDirty(async () => {
+                for (let [k,v] of arr) {
+                    const t = await Save.get<[k: string, v: unknown][]>(k)
+                    if (!t) continue
+                    ObjectStringToDate(t)
+                    addDataToMap(t, v)
+                }
+            })
             rememberCurrentPayloads()
+            resetDirty()
         },
         async save(){
             await queueSave()
@@ -162,10 +170,16 @@ export function CacheFuncMapBase(arr: [k: string, v: Map<string, unknown>][], Sa
         async clear(){
             cancelDebouncedSave()
             savedPayloadByKey.clear()
+            resetDirty()
             for (let [k,v] of arr) {
                 await Save.delete(k)
             }
         },
+        // dirty channel is module-global (cacheDirty.ts): all CacheFuncMapBase instances
+        // share it - fine while there is a single Cash, which is the actual setup
+        markDirty,
+        onDirty,
+        isDirty,
         getArr: arr
     }
 }

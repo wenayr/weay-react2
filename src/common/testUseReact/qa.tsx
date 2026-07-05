@@ -609,15 +609,18 @@ const qaSlot = createUiSlot({
 const slotContent = <span style={{ padding: "4px 10px", background: "#0969da", color: "#fff", borderRadius: 6, fontSize: 12 }}>the block</span>;
 
 const UiSlotDemo = () => {
-    // App-side persistence contract: Cash.load() on start, Cash.save() after changes.
-    useEffect(() => { void Cash.load(); }, []);
+    // App-side persistence contract: Cash.load() on start, then subscribe to the dirty
+    // channel - the lib marks dirty on real user changes, the app owns the write policy.
+    useEffect(() => {
+        void Cash.load();
+        const off = Cash.onDirty(() => Cash.saveDebounced(300));
+        return off;
+    }, []);
     return <div style={{ display: "grid", gap: 10 }}>
         <style>{`.qaChip{border:1px solid #6e7781;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;display:inline-block}.qaChipActive{background:#0969da;border-color:#0969da;color:#fff}`}</style>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <span style={{ fontSize: 13 }}>place:</span>
-            <div onClickCapture={() => setTimeout(() => void Cash.save(), 0)}>
-                <qaSlot.PlacementSetting className="qaChip" activeClassName="qaChipActive" />
-            </div>
+            <qaSlot.PlacementSetting className="qaChip" activeClassName="qaChipActive" />
         </div>
         <div style={{ border: "1px dashed #6e7781", borderRadius: 6, padding: 8, minHeight: 38, fontSize: 13 }}>
             Top bar: <qaSlot.Slot place="top">{slotContent}</qaSlot.Slot>
@@ -790,7 +793,7 @@ function ActiveChecks() {
             <Check n={21} title="createUiSlot - configurable block placement"
                    do="Switch Top bar / Sidebar. Then reload the page (F5)."
                    expect="The block moves between the two containers WITHOUT a reload; only one mount point shows it at a time. After F5 the chosen place is restored (staticGetAdd -> Cash)."
-                   note="Mount points render <Slot place=...> themselves and stay ignorant of each other. The demo calls Cash.load() on mount and Cash.save() after clicks - persistence stays app-side, as with window state.">
+                   note="Mount points render <Slot place=...> themselves and stay ignorant of each other. The demo calls Cash.load() on mount and subscribes Cash.onDirty -> saveDebounced(300): the lib only marks dirty on setPlace, the app owns the write policy.">
                 <UiSlotDemo />
             </Check>
 
