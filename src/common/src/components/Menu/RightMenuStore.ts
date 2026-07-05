@@ -10,4 +10,7 @@ export type MenuRightSavedState = {
     };
 };
 
-export const mapRightMenu = new Map<string, MenuRightSavedState>();
+import { ObservableMap } from "../../utils/observableMap";
+
+// observable - Cash marks itself dirty on its mutations (drag end re-set()s the state)
+export const mapRightMenu = new ObservableMap<string, MenuRightSavedState>();

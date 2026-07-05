@@ -1,10 +1,10 @@
 import React from "react";
 import {Resizable, ResizableProps} from "re-resizable";
-import {markDirty} from "../../utils/cacheDirty";
+import {ObservableMap} from "../../utils/observableMap";
 
 type tSaveMap = {height?: number|string, width?: number|string}
-// Memory for all column sizes
-export const mapResiReact = new Map<string,tSaveMap >()
+// Memory for all column sizes; observable - Cash marks itself dirty on its mutations
+export const mapResiReact = new ObservableMap<string,tSaveMap >()
 type t3 = Pick<ResizableProps, "style" | "enable" | "onResize" | "children" | "size" | "maxWidth"| "maxHeight"| "minWidth"| "minHeight">
 
 export function FResizableReact(
@@ -42,7 +42,8 @@ export function FResizableReact(
                               if (typeof obj.height == "number") obj.height += delta.height;
                               else {obj.height = elementRef.style.height}
                           // onResize?.(size)
-                          if (keyForSave) markDirty("mapResiReact", keyForSave)
+                          // obj is mutated in place - invisible to the map, so announce it
+                          if (keyForSave) mapResiReact.touch(keyForSave)
                           onResizeStop?.(obj)
                           // this.Refresh()
                       }}

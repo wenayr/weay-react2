@@ -40,17 +40,18 @@ staticGetAdd(key, def, {abs?, deepAutoMerge?, reversDeep?}) -> def-or-stored
 staticGetById(key, def, id) -> stored only while id is the same
 staticSet(key, data)
 staticGet(key)
-staticUpdate(key, mutate) -> cur?               // mutate + rerender + markDirty in one call
-staticMarkDirty(key)                            // announce a manual mutation of a staticGetAdd object
+staticUpdate(key, mutate) -> cur?               // mutate + rerender + announce in one call
+staticMarkDirty(key)                            // announce an in-place mutation of a staticGetAdd object
 MemoryMap                                       // rnd / resize / other maps
 ```
 
-Persistence contract (Cash): the library NEVER writes storage by itself. Committed user
-changes (DivRnd3 drag/resize stop, FResizableReact resize stop with keyForSave, right-menu
-drag end, createUiSlot.setPlace) only mark the cache dirty; the app owns the write policy:
+Persistence contract (Cash): the library NEVER writes storage by itself. The persisted maps
+(ExRNDMap3, mapResiReact, mapRightMenu, staticProps) are `ObservableMap`s - set/delete/clear
+announce themselves, in-place mutations are announced at the commit points (drag/resize stop,
+menu drag end, setPlace). Cash observes the maps it owns; the app owns the write policy:
 ```
 Cash.load()                                      // once on start; remembers the saved snapshot
-Cash.onDirty((scope?, key?) => ...) -> off       // dirty channel; also Cash.markDirty(scope?, key?)
+Cash.onDirty((scope?, key?) => ...) -> off       // dirty channel (coalesced, async)
 Cash.saveDebounced(ms?) / save() / flush()       // write only payloads that differ from the snapshot
 Cash.isDirty()                                   // cheap hint, e.g. a beforeunload guard
 
@@ -285,7 +286,7 @@ The chart engine surface is still mostly low-level. Keep product-specific chart 
 
 ## QA Stand
 ```
-npm run testReact -- --host 127.0.0.1 --port 3002
+npm run testReact                                // http://localhost:3010/
 ```
 
 The stand lives in `src/common/testUseReact/qa.tsx`. Use it for visual checks; agGrid4 overlay/dynamic-column demos are dedicated QA cards.

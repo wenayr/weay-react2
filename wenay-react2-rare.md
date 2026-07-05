@@ -91,9 +91,9 @@ UI slot:
 createUiSlot({key, places, def}) -> {Slot, PlacementSetting, getPlace, setPlace}
 <slot.PlacementSetting className? activeClassName? />   // defaults .wenaySegBtn / .wenaySegBtnActive
 ```
-State lives in `staticGetAdd(key)` -> persisted with the rest of staticProps; `setPlace` calls
-`markDirty("staticProps", key)` and the APP decides when to save via `Cash.onDirty`
-(the library never writes storage itself, same as window state).
+State lives in `staticGetAdd(key)` -> persisted with the rest of staticProps; `setPlace`
+announces the in-place mutation via `staticMarkDirty(key)` and the APP decides when to save
+via `Cash.onDirty` (the library never writes storage itself, same as window state).
 A stored place that no longer exists in `places` falls back to `def`. `getPlace()` is not reactive;
 Slot/PlacementSetting subscribe internally via updateBy.
 
@@ -121,13 +121,13 @@ StyleOtherColum
 ```
 DivRndBase3(props)                  // lower-level react-rnd wrapper
 DivRnd3(props)                      // canonical floating window component
-ExRNDMap3                           // persisted RND map
+ExRNDMap3                           // persisted RND map (ObservableMap)
 tRndUpdate
 
 Drag22(props)                       // old movement component
 Drag2(props)                        // older component from RNDFunc.tsx
 FResizableReact(props)
-mapResiReact
+mapResiReact                        // persisted resize map (ObservableMap)
 DraggableOutlineDiv()
 ```
 
@@ -201,8 +201,10 @@ tMenuReactStrictly / tMenuReact
 GetMenuR()                           // lower-level right-click menu factory
 mouseMenuApi                         // shared global mouse menu API
 
-DropdownMenu({elements, style?, position?, position2?})
+DropdownMenu({elements, style?, position?, position2?, keyForSave?})
 MenuRightApi()
+mapRightMenu                         // persisted right-menu state (ObservableMap, RightMenuStore)
+MenuRightPosition / MenuRightPosition2 / MenuRightSavedState / MenuRightRenderProps
 StickerMenu                          // components/Menu re-export
 ```
 
@@ -264,9 +266,11 @@ ObjectStringToDate(obj)
 CacheFuncMapBase(entries, save)
 CacheFuncMap(entries)
 
-markDirty(scope?, key?)             // dirty channel (cacheDirty.ts, module-global);
-onDirty(cb) -> off                  // also exposed as Cash.markDirty / onDirty / isDirty
-isDirty()
+ObservableMap<K,V> extends Map      // set/delete/clear announce themselves; touch(key?)
+  .onChange(cb) -> off              //   announces an in-place mutation; tMapChangeListener<K>
+Cash.onDirty(cb) -> off             // instance dirty channel (coalesced, async); tDirtyListener
+Cash.isDirty()
+Cash.markDirty(scope?, key?)        // manual announce, for plain-Map entries only
 
 staticSet(key, data)
 staticGet(key)
@@ -286,17 +290,23 @@ SetAutoStepForElement(input, {minStep?, maxStep?})
 
 Cache helpers are process/browser storage utilities, not React state management.
 
-Dirty/save contract: `markDirty` only announces "persisted state changed" - it never saves.
-The dirty scope/key are event metadata; WHAT gets written is decided by the save-side
-serialized-snapshot diff, so a missed markDirty degrades to "saved later" and an extra one
-to a no-op write. Emit points inside the library (all committed user changes, never
-render/init paths): DivRnd3 drag/resize stop, FResizableReact resize stop (keyForSave),
-right-menu drag end, createUiSlot.setPlace. `Cash.load()` suppresses dirty while loading
-and resets it after; a save cycle resets the flag at its START so a markDirty arriving
-mid-write survives. For manual mutations of objects taken from `staticGetAdd` use
-`staticUpdate(key, mutate)` (mutate + renderBy + markDirty) or `staticMarkDirty(key)`.
-Caveat: `flush()` is async - on pagehide localStorage writes usually complete but are not
-guaranteed (Cache API is not); prefer visibilitychange->hidden as the primary final save.
+Dirty/save contract: the dirty signal originates in the data layer. The persisted maps are
+`ObservableMap`s, so `set/delete/clear` announce themselves; in-place mutations of stored
+objects are invisible to map methods and are announced with `map.touch(key)` at the commit
+points (DivRnd3 drag/resize stop, FResizableReact resize stop, createUiSlot.setPlace) or,
+app-side, with `staticUpdate(key, mutate)` / `staticMarkDirty(key)`. `CacheFuncMapBase`
+subscribes to the ObservableMaps it owns - the channel is per instance, there is no global
+bus; plain Maps in `arr` stay silent (announce those via `Cash.markDirty`). Announcements
+never save anything: scope/key are event metadata, WHAT gets written is decided by the
+save-side serialized-snapshot diff, so a missed announcement degrades to "saved later" and
+an extra one to a no-op write. `isDirty()` is set synchronously; `onDirty` delivery is
+coalesced through a microtask (safe to mutate maps inside render/init paths; not throttled
+in background tabs the way timers are). `Cash.load()` ignores its own map events while
+loading and resets dirty after; a save cycle waits out an in-flight load() (a save racing
+a load could overwrite storage with in-memory defaults) and resets the flag at its START
+so a change arriving mid-write survives. Caveat: `flush()` is async - on pagehide
+localStorage writes usually complete but are not guaranteed (Cache API is not); prefer
+visibilitychange->hidden as the primary final save.
 
 ## Resize Observer
 ```

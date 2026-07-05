@@ -610,7 +610,8 @@ const slotContent = <span style={{ padding: "4px 10px", background: "#0969da", c
 
 const UiSlotDemo = () => {
     // App-side persistence contract: Cash.load() on start, then subscribe to the dirty
-    // channel - the lib marks dirty on real user changes, the app owns the write policy.
+    // channel - the persisted maps are observable and mark their Cash dirty themselves,
+    // the app owns the write policy.
     useEffect(() => {
         void Cash.load();
         const off = Cash.onDirty(() => Cash.saveDebounced(300));
@@ -793,7 +794,7 @@ function ActiveChecks() {
             <Check n={21} title="createUiSlot - configurable block placement"
                    do="Switch Top bar / Sidebar. Then reload the page (F5)."
                    expect="The block moves between the two containers WITHOUT a reload; only one mount point shows it at a time. After F5 the chosen place is restored (staticGetAdd -> Cash)."
-                   note="Mount points render <Slot place=...> themselves and stay ignorant of each other. The demo calls Cash.load() on mount and subscribes Cash.onDirty -> saveDebounced(300): the lib only marks dirty on setPlace, the app owns the write policy.">
+                   note="Mount points render <Slot place=...> themselves and stay ignorant of each other. The demo calls Cash.load() on mount and subscribes Cash.onDirty -> saveDebounced(300): the persisted maps are observable and mark Cash dirty themselves, the app owns the write policy.">
                 <UiSlotDemo />
             </Check>
 

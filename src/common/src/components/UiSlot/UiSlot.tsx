@@ -1,11 +1,11 @@
 import React from "react";
 import {renderBy, updateBy} from "../../../updateBy";
-import {markDirty} from "../../utils/cacheDirty";
-import {staticGetAdd} from "../../utils/mapMemory";
+import {staticGetAdd, staticMarkDirty} from "../../utils/mapMemory";
 
 /** One UI block shown in exactly one of several mount points; the point is a persisted setting.
- *  Persistence rides the existing staticProps -> Cash mechanics: setPlace marks the cache
- *  dirty (Cash.onDirty), the app decides when to save - same as window state (ExRNDMap3 etc.).
+ *  Persistence rides the existing staticProps -> Cash mechanics: staticProps is observable,
+ *  setPlace announces its in-place mutation (staticMarkDirty), the app decides when to save
+ *  via Cash.onDirty - same as window state (ExRNDMap3 etc.).
  *  Mount points render <Slot place="..."> themselves and decide nothing: the slot compares
  *  the persisted place with its own and renders children only on a match. */
 export function createUiSlot<Places extends string>(opts: {
@@ -24,7 +24,7 @@ export function createUiSlot<Places extends string>(opts: {
         if (st.place == p) return
         st.place = p
         renderBy(st)
-        markDirty("staticProps", opts.key)
+        staticMarkDirty(opts.key)
     }
 
     function Slot(p: {place: Places, children: React.ReactNode}): React.JSX.Element | null {

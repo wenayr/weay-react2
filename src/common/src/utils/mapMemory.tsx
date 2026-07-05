@@ -4,9 +4,10 @@ import { ExRNDMap3 } from "../components/Dnd/RNDFunc3";
 import { mapResiReact } from "../components/Dnd/Resizable";
 import { mapRightMenu } from "../components/Menu/RightMenuStore";
 import {CacheFuncMap} from "./cache";
-import { markDirty } from "./cacheDirty";
+import { ObservableMap } from "./observableMap";
 
-const staticProps = new Map<string,object>()
+// observable - Cash marks itself dirty on its mutations
+const staticProps = new ObservableMap<string,object>()
 
 export function staticSet(key: any, data: object) {
     if (!staticProps.has(key)) staticProps.set(key,data)
@@ -57,11 +58,11 @@ export function staticGetAdd<T extends object>(key: any, def: T, options: {abs?:
     return t// Object.assign(def, t) // t //
 }
 
-/** Mark a persisted staticProps entry dirty after a direct mutation of an object taken
- *  from staticGetAdd - such mutations are invisible to the library, someone must announce
- *  them. staticSet/staticGetAdd themselves stay silent: they only initialize/merge. */
+/** Announce a direct in-place mutation of an object taken from staticGetAdd - such
+ *  mutations are invisible to map methods. staticSet/staticGetAdd need no announcement:
+ *  their set() calls are observed by Cash automatically. */
 export function staticMarkDirty(key: any) {
-    markDirty("staticProps", typeof key == "string" ? key : undefined)
+    staticProps.touch(typeof key == "string" ? key : undefined)
 }
 
 /** App-facing change of a persisted staticProps entry in one call:
