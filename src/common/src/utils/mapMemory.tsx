@@ -1,6 +1,7 @@
 import { deepClone } from "wenay-common2";
 import { ExRNDMap3 } from "../components/Dnd/RNDFunc3";
 import { mapResiReact } from "../components/Dnd/Resizable";
+import { mapRightMenu } from "../components/Menu/RightMenuStore";
 import {CacheFuncMap} from "./cache";
 
 const staticProps = new Map<string,object>()
@@ -68,6 +69,7 @@ export const Cash = CacheFuncMap(
     [
         ["mapResiReact", mapResiReact],
         ["ExRNDMap3", ExRNDMap3],
+        ["mapRightMenu", mapRightMenu],
         ["staticProps", staticProps]
     ]
 )
@@ -75,5 +77,6 @@ export const Cash = CacheFuncMap(
 export const MemoryMap = {
     rnd: ExRNDMap3,
     resize: mapResiReact,
+    rightMenu: mapRightMenu,
     other: staticProps
 }

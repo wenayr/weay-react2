@@ -44,7 +44,16 @@ export class CResizeObserver {
 
 const global_resizeObserver = new CResizeObserver();
 
-const resizeableElementMap = new WeakMap<HTMLElement, ObserveID>();
+type ResizeableElementState = { observerId: ObserveID, defaultWidth: number, styleWidth: string, resizing: boolean };
+const resizeableElementMap = new WeakMap<HTMLElement, ResizeableElementState>();
+
+function getWidth(el: HTMLElement) {
+    return Math.ceil(el.clientWidth || el.getBoundingClientRect().width);
+}
+
+function applyWidth(el: HTMLElement, state: ResizeableElementState, width: number) {
+    el.style.width = width >= state.defaultWidth ? state.styleWidth : width + "px";
+}
 
 // Set automatic element resizing based on the parent element size
 //
@@ -55,33 +64,59 @@ export function setResizeableElement(el: HTMLElement) {
     if (!parentParent) return;
     const lastEl = parent.lastElementChild as HTMLElement | null;
     if (!lastEl) return;
-    let defaultWidth: number | undefined;
+
     const existing = resizeableElementMap.get(el);
-    if (existing) global_resizeObserver.delete(existing);
-    const observerId = global_resizeObserver.add(parentParent, () => {
-        // Jump directly by the mismatch amount (previously 1px with reflow on each step);
-        // a few iterations are only for final adjustment, the upper bound prevents an infinite loop
-        let lastRangeDelta = 0;
-        for (let width = el.clientWidth, i = 0; i < 8; i++) {
-            const rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentParent.getBoundingClientRect().right);
-            if (rangeDelta == 0) break;
-            if (lastRangeDelta && rangeDelta * lastRangeDelta < 0) break;
-            lastRangeDelta = rangeDelta;
-            defaultWidth ??= el.clientWidth;
-            width -= rangeDelta;
-            if (width < 10) width = 10;
-            if (width > defaultWidth) width = defaultWidth;
-            el.style.width = width + "px";
-            if (width == 10 || width == defaultWidth) break;
+    if (existing) {
+        global_resizeObserver.delete(existing.observerId);
+        el.style.width = existing.styleWidth;
+    }
+
+    const state: ResizeableElementState = {
+        observerId: {} as ObserveID,
+        defaultWidth: existing?.defaultWidth ?? getWidth(el),
+        styleWidth: existing?.styleWidth ?? el.style.width,
+        resizing: false,
+    };
+
+    const resize = () => {
+        if (state.resizing) return;
+        state.resizing = true;
+        try {
+            applyWidth(el, state, state.defaultWidth);
+            let rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentParent.getBoundingClientRect().right);
+            if (rangeDelta <= 0) return;
+
+            const parentWidth = parentParent.getBoundingClientRect().width;
+            const probeWidth = Math.max(10, Math.floor(state.defaultWidth * 0.8));
+            if (state.defaultWidth - probeWidth >= 2) {
+                el.style.width = probeWidth + "px";
+                const probedParentWidth = parentParent.getBoundingClientRect().width;
+                applyWidth(el, state, state.defaultWidth);
+                if (Math.abs(parentWidth - probedParentWidth) > 0.5) return;
+            }
+
+            for (let width = state.defaultWidth, i = 0; i < 8; i++) {
+                width = Math.max(10, Math.min(state.defaultWidth, width - rangeDelta));
+                applyWidth(el, state, width);
+                if (width == 10 || width == state.defaultWidth) break;
+                rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentParent.getBoundingClientRect().right);
+                if (rangeDelta <= 0) break;
+            }
+        } finally {
+            state.resizing = false;
         }
-    });
-    resizeableElementMap.set(el, observerId);
+    };
+
+    state.observerId = global_resizeObserver.add(parentParent, resize);
+    resizeableElementMap.set(el, state);
+    resize();
     return el;
 }
 
 export function removeResizeableElement(el: HTMLElement) {
-    const id = resizeableElementMap.get(el);
-    if (!id) return;
-    global_resizeObserver.delete(id);
+    const state = resizeableElementMap.get(el);
+    if (!state) return;
+    global_resizeObserver.delete(state.observerId);
+    el.style.width = state.styleWidth;
     resizeableElementMap.delete(el);
 }

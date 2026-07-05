@@ -7,29 +7,53 @@ import React, {
     useState
 } from 'react';
 import { sleepAsync } from 'wenay-common2';
-import {Position, useDraggable} from "../../hooks/useDraggable";
+import {type Position, useDraggable} from "../../hooks/useDraggable";
 import {DivOutsideClick} from "../../hooks/useOutside";
 import { DraggableOutlineDiv } from "../Dnd/DraggableOutlineDiv";
 import { GetModalFuncJSX } from "../Modal/Modal";
+import {
+    mapRightMenu,
+    type MenuRightPosition,
+    type MenuRightPosition2,
+    type MenuRightSavedState
+} from "./RightMenuStore";
 
-type MenuElement = {
+export type MenuElement = {
     label: string;
     subMenuContent: () => JSX.Element;
 };
 
-type DropdownMenuProps = {
+export type DropdownMenuProps = {
     elements: MenuElement[];
     style?: React.CSSProperties;
-    position?: 'left' | 'right';
-    position2?: 'top' | 'bottom';
+    position?: MenuRightPosition;
+    position2?: MenuRightPosition2;
+    keyForSave?: string;
 };
+
+export type MenuRightRenderProps = Omit<DropdownMenuProps, 'elements'>;
 
 export function DropdownMenu({
                                  elements,
                                  style,
                                  position: initialPosition = 'right',
-                                 position2: initialPos2 = 'top'
+                                 position2: initialPos2 = 'top',
+                                 keyForSave
                              }: DropdownMenuProps) {
+    const [initialState] = useState<MenuRightSavedState>(() => {
+        const fallback: MenuRightSavedState = {
+            position: initialPosition,
+            position2: initialPos2,
+            offset: { x: 0, y: 0 }
+        };
+        if (!keyForSave) return fallback;
+
+        const saved = mapRightMenu.get(keyForSave);
+        if (saved) return saved;
+
+        mapRightMenu.set(keyForSave, fallback);
+        return fallback;
+    });
     const [isOpen, setIsOpen] = useState(false);
     const [isFixed, setIsFixed] = useState(false);
     const [select, setSelect] = useState<number | null>(null);
@@ -37,45 +61,56 @@ export function DropdownMenu({
     // Get modal JSX functions
     const jsx = useMemo(GetModalFuncJSX, []);
     const jsxRender = useMemo(() => <jsx.Render />, [jsx]);
+    const [position, setPosition] = useState<MenuRightPosition>(initialState.position);
+    const [isTop, setIsTop] = useState(initialState.position2 === 'top');
+    const positionLast = useRef<{ x: number; y: number }>({ ...initialState.offset });
+    const containerRef = useRef<HTMLDivElement | null>(null);
 
-    const [position, setPosition] = useState<'left' | 'right'>(initialPosition);
-    const [isTop, setIsTop] = useState(initialPos2 === 'top');
-    const positionLast = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const handleDragEnd = useCallback((finalPosition: Position) => {
+        // Re-anchor from the computed dropped rect. useDraggable resets its delta
+        // before React necessarily paints, so measuring the element position here
+        // can read the pre-drop corner and cause a sudden relocation.
+        const el = containerRef.current;
+        if (!el) return;
+        const parent = el.offsetParent as HTMLElement | null;
+        // fixed positioning -> offsetParent is null -> viewport is the box
+        const bounds = parent?.getBoundingClientRect()
+            ?? new DOMRect(0, 0, window.innerWidth, document.documentElement.clientHeight);
 
-    const handleDragEnd = useCallback(
-        (finalPosition: Position) => {
-            // Handle horizontal offset
-            if (position === 'left') {
-                positionLast.current.x += finalPosition.x;
-                if (positionLast.current.x > window.innerWidth * 0.6) {
-                    positionLast.current.x = window.innerWidth - positionLast.current.x;
-                    setPosition('right');
-                }
-            } else if (position === 'right') {
-                positionLast.current.x -= finalPosition.x;
-                if (positionLast.current.x > window.innerWidth * 0.6) {
-                    positionLast.current.x = window.innerWidth - positionLast.current.x;
-                    setPosition('left');
-                }
-            }
-            // Handle vertical offset
-            if (isTop) {
-                positionLast.current.y += finalPosition.y;
-                if (positionLast.current.y > document.documentElement.clientHeight * 0.6) {
-                    positionLast.current.y = document.documentElement.clientHeight - positionLast.current.y;
-                    setIsTop(false);
-                }
-            } else {
-                positionLast.current.y -= finalPosition.y;
-                if (positionLast.current.y > document.documentElement.clientHeight * 0.6) {
-                    positionLast.current.y = document.documentElement.clientHeight - positionLast.current.y;
-                    setIsTop(true);
-                }
-            }
-        },
-        [position, isTop]
-    );
+        const measured = el.getBoundingClientRect();
+        const width = measured.width;
+        const height = measured.height;
+        const baseLeft = position === 'left'
+            ? bounds.left + positionLast.current.x
+            : bounds.right - positionLast.current.x - width;
+        const baseTop = isTop
+            ? bounds.top + positionLast.current.y
+            : bounds.bottom - positionLast.current.y - height;
+        const left = baseLeft + finalPosition.x;
+        const top = baseTop + finalPosition.y;
+        const right = left + width;
+        const bottom = top + height;
 
+        const toLeft = left + width / 2 < bounds.left + bounds.width / 2;
+        const toTop = top + height / 2 < bounds.top + bounds.height / 2;
+        const nextPosition: MenuRightPosition = toLeft ? 'left' : 'right';
+        const nextOffset = {
+            x: Math.max(0, toLeft ? left - bounds.left : bounds.right - right),
+            y: Math.max(0, toTop ? top - bounds.top : bounds.bottom - bottom)
+        };
+
+        positionLast.current = nextOffset;
+        setPosition(nextPosition);
+        setIsTop(toTop);
+
+        if (keyForSave) {
+            mapRightMenu.set(keyForSave, {
+                position: nextPosition,
+                position2: toTop ? 'top' : 'bottom',
+                offset: { ...nextOffset }
+            });
+        }
+    }, [isTop, keyForSave, position]);
     const { position: pos, dragProps } = useDraggable(0, 0, 50, handleDragEnd, () => {});
 
     // Click and hover handlers
@@ -153,7 +188,10 @@ export function DropdownMenu({
                 onMouseLeave={handleSubmenuMouseLeave}
             >
                 {jsx.JSX ? (
-                    <div className="submenu" style={{ width: '40vw', minHeight: '70vh' }}>
+                    // clamp to the viewport: with hard 40vw/70vh the submenu ran
+                    // off screen when the menu sat near a bottom/side edge
+                    <div className="submenu" style={{ width: '40vw', minHeight: '70vh',
+                        maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto' }}>
                         {jsxRender}
                     </div>
                 ) : null}
@@ -198,6 +236,7 @@ export function DropdownMenu({
 
     return (
         <DivOutsideClick
+            ref={containerRef}
             outsideClick={handleClickOutside}
             className={`menu-container ${isFixed ? 'activeM' : ''}`}
             style={containerStyle}
@@ -221,7 +260,7 @@ export function MenuRightApi() {
             const el = array.filter((e) => elements.indexOf(e) === -1);
             if (el.length === 0) return;
             elements.push(...el);
-            render?.(elements);
+            render?.([...elements]);
         },
         delete(array: MenuElement[]) {
             array.forEach((e) => {
@@ -233,15 +272,15 @@ export function MenuRightApi() {
         get() {
             return elements;
         },
-        Render({ style }: { style?: React.CSSProperties }) {
-            const [el, setEl] = useState(elements);
+        Render(props: MenuRightRenderProps = {}) {
+            const [el, setEl] = useState([...elements]);
             useEffect(() => {
                 render = setEl;
                 return () => {
                     render = null;
                 };
             }, []);
-            return <DropdownMenu elements={el} style={style} position="left" />;
+            return <DropdownMenu {...props} elements={el} />;
         }
     };
 }
@@ -281,4 +320,3 @@ const SubMenu2 = () => {
         </div>
     );
 };
-

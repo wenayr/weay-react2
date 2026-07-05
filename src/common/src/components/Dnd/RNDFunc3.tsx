@@ -81,9 +81,11 @@ export function DivRndBase3({
                                 onCLickClose,
                                 sizeByWindow = true
                             }: tDivRndBase) {
-    if (onCLickClose && !limit) {
-        limit = { y: { min: 0 } };
-    }
+    // NOTE: no implicit limit for onCLickClose windows. `limit` is parent-relative,
+    // so {y:{min:0}} pinned windows to their DOM parent's top: a window opened from a
+    // centered wrapper (ModalProvider / ModalWrapper at top:50%) could not be dragged
+    // above mid-screen. Keeping the window on screen is already handled by the
+    // viewport clamp below (header rect vs viewport in useLayoutEffect).
 
     const positionDef: tPosition = { x: 0, y: 0, ...(position ?? {}) };
     const sizeDef: tSize = { height: 0, width: 0, ...(size ?? {}) };
@@ -266,6 +268,7 @@ export function DivRndBase3({
     const headerD = (
         <div
             ref={headerRef}
+            className="wenayWndHeader"
             onTouchStart={(e) => {
                 const t = e.changedTouches[0];
                 if (t) {
@@ -284,21 +287,8 @@ export function DivRndBase3({
                 };
                 setA(true);
             }}
-            style={{
-                userSelect: "none",
-                cursor: "grabbing"
-            }}
         >
-            {header ?? (
-                <div
-                    style={{
-                        height: 20,
-                        width: "100%",
-                        backgroundImage:
-                            "repeating-linear-gradient(139deg, hsla(0,0%,100%,.1), hsla(0,0%,100%,.1) 15px, transparent 0, transparent 30px)"
-                    }}
-                ></div>
-            )}
+            {header ?? <div className="wenayWndHeaderDef"></div>}
         </div>
     );
 
@@ -328,6 +318,7 @@ export function DivRndBase3({
             }}
         >
             <div
+                className="wenayWnd"
                 style={{
                     width: "100%",
                     height: "100%",
@@ -363,12 +354,9 @@ export function DivRndBase3({
                 {onCLickClose && (
                     <div
                         key="323"
-                        className="wenayCloseBtn"
+                        className="wenayCloseBtn wenayWndClose"
                         title="Close"
                         style={{
-                            position: "absolute",
-                            right: -12,
-                            top: -12,
                             zIndex: zIndexX * 2 + zIndex + 1
                         }}
                         onClick={onCLickClose}

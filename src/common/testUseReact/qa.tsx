@@ -502,6 +502,74 @@ const ModalOpener = () => {
 };
 const ModalDemo = () => <ModalProvider><ModalOpener /></ModalProvider>;
 
+const resizeAssetRange = ["USDT", "BTC", "ETH", "BNB", "AMB"] as const;
+function makeResizeParams(asset: string) {
+    return {
+        asset: {
+            name: "asset",
+            value: asset,
+            range: resizeAssetRange,
+        },
+    };
+}
+
+const ResizeBugRepro = () => {
+    const [n, setN] = useState(0);
+    const [asset, setAsset] = useState("USDT");
+    const [fixedWidth, setFixedWidth] = useState(150);
+    const [autoWidth, setAutoWidth] = useState(0);
+    const [fixedSelectWidth, setFixedSelectWidth] = useState(0);
+    const autoRef = React.useRef<HTMLDivElement>(null);
+    const fixedRef = React.useRef<HTMLDivElement>(null);
+
+    const onChange = (params: ReturnType<typeof makeResizeParams>) => {
+        setAsset(params.asset.value);
+        setN(v => v + 1);
+    };
+
+    React.useLayoutEffect(() => {
+        const readWidths = () => {
+            const autoSelect = autoRef.current?.querySelector("select");
+            const fixedSelect = fixedRef.current?.querySelector("select");
+            setAutoWidth(Math.round(autoSelect?.getBoundingClientRect().width ?? 0));
+            setFixedSelectWidth(Math.round(fixedSelect?.getBoundingClientRect().width ?? 0));
+        };
+        readWidths();
+        const id = requestAnimationFrame(readWidths);
+        const observer = typeof ResizeObserver != "undefined" ? new ResizeObserver(readWidths) : null;
+        if (autoRef.current) observer?.observe(autoRef.current);
+        if (fixedRef.current) observer?.observe(fixedRef.current);
+        return () => {
+            cancelAnimationFrame(id);
+            observer?.disconnect();
+        };
+    }, [n, asset, fixedWidth]);
+
+    const selectInfo: React.CSSProperties = { fontSize: 12, color: "#57606a", marginTop: 6 };
+
+    return <div style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
+            <div>
+                <div ref={autoRef} style={{ display: "inline-flex", flexDirection: "column", alignItems: "stretch", border: "1px solid #cf222e", padding: 6 }}>
+                    <ParametersReact params={makeResizeParams(asset)} onChange={onChange}/>
+                    <button onClick={() => setN(v => v + 1)}>rerender {n}</button>
+                </div>
+                <div style={selectInfo}>auto-width select: <b>{autoWidth}px</b></div>
+            </div>
+            <div>
+                <div ref={fixedRef} style={{ width: fixedWidth, minWidth: 90, maxWidth: 300, resize: "horizontal", overflow: "auto", border: "1px solid #0969da", padding: 6 }}>
+                    <ParametersReact params={makeResizeParams(asset)} onChange={onChange}/>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                    <button onClick={() => setFixedWidth(w => w == 150 ? 240 : 150)}>parent {fixedWidth}px</button>
+                    <button onClick={() => setN(v => v + 1)}>rerender</button>
+                </div>
+                <div style={selectInfo}>fixed-parent select: <b>{fixedSelectWidth}px</b></div>
+            </div>
+        </div>
+        <div style={{ fontSize: 13 }}>selected asset: <b>{asset}</b></div>
+    </div>;
+};
 /* ---------- borad ---------- */
 function ActiveChecks() {
     return (
@@ -576,6 +644,13 @@ function ActiveChecks() {
                 <div style={{ minHeight: 260 }}><TestParams /></div>
             </Check>
 
+            <Check n={19} title="Parameters - resize observer shrink repro"
+                   do="Click rerender many times and change the asset select. Then click parent 150/240px, or narrow the blue wrapper in DevTools."
+                   expect="The red auto-width select does not ratchet down. The blue fixed-parent select gets narrower when the parent is 150px and grows back when the parent is 240px."
+                   note="This is the setResizeableElement repro: repeated ref/ResizeObserver runs must keep the natural width and avoid feedback in shrink-to-content containers."
+                   tall>
+                <ResizeBugRepro />
+            </Check>
             <Check n={12} title="agGrid4 - controller, removal, external buffer"
                    do="add/update Tesla and Apple should make rows appear/update. remove Tesla should remove it. Then: unmount grid -> write MSFT directly to the buffer -> mount grid."
                    expect="Updates by ID have no duplicates; removal works. After remount, the grid catches up with the buffer itself: Tesla/Apple are still present, MSFT appears (attach->sync). Theme is dark, like production grids (GridStyleDefault)."

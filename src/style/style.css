@@ -136,11 +136,11 @@ input:invalid {
 
 /* Menu */
 .MenuR {
-  box-shadow: 0 0 20px 14px rgba(34, 60, 80, 0.2);
+  box-shadow: var(--menu-shadow);
   margin-top: 4px;
   min-width: 80px;
   width: max-content;
-  background: rgba(12, 12, 12, 0.91);
+  background: var(--menu-bg-color);
 }
 
 .maxSize {
@@ -319,28 +319,69 @@ body {
   margin-left: -1px;
 }
 
+/* DivRnd3 window chrome. All visuals go through --wnd-* tokens (tokens.css);
+   defaults reproduce the legacy look, apps re-skin via :root[data-theme] token overrides. */
+.wenayWnd {
+  background: var(--wnd-bg);
+  border: var(--wnd-border);
+  border-radius: var(--wnd-radius);
+  box-shadow: var(--wnd-shadow);
+}
+/* Header drag zone. Color/font tokens are undeclared by default: an unresolved var()
+   makes the property fall back to its inherited value, i.e. exactly the legacy look. */
+.wenayWndHeader {
+  user-select: none;
+  cursor: grabbing;
+  height: var(--wnd-header-height, auto);
+  padding: var(--wnd-header-padding);
+  background: var(--wnd-header-bg);
+  border-bottom: var(--wnd-header-border);
+  border-top-left-radius: var(--wnd-radius);
+  border-top-right-radius: var(--wnd-radius);
+  color: var(--wnd-header-color, inherit);
+  font-size: var(--wnd-header-font-size, inherit);
+  letter-spacing: var(--wnd-header-letter-spacing, inherit);
+  text-transform: var(--wnd-header-transform, inherit);
+}
+/* Default header content when no header element is passed (striped drag strip) */
+.wenayWndHeaderDef {
+  height: var(--wnd-header-height, 20px);
+  width: 100%;
+  background: var(--wnd-header-stripes);
+}
+
 /* Window close button (DivRnd3 and others) */
 .wenayCloseBtn {
-  width: 28px;
-  height: 28px;
+  width: var(--wnd-close-size, 28px);
+  height: var(--wnd-close-size, 28px);
+  /* keep the clickable zone >= 24x24 whatever the theme sets */
+  min-width: 24px;
+  min-height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--color-bg-light);
-  border: 1px solid var(--color-border-common);
-  color: var(--color-text-base);
+  background: var(--wnd-close-bg, var(--color-bg-light));
+  border: var(--wnd-close-border, 1px solid var(--color-border-common));
+  color: var(--wnd-close-color, var(--color-text-base));
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--wnd-close-shadow, 0 2px 6px rgba(0, 0, 0, 0.35));
   transition: background 0.15s, color 0.15s, transform 0.15s;
 }
 .wenayCloseBtn:hover {
-  background: #e5484d;
-  border-color: #e5484d;
-  color: #fff;
+  background: var(--wnd-close-hover-bg, #e5484d);
+  border-color: var(--wnd-close-hover-bg, #e5484d);
+  color: var(--wnd-close-hover, #fff);
   transform: scale(1.08);
 }
 .wenayCloseBtn:active {
   transform: scale(0.95);
+}
+/* Positioning of the close button inside DivRnd3. Kept separate from .wenayCloseBtn,
+   which may be used outside windows and must not become position:absolute there. */
+.wenayWndClose {
+  position: absolute;
+  top: var(--wnd-close-top, -12px);
+  right: var(--wnd-close-right, -12px);
 }

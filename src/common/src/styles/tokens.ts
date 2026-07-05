@@ -20,6 +20,32 @@ export const tokens = {
         itemColor: '#fff',
         itemHoverColor: '#101010',
         itemHoverBgColor: '#fff',
+        shadow: '0 0 20px 14px rgba(34, 60, 80, 0.2)',
+    },
+    /** DivRnd3 window chrome (--wnd-*). Defaults = legacy look; apps re-skin via :root[data-theme].
+     *  --wnd-header-height/color/font-size/letter-spacing/transform are intentionally undeclared
+     *  (inherit/auto) until a theme sets them. */
+    wnd: {
+        bg: 'transparent',
+        border: 'none',
+        radius: '0',
+        shadow: 'none',
+        headerBg: 'transparent',
+        headerStripes: 'repeating-linear-gradient(139deg, hsla(0, 0%, 100%, 0.1), hsla(0, 0%, 100%, 0.1) 15px, transparent 0, transparent 30px)',
+        headerBorder: 'none',
+        headerPadding: '0',
+        closeSize: '28px',
+        closeTop: '-12px',
+        closeRight: '-12px',
+        /** var(--color-bg-light) in CSS */
+        closeBg: '#17202e',
+        /** var(--color-border-common) in CSS */
+        closeBorder: '1px solid rgb(50, 62, 71)',
+        closeShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',
+        /** var(--color-text-base) in CSS */
+        closeColor: '#c4c4c4',
+        closeHover: '#fff',
+        closeHoverBg: '#e5484d',
     },
     font: {
         family: 'Roboto',

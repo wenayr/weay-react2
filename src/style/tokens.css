@@ -29,6 +29,39 @@
   --menu-item-hover-color: #101010;
   --menu-item-hover-bg-color: var(--base-color-hover);
 
+  /* Menu shadow (was a literal in .MenuR) */
+  --menu-shadow: 0 0 20px 14px rgba(34, 60, 80, 0.2);
+
+  /* Window (DivRnd3) chrome. Defaults = legacy look, so apps without themes do not change.
+     Apps re-skin via :root[data-theme='...'] overrides, same contract as --color-* / --menu-*.
+     Intentionally NOT declared here (fall back to inherit/auto until a theme declares them):
+     --wnd-header-height, --wnd-header-color, --wnd-header-font-size,
+     --wnd-header-letter-spacing, --wnd-header-transform */
+  --wnd-bg: transparent;
+  --wnd-border: none;
+  --wnd-radius: 0;
+  --wnd-shadow: none;
+
+  /* Header drag zone: wrapper background (solid in themes) vs default striped strip.
+     Themes typically set --wnd-header-bg to a panel color and --wnd-header-stripes to none. */
+  --wnd-header-bg: transparent;
+  --wnd-header-stripes: repeating-linear-gradient(139deg, hsla(0, 0%, 100%, 0.1), hsla(0, 0%, 100%, 0.1) 15px, transparent 0, transparent 30px);
+  --wnd-header-border: none;
+  --wnd-header-padding: 0;
+
+  /* Close button. Legacy: floating circle at the window's top-right corner.
+     Themes move it into the header (top/right offsets) and strip the circle chrome.
+     Clickable zone is clamped to >= 24x24 in CSS regardless of --wnd-close-size. */
+  --wnd-close-size: 28px;
+  --wnd-close-top: -12px;
+  --wnd-close-right: -12px;
+  --wnd-close-bg: var(--color-bg-light);
+  --wnd-close-border: 1px solid var(--color-border-common);
+  --wnd-close-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --wnd-close-color: var(--color-text-base);
+  --wnd-close-hover: #fff;
+  --wnd-close-hover-bg: #e5484d;
+
   /* Layers */
   --wenay-z-modal: 9999;
 }

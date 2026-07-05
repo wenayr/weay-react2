@@ -52,7 +52,8 @@ export * from "./src/components/Modal";
 export * from "./src/components/Menu";
 
 // 12. MENU - depends on components
-export * from "./src/menu/menu";
+export { MenuBase, TimeNum, MenuElement as LegacyMenuElement } from "./src/menu/menu";
+export type { tMenuReact, tMenuReactStrictly } from "./src/menu/menu";
 export * from "./src/menu/menuMouse";
 export * from "./src/menu/menuR";
 
