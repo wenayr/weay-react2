@@ -63,6 +63,48 @@ TestLeft333()
 
 These are app-shell style utilities. Prefer local app wrappers for new layouts.
 
+## Settings Dialog / UI Slot / Callback Hub Details
+Settings dialog (centered panel ~640x420, max 92vw/82vh; sections column left, content right):
+```
+type tSettingsSection = {key: string, name: string, render: () => ReactNode}
+
+<SettingsDialog
+    trigger={...}                     // wrapper span is clickable
+    sections?                         // static sections, listed first
+    defaultSection?                   // falls back to the first section when missing/unmounted
+    sectionClassName?                 // apps pass their own .chip; default .wenayDlgSection
+    sectionActiveClassName?           // apps pass their own .chipActive; default .wenayDlgSectionActive
+/>
+
+registerSettingsSection(s) -> unregister
+getSettingsSections() -> readonly tSettingsSection[]
+```
+The registry is a module singleton on updateBy/renderBy (no React context). Registering the same
+`key` replaces the previous section; unregister removes by identity, so a stale unregister after a
+replacement is a no-op. Closes on the x, a scrim click, and Escape.
+Styling: `--dlg-scrim / bg / border / radius / shadow / nav-bg / nav-width` tokens (tokens.css,
+mirror `tokens.dlg`), classes `.wenayDlgScrim / .wenayDlg / .wenayDlgNav / .wenayDlgContent /
+.wenayDlgClose` in style.css; dark defaults, apps re-skin via `:root[data-theme]` like `--wnd-*`.
+
+UI slot:
+```
+createUiSlot({key, places, def}) -> {Slot, PlacementSetting, getPlace, setPlace}
+<slot.PlacementSetting className? activeClassName? />   // defaults .wenaySegBtn / .wenaySegBtnActive
+```
+State lives in `staticGetAdd(key)` -> persisted with the rest of staticProps by the APP calling
+`Cash.load()/save()` (the library never calls Cash.save itself, same as window state).
+A stored place that no longer exists in `places` falls back to `def`. `getPlace()` is not reactive;
+Slot/PlacementSetting subscribe internally via updateBy.
+
+Callback hub (for single-slot callback APIs `onX(cb | null)` whose subscribers silently
+overwrite each other):
+```
+createCallbackHub<Args>(bind) -> {on, count}
+```
+`bind(emit)` runs lazily, ONCE, on the first `on()` - not at creation time, because the slot may
+still be taken by app initialization. The first callback is registered before bind runs, so it
+also catches synchronous emits. `on(cb) -> off`; off removes only that subscriber.
+
 ## Outside / Buttons Compatibility
 ```
 useOutsideOld(options) -> ref       // use useOutside(options).ref / .props

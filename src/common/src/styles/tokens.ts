@@ -47,6 +47,19 @@ export const tokens = {
         closeHover: '#fff',
         closeHoverBg: '#e5484d',
     },
+    /** SettingsDialog chrome (--dlg-*). Dark defaults; apps re-skin via :root[data-theme]. */
+    dlg: {
+        scrim: 'rgba(0, 0, 0, 0.5)',
+        /** var(--color-bg-dark) in CSS */
+        bg: '#131821',
+        /** var(--color-border-common) in CSS */
+        border: '1px solid rgb(50, 62, 71)',
+        radius: '10px',
+        shadow: '0 12px 40px rgba(0, 0, 0, 0.5)',
+        /** var(--color-bg-light) in CSS */
+        navBg: '#17202e',
+        navWidth: '168px',
+    },
     font: {
         family: 'Roboto',
         sizeBase: '12px',

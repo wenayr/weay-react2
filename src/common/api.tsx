@@ -51,6 +51,10 @@ export * from "./src/components/Modal";
 // 11. Menu - depends on hooks, Dnd, and Modal
 export * from "./src/components/Menu";
 
+// 11b. Settings dialog + section registry; UI slot with configurable placement
+export * from "./src/components/Settings";
+export * from "./src/components/UiSlot";
+
 // 12. MENU - depends on components
 export { MenuBase, TimeNum, MenuElement as LegacyMenuElement } from "./src/menu/menu";
 export type { tMenuReact, tMenuReactStrictly } from "./src/menu/menu";

@@ -7,3 +7,5 @@ export * from './Parameters';
 export * from './ParametersEngine';
 export * from './MyResizeObserver';
 export * from './Other';
+export * from './Settings';
+export * from './UiSlot';

@@ -385,3 +385,72 @@ body {
   top: var(--wnd-close-top, -12px);
   right: var(--wnd-close-right, -12px);
 }
+
+/* Settings dialog (SettingsDialog). Themed via --dlg-* (tokens.css), dark defaults. */
+.wenayDlgScrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--wenay-z-modal, 9999);
+  background: var(--dlg-scrim, rgba(0, 0, 0, 0.5));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wenayDlg {
+  position: relative;
+  display: flex;
+  width: 640px;
+  height: 420px;
+  max-width: 92vw;
+  max-height: 82vh;
+  background: var(--dlg-bg, var(--color-bg-dark));
+  border: var(--dlg-border, 1px solid var(--color-border-common));
+  border-radius: var(--dlg-radius, 10px);
+  box-shadow: var(--dlg-shadow, 0 12px 40px rgba(0, 0, 0, 0.5));
+  color: var(--color-text-base);
+  overflow: hidden;
+}
+.wenayDlgNav {
+  width: var(--dlg-nav-width, 168px);
+  flex: none;
+  background: var(--dlg-nav-bg, var(--color-bg-light));
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+.wenayDlgContent {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 14px 40px 14px 16px;
+  overflow: auto;
+}
+/* Positioning of the close button in the dialog's top-right corner (over the content column).
+   A direct child of .wenayDlg, NOT of the scrollable content, so it does not scroll away. */
+.wenayDlgClose {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+/* Minimal default section/segment buttons; apps override via sectionClassName /
+   sectionActiveClassName (SettingsDialog) and className / activeClassName (PlacementSetting) */
+.wenayDlgSection,
+.wenaySegBtn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  text-align: left;
+  color: inherit;
+}
+.wenayDlgSection:hover,
+.wenaySegBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.wenayDlgSectionActive,
+.wenaySegBtnActive {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}

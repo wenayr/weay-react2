@@ -62,6 +62,16 @@
   --wnd-close-hover: #fff;
   --wnd-close-hover-bg: #e5484d;
 
+  /* Settings dialog (SettingsDialog). Dark defaults close to current apps;
+     apps re-skin via :root[data-theme='...'] overrides, same contract as --wnd-*. */
+  --dlg-scrim: rgba(0, 0, 0, 0.5);
+  --dlg-bg: var(--color-bg-dark);
+  --dlg-border: 1px solid var(--color-border-common);
+  --dlg-radius: 10px;
+  --dlg-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --dlg-nav-bg: var(--color-bg-light);
+  --dlg-nav-width: 168px;
+
   /* Layers */
   --wenay-z-modal: 9999;
 }

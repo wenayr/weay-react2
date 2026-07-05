@@ -94,6 +94,26 @@ Input helpers:
 <PageModalFree outClick={modal.close} size={{width: 400, height: 260}}>...</PageModalFree>
 ```
 
+## Settings Dialog
+```
+<SettingsDialog trigger={<span>settings</span>} sections={[{key, name, render}]} defaultSection? />
+registerSettingsSection({key, name, render}) -> unregister   // external section from any module
+```
+
+## UI Slot
+```
+const slot = createUiSlot({key, places: {top: "Top bar", side: "Sidebar"}, def: "top"})
+
+<slot.Slot place="top">{content}</slot.Slot>     // each mount point decides by itself
+<slot.PlacementSetting />                        // segmented place switcher; place persists
+```
+
+## Callback Hub
+```
+const hub = createCallbackHub<[Args]>(emit => api.onX(emit))  // one slot -> many subscribers
+hub.on(cb) -> off
+```
+
 ## Params
 ```
 <ParametersReact

@@ -101,6 +101,40 @@ function isDate(_date: string){
 }
 
 export function CacheFuncMapBase(arr: [k: string, v: Map<string, unknown>][], Save: IServerSaveBasePromise) {
+    const savedPayloadByKey = new Map<string, string>()
+    let saveTimer: ReturnType<typeof setTimeout> | null = null
+    let runningSave: Promise<void> | null = null
+
+    const getPayloads = () => arr.map(([key, map]) => [key, JSON.stringify([...map.entries()])] as const)
+    const rememberCurrentPayloads = () => {
+        savedPayloadByKey.clear()
+        for (const [key, payload] of getPayloads()) savedPayloadByKey.set(key, payload)
+    }
+    const cancelDebouncedSave = () => {
+        if (saveTimer === null) return
+        clearTimeout(saveTimer)
+        saveTimer = null
+    }
+    const saveChangedPayloads = async () => {
+        for (const [key, payload] of getPayloads()) {
+            if (savedPayloadByKey.get(key) === payload) continue
+            if (await Save.set(key, JSON.parse(payload) as object)) {
+                savedPayloadByKey.set(key, payload)
+            }
+        }
+    }
+    const trackSave = (savePromise: Promise<void>) => {
+        const trackedPromise = savePromise.catch(() => undefined).finally(() => {
+            if (runningSave === trackedPromise) runningSave = null
+        })
+        runningSave = trackedPromise
+        return savePromise
+    }
+    const queueSave = () => {
+        if (runningSave === null) return trackSave(saveChangedPayloads())
+        return trackSave(runningSave.then(saveChangedPayloads, saveChangedPayloads))
+    }
+
     return {
         async load(){
             for (let [k,v] of arr) {
@@ -109,13 +143,25 @@ export function CacheFuncMapBase(arr: [k: string, v: Map<string, unknown>][], Sa
                 ObjectStringToDate(t)
                 addDataToMap(t, v)
             }
+            rememberCurrentPayloads()
         },
         async save(){
-            for (let [k,v] of arr) {
-                await Save.set(k, [...v.entries()])
-            }
+            await queueSave()
+        },
+        saveDebounced(delay = 800){
+            cancelDebouncedSave()
+            saveTimer = setTimeout(() => {
+                saveTimer = null
+                void queueSave()
+            }, delay)
+        },
+        async flush(){
+            cancelDebouncedSave()
+            await queueSave()
         },
         async clear(){
+            cancelDebouncedSave()
+            savedPayloadByKey.clear()
             for (let [k,v] of arr) {
                 await Save.delete(k)
             }

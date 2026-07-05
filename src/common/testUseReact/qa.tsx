@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from "react";
-import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact, ModalProvider, useModal, useKeyDown, keyDownApi, useAgGrid, AgGridMy, createGridBuffer, createColumnBuffer, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, type BufferTable } from "../api";
+import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact, ModalProvider, useModal, useKeyDown, keyDownApi, useAgGrid, AgGridMy, createGridBuffer, createColumnBuffer, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, Cash, type BufferTable } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { ListenNext, ObserveAll2, Params } from "wenay-common2";
 import { Button, ButtonHover, DivOutsideClick } from "../src/hooks";
@@ -480,7 +480,7 @@ const ObserveStoreMirrorDemo = () => {
             <span>deep leaf: <b>{deepLeaf.value}</b></span>
             <span>deep keys: <b>{deepCounterKeys.stringKeys.join(",")}</b></span>
         </div>
-        {mirror.error && <div style={{ color: "#cf222e" }}>error: {String(mirror.error)}</div>}
+        {mirror.error != null && <div style={{ color: "#cf222e" }}>error: {String(mirror.error)}</div>}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <pre style={{ background: "#f6f8fa", padding: 8, borderRadius: 6, overflow: "auto", fontSize: 11 }}>mirror.value\n{JSON.stringify(mirror.value, null, 2)}</pre>
             <pre style={{ background: "#f6f8fa", padding: 8, borderRadius: 6, overflow: "auto", fontSize: 11 }}>label selection\n{JSON.stringify(labelSelection.value, null, 2)}\n\nchanged paths\n{JSON.stringify(pathEvents.paths)}\n\nlast POST\n{lastPost}</pre>
@@ -570,6 +570,91 @@ const ResizeBugRepro = () => {
         <div style={{ fontSize: 13 }}>selected asset: <b>{asset}</b></div>
     </div>;
 };
+/* ---------- 20. SettingsDialog + section registry ---------- */
+const dlgBody: React.CSSProperties = { fontSize: 13, lineHeight: 1.6 };
+const dlgStaticSections = [
+    { key: "general", name: "General", render: () => <div style={dlgBody}><b>General</b><div>Static section passed via the sections prop.</div></div> },
+    { key: "display", name: "Display", render: () => <div style={dlgBody}><b>Display</b><div>Second static section. Long content to test scrolling:</div>{Array.from({ length: 30 }, (_, i) => <div key={i}>line {i + 1}</div>)}</div> },
+];
+
+// Any module: register on mount, the returned unregister runs on unmount.
+const ExternalSectionModule = () => {
+    useEffect(() => registerSettingsSection({
+        key: "external",
+        name: "External",
+        render: () => <div style={dlgBody}><b>External</b><div>Registered by a module on mount and removed on unmount.</div></div>,
+    }), []);
+    return <span style={{ padding: "2px 8px", background: "#dafbe1", borderRadius: 6, fontSize: 12 }}>external module mounted</span>;
+};
+
+const SettingsDialogDemo = () => {
+    const [mounted, setMounted] = useState(true);
+    return <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <SettingsDialog
+            trigger={<span style={{ display: "inline-block", padding: "6px 12px", border: "1px solid #0969da", borderRadius: 6, color: "#0969da" }}>open settings</span>}
+            sections={dlgStaticSections}
+            defaultSection="general"
+        />
+        <button onClick={() => setMounted(v => !v)}>{mounted ? "unmount external module" : "mount external module"}</button>
+        {mounted && <ExternalSectionModule />}
+    </div>;
+};
+
+/* ---------- 21. createUiSlot - configurable placement ---------- */
+const qaSlot = createUiSlot({
+    key: "qa-ui-slot",
+    places: { top: "Top bar", side: "Sidebar" },
+    def: "top",
+});
+const slotContent = <span style={{ padding: "4px 10px", background: "#0969da", color: "#fff", borderRadius: 6, fontSize: 12 }}>the block</span>;
+
+const UiSlotDemo = () => {
+    // App-side persistence contract: Cash.load() on start, Cash.save() after changes.
+    useEffect(() => { void Cash.load(); }, []);
+    return <div style={{ display: "grid", gap: 10 }}>
+        <style>{`.qaChip{border:1px solid #6e7781;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;display:inline-block}.qaChipActive{background:#0969da;border-color:#0969da;color:#fff}`}</style>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 13 }}>place:</span>
+            <div onClickCapture={() => setTimeout(() => void Cash.save(), 0)}>
+                <qaSlot.PlacementSetting className="qaChip" activeClassName="qaChipActive" />
+            </div>
+        </div>
+        <div style={{ border: "1px dashed #6e7781", borderRadius: 6, padding: 8, minHeight: 38, fontSize: 13 }}>
+            Top bar: <qaSlot.Slot place="top">{slotContent}</qaSlot.Slot>
+        </div>
+        <div style={{ border: "1px dashed #6e7781", borderRadius: 6, padding: 8, minHeight: 38, fontSize: 13 }}>
+            Sidebar: <qaSlot.Slot place="side">{slotContent}</qaSlot.Slot>
+        </div>
+    </div>;
+};
+
+/* ---------- 22. createCallbackHub - single callback slot multiplexer ---------- */
+// Fake legacy API with ONE callback slot: a second direct subscriber would silently
+// overwrite the first. The hub takes the slot once and fans events out.
+const hubSlot: { cb: ((n: number) => void) | null } = { cb: null };
+let hubTick = 0;
+const qaHub = createCallbackHub<[number]>(emit => { hubSlot.cb = emit });
+
+const HubDemo = () => {
+    const [a, setA] = useState<number[]>([]);
+    const [b, setB] = useState<number[]>([]);
+    const [aOn, setAOn] = useState(false);
+    const [bOn, setBOn] = useState(false);
+    useEffect(() => { if (aOn) return qaHub.on(n => setA(v => [...v, n])); }, [aOn]);
+    useEffect(() => { if (bOn) return qaHub.on(n => setB(v => [...v, n])); }, [bOn]);
+    return <div style={{ display: "grid", gap: 8, fontSize: 13 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <button onClick={() => hubSlot.cb?.(++hubTick)}>fire source event</button>
+            <button onClick={() => setAOn(v => !v)}>{aOn ? "off A" : "on A"}</button>
+            <button onClick={() => setBOn(v => !v)}>{bOn ? "off B" : "on B"}</button>
+            <span>slot bound (lazy): <b>{String(hubSlot.cb != null)}</b></span>
+            <span>hub.count(): <b>{qaHub.count()}</b></span>
+        </div>
+        <div>A received: <b>{a.join(", ") || "-"}</b></div>
+        <div>B received: <b>{b.join(", ") || "-"}</b></div>
+    </div>;
+};
+
 /* ---------- borad ---------- */
 function ActiveChecks() {
     return (
@@ -693,6 +778,27 @@ function ActiveChecks() {
                    expect="All three methods close it. The dimmed backdrop is above everything (z-index from token --wenay-z-modal)."
                    note="M1: Escape and closeOnEscape/closeOnOutsideClick options were added; useModal and previous behavior are unchanged. GetModalJSX is marked @deprecated.">
                 <ModalDemo />
+            </Check>
+
+            <Check n={20} title="SettingsDialog - centered dialog + section registry"
+                   do="Click open settings: switch sections on the left, scroll Display, close via the x, the scrim, and Escape. Then unmount external module and open the dialog again."
+                   expect="The dialog is centered with a scrim; the active section is highlighted; content switches. The External section is present while the module is mounted and disappears after unmount (falls back to the first section if it was active)."
+                   note="Registry is a module singleton (registerSettingsSection -> unregister), no React context. Look via --dlg-* tokens; apps pass their own section classes via sectionClassName/sectionActiveClassName.">
+                <SettingsDialogDemo />
+            </Check>
+
+            <Check n={21} title="createUiSlot - configurable block placement"
+                   do="Switch Top bar / Sidebar. Then reload the page (F5)."
+                   expect="The block moves between the two containers WITHOUT a reload; only one mount point shows it at a time. After F5 the chosen place is restored (staticGetAdd -> Cash)."
+                   note="Mount points render <Slot place=...> themselves and stay ignorant of each other. The demo calls Cash.load() on mount and Cash.save() after clicks - persistence stays app-side, as with window state.">
+                <UiSlotDemo />
+            </Check>
+
+            <Check n={22} title="createCallbackHub - one slot, many subscribers"
+                   do="Note slot bound = false. Click on A (bound becomes true), fire source event, then on B and fire again. Then off A and fire once more."
+                   expect="Before the first on() the slot is untouched (lazy bind). With A+B subscribed both receive the same events. After off A, B keeps receiving; hub.count() tracks subscribers."
+                   note="Fixes the real bug where two onX(cb) subscribers silently overwrote each other. Built on UseListen from wenay-common2; bind(emit) runs once.">
+                <HubDemo />
             </Check>
 
             <Check n={8} title="Outside-click closing (DivOutsideClick)"
