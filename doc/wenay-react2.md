@@ -254,6 +254,28 @@ const args = useListenArgs(listen)
 ```
 
 The hook does not choose transport. `remoteStore` needs `{ get(mask?), changed }` and may also provide `changedPaths`; apps may implement it with RPC, WebSocket, SSE, or test HTTP. `changedPaths` is used as a transport optimization: mirror pulls `mask ∩ paths` instead of the whole mask. `initial` is only the local mirror seed; changing it does not reset an existing mirror. `mask` is treated as a small declarative StoreMask, so structurally equal inline masks do not resubscribe. For add/delete keys, subscribe to the parent object node with `useStoreKeys(node)`; this also covers deep objects. If a state key conflicts with StoreNode methods such as `count`, use `store.node.at("count")`.
+
+## Replay React Adapter
+Client-side hooks over the wenay-common2 Replay stack (snapshot + sequenced delta line). Server parts (`conflateReplay`, `archiveReplay`) are per-connection and stay hook-free by design.
+
+```ts
+import { useReplaySubscribe, useStoreReplaySync, useStoreReplayMirror, useReplayHistory } from "wenay-react2"
+
+// any replay line ({line, since, keyframe} remote)
+const sub = useReplaySubscribe(remote, (frame) => draw(frame), {onSeq?, onError?, since?, enabled?})
+sub.ready; sub.error; sub.seq(); sub.restart()
+
+// store patch line (ObserveAll2.exposeStoreReplay(...).api.replay)
+const mirror = useStoreReplayMirror(remote, initial, {enabled?})   // creates the mirror store
+mirror.store; mirror.ready; mirror.seq(); mirror.restart()
+const sync = useStoreReplaySync(existingStore, remote)              // same, store supplied by the app
+
+// time machine over Replay.openHistory(storage, live?)
+const tt = useReplayHistory(history, (frame) => draw(frame), {head: () => replay.head()})
+tt.live; tt.seq; tt.head; tt.pause(); tt.play(); tt.seek({seq})
+```
+
+Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. QA cards 23 (video line + conflation + time travel) and 24 (store sync) are the live examples.
 ## Logs
 ```
 logsApi.addLogs({id: "api", time: new Date(), txt: "done", var: 1})

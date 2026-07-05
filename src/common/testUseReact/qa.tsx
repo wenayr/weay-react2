@@ -14,6 +14,7 @@ import { DivRnd3 } from "../src/components";
 import { MyChartEngine } from "../src/myChart/chartEngine/chartEngineReact";
 import { GridExample, tt } from "./useGrid";
 import { TestParams } from "./testParams";
+import { ReplayVideoDemo, ReplayStoreDemo } from "./replayVideo";
 
 /* ---------- card wrapper ---------- */
 const card: React.CSSProperties = { border: "1px solid #d0d7de", borderRadius: 10, margin: "14px 0", background: "#fff", overflow: "hidden", fontFamily: "system-ui, sans-serif" };
@@ -776,6 +777,19 @@ function ActiveChecks() {
                    note="This checks the React adapter only in wenay-react2: common2 remains React-free; transport policy stays outside the hook."
                    tall>
                 <ObserveStoreMirrorDemo />
+            </Check>
+            <Check n={23} title="Replay hooks - video line, conflation, time travel"
+                   do="Watch A and B play the same synthetic video. Toggle slow network for B, switch resolution, unmount/remount A. In C drag the slider (playback pauses), then press live."
+                   expect="A plays smoothly at 10 fps. B on slow network stays CURRENT (bounded latency): frames drop (dropped/coalesced counters grow), the wire buffer never grows past highWater, and each recovery is one coalesced last-frame envelope. Resolution switches on all clients within a frame. Remounting A continues from the kept seq (seq does not reset, frames counter continues from the tail). C seeks to any archived seq via keyframe+tail fold and hands over to live seamlessly."
+                   note="All in-proc: the socket transport is already proven in wenay-common2 (replay/video-socket.demo, canvas-socket.test). This card tests the React side: useReplaySubscribe lifecycle (off on unmount, reconnect by since), useReplayHistory scrubber, frames drawn to canvas via ref - bypassing VDOM. The producer starts on first render and runs until page reload."
+                   tall>
+                <ReplayVideoDemo />
+            </Check>
+            <Check n={24} title="Replay hooks - store sync (useStoreReplayMirror)"
+                   do="Watch ticks/price advance. Click server note / add key / delete key. Uncheck sync enabled, mutate the server a few times, recheck. Click restart."
+                   expect="Mirror follows the server store with seq ascending. While sync is disabled the mirror freezes; on re-enable it catches up through the journal tail (seq jumps to head, no full reset flicker). Object key add/delete replicate. restart resubscribes from the kept seq."
+                   note="exposeStoreReplay/syncStoreReplay in-proc: the remote is the exposed {line, since, keyframe} facade, exactly what createRpcServerAuto would expose over a socket.">
+                <ReplayStoreDemo />
             </Check>
             <Check n={13} title="ModalProvider / useModal - Escape and outside click"
                    do="Click open modal. Close it with Escape. Open it again and close with an outside click. Open it again and close with the close button."

@@ -4,8 +4,8 @@ Common React UI primitives for wenay apps.
 
 Use the new concise API guide first:
 
-- [wenay-react2.md](./wenay-react2.md) - canonical everyday API.
-- [wenay-react2-rare.md](./wenay-react2-rare.md) - old names, low-level exports, migration notes.
+- [wenay-react2.md](doc/wenay-react2.md) - canonical everyday API.
+- [wenay-react2-rare.md](doc/wenay-react2-rare.md) - old names, low-level exports, migration notes.
 - [agGrid4 README](./src/common/src/grid/agGrid4/README.md) - table buffer/controller details.
 - [agGrid4 wrapper boundary](./src/common/src/grid/agGrid4/WRAPPER.md) - where generic primitives end and app wrappers begin.
 
