@@ -86,6 +86,18 @@ drag.setPosition({x, y})
 drag.resetPosition()
 drag.cancelDrag()
 
+const r = useReorder({order, commit, move?, canDrag?, preview?, holdMs?})   // mini reorder-by-drag
+<div ref={r.listRef}>{order.map(k => {                                      // children 1:1 with order
+    const it = r.item(k)                                                    // it.dragging / it.active
+    return <div key={k} {...it.props} style={{...own, ...it.style}} />      // ONE commit(next) on drop
+})}</div>
+
+const b = useReorderBoard({columns: [{key, items}], commit,                 // drag between vertical columns
+    canDrag?, holdMs?, onDragStart?, onDragMove?, onOverChange?, onDragEnd?})
+<div ref={b.columnRef('todo')}>{items.map(k => ...b.item(k)...)}</div>      // one div per column, any count
+b.over                                                                      // {col, index} | null - live target
+// column gravity is YOUR CSS: justify-content flex-start packs up, flex-end packs down
+
 <DivRnd3 keyForSave="tool" size={{width: 320, height: 240}} header={<div>Tool</div>}>
     <Panel />
 </DivRnd3>
@@ -126,6 +138,24 @@ const slot = createUiSlot({key, places: {top: "Top bar", side: "Sidebar"}, def: 
 <slot.Slot place="top">{content}</slot.Slot>     // each mount point decides by itself
 <slot.PlacementSetting />                        // segmented place switcher; setPlace marks Cash dirty
 ```
+
+## Toolbar
+```
+const tb = createToolbar({key, items: [{key, title, icon, short?, render?, onClick?, defaultVisible?, fixed?}], def?, settingsItem?})
+
+<tb.Bar settings />          // the live bar; settings adds a gear opening Settings in a popover
+<tb.Settings />              // the PURE config editor - same element drops into a settings section
+tb.api.useConfig() / getConfig() / setConfig(next) / reset()
+tb.api.useItems()            // headless bar: ordered visible [{item, density, content}] - custom markup
+tb.api.onChange.on(cfg => ...) -> off        // fires on every edit
+
+registerToolbarDensity({key, name, renderItem?}) -> unregister   // built-ins: 'icon', 'label'
+```
+Config `{order, visible, density}` is serializable and persisted like createUiSlot
+(staticGetAdd -> Cash, the app owns the write policy). Items added in an app update are merged
+into a stale persisted config (appended, default-visible), removed ones are ignored.
+The gear is a pseudo-item: `settingsItem: {title?, icon?}` re-skins it, and the editor has a
+separated toggle row for it (`visible['__settings']`, no order slot - it always sits at the bar edge).
 
 ## Callback Hub
 ```
@@ -256,20 +286,26 @@ const args = useListenArgs(listen)
 The hook does not choose transport. `remoteStore` needs `{ get(mask?), changed }` and may also provide `changedPaths`; apps may implement it with RPC, WebSocket, SSE, or test HTTP. `changedPaths` is used as a transport optimization: mirror pulls `mask ∩ paths` instead of the whole mask. `initial` is only the local mirror seed; changing it does not reset an existing mirror. `mask` is treated as a small declarative StoreMask, so structurally equal inline masks do not resubscribe. For add/delete keys, subscribe to the parent object node with `useStoreKeys(node)`; this also covers deep objects. If a state key conflicts with StoreNode methods such as `count`, use `store.node.at("count")`.
 
 ## Replay React Adapter
-Client-side hooks over the wenay-common2 Replay stack (snapshot + sequenced delta line). Server parts (`conflateReplay`, `archiveReplay`) are per-connection and stay hook-free by design.
+Client-side hooks over the wenay-common2 Replay stack (snapshot + sequenced delta line). Server parts (`conflateReplay`, `archiveReplay`, `createRpcServerAuto` replayOpts) are per-connection and stay hook-free by design.
 
 ```ts
-import { useReplaySubscribe, useStoreReplaySync, useStoreReplayMirror, useReplayHistory } from "wenay-react2"
+import { useReplaySubscribe, useStoreReplaySync, useStoreReplayMirror, useReplayFrame, useReplayHistory } from "wenay-react2"
 
-// any replay line ({line, since, keyframe} remote)
-const sub = useReplaySubscribe(remote, (frame) => draw(frame), {onSeq?, onError?, since?, enabled?, staleMs?, onStale?})
+// any replay line ({line, since, keyframe, frame?, frameLine?} remote)
+const sub = useReplaySubscribe(remote, (frame) => draw(frame), {onSeq?, onError?, since?, enabled?, staleMs?, onStale?, policy?, hint?})
 sub.ready; sub.error; sub.seq(); sub.restart()
 sub.stale; sub.lastTs()   // freshness (needs staleMs): stale re-renders on fresh<->stale transitions ONLY; lastTs() is a getter like seq()
+// policy: 'queue' (default, nothing skipped) | 'frame' (rides the server frameLine when present: on lag the
+// server drops and recovers with a mini-frame; old servers/in-proc degrade to 'queue'). hint -> the line's frame condenser.
 
 // store patch line (ObserveAll2.exposeStoreReplay(...).api.replay)
-const mirror = useStoreReplayMirror(remote, initial, {enabled?})   // creates the mirror store; same staleMs/stale surface
+const mirror = useStoreReplayMirror(remote, initial, {enabled?})   // creates the mirror store; same staleMs/stale/policy surface
 mirror.store; mirror.ready; mirror.seq(); mirror.restart()
 const sync = useStoreReplaySync(existingStore, remote)              // same, store supplied by the app
+
+// pull at YOUR pace (frame model): timer around remote.frame(seq, hint) — server condenses, no backlog, no live socket sub
+const pf = useReplayFrame(remote, (quote) => apply(quote), {intervalMs: 500, hint?})
+pf.ready; pf.error; pf.seq(); pf.pull(); pf.restart()               // error (e.g. sacred line evicted) STOPS pulling until restart()
 
 // time machine over Replay.openHistory(storage, live?)
 const tt = useReplayHistory(history, (frame) => draw(frame), {head: () => replay.head()})
@@ -313,6 +349,8 @@ npm run testReact                                // http://localhost:3010/
 ```
 
 The stand lives in `src/common/testUseReact/qa.tsx`. Use it for visual checks; agGrid4 overlay/dynamic-column demos are dedicated QA cards.
+Two tabs: Active checks (current work) and Verified archive (`#archive`) - verified/fixed cards move
+there and stay runnable for regression re-checks.
 
 
 

@@ -19,10 +19,14 @@ type StaleInfo = Replay.StaleInfo;
  *   outside via onSeq and pass it back as `since` (see the QA card for the pattern);
  * - a different `remote` identity always starts from scratch (seq from another line is meaningless);
  * - freshness (staleMs/onStale, controller.stale/lastTs()) is detected by wenay-common2;
- *   the hooks only mirror the fresh<->stale edges into React state.
+ *   the hooks only mirror the fresh<->stale edges into React state;
+ * - lag policy is the consumer's pick per subscription (frame model of common2 rev2):
+ *   {policy: 'frame'} rides the server's frameLine when the remote has one (on lag the server
+ *   drops and recovers with a mini-frame; old servers/in-proc lines degrade to 'queue');
+ *   pull-at-own-pace is a separate hook (useReplayFrame) — a timer around remote.frame().
  *
- * Server-side parts of the stack (conflateReplay, archiveReplay) are per-connection/per-process
- * and intentionally have no hooks here.
+ * Server-side parts of the stack (conflateReplay, archiveReplay, createRpcServerAuto replayOpts)
+ * are per-connection/per-process and intentionally have no hooks here.
  */
 
 function useLatestRef<T>(value: T) {
@@ -49,6 +53,20 @@ export type UseReplaySubscribeOptions = {
     staleMs?: number;
     /** Edge-triggered mirror of common2's onStale (fresh<->stale transitions only). Goes through a ref — a new identity does not resubscribe. */
     onStale?: (info: StaleInfo) => void;
+    /**
+     * Lag policy of the wire subscription (frame model): 'queue' (default) — the socket buffers
+     * everything, nothing is ever skipped; 'frame' — rides the server's frameLine when the remote
+     * has one: on lag the server DROPS events for this client and recovers with a mini-frame.
+     * Without a frameLine (old server, in-proc line) 'frame' degrades to 'queue' in common2.
+     * This picks the wire surface, so changing it resubscribes (reconnects by tail under keepSeq).
+     */
+    policy?: 'queue' | 'frame';
+    /**
+     * Opaque pass-through for the line's `frame` condenser on catch-up (which condensation rule
+     * this client wants). Captured at subscribe time through a ref — a new identity does not
+     * resubscribe; the next (re)subscribe reads the latest value.
+     */
+    hint?: unknown;
 };
 
 export type ReplaySubscribeController = {
@@ -80,9 +98,10 @@ export function useReplaySubscribe<Z extends any[]>(
     cb: (...event: Z) => void,
     options: UseReplaySubscribeOptions = {},
 ): ReplaySubscribeController {
-    const {since, keepSeq = true, enabled = true, onSeq, onError, staleMs, onStale} = options;
+    const {since, keepSeq = true, enabled = true, onSeq, onError, staleMs, onStale, policy, hint} = options;
     const cbRef = useLatestRef(cb);
     const hooksRef = useLatestRef({onSeq, onError, onStale});
+    const hintRef = useLatestRef(hint);
     const seqRef = useRef<number | undefined>(since);
     const subRef = useRef<(() => void) & {seq: () => number, lastTs: () => number} | null>(null);
     const lastRemoteRef = useRef<ReplayRemote<Z> | null | undefined>(undefined);
@@ -104,6 +123,8 @@ export function useReplaySubscribe<Z extends any[]>(
         if (staleMs === undefined) setStale(false);
         const off = Replay.replaySubscribe<Z>(remote, (...event) => cbRef.current(...event), {
             since: seqRef.current,
+            policy,
+            hint: hintRef.current,
             onSeq: seq => {
                 seqRef.current = seq;
                 hooksRef.current.onSeq?.(seq);
@@ -136,9 +157,10 @@ export function useReplaySubscribe<Z extends any[]>(
             if (!keepSeq) seqRef.current = since;
         };
         // keepSeq/since are start-position config, not subscription identity — no resubscribe on change;
-        // staleMs is subscribe-time config in common2, so changing it resubscribes
+        // staleMs is subscribe-time config in common2, so changing it resubscribes;
+        // policy picks the wire surface (line vs frameLine), so it resubscribes too; hint rides a ref
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [remote, enabled, epoch, staleMs]);
+    }, [remote, enabled, epoch, staleMs, policy]);
 
     const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
     const lastTs = useCallback(() => subRef.current?.lastTs() ?? 0, []);
@@ -165,8 +187,9 @@ export function useStoreReplaySync<T extends object>(
     remote: ReplayRemote<[StorePatch]> | null | undefined,
     options: UseStoreReplaySyncOptions = {},
 ): StoreReplaySyncController {
-    const {since, keepSeq = true, enabled = true, onSeq, onError, staleMs, onStale} = options;
+    const {since, keepSeq = true, enabled = true, onSeq, onError, staleMs, onStale, policy, hint} = options;
     const hooksRef = useLatestRef({onSeq, onError, onStale});
+    const hintRef = useLatestRef(hint);
     const seqRef = useRef<number | undefined>(since);
     const subRef = useRef<(() => void) & {seq: () => number, lastTs: () => number} | null>(null);
     const lastRemoteRef = useRef<ReplayRemote<[StorePatch]> | null | undefined>(undefined);
@@ -186,6 +209,8 @@ export function useStoreReplaySync<T extends object>(
         if (staleMs === undefined) setStale(false); // see useReplaySubscribe: stale re-syncs from common2, no reset-to-false flicker
         const off = ObserveAll2.syncStoreReplay(store, remote, {
             since: seqRef.current,
+            policy,
+            hint: hintRef.current,
             onSeq: seq => {
                 seqRef.current = seq;
                 hooksRef.current.onSeq?.(seq);
@@ -218,7 +243,7 @@ export function useStoreReplaySync<T extends object>(
             if (!keepSeq) seqRef.current = since;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [store, remote, enabled, epoch, staleMs]);
+    }, [store, remote, enabled, epoch, staleMs, policy]);
 
     const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
     const lastTs = useCallback(() => subRef.current?.lastTs() ?? 0, []);
@@ -251,6 +276,145 @@ export function useStoreReplayMirror<T extends object>(
     const store = storeRef.current.store;
     const sync = useStoreReplaySync(store, remote, options);
     return useMemo(() => ({...sync, store}), [sync, store]);
+}
+
+export type UseReplayFrameOptions = {
+    /** Pull period, ms. Default 300. */
+    intervalMs?: number;
+    /**
+     * Start position: frame() brings the consumer from here to head. Omit = keyframe start:
+     * keyframe() is polled until the line has one (an empty line is "nothing yet", not an error).
+     * A sacred line (no keyframe) NEEDS an explicit since (0 = full tail) — omitted, it waits forever.
+     */
+    since?: number;
+    /** Keep the last folded seq across remote-identity-stable resubscribes. Default true. */
+    keepSeq?: boolean;
+    /** false = stop pulling (and drop the timer). Default true. */
+    enabled?: boolean;
+    /**
+     * Opaque pass-through for the line's `frame` condenser (which condensation rule this client
+     * wants). Read through a ref on EVERY pull — a new identity neither resubscribes nor is missed.
+     */
+    hint?: unknown;
+    onSeq?: (seq: number) => void;
+    /** frame() failed (network, or a sacred line evicted past our seq — loud by design). Pulling STOPS until restart(). */
+    onError?: (e: unknown) => void;
+};
+
+export type ReplayFrameController = {
+    /** First successful pull finished (like replaySubscribe's ready — even if the line was still empty). */
+    readonly ready: boolean;
+    /** Last pull error; pulling is stopped while set (restart() clears and re-arms). */
+    readonly error: unknown;
+    /** Last folded seq (reconnect point). Getter — reading it does not re-render. */
+    seq(): number;
+    /** Pull out of schedule now; resolves after folding. hint omitted = the latest options.hint. */
+    pull(hint?: unknown): Promise<void>;
+    /** Re-arm after an error / jump: since omitted = continue from the current seq. */
+    restart(since?: number): void;
+};
+
+/**
+ * Pull a replay line at YOUR pace (the frame model of common2): a timer around
+ * `remote.frame(seq, hint)` — the server condenses the tail via the line's `frame` lambda
+ * (mini-frame), so a slow consumer never accumulates a backlog and never holds a live socket
+ * subscription. Complements useReplaySubscribe (push): use pull when the consumer wants its own
+ * cadence (e.g. 500ms UI refresh over a fast line) or a client-picked condensation rule (hint).
+ *
+ * Folding contract mirrors the push path: envelopes arrive seq-ascending, already-seen seq are
+ * skipped, a keyframe recovery is just an envelope of the same event type. Fresh start (no since)
+ * = keyframe start like replaySubscribe: keyframe() is polled until the line has one; a sacred
+ * line needs an explicit since. Overlapping pulls are never issued (a slow frame() call skips
+ * timer ticks). A remote without frame() (old server) fails loudly via onError — there is
+ * deliberately no tail fallback here (that is replaySubscribe's job).
+ */
+export function useReplayFrame<Z extends any[]>(
+    remote: ReplayRemote<Z> | null | undefined,
+    cb: (...event: Z) => void,
+    options: UseReplayFrameOptions = {},
+): ReplayFrameController {
+    const {intervalMs = 300, since, keepSeq = true, enabled = true, hint, onSeq, onError} = options;
+    const cbRef = useLatestRef(cb);
+    const hooksRef = useLatestRef({onSeq, onError});
+    const hintRef = useLatestRef(hint);
+    const seqRef = useRef<number>(since ?? -1);
+    const pullRef = useRef<((hint?: unknown) => Promise<void>) | null>(null);
+    const lastRemoteRef = useRef<ReplayRemote<Z> | null | undefined>(undefined);
+    const [ready, setReady] = useState(false);
+    const [error, setError] = useState<unknown>(null);
+    const [epoch, setEpoch] = useState(0);
+
+    useEffect(() => {
+        if (!remote || !enabled) return;
+        if (lastRemoteRef.current !== undefined && lastRemoteRef.current !== remote) seqRef.current = since ?? -1; // a different line — old seq is meaningless
+        lastRemoteRef.current = remote;
+
+        let alive = true;
+        let stopped = false;
+        let timer: ReturnType<typeof setInterval> | null = null;
+        let inflight: Promise<void> | null = null;
+        setReady(false);
+        setError(null);
+
+        const fail = (e: unknown) => {
+            stopped = true;
+            if (timer) { clearInterval(timer); timer = null; }
+            setError(e);
+            hooksRef.current.onError?.(e);
+        };
+        const pull = (hintArg?: unknown) => {
+            if (inflight) return inflight; // a slow frame() skips ticks, pulls never overlap
+            if (stopped || !alive) return Promise.resolve();
+            const frame = remote.frame;
+            if (!frame) {
+                fail(new Error("useReplayFrame: remote has no frame() (old server) — use useReplaySubscribe"));
+                return Promise.resolve();
+            }
+            inflight = (async () => {
+                try {
+                    // no position yet -> keyframe start, mirroring replaySubscribe's catch-up for since<0:
+                    // frame(-1) has no tail to return and THROWS on a still-empty line, which is not an
+                    // error here — poll keyframe() until the line has one, then switch to frame(seq)
+                    const envs = seqRef.current < 0
+                        ? await Promise.resolve(remote.keyframe()).then(kf => kf ? [kf] : null)
+                        : await frame(seqRef.current, hintArg !== undefined ? hintArg : hintRef.current);
+                    if (!alive) return;
+                    for (const ev of envs ?? []) {
+                        if (ev.seq <= seqRef.current) continue;
+                        seqRef.current = ev.seq;
+                        cbRef.current(...ev.event);
+                        hooksRef.current.onSeq?.(ev.seq);
+                    }
+                    setReady(true);
+                } catch (e) {
+                    if (alive) fail(e);
+                } finally {
+                    inflight = null;
+                }
+            })();
+            return inflight;
+        };
+        pullRef.current = pull;
+        void pull();
+        if (!stopped) timer = setInterval(() => { void pull(); }, intervalMs); // a sync throw in the first pull may already have stopped us
+        return () => {
+            alive = false;
+            pullRef.current = null;
+            if (timer) clearInterval(timer);
+            if (!keepSeq) seqRef.current = since ?? -1;
+        };
+        // since/keepSeq are start-position config, hint rides a ref — only the pace and identity resubscribe
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [remote, enabled, epoch, intervalMs]);
+
+    const seq = useCallback(() => seqRef.current, []);
+    const pull = useCallback((hintArg?: unknown) => pullRef.current?.(hintArg) ?? Promise.resolve(), []);
+    const restart = useCallback((at?: number) => {
+        if (at !== undefined) seqRef.current = at;
+        setEpoch(v => v + 1);
+    }, []);
+
+    return useMemo(() => ({ready, error, seq, pull, restart}), [ready, error, seq, pull, restart]);
 }
 
 export type ReplayHistoryLike<Z extends any[]> = {

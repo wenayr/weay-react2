@@ -55,6 +55,10 @@ export * from "./src/components/Menu";
 export * from "./src/components/Settings";
 export * from "./src/components/UiSlot";
 
+// 11c. Customizable toolbar (createToolbar): config persisted like createUiSlot,
+// pure Settings editor works both in the bar's gear popover and in a settings section
+export * from "./src/components/Toolbar";
+
 // 12. MENU - depends on components
 export { MenuBase, TimeNum, MenuElement as LegacyMenuElement } from "./src/menu/menu";
 export type { tMenuReact, tMenuReactStrictly } from "./src/menu/menu";

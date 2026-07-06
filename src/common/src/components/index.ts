@@ -9,3 +9,4 @@ export * from './MyResizeObserver';
 export * from './Other';
 export * from './Settings';
 export * from './UiSlot';
+export * from './Toolbar';

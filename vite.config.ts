@@ -185,5 +185,10 @@ export default defineConfig({
     host: true,
     port: 3010,
     open: true,
+    watch: {
+      // lib/ is the tsc build output (incl. a copied tsconfig.json); watching it
+      // caused a chronic "changed tsconfig file detected" full-reload loop
+      ignored: ['**/lib/**', '**/dist/**'],
+    },
   },
 });

@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from "react";
-import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact, ModalProvider, useModal, useKeyDown, keyDownApi, useAgGrid, AgGridMy, createGridBuffer, createColumnBuffer, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, Cash, type BufferTable } from "../api";
+import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact, ModalProvider, useModal, useKeyDown, keyDownApi, useAgGrid, AgGridMy, createGridBuffer, createColumnBuffer, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, Cash, type BufferTable, type tToolbarItem, type tToolbarConfig, type tBoardColumn } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { ListenNext, ObserveAll2, Params } from "wenay-common2";
 import { Button, ButtonHover, DivOutsideClick } from "../src/hooks";
@@ -660,8 +660,295 @@ const HubDemo = () => {
     </div>;
 };
 
+/* ---------- 25. createToolbar - customizable toolbar ---------- */
+// Item actions land in a module store (the demo component reads it via updateBy).
+const tbActions = { last: "-", count: 0 };
+function tbAct(name: string) {
+    return () => {
+        tbActions.last = name;
+        tbActions.count++;
+        renderBy(tbActions);
+    };
+}
+const tbBaseItems: tToolbarItem[] = [
+    { key: "home", title: "Home (fixed)", short: "Home", icon: <span>🏠</span>, fixed: true, onClick: tbAct("home") },
+    { key: "star", title: "Add to favorites", short: "Star", icon: <span>⭐</span>, onClick: tbAct("star") },
+    { key: "bell", title: "Notifications", short: "Alerts", icon: <span>🔔</span>, onClick: tbAct("bell") },
+    { key: "chart", title: "Open chart window", short: "Chart", icon: <span>📈</span>, onClick: tbAct("chart") },
+    { key: "trash", title: "Clear workspace", short: "Clear", icon: <span>🗑️</span>, defaultVisible: false, onClick: tbAct("trash") },
+];
+const qaToolbar = createToolbar({ key: "qa-toolbar", items: tbBaseItems });
+// The merge case (acceptance #3): the SAME persist key, one EXTRA item - as if the app
+// shipped an update. Created lazily so the base bar is what the page starts with.
+let qaToolbarExtra: ReturnType<typeof createToolbar> | null = null;
+const getQaToolbarExtra = () => qaToolbarExtra ??= createToolbar({
+    key: "qa-toolbar",
+    items: [...tbBaseItems, { key: "help", title: "Help (added in the update)", short: "Help", icon: <span>❓</span>, onClick: tbAct("help") }],
+});
+
+const ToolbarDemo = () => {
+    updateBy(tbActions);
+    const [extra, setExtra] = useState(false);
+    const [thirdDensity, setThirdDensity] = useState(false);
+    const [changes, setChanges] = useState(0);
+    const [lastCfg, setLastCfg] = useState<tToolbarConfig | null>(null);
+    const tb = extra ? getQaToolbarExtra() : qaToolbar;
+
+    // App-side persistence contract - same wiring as the UiSlot card.
+    useEffect(() => {
+        void Cash.load();
+        return Cash.onDirty(() => Cash.saveDebounced(300));
+    }, []);
+    // Same pure Settings element registered as a global settings section (see card 20's dialog).
+    useEffect(() => registerSettingsSection({
+        key: "qa-toolbar",
+        name: "Toolbar",
+        render: () => <tb.Settings />,
+    }), [tb]);
+    // Both bars share one persist key -> both apis emit; subscribe to the visible one.
+    useEffect(() => tb.api.onChange.on(cfg => {
+        setChanges(v => v + 1);
+        setLastCfg(cfg);
+    }), [tb]);
+    // Density registry extensibility: a third level is just one more registration.
+    useEffect(() => {
+        if (!thirdDensity) return;
+        return registerToolbarDensity({
+            key: "full",
+            name: "Full text",
+            renderItem: item => <span>{item.icon} {item.title}</span>,
+        });
+    }, [thirdDensity]);
+
+    return <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ background: "#17202e", borderRadius: 8, padding: 6, width: "fit-content", maxWidth: "100%" }}>
+            <tb.Bar settings popAlign="left" />
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
+            <SettingsDialog trigger={<span style={{ display: "inline-block", padding: "4px 10px", border: "1px solid #0969da", borderRadius: 6, color: "#0969da" }}>global settings</span>} />
+            <button onClick={() => tb.api.reset()}>reset config</button>
+            <button onClick={() => setExtra(v => !v)}>{extra ? "app update: extra item ON" : "simulate app update (+1 item)"}</button>
+            <label><input type="checkbox" checked={thirdDensity} onChange={e => setThirdDensity(e.target.checked)} /> register 3rd density (Full text)</label>
+        </div>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
+            <span>last action: <b>{tbActions.last}</b> ({tbActions.count})</span>
+            <span>onChange fired: <b>{changes}</b></span>
+        </div>
+        {lastCfg && <div style={{ fontSize: 11, fontFamily: "monospace", color: "#57606a", overflowX: "auto" }}>{JSON.stringify(lastCfg)}</div>}
+    </div>;
+};
+
+/* ---------- 26. useReorder - a field of blocks ---------- */
+// Module store: the hook owns NO state beyond the live drag - order lives with the app.
+const reorderState = { order: ["A", "B", "C", "D", "E", "F", "G", "H"], varied: false, commits: 0 };
+
+const ReorderDemo = () => {
+    updateBy(reorderState);
+    const r = useReorder({
+        order: reorderState.order,
+        commit: next => {
+            reorderState.order = next;
+            reorderState.commits++;
+            renderBy(reorderState);
+        },
+        // equal blocks: 'slots' is exact; varied sizes: FLIP-measure the real layout
+        preview: reorderState.varied ? "measure" : "slots",
+    });
+    const width = (k: string) => reorderState.varied ? 56 + (k.charCodeAt(0) % 4) * 26 : 64;
+    return <div style={{ display: "grid", gap: 8, fontSize: 13 }}>
+        <label>
+            <input type="checkbox" checked={reorderState.varied}
+                   onChange={() => { reorderState.varied = !reorderState.varied; renderBy(reorderState); }} />
+            {" "}varied block widths (preview: measure / FLIP)
+        </label>
+        <div ref={r.listRef} style={{ display: "flex", flexWrap: "wrap", gap: 8, width: 300, background: "#17202e", padding: 8, borderRadius: 8 }}>
+            {reorderState.order.map(k => {
+                const it = r.item(k);
+                return <div key={k} {...it.props}
+                            style={{
+                                width: width(k), height: 44, lineHeight: "44px", textAlign: "center",
+                                background: it.dragging ? "#2f5a8f" : "#2b3648", color: "#dfe6ef", borderRadius: 6,
+                                cursor: "grab", userSelect: "none", touchAction: "none",
+                                transition: it.active && !it.dragging ? "transform 0.12s ease" : undefined,
+                                position: it.dragging ? "relative" : undefined, zIndex: it.dragging ? 1 : undefined,
+                                boxShadow: it.dragging ? "0 4px 14px rgba(0,0,0,0.4)" : undefined,
+                                ...it.style,
+                            }}>{k}</div>;
+            })}
+        </div>
+        <div style={{ color: "#57606a", fontFamily: "monospace", fontSize: 12 }}>order: {reorderState.order.join(" ")} | commits: {reorderState.commits}</div>
+    </div>;
+};
+
+/* ---------- 27. useReorderBoard - columns with per-column gravity ---------- */
+const boardState = {
+    cols: [
+        { key: "c1", items: ["A1", "A2", "A3"] },
+        { key: "c2", items: ["B1", "B2"] },
+        { key: "c3", items: ["C1", "C2", "C3", "C4"] },
+        { key: "c4", items: ["D1"] },
+        { key: "c5", items: [] as string[] },
+    ] as tBoardColumn[],
+    gravity: { c1: "top", c2: "bottom", c3: "top", c4: "bottom", c5: "top" } as { [k: string]: string },
+    commits: 0, events: 0, last: "-", nextCol: 6,
+};
+
+const BoardDemo = () => {
+    updateBy(boardState);
+    const log = (s: string) => { boardState.last = s; boardState.events++; renderBy(boardState); };
+    const r = useReorderBoard({
+        columns: boardState.cols,
+        commit: next => { boardState.cols = next; boardState.commits++; renderBy(boardState); },
+        onOverChange: e => log(`over ${e.over.col}#${e.over.index}` + (e.prev && e.prev.col != e.over.col ? " (column crossed)" : "")),
+        onDragEnd: e => log(`drop ${e.key} -> ${e.over.col}#${e.over.index} committed=${e.committed}`),
+    });
+    // A column is consumer state: splice at ANY position, the hook picks it up
+    // via the live columnRef registry - nothing to tell the hook.
+    const addColumnAt = (i: number) => {
+        const k = "c" + boardState.nextCol++;
+        const cols = boardState.cols.slice();
+        cols.splice(i, 0, { key: k, items: [] });
+        boardState.cols = cols;
+        boardState.gravity[k] = boardState.nextCol % 2 ? "bottom" : "top";
+        renderBy(boardState);
+    };
+    const InsertStrip = ({ at }: { at: number }) => (
+        <div title="insert column here" onClick={() => addColumnAt(at)}
+             style={{
+                 width: 14, height: 240, borderRadius: 6, cursor: "pointer", userSelect: "none",
+                 display: "flex", alignItems: "center", justifyContent: "center",
+                 color: "#57606a", background: "#151b26", fontSize: 12,
+             }}>+</div>
+    );
+    return <div style={{ display: "grid", gap: 8, fontSize: 13 }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "flex-start", flexWrap: "wrap" }}>
+            <InsertStrip at={0} />
+            {boardState.cols.map((c, ci) => (
+                <React.Fragment key={c.key}>
+                    <div ref={r.columnRef(c.key)}
+                         style={{
+                             display: "flex", flexDirection: "column", gap: 6, width: 78, height: 240,
+                             justifyContent: boardState.gravity[c.key] == "bottom" ? "flex-end" : "flex-start",
+                             background: r.over?.col == c.key ? "#1d2b40" : "#17202e", padding: 6, borderRadius: 8,
+                             outline: r.over?.col == c.key ? "1px solid #2f5a8f" : undefined,
+                         }}>
+                        {c.items.map(k => {
+                            const it = r.item(k);
+                            return <div key={k} {...it.props}
+                                        style={{
+                                            height: 32, lineHeight: "32px", textAlign: "center", borderRadius: 6,
+                                            background: it.dragging ? "#2f5a8f" : "#2b3648", color: "#dfe6ef",
+                                            cursor: "grab", userSelect: "none", touchAction: "none",
+                                            transition: it.active && !it.dragging ? "transform 0.12s ease" : undefined,
+                                            position: it.dragging ? "relative" : undefined, zIndex: it.dragging ? 1 : undefined,
+                                            boxShadow: it.dragging ? "0 4px 14px rgba(0,0,0,0.4)" : undefined,
+                                            ...it.style,
+                                        }}>{k}</div>;
+                        })}
+                    </div>
+                    <InsertStrip at={ci + 1} />
+                </React.Fragment>
+            ))}
+        </div>
+        <div style={{ color: "#57606a", fontFamily: "monospace", fontSize: 12 }}>
+            {boardState.cols.map(c => c.key + (boardState.gravity[c.key] == "bottom" ? "↓" : "↑") + ":[" + c.items.join(",") + "]").join(" ")} | commits: {boardState.commits} | events: {boardState.events} | last: {boardState.last}
+        </div>
+    </div>;
+};
+
 /* ---------- borad ---------- */
 function ActiveChecks() {
+    return (
+        <>
+            <Check n={18} title="ObserveAll2 hooks - local store and listen"
+                   do="Click node.at(count) +1, replace status, plain state mutation + flush, emit listen, and replace whole store."
+                   expect="Leaf node, selection, direct state mutation after flush, add/delete object keys, and listen hooks all rerender. The count key is read through node.at(count), so it does not conflict with node.count()."
+                   note="This isolates the React adapter from transport: no fetch/SSE/RPC involved."
+                   tall>
+                <ObserveStoreLocalDemo />
+            </Check>
+            <Check n={17} title="ObserveAll2 hooks - store mirror over HTTP/SSE"
+                   do="Click server +1, label, add/delete key, deep leaf/deep add/deep delete, local mirror +1000, stop sync, then manual sync."
+                   expect="Server buttons POST to the Vite QA server, including add/delete object keys and deep mutations. SSE pushes changedPaths; mirror pulls only the intersecting mask when possible. Local mirror edits render immediately and are overwritten by the next server sync."
+                   note="This checks the React adapter only in wenay-react2: common2 remains React-free; transport policy stays outside the hook."
+                   tall>
+                <ObserveStoreMirrorDemo />
+            </Check>
+            <Check n={23} title="Replay hooks - video line, conflation, time travel, freshness"
+                   do="Watch A and B play the same synthetic video. Toggle slow network for B, switch resolution, unmount/remount A. In C drag the slider (playback pauses), then press live. In D: note the renders counter while the line is fresh, check stall producer, wait 2s, uncheck; while stalled press new client (keyframe). In E: switch pull pace (250ms/1s/3s), press pull now."
+                   expect="A plays smoothly at 10 fps. B on slow network stays CURRENT (bounded latency): frames drop (dropped/coalesced counters grow), the wire buffer never grows past highWater, and each recovery is one coalesced last-frame envelope. Resolution switches on all clients within a frame. Remounting A continues from the kept seq (seq does not reset, frames counter continues from the tail). C seeks to any archived seq via keyframe+tail fold and hands over to live seamlessly. D: renders stays FLAT while frames grow (no per-event re-renders); on stall the STALE badge appears after ~2s and disappears on the first frame after resume; a client mounted during a stall goes STALE within staleMs (this in-proc keyframe is stamped at request time; a tail/keyframe carrying an old producer ts goes stale from the first paint); StrictMode double-effect leaves one watchdog and no badge flicker. E advances ONLY at the pull cadence: frames jumps by ~pace×10fps per pull while pulls grows by one; seq keeps up with head; switching pace keeps the position (no keyframe restart, frames does not re-fold); pull now folds immediately."
+                   note="All in-proc: the socket transport is already proven in wenay-common2 (replay/video-socket.demo, canvas-socket.test). This card tests the React side: useReplaySubscribe lifecycle (off on unmount, reconnect by since), useReplayHistory scrubber, frames drawn to canvas via ref - bypassing VDOM, stale/staleMs mirroring common2's edge-triggered watchdog into React state, useReplayFrame pull path (timer around remote.frame(), rev2 frame model; policy:'frame'/hint ride ReplaySubscribeOpts but need a server frameLine - the wire test lives in common2 replay/rpc-auto.test.ts). The producer starts on first render and runs until page reload."
+                   tall>
+                <ReplayVideoDemo />
+            </Check>
+            <Check n={24} title="Replay hooks - store sync (useStoreReplayMirror)"
+                   do="Watch ticks/price advance. Click server note / add key / delete key. Uncheck sync enabled, mutate the server a few times, recheck. Click restart. Check stall producer, wait 2.5s, then click server note."
+                   expect="Mirror follows the server store with seq ascending. While sync is disabled the mirror freezes; on re-enable it catches up through the journal tail (seq jumps to head, no full reset flicker). Object key add/delete replicate. restart resubscribes from the kept seq. On stall the stale flag flips true after 2.5s and lastTs freezes; any server mutation (e.g. server note) flips it back to fresh."
+                   note="exposeStoreReplay/syncStoreReplay in-proc: the remote is the exposed {line, since, keyframe} facade, exactly what createRpcServerAuto would expose over a socket. staleMs rides the same ReplaySubscribeOpts as the video card.">
+                <ReplayStoreDemo />
+            </Check>
+            <Check n={13} title="ModalProvider / useModal - Escape and outside click"
+                   do="Click open modal. Close it with Escape. Open it again and close with an outside click. Open it again and close with the close button."
+                   expect="All three methods close it. The dimmed backdrop is above everything (z-index from token --wenay-z-modal)."
+                   note="M1: Escape and closeOnEscape/closeOnOutsideClick options were added; useModal and previous behavior are unchanged. GetModalJSX is marked @deprecated.">
+                <ModalDemo />
+            </Check>
+
+            <Check n={20} title="SettingsDialog - centered dialog + section registry"
+                   do="Click open settings: switch sections on the left, scroll Display, close via the x, the scrim, and Escape. Then unmount external module and open the dialog again."
+                   expect="The dialog is centered with a scrim; the active section is highlighted; content switches. The External section is present while the module is mounted and disappears after unmount (falls back to the first section if it was active)."
+                   note="Registry is a module singleton (registerSettingsSection -> unregister), no React context. Look via --dlg-* tokens; apps pass their own section classes via sectionClassName/sectionActiveClassName.">
+                <SettingsDialogDemo />
+            </Check>
+
+            <Check n={21} title="createUiSlot - configurable block placement"
+                   do="Switch Top bar / Sidebar. Then reload the page (F5)."
+                   expect="The block moves between the two containers WITHOUT a reload; only one mount point shows it at a time. After F5 the chosen place is restored (staticGetAdd -> Cash)."
+                   note="Mount points render <Slot place=...> themselves and stay ignorant of each other. The demo calls Cash.load() on mount and subscribes Cash.onDirty -> saveDebounced(300): the persisted maps are observable and mark Cash dirty themselves, the app owns the write policy.">
+                <UiSlotDemo />
+            </Check>
+
+            <Check n={22} title="createCallbackHub - one slot, many subscribers"
+                   do="Note slot bound = false. Click on A (bound becomes true), fire source event, then on B and fire again. Then off A and fire once more."
+                   expect="Before the first on() the slot is untouched (lazy bind). With A+B subscribed both receive the same events. After off A, B keeps receiving; hub.count() tracks subscribers."
+                   note="Fixes the real bug where two onX(cb) subscribers silently overwrote each other. Built on UseListen from wenay-common2; bind(emit) runs once.">
+                <HubDemo />
+            </Check>
+
+            <Check n={25} title="createToolbar - customizable toolbar (config / Bar / Settings)"
+                   do="Click toolbar items (last action updates). Open the gear popover: toggle Clear workspace on, drag rows to reorder - grab ANYWHERE on the row, mouse or touch, try dragging above the fixed Home too (or focus the handle and press arrow keys), switch density Icons / Icons + labels. Open global settings -> Toolbar section and repeat an edit there. Register the 3rd density and switch to Full text. Uncheck the separated Toolbar settings row at the bottom - the gear (and this popover) disappears from the bar; re-enable it via global settings -> Toolbar. Click simulate app update. Reload the page (F5). Click reset config."
+                   expect="The bar renders visible items in config order; density switches icon-only <-> icon+label (tooltips show titles in icon mode). Home is fixed: checkbox disabled, no drag handle, pinned first - it never moves during a drag preview and a row dragged above it lands right below it, exactly as previewed (no snap-back on drop). The gear popover and the global settings section are THE SAME editor - an edit in one is instantly visible in the other and on the bar. The 3rd density appears in the editor as one more segment and renders icon + full title. The app update appends Help as visible WITHOUT wiping your order/visibility. After F5 everything is restored (staticGetAdd -> Cash). onChange fires on every edit with the new config (JSON below); reset restores defaults (Clear workspace hidden again)."
+                   note="Three decoupled layers: serializable config (single source of truth, persisted like createUiSlot), Bar, and a PURE Settings editor over config. Density levels live in an extensible module registry (registerToolbarDensity); reorder is a built-in nearest-slot pointer sort (no dnd deps, layout-agnostic: list / bar / grid) + keyboard arrows; the preview simulates the commit incl. fixed pinning, so what you see is what you drop. v1 has no overflow menu - visibility is the space tool."
+                   tall>
+                <ToolbarDemo />
+            </Check>
+
+            <Check n={26} title="useReorder - drag blocks in a field (mini dnd)"
+                   do="Drag blocks around the wrapped field (mouse or touch) - within a row, across rows, to the first/last slot. Click a block without moving. Then enable varied block widths and repeat: rows re-wrap differently, blocks still glide exactly to where they will land."
+                   expect="During a drag the grabbed block follows the pointer, the rest GLIDE to their preview slots; on drop everything is already where the preview showed - no snap-back, no jumps. A plain click commits nothing (commits counter unchanged). With varied widths the preview is measured from the real CSS layout (FLIP via the order property), so wrapping changes are previewed exactly too."
+                   note="The library's own mini reorder-by-drag (useReorder, extracted from the Toolbar editor): keyed blocks in ANY CSS layout - list, bar, wrapped grid; DOM order never changes mid-drag, targeting runs against START slots (no boundary oscillation), ONE commit on drop. Deliberately not a dnd framework: no nesting, no cross-container moves, no collision packing.">
+                <ReorderDemo />
+            </Check>
+
+            <Check n={27} title="useReorderBoard - columns, per-column gravity, cross-column drag"
+                   do="Drag blocks between columns: from a top-packed (up arrow) into a bottom-packed (down arrow) column, into the EMPTY column, back. Watch the landing gap: in a bottom-packed column the blocks ABOVE the slot slide UP to make room. Drag within one column too. Click a thin + strip BETWEEN columns (or at either edge) - a new column appears exactly there; drag something into it. Watch the events line: over changes, column crossings, drop."
+                   expect="The dragged block follows the pointer; the hovered column highlights (r.over); survivors glide to exactly where they land on drop - including the source column compacting per ITS gravity and the target column opening a real gap per ITS gravity. One commit per drop (counter); a plain click commits nothing. onOverChange fires only when the slot changes, onDragEnd reports the final slot and committed flag."
+                   note="useReorderBoard - the columns extension of useReorder: column gravity is pure consumer CSS (justify-content), the hook never knows it - it measures the real layout (offset-based FLIP with display:none for the dragged and a real margin gap at the landing slot, so CSS decides who moves aside). Columns register via live callback refs - adding one is just consumer state. Same non-goals: no nesting, no collision packing, no autoscroll."
+                   tall>
+                <BoardDemo />
+            </Check>
+
+            <Check n={8} title="Outside-click closing (DivOutsideClick)"
+                   do="Click open. Then click ANY place outside the panel, including on the same horizontal line and slightly to the right of the open button, within the panel width where there used to be a dead zone."
+                   expect="A click anywhere outside the panel/button closes it, including the area to the right of the button above the panel. Clicking the panel or button does NOT close it."
+                   note="Library BUG, this card used to fail on it: Button+outClick wraps in DivOutsideClick, which is a full-width block div, so the entire horizontal strip counts as inside. Here DivOutsideClick uses display:inline-block, and the popup uses position:absolute; otherwise it expands the wrapper rectangle and creates a dead zone to the right of the button. Real library fix: wrap content by default, or let Button narrow the wrapper.">
+                <OutsideDemo />
+            </Check>
+        </>
+    );
+}
+
+function ArchiveChecks() {
     return (
         <>
             <Check n={1} title="Reactivity updateBy / renderBy"
@@ -670,7 +957,6 @@ function ActiveChecks() {
                    note="This is the split between change and notification. After migration to the store, app.set(...) performs both steps at once.">
                 <ReactivityDemo />
             </Check>
-
 
             <Check n={14} title="Keyboard API - useKeyDown / keyDownApi"
                    do="Press any key, then click clear."
@@ -764,74 +1050,7 @@ function ActiveChecks() {
                    tall>
                 <AgGrid4ColumnBufferDemo />
             </Check>
-            <Check n={18} title="ObserveAll2 hooks - local store and listen"
-                   do="Click node.at(count) +1, replace status, plain state mutation + flush, emit listen, and replace whole store."
-                   expect="Leaf node, selection, direct state mutation after flush, add/delete object keys, and listen hooks all rerender. The count key is read through node.at(count), so it does not conflict with node.count()."
-                   note="This isolates the React adapter from transport: no fetch/SSE/RPC involved."
-                   tall>
-                <ObserveStoreLocalDemo />
-            </Check>
-            <Check n={17} title="ObserveAll2 hooks - store mirror over HTTP/SSE"
-                   do="Click server +1, label, add/delete key, deep leaf/deep add/deep delete, local mirror +1000, stop sync, then manual sync."
-                   expect="Server buttons POST to the Vite QA server, including add/delete object keys and deep mutations. SSE pushes changedPaths; mirror pulls only the intersecting mask when possible. Local mirror edits render immediately and are overwritten by the next server sync."
-                   note="This checks the React adapter only in wenay-react2: common2 remains React-free; transport policy stays outside the hook."
-                   tall>
-                <ObserveStoreMirrorDemo />
-            </Check>
-            <Check n={23} title="Replay hooks - video line, conflation, time travel, freshness"
-                   do="Watch A and B play the same synthetic video. Toggle slow network for B, switch resolution, unmount/remount A. In C drag the slider (playback pauses), then press live. In D: note the renders counter while the line is fresh, check stall producer, wait 2s, uncheck; while stalled press new client (keyframe)."
-                   expect="A plays smoothly at 10 fps. B on slow network stays CURRENT (bounded latency): frames drop (dropped/coalesced counters grow), the wire buffer never grows past highWater, and each recovery is one coalesced last-frame envelope. Resolution switches on all clients within a frame. Remounting A continues from the kept seq (seq does not reset, frames counter continues from the tail). C seeks to any archived seq via keyframe+tail fold and hands over to live seamlessly. D: renders stays FLAT while frames grow (no per-event re-renders); on stall the STALE badge appears after ~2s and disappears on the first frame after resume; a client mounted during a stall goes STALE within staleMs (this in-proc keyframe is stamped at request time; a tail/keyframe carrying an old producer ts goes stale from the first paint); StrictMode double-effect leaves one watchdog and no badge flicker."
-                   note="All in-proc: the socket transport is already proven in wenay-common2 (replay/video-socket.demo, canvas-socket.test). This card tests the React side: useReplaySubscribe lifecycle (off on unmount, reconnect by since), useReplayHistory scrubber, frames drawn to canvas via ref - bypassing VDOM, stale/staleMs mirroring common2's edge-triggered watchdog into React state. The producer starts on first render and runs until page reload."
-                   tall>
-                <ReplayVideoDemo />
-            </Check>
-            <Check n={24} title="Replay hooks - store sync (useStoreReplayMirror)"
-                   do="Watch ticks/price advance. Click server note / add key / delete key. Uncheck sync enabled, mutate the server a few times, recheck. Click restart. Check stall producer, wait 2.5s, then click server note."
-                   expect="Mirror follows the server store with seq ascending. While sync is disabled the mirror freezes; on re-enable it catches up through the journal tail (seq jumps to head, no full reset flicker). Object key add/delete replicate. restart resubscribes from the kept seq. On stall the stale flag flips true after 2.5s and lastTs freezes; any server mutation (e.g. server note) flips it back to fresh."
-                   note="exposeStoreReplay/syncStoreReplay in-proc: the remote is the exposed {line, since, keyframe} facade, exactly what createRpcServerAuto would expose over a socket. staleMs rides the same ReplaySubscribeOpts as the video card.">
-                <ReplayStoreDemo />
-            </Check>
-            <Check n={13} title="ModalProvider / useModal - Escape and outside click"
-                   do="Click open modal. Close it with Escape. Open it again and close with an outside click. Open it again and close with the close button."
-                   expect="All three methods close it. The dimmed backdrop is above everything (z-index from token --wenay-z-modal)."
-                   note="M1: Escape and closeOnEscape/closeOnOutsideClick options were added; useModal and previous behavior are unchanged. GetModalJSX is marked @deprecated.">
-                <ModalDemo />
-            </Check>
 
-            <Check n={20} title="SettingsDialog - centered dialog + section registry"
-                   do="Click open settings: switch sections on the left, scroll Display, close via the x, the scrim, and Escape. Then unmount external module and open the dialog again."
-                   expect="The dialog is centered with a scrim; the active section is highlighted; content switches. The External section is present while the module is mounted and disappears after unmount (falls back to the first section if it was active)."
-                   note="Registry is a module singleton (registerSettingsSection -> unregister), no React context. Look via --dlg-* tokens; apps pass their own section classes via sectionClassName/sectionActiveClassName.">
-                <SettingsDialogDemo />
-            </Check>
-
-            <Check n={21} title="createUiSlot - configurable block placement"
-                   do="Switch Top bar / Sidebar. Then reload the page (F5)."
-                   expect="The block moves between the two containers WITHOUT a reload; only one mount point shows it at a time. After F5 the chosen place is restored (staticGetAdd -> Cash)."
-                   note="Mount points render <Slot place=...> themselves and stay ignorant of each other. The demo calls Cash.load() on mount and subscribes Cash.onDirty -> saveDebounced(300): the persisted maps are observable and mark Cash dirty themselves, the app owns the write policy.">
-                <UiSlotDemo />
-            </Check>
-
-            <Check n={22} title="createCallbackHub - one slot, many subscribers"
-                   do="Note slot bound = false. Click on A (bound becomes true), fire source event, then on B and fire again. Then off A and fire once more."
-                   expect="Before the first on() the slot is untouched (lazy bind). With A+B subscribed both receive the same events. After off A, B keeps receiving; hub.count() tracks subscribers."
-                   note="Fixes the real bug where two onX(cb) subscribers silently overwrote each other. Built on UseListen from wenay-common2; bind(emit) runs once.">
-                <HubDemo />
-            </Check>
-
-            <Check n={8} title="Outside-click closing (DivOutsideClick)"
-                   do="Click open. Then click ANY place outside the panel, including on the same horizontal line and slightly to the right of the open button, within the panel width where there used to be a dead zone."
-                   expect="A click anywhere outside the panel/button closes it, including the area to the right of the button above the panel. Clicking the panel or button does NOT close it."
-                   note="Library BUG, this card used to fail on it: Button+outClick wraps in DivOutsideClick, which is a full-width block div, so the entire horizontal strip counts as inside. Here DivOutsideClick uses display:inline-block, and the popup uses position:absolute; otherwise it expands the wrapper rectangle and creates a dead zone to the right of the button. Real library fix: wrap content by default, or let Button narrow the wrapper.">
-                <OutsideDemo />
-            </Check>
-        </>
-    );
-}
-
-function ArchiveChecks() {
-    return (
-        <>
             <Check n={4} title="Right-click context menu (mouseMenuApi)"
                    do="Right-click the gray area to open the menu. Then right-click somewhere ELSE."
                    expect="Right-clicking elsewhere closes the previous menu and opens a new one with items. ✅ Fixed."

@@ -72,6 +72,20 @@
   --dlg-nav-bg: var(--color-bg-light);
   --dlg-nav-width: 168px;
 
+  /* Toolbar (createToolbar). Dark defaults; apps re-skin via :root[data-theme]
+     overrides, same contract as --wnd-* / --dlg-*. */
+  --tb-bg: transparent;
+  --tb-border: none;
+  --tb-radius: 6px;
+  --tb-gap: 2px;
+  --tb-item-color: var(--color-text-base);
+  --tb-item-hover-bg: rgba(255, 255, 255, 0.08);
+  --tb-item-radius: 6px;
+  --tb-pop-bg: var(--color-bg-dark);
+  --tb-pop-border: 1px solid var(--color-border-common);
+  --tb-pop-radius: 8px;
+  --tb-pop-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+
   /* Layers */
   --wenay-z-modal: 9999;
 }

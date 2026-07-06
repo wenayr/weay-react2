@@ -434,6 +434,134 @@ body {
   top: 8px;
   right: 8px;
 }
+/* Toolbar (createToolbar). Themed via --tb-* (tokens.css), dark defaults. */
+.wenayTb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tb-gap, 2px);
+  background: var(--tb-bg, transparent);
+  border: var(--tb-border, none);
+  border-radius: var(--tb-radius, 6px);
+  color: var(--tb-item-color, var(--color-text-base));
+}
+.wenayTbItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--tb-item-radius, 6px);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.wenayTbItem:hover {
+  background: var(--tb-item-hover-bg, rgba(255, 255, 255, 0.08));
+}
+.wenayTbIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+}
+/* The gear + its popover live in one positioned container (also the outside-click boundary) */
+.wenayTbGear {
+  position: relative;
+  display: inline-flex;
+}
+.wenayTbPop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: var(--wenay-z-modal, 9999);
+  min-width: 240px;
+  padding: 10px;
+  background: var(--tb-pop-bg, var(--color-bg-dark));
+  border: var(--tb-pop-border, 1px solid var(--color-border-common));
+  border-radius: var(--tb-pop-radius, 8px);
+  box-shadow: var(--tb-pop-shadow, 0 8px 28px rgba(0, 0, 0, 0.5));
+  color: var(--color-text-base);
+}
+/* Bar popAlign='left' - for bars sitting at a container's LEFT edge (default 'right'
+   suits toolbars in a top-right corner) */
+.wenayTbPopLeft {
+  right: auto;
+  left: 0;
+}
+/* The pure config editor (same element in the popover and in a settings section) */
+.wenayTbSettings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+.wenayTbDensity {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.wenayTbRows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wenayTbRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.wenayTbRow:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+/* Non-fixed rows drag as a whole (mouse and touch) */
+.wenayTbRowGrab {
+  cursor: grab;
+  touch-action: none; /* the browser must not hijack drags for scrolling */
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* Displaced neighbours glide; the dragged row itself must NOT transition (it follows the pointer) */
+.wenayTbRowShift {
+  transition: transform 0.12s ease;
+}
+.wenayTbRowDrag {
+  position: relative;
+  z-index: 1;
+  cursor: grabbing;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.wenayTbRowTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The settings-button toggle: set slightly apart from the item rows, never draggable */
+.wenayTbRowMeta {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 4px;
+  border-radius: 0 0 6px 6px;
+  opacity: 0.85;
+}
+.wenayTbHandle {
+  display: inline-flex;
+  align-items: center;
+  cursor: grab;
+  user-select: none;
+  touch-action: none; /* the browser must not hijack vertical drags for scrolling */
+  padding: 0 4px;
+  opacity: 0.65;
+}
+.wenayTbHandle:hover,
+.wenayTbHandle:focus {
+  opacity: 1;
+  outline: none;
+  color: #fff;
+}
+
 /* Minimal default section/segment buttons; apps override via sectionClassName /
    sectionActiveClassName (SettingsDialog) and className / activeClassName (PlacementSetting) */
 .wenayDlgSection,

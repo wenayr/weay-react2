@@ -7,7 +7,8 @@
 ## Migration Rule
 ```
 New code teaches and imports the short canonical surface:
-  useModal(), useOutside(), useDraggableApi(), useAgGrid(), createGridBuffer(), createColumnBuffer()
+  useModal(), useOutside(), useDraggableApi(), useReorder(), useReorderBoard(),
+  useAgGrid(), createGridBuffer(), createColumnBuffer(), createUiSlot(), createToolbar()
 
 Old names remain exported for existing apps unless a project deliberately removes them.
 Do not add new examples with Get*, FuncJSX, *2/*3, or business-specific helper names.
@@ -97,6 +98,53 @@ via `Cash.onDirty` (the library never writes storage itself, same as window stat
 A stored place that no longer exists in `places` falls back to `def`. `getPlace()` is not reactive;
 Slot/PlacementSetting subscribe internally via updateBy.
 
+Toolbar (createToolbar, `components/Toolbar/Toolbar.tsx`):
+```
+createToolbar({key, items, def?, settingsItem?}) -> {Bar, Settings, api: {useConfig, useItems, getConfig, setConfig, reset, onChange}}
+<tb.Bar className? settings? popAlign? />             // default classes .wenayTb / .wenayTbItem; popAlign
+                                                      //   'right' (default, top-right bars) | 'left'
+<tb.Settings className? activeClassName? />           // density segments default .wenaySegBtn(Active)
+registerToolbarDensity({key, name, renderItem?}) / getToolbarDensities()
+```
+Three decoupled layers: serializable config `{order, visible, density}` (single source of truth,
+persisted exactly like createUiSlot: staticGetAdd(key), edits mutate in place + renderBy +
+staticMarkDirty, the APP saves via Cash.onDirty), Bar (visible!==false, in order, at density) and
+a PURE Settings editor over config - the same element works in the Bar's gear popover and in a
+registered settings section, no prop changes. Semantics that are easy to get wrong:
+- Merge of stale persist: unknown keys in stored order/visible are ignored (view-level; raw
+  storage is untouched until the next setConfig), items missing from the config are APPENDED
+  default-visible - an app update never wipes the user's order/visibility.
+- `fixed` items: always visible, pinned at normalize() to their index in opts.items (checkbox
+  disabled, not draggable) - and the drag PREVIEW already respects the pinning, so they never
+  move visually and a drop never lands elsewhere than shown.
+- Density is an extensible module registry (like registerSettingsSection): entries may carry
+  `renderItem(item)`; item.render(density) always wins; entries without renderItem fall back to
+  icon + (short ?? title). A persisted density that is no longer registered falls back to
+  def/first. Bar/Settings subscribe to the registry (updateBy), so registering a level updates
+  live.
+- Reorder rides the library's own `useReorder` (see Drag / Resize Low Level; this editor is its
+  first consumer): the WHOLE row drags, mouse+touch, checkbox excluded, and `move` is the SAME
+  simulated commit as normalize() (splice + fixed pinning), so preview and drop agree by
+  construction. Neighbours glide via transitioned transforms (`.wenayTbRowShift`), ONE setConfig
+  on drop. Plus arrow keys on the focused handle (the drag hook preventDefaults mousedown, so the
+  row handler focuses the handle itself). No dnd dependency; DivRnd3/react-rnd deliberately not
+  used (free-floating windows, wrong tool). `touch-action: none` + `user-select: none` on
+  draggable rows (`.wenayTbRowGrab`).
+- `api.onChange` is a wenay-common2 UseListen stream; emits the NORMALIZED config after every
+  setConfig. useConfig subscribes via updateBy; getConfig is a non-reactive snapshot.
+- The gear button is a pseudo-item: reserved visible key `__settings` (always normalized in,
+  default true), NO order slot (it always sits at the bar edge), toggled from a separated row at
+  the bottom of the editor (`.wenayTbRowMeta`, outside the drag-slot container on purpose).
+  Hiding it in the gear's own popover closes the popover - the global settings section is the way
+  back. Face via `createToolbar({settingsItem: {title?, icon?}})`.
+- `api.useItems()` is the headless bar: ordered, visibility-filtered `[{item, density, content}]`
+  for fully custom markup. Refs-out was rejected deliberately: order lives in the config, so the
+  consumer re-renders from this list - the library never re-parents foreign DOM nodes.
+- v1 non-goals: no overflow/"more" menu (hook point: Bar, after the visible-items map), no
+  grouping, no cross-bar drag.
+Styling: `--tb-*` tokens (tokens.css, mirror `tokens.tb`), classes `.wenayTb*` in style.css;
+dark defaults, apps re-skin via `:root[data-theme]` like `--wnd-*` / `--dlg-*`.
+
 Callback hub (for single-slot callback APIs `onX(cb | null)` whose subscribers silently
 overwrite each other):
 ```
@@ -138,6 +186,63 @@ const drag = useDraggableApi(...)
 ```
 
 `useDraggable(...)` is kept as the simple hook wrapper; `useDraggableApi(...)` is the controller-style shape.
+
+Reorder-by-drag (useReorder, `hooks/useReorder.tsx` - extracted from the Toolbar editor, which is
+its first consumer):
+```
+useReorder({order, commit, move?, canDrag?, preview?: 'slots'|'measure', holdMs?})
+    -> {listRef, item(key) -> {props, style?, dragging, active}, dragKey, preview}
+```
+A deliberately SMALL reorder for keyed blocks laid out by CSS - the hook never knows the layout
+(vertical list, horizontal bar, wrapped grid all work). Semantics:
+- DOM order never changes mid-drag: the dragged block follows the pointer via transform, the rest
+  glide to their preview position (consumer adds the transition on `active && !dragging`), ONE
+  `commit(next)` on drop, skipped when nothing moved (a plain click is a no-op).
+- Targeting = nearest slot center measured at drag START - never against the live layout
+  (re-measuring moving blocks oscillates at boundaries; designed out). Pointer deltas (viewport
+  px) are normalized by the container's scale factor (rect.width / offsetWidth), so
+  `transform: scale` / zoomed ancestors do not skew targeting.
+- `move` is the simulated commit: the preview shows exactly `move(order, key, to)` - consumers
+  with pinning rules (Toolbar's fixed items) pass their own so preview == drop by construction.
+- preview 'slots' (default) transforms between start slot centers - exact when blocks are
+  equal-sized. 'measure' is FLIP: the preview order is applied via CSS `order`, layout offsets
+  (offsetLeft/Top) are read and reverted in one synchronous pass (never paints), so wrapping with
+  ANY block sizes previews exactly; requires a flex/grid container; measured once per target
+  change. Offsets, NEVER getBoundingClientRect: rects include mid-flight TRANSITION values
+  (style.transform='none' does not stop a running transition within the same synchronous pass),
+  so rect-based re-measures accumulated the previous preview's shifts on every target change and
+  the blocks flew apart on target oscillation.
+- Events from `input/button/select/textarea/a` never start a drag; mouse is left-button only;
+  touch works (`touch-action: none` on blocks is the consumer's CSS).
+- Non-goals (use a ready-made dnd library instead): nesting, spans/collision packing,
+  autoscroll. QA card 26 is the live example. Cross-COLUMN moves live in useReorderBoard below.
+
+Board (useReorderBoard, `hooks/useReorderBoard.tsx` - the columns extension of useReorder):
+```
+useReorderBoard({columns: [{key, items}], commit(next), canDrag?, holdMs?,
+                 onDragStart?, onDragMove?, onOverChange?, onDragEnd?})
+    -> {columnRef(col) -> RefCallback, item(key), dragKey, over: {col, index} | null}
+```
+- Columns are plain consumer divs registered via `columnRef(key)` (live callback-ref registry -
+  ADDING a column is just consumer state + one more div, spliced at ANY position of the columns
+  array incl. the middle); a column's children must be exactly its items, 1:1, in order. The
+  column set/geometry is frozen for the duration of one drag.
+- Column gravity is pure consumer CSS (`justify-content: flex-start` packs up, `flex-end` packs
+  down) - the hook never knows it, it measures the real layout. Do NOT use `flex-direction:
+  column-reverse` (it inverts DOM-vs-visual order; the 1:1 mapping breaks).
+- Targeting: nearest column by clamped rect distance, insertion index = how many of that column's
+  START item centers sit above the dragged center (start geometry only - anti-oscillation, same
+  rule as useReorder). Preview = simulated commit (movedColumns), so preview == drop.
+- Cross-column FLIP, offset-based like useReorder: the dragged block leaves flow via
+  display:none, survivors get preview CSS `order`, and the landing slot becomes a real
+  margin gap (draggedHeight + row-gap) on the neighbour - the column's own gravity then decides
+  who moves aside (a flex-end column slides the blocks ABOVE the slot up). Apply-read-revert in
+  one synchronous pass, cached per target slot.
+- Callbacks: onDragStart (grab), onDragMove (every move, pointer delta in local px),
+  onOverChange (only when the target slot changes; compare prev.col != over.col for column
+  crossings), onDragEnd (final slot + committed flag; a plain click is committed=false).
+  `over`/`dragKey` are also returned reactively for render-time styling (column highlight).
+- QA card 27 is the live example (5 columns, mixed gravity, empty column, add-column).
 
 ## agGrid Legacy Utilities
 ```
@@ -239,15 +344,19 @@ QA stand coverage:
 ## Replay React Hooks (details)
 `src/common/src/hooks/useReplay.ts`. Client side of the wenay-common2 Replay stack only.
 ```
-useReplaySubscribe(remote, cb, {since?, keepSeq?=true, enabled?=true, onSeq?, onError?, staleMs?, onStale?})
+useReplaySubscribe(remote, cb, {since?, keepSeq?=true, enabled?=true, onSeq?, onError?, staleMs?, onStale?, policy?, hint?})
   -> {ready, error, stale, seq(), lastTs(), restart(since?)}
 useStoreReplaySync(store, remote, sameOpts)  -> same controller       // ObserveAll2.syncStoreReplay wrapper
 useStoreReplayMirror(remote, initial, sameOpts) -> controller & {store}   // creates the mirror store in a ref
+useReplayFrame(remote, cb, {intervalMs?=300, since?, keepSeq?=true, enabled?=true, hint?, onSeq?, onError?})
+  -> {ready, error, seq(), pull(hint?), restart(since?)}              // pull-at-own-pace over remote.frame()
 useReplayHistory(history, apply, {head?, reset?, tickMs?=300, autoPlay?=true})
   -> {live, seq, head, pause(), play(), seek({seq?|ts?})}
 ```
 Semantics that are easy to get wrong:
-- `cb`/`apply` go through refs: new function identity does NOT resubscribe. Resubscribe identity is `[remote, enabled, epoch, staleMs]` — changing `staleMs` resubscribes (it is subscribe-time config in common2; under keepSeq the reconnect is a journal tail, so it is cheap). `onStale` goes through a ref like `cb`.
+- `cb`/`apply` go through refs: new function identity does NOT resubscribe. Resubscribe identity is `[remote, enabled, epoch, staleMs, policy]` — changing `staleMs` resubscribes (it is subscribe-time config in common2; under keepSeq the reconnect is a journal tail, so it is cheap); `policy` picks the wire surface (line vs frameLine), so it resubscribes too. `onStale` goes through a ref like `cb`.
+- Lag policy / hint (frame model, common2 rev2): `policy: 'frame'` rides the server's `frameLine` when the remote has one — on lag the server drops for THIS client and recovers via the line's `frame` lambda (mini-frame); without a frameLine (old server, in-proc `exposeReplay`) common2 silently degrades to `'queue'`, so an in-proc QA of `'frame'` proves nothing — the wire test lives in common2 (`replay/rpc-auto.test.ts`). `hint` is opaque to the transport and goes through a ref: in `useReplaySubscribe` it is captured at subscribe time (used for the catch-up `frame()` call); in `useReplayFrame` it is read on EVERY pull, so a new identity is never missed and never resubscribes.
+- `useReplayFrame` is the pull path: no live socket subscription at all; a timer calls `remote.frame(seq, hint)` and folds envelopes (seq-ascending, seen seq skipped — a keyframe recovery is just an envelope). Fresh start (no `since`) mirrors `replaySubscribe`'s catch-up for since<0: `keyframe()` is polled until the line has one (`frame(-1)` has no tail to return and THROWS on a still-empty line — a mount racing the producer's first event must not stick an error); a sacred line therefore NEEDS an explicit `since` (0 = full tail) — omitted, it waits forever. Overlapping pulls are never issued (a slow `frame()` skips ticks). Errors are LOUD and sticky: a reject (network, sacred line evicted past our seq, remote without `frame()`) stops the timer and sets `error` until `restart()` — deliberately no tail fallback here, that is `replaySubscribe`'s job. Freshness (`staleMs`) does not apply (the consumer owns the cadence).
 - Freshness (`staleMs`): detection is 100% wenay-common2's watchdog (`ReplaySubscribeOpts.staleMs/onStale`, edge-triggered); the hook only mirrors the edges into `stale` state, so a fresh high-frequency line causes zero extra renders. `lastTs()` is a plain getter like `seq()` (producer ts of the last delivered event, 0 before the first delivery / while unsubscribed). Without `staleMs`: no watchdog, no state updates, `stale` stays `false`.
 - Freshness on resubscribe/restart: the hook does NOT reset `stale` to `false` at effect start — it re-syncs from common2 after catch-up (mirrors the `onStale` edge fired during catch-up, plus `isStale()` once `ready` resolves), so a snapshot/tail carrying an old producer ts is stale from the first paint with no fresh-flicker. Caveat: common2's in-proc `keyframe()` stamps `ts` at request time, so a brand-new client on a stalled in-proc line reads as fresh at delivery and flips stale after `staleMs` via the arrival-gap watchdog; old-ts detection kicks in when the tail/keyframe actually carries producer timestamps (real relays, archives).
 - `useReplayHistory` is archive playback — staleness intentionally does not apply there.
@@ -256,7 +365,7 @@ Semantics that are easy to get wrong:
 - `useReplayHistory.seek` kills the live subscription imperatively (guarded off, double-call safe), folds `history.at(where)` through `apply` (keyframe + tail; a keyframe fully redefines consumer state, so `reset` is rarely needed), and freezes. `play()` resubscribes `{since: pos}` -> archive tail -> live handover.
 - Server primitives (`conflateReplay` per connection, `archiveReplay`) intentionally have no hooks: they live where the RPC server is built.
 
-QA cards 23/24 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `UseReplayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
+QA cards 23/24 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `UseReplayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror); client E = pull path (`useReplayFrame` over the direct remote with a wrapped counting `frame()`, pace switch 250ms/1s/3s keeps seq). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
 ## Logs
 Frequent legacy/global logger:
 ```

@@ -60,6 +60,23 @@ export const tokens = {
         navBg: '#17202e',
         navWidth: '168px',
     },
+    /** Toolbar (createToolbar) chrome (--tb-*). Dark defaults; apps re-skin via :root[data-theme]. */
+    tb: {
+        bg: 'transparent',
+        border: 'none',
+        radius: '6px',
+        gap: '2px',
+        /** var(--color-text-base) in CSS */
+        itemColor: '#c4c4c4',
+        itemHoverBg: 'rgba(255, 255, 255, 0.08)',
+        itemRadius: '6px',
+        /** var(--color-bg-dark) in CSS */
+        popBg: '#131821',
+        /** var(--color-border-common) in CSS */
+        popBorder: '1px solid rgb(50, 62, 71)',
+        popRadius: '8px',
+        popShadow: '0 8px 28px rgba(0, 0, 0, 0.5)',
+    },
     font: {
         family: 'Roboto',
         sizeBase: '12px',

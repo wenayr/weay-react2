@@ -9,7 +9,7 @@
 
 import React, {StrictMode, useEffect, useMemo, useRef, useState} from "react";
 import {ObserveAll2, Replay} from "wenay-common2";
-import {useReplaySubscribe, useReplayHistory, useStoreReplayMirror, useStoreNode, useStoreKeys} from "../src/hooks";
+import {useReplaySubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreNode, useStoreKeys} from "../src/hooks";
 
 type tFrame = {n: number, w: number, h: number, ts: number, jpeg: string};
 type tFrameRemote = Replay.ReplayRemote<[tFrame]>;
@@ -188,6 +188,36 @@ const StaleClient = React.memo(function StaleClient(p: {remote: tFrameRemote, st
     </div>;
 });
 
+/* pull client (useReplayFrame): NO live subscription — a timer around remote.frame(seq).
+ * The canvas advances at the PULL cadence while the producer runs at 10 fps: each pull folds
+ * the whole journal tail since our seq (frames counter jumps by ~pace×fps), the sink's
+ * latest-wins decode draws only the last one. The remote is wrapped to count frame() calls —
+ * also QA-proves a hand-wrapped remote works. Pace switches resubscribe but keep the seq
+ * (keepSeq), so no keyframe restart. */
+function PullClient(p: {remote: tFrameRemote}) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const sink = useMemo(() => makeFrameSink(canvasRef), []);
+    const framesRef = useRef(0);
+    const pullsRef = useRef(0);
+    const [intervalMs, setIntervalMs] = useState(1000);
+    const remote = useMemo<tFrameRemote>(() => ({
+        ...p.remote,
+        frame: (seq, hint) => { pullsRef.current++; return p.remote.frame!(seq, hint); },
+    }), [p.remote]);
+    const pf = useReplayFrame(remote, (frame) => { framesRef.current++; sink(frame); }, {intervalMs});
+    useTick(500);
+    return <div>
+        <canvas ref={canvasRef} style={canvasStyle}/>
+        <div style={{display: "flex", gap: 6, alignItems: "center", marginTop: 4, flexWrap: "wrap"}}>
+            <span style={{fontSize: 12}}>pull every:</span>
+            {[250, 1000, 3000].map(ms =>
+                <button key={ms} style={{fontWeight: ms == intervalMs ? 700 : 400}} onClick={() => setIntervalMs(ms)}>{ms}ms</button>)}
+            <button onClick={() => void pf.pull()}>pull now</button>
+        </div>
+        <div style={statLine}>ready {String(pf.ready)} · seq {pf.seq()} · pulls {pullsRef.current} · frames {framesRef.current}{pf.error != null ? ` · error ${String(pf.error)}` : ""}</div>
+    </div>;
+}
+
 /* ---------- card 23: video line - direct client, conflated slow client, time travel ---------- */
 
 export const ReplayVideoDemo = () => {
@@ -263,6 +293,10 @@ export const ReplayVideoDemo = () => {
                     counters refresh only on fresh↔stale flips: a flat "renders" while frames grow is the
                     no-per-event-render proof
                 </div>
+            </div>
+            <div>
+                <div style={{fontSize: 13, fontWeight: 700, marginBottom: 4}}>E: pull at own pace (useReplayFrame)</div>
+                <PullClient remote={demo.remoteDirect}/>
             </div>
         </div>
     </div>;
