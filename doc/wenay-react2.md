@@ -262,11 +262,12 @@ Client-side hooks over the wenay-common2 Replay stack (snapshot + sequenced delt
 import { useReplaySubscribe, useStoreReplaySync, useStoreReplayMirror, useReplayHistory } from "wenay-react2"
 
 // any replay line ({line, since, keyframe} remote)
-const sub = useReplaySubscribe(remote, (frame) => draw(frame), {onSeq?, onError?, since?, enabled?})
+const sub = useReplaySubscribe(remote, (frame) => draw(frame), {onSeq?, onError?, since?, enabled?, staleMs?, onStale?})
 sub.ready; sub.error; sub.seq(); sub.restart()
+sub.stale; sub.lastTs()   // freshness (needs staleMs): stale re-renders on fresh<->stale transitions ONLY; lastTs() is a getter like seq()
 
 // store patch line (ObserveAll2.exposeStoreReplay(...).api.replay)
-const mirror = useStoreReplayMirror(remote, initial, {enabled?})   // creates the mirror store
+const mirror = useStoreReplayMirror(remote, initial, {enabled?})   // creates the mirror store; same staleMs/stale surface
 mirror.store; mirror.ready; mirror.seq(); mirror.restart()
 const sync = useStoreReplaySync(existingStore, remote)              // same, store supplied by the app
 
@@ -275,7 +276,7 @@ const tt = useReplayHistory(history, (frame) => draw(frame), {head: () => replay
 tt.live; tt.seq; tt.head; tt.pause(); tt.play(); tt.seek({seq})
 ```
 
-Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. QA cards 23 (video line + conflation + time travel) and 24 (store sync) are the live examples.
+Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. Freshness: detection lives in wenay-common2 (`staleMs` watchdog); the hooks mirror its edge-triggered `onStale` into `stale`, so a fresh 100 ev/s line causes zero extra renders. `useReplayHistory` is archive playback — staleness does not apply. QA cards 23 (video line + conflation + time travel + freshness) and 24 (store sync) are the live examples.
 ## Logs
 ```
 logsApi.addLogs({id: "api", time: new Date(), txt: "done", var: 1})

@@ -4,6 +4,7 @@ import {ObserveAll2, Replay} from "wenay-common2";
 type StorePatch = ObserveAll2.StorePatch;
 type ReplayEvent<Z extends any[]> = Replay.ReplayEvent<Z>;
 type ReplayRemote<Z extends any[]> = Replay.ReplayRemote<Z>;
+type StaleInfo = Replay.StaleInfo;
 
 /**
  * React bridge over the Replay stack (snapshot + sequenced delta line) of wenay-common2.
@@ -16,7 +17,9 @@ type ReplayRemote<Z extends any[]> = Replay.ReplayRemote<Z>;
  *   (ref/store/canvas). If the consumer state resets on resubscribe, pass {keepSeq: false};
  * - a FULL unmount loses the hook's refs: to reconnect by tail after a remount, keep the position
  *   outside via onSeq and pass it back as `since` (see the QA card for the pattern);
- * - a different `remote` identity always starts from scratch (seq from another line is meaningless).
+ * - a different `remote` identity always starts from scratch (seq from another line is meaningless);
+ * - freshness (staleMs/onStale, controller.stale/lastTs()) is detected by wenay-common2;
+ *   the hooks only mirror the fresh<->stale edges into React state.
  *
  * Server-side parts of the stack (conflateReplay, archiveReplay) are per-connection/per-process
  * and intentionally have no hooks here.
@@ -37,14 +40,31 @@ export type UseReplaySubscribeOptions = {
     enabled?: boolean;
     onSeq?: (seq: number) => void;
     onError?: (e: unknown) => void;
+    /**
+     * Producer-freshness watchdog (detection lives in wenay-common2): no event with a fresh
+     * producer ts for staleMs -> `stale` flips true, flips back on resume. Omitted = zero cost
+     * (no watchdog, no extra state updates). Changing staleMs resubscribes (reconnects by tail
+     * under keepSeq, so it is cheap).
+     */
+    staleMs?: number;
+    /** Edge-triggered mirror of common2's onStale (fresh<->stale transitions only). Goes through a ref — a new identity does not resubscribe. */
+    onStale?: (info: StaleInfo) => void;
 };
 
 export type ReplaySubscribeController = {
     /** Keyframe/tail catch-up finished, events are live from here. */
     readonly ready: boolean;
     readonly error: unknown;
+    /**
+     * Line is stale by the staleMs watchdog. React state, but it updates ONLY on fresh<->stale
+     * transitions — a high-frequency line causes zero extra renders while fresh.
+     * Always false without staleMs.
+     */
+    readonly stale: boolean;
     /** Last seen seq (reconnect point). Getter — reading it does not re-render. */
     seq(): number;
+    /** Producer ts of the last delivered event (0 before the first delivery). Getter — reading it does not re-render. */
+    lastTs(): number;
     /** Drop and re-create the subscription. since omitted = continue by keepSeq rules; a number = explicit position. */
     restart(since?: number): void;
 };
@@ -60,14 +80,15 @@ export function useReplaySubscribe<Z extends any[]>(
     cb: (...event: Z) => void,
     options: UseReplaySubscribeOptions = {},
 ): ReplaySubscribeController {
-    const {since, keepSeq = true, enabled = true, onSeq, onError} = options;
+    const {since, keepSeq = true, enabled = true, onSeq, onError, staleMs, onStale} = options;
     const cbRef = useLatestRef(cb);
-    const hooksRef = useLatestRef({onSeq, onError});
+    const hooksRef = useLatestRef({onSeq, onError, onStale});
     const seqRef = useRef<number | undefined>(since);
-    const subRef = useRef<(() => void) & {seq: () => number} | null>(null);
+    const subRef = useRef<(() => void) & {seq: () => number, lastTs: () => number} | null>(null);
     const lastRemoteRef = useRef<ReplayRemote<Z> | null | undefined>(undefined);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<unknown>(null);
+    const [stale, setStale] = useState(false);
     const [epoch, setEpoch] = useState(0);
 
     useEffect(() => {
@@ -78,6 +99,9 @@ export function useReplaySubscribe<Z extends any[]>(
         let alive = true;
         setReady(false);
         setError(null);
+        // stale is NOT reset here: it re-syncs from common2 after the first delivery (a stale
+        // keyframe must show stale from the start, not flicker through false on resubscribe)
+        if (staleMs === undefined) setStale(false);
         const off = Replay.replaySubscribe<Z>(remote, (...event) => cbRef.current(...event), {
             since: seqRef.current,
             onSeq: seq => {
@@ -88,10 +112,21 @@ export function useReplaySubscribe<Z extends any[]>(
                 if (alive) setError(e);
                 hooksRef.current.onError?.(e);
             },
+            ...(staleMs !== undefined ? {
+                staleMs,
+                onStale: (info: StaleInfo) => {
+                    if (alive) setStale(info.stale);
+                    hooksRef.current.onStale?.(info);
+                },
+            } : null),
         });
         subRef.current = off;
         off.ready.then(
-            () => { if (alive) setReady(true); },
+            () => {
+                if (!alive) return;
+                setReady(true);
+                if (staleMs !== undefined) setStale(off.isStale()); // fresh line after a stale one: no edge from common2, sync by hand
+            },
             e => { if (alive) setError(e); },
         );
         return () => {
@@ -100,17 +135,19 @@ export function useReplaySubscribe<Z extends any[]>(
             off();
             if (!keepSeq) seqRef.current = since;
         };
-        // keepSeq/since are start-position config, not subscription identity — no resubscribe on change
+        // keepSeq/since are start-position config, not subscription identity — no resubscribe on change;
+        // staleMs is subscribe-time config in common2, so changing it resubscribes
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [remote, enabled, epoch]);
+    }, [remote, enabled, epoch, staleMs]);
 
     const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
+    const lastTs = useCallback(() => subRef.current?.lastTs() ?? 0, []);
     const restart = useCallback((at?: number) => {
         if (at !== undefined) seqRef.current = at;
         setEpoch(v => v + 1);
     }, []);
 
-    return useMemo(() => ({ready, error, seq, restart}), [ready, error, seq, restart]);
+    return useMemo(() => ({ready, error, stale, seq, lastTs, restart}), [ready, error, stale, seq, lastTs, restart]);
 }
 
 export type UseStoreReplaySyncOptions = UseReplaySubscribeOptions;
@@ -128,13 +165,14 @@ export function useStoreReplaySync<T extends object>(
     remote: ReplayRemote<[StorePatch]> | null | undefined,
     options: UseStoreReplaySyncOptions = {},
 ): StoreReplaySyncController {
-    const {since, keepSeq = true, enabled = true, onSeq, onError} = options;
-    const hooksRef = useLatestRef({onSeq, onError});
+    const {since, keepSeq = true, enabled = true, onSeq, onError, staleMs, onStale} = options;
+    const hooksRef = useLatestRef({onSeq, onError, onStale});
     const seqRef = useRef<number | undefined>(since);
-    const subRef = useRef<(() => void) & {seq: () => number} | null>(null);
+    const subRef = useRef<(() => void) & {seq: () => number, lastTs: () => number} | null>(null);
     const lastRemoteRef = useRef<ReplayRemote<[StorePatch]> | null | undefined>(undefined);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<unknown>(null);
+    const [stale, setStale] = useState(false);
     const [epoch, setEpoch] = useState(0);
 
     useEffect(() => {
@@ -145,6 +183,7 @@ export function useStoreReplaySync<T extends object>(
         let alive = true;
         setReady(false);
         setError(null);
+        if (staleMs === undefined) setStale(false); // see useReplaySubscribe: stale re-syncs from common2, no reset-to-false flicker
         const off = ObserveAll2.syncStoreReplay(store, remote, {
             since: seqRef.current,
             onSeq: seq => {
@@ -155,10 +194,21 @@ export function useStoreReplaySync<T extends object>(
                 if (alive) setError(e);
                 hooksRef.current.onError?.(e);
             },
+            ...(staleMs !== undefined ? {
+                staleMs,
+                onStale: (info: StaleInfo) => {
+                    if (alive) setStale(info.stale);
+                    hooksRef.current.onStale?.(info);
+                },
+            } : null),
         });
         subRef.current = off;
         off.ready.then(
-            () => { if (alive) setReady(true); },
+            () => {
+                if (!alive) return;
+                setReady(true);
+                if (staleMs !== undefined) setStale(off.isStale());
+            },
             e => { if (alive) setError(e); },
         );
         return () => {
@@ -168,15 +218,16 @@ export function useStoreReplaySync<T extends object>(
             if (!keepSeq) seqRef.current = since;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [store, remote, enabled, epoch]);
+    }, [store, remote, enabled, epoch, staleMs]);
 
     const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
+    const lastTs = useCallback(() => subRef.current?.lastTs() ?? 0, []);
     const restart = useCallback((at?: number) => {
         if (at !== undefined) seqRef.current = at;
         setEpoch(v => v + 1);
     }, []);
 
-    return useMemo(() => ({ready, error, seq, restart}), [ready, error, seq, restart]);
+    return useMemo(() => ({ready, error, stale, seq, lastTs, restart}), [ready, error, stale, seq, lastTs, restart]);
 }
 
 export type StoreReplayMirrorController<T extends object> = StoreReplaySyncController & {

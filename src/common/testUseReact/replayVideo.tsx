@@ -7,7 +7,7 @@
  * these cards exercise the React lifecycle side.
  */
 
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {StrictMode, useEffect, useMemo, useRef, useState} from "react";
 import {ObserveAll2, Replay} from "wenay-common2";
 import {useReplaySubscribe, useReplayHistory, useStoreReplayMirror, useStoreNode, useStoreKeys} from "../src/hooks";
 
@@ -23,6 +23,7 @@ function createVideoDemo() {
     let res: {w: number, h: number} = videoResolutions[1];
     let frameN = 0;
     let last: tFrame | null = null;
+    let stalled = false;
 
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
@@ -52,6 +53,7 @@ function createVideoDemo() {
     }
 
     setInterval(() => {
+        if (stalled) return;                            // freshness QA: producer stops emitting, line stays subscribed
         frameN++;
         drawScene(performance.now());
         const frame: tFrame = {n: frameN, w: res.w, h: res.h, ts: Date.now(), jpeg: canvas.toDataURL("image/jpeg", 0.55)};
@@ -110,6 +112,7 @@ function createVideoDemo() {
         history,
         setResolution: (r: {w: number, h: number}) => { res = r; },
         getResolution: () => res,
+        setStalled: (v: boolean) => { stalled = v; },
     };
 }
 
@@ -159,13 +162,41 @@ function LiveClient(p: {remote: tFrameRemote, since?: number, onSeq?: (seq: numb
     </div>;
 }
 
+/* freshness client: no useTick — the ONLY re-render sources are ready/stale transitions.
+ * React.memo shields it from the parent's 500ms tick, so the render counter is the proof
+ * that a fresh 10 fps line causes zero per-event renders. Wrapped in StrictMode by the card:
+ * double-effect must not leak a second watchdog or flicker the badge. */
+const STALE_MS = 2000;
+const staleBadge: React.CSSProperties = {padding: "1px 8px", borderRadius: 4, color: "#fff", fontWeight: 700};
+
+const StaleClient = React.memo(function StaleClient(p: {remote: tFrameRemote, staleMs: number}) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const sink = useMemo(() => makeFrameSink(canvasRef), []);
+    const framesRef = useRef(0);
+    const rendersRef = useRef(0);
+    rendersRef.current++;
+    const sub = useReplaySubscribe(p.remote, (frame) => { framesRef.current++; sink(frame); }, {staleMs: p.staleMs});
+    return <div>
+        <canvas ref={canvasRef} style={canvasStyle}/>
+        <div style={statLine}>
+            {sub.stale
+                ? <span style={{...staleBadge, background: "#cf222e"}}>STALE</span>
+                : <span style={{...staleBadge, background: "#2da44e"}}>fresh</span>}
+            {" "}· renders {rendersRef.current} · frames {framesRef.current}
+            {" "}· lastTs {sub.lastTs() > 0 ? new Date(sub.lastTs()).toLocaleTimeString() : "-"}
+        </div>
+    </div>;
+});
+
 /* ---------- card 23: video line - direct client, conflated slow client, time travel ---------- */
 
 export const ReplayVideoDemo = () => {
     const demo = useMemo(() => getVideoDemo(), []);
     const [resIdx, setResIdx] = useState(1);
     const [slow, setSlow] = useState(true);
+    const [stalled, setStalled] = useState(false);
     const [mountedA, setMountedA] = useState(true);
+    const [genD, setGenD] = useState(0);
     const lastSeqA = useRef<number | undefined>(undefined);
     useTick(500);
 
@@ -183,6 +214,10 @@ export const ReplayVideoDemo = () => {
             <label style={{fontSize: 13, marginLeft: 12}}>
                 <input type="checkbox" checked={slow} onChange={e => { setSlow(e.target.checked); demo.wire.setRateMs(e.target.checked ? 400 : 66); }}/>
                 slow network for client B (1 envelope / {demo.wire.getRateMs()}ms)
+            </label>
+            <label style={{fontSize: 13, marginLeft: 12}}>
+                <input type="checkbox" checked={stalled} onChange={e => { setStalled(e.target.checked); demo.setStalled(e.target.checked); }}/>
+                stall producer (freshness for D)
             </label>
             <span style={{fontSize: 12, color: "#57606a"}}>producer: {FPS} fps · head seq {demo.replay.head()}</span>
         </div>
@@ -216,6 +251,19 @@ export const ReplayVideoDemo = () => {
                     <span style={{fontSize: 12, fontFamily: "monospace"}}>{tt.seq}/{tt.head} {tt.live ? "live" : "paused"}</span>
                 </div>
             </div>
+            <div>
+                <div style={{fontSize: 13, fontWeight: 700, marginBottom: 4}}>
+                    D: freshness (staleMs={STALE_MS}, StrictMode){" "}
+                    <button onClick={() => setGenD(v => v + 1)}>new client (keyframe)</button>
+                </div>
+                <StrictMode>
+                    <StaleClient key={genD} remote={demo.remoteDirect} staleMs={STALE_MS}/>
+                </StrictMode>
+                <div style={{fontSize: 12, color: "#57606a", maxWidth: 320, marginTop: 4}}>
+                    counters refresh only on fresh↔stale flips: a flat "renders" while frames grow is the
+                    no-per-event-render proof
+                </div>
+            </div>
         </div>
     </div>;
 };
@@ -225,13 +273,15 @@ export const ReplayVideoDemo = () => {
 type tWorld = {ticks: number, price: number, note: string, bag: Record<string, number>};
 
 function createStoreReplayDemo() {
+    let stalled = false;
     const store = ObserveAll2.createStore<tWorld>({ticks: 0, price: 100, note: "start", bag: {a: 1}});
     const exposed = ObserveAll2.exposeStoreReplay(store, {history: 128});
     setInterval(() => {
+        if (stalled) return;
         store.state.ticks++;
         store.state.price = Math.round((store.state.price + (Math.random() - 0.5) * 2) * 100) / 100;
     }, 800);
-    return {store, remote: exposed.api.replay};
+    return {store, remote: exposed.api.replay, setStalled: (v: boolean) => { stalled = v; }};
 }
 
 type tStoreDemo = ReturnType<typeof createStoreReplayDemo>;
@@ -241,7 +291,8 @@ const getStoreReplayDemo = () => storeDemo ??= createStoreReplayDemo();
 export const ReplayStoreDemo = () => {
     const demo = useMemo(() => getStoreReplayDemo(), []);
     const [enabled, setEnabled] = useState(true);
-    const mirror = useStoreReplayMirror<tWorld>(demo.remote, {ticks: 0, price: 0, note: "", bag: {}}, {enabled});
+    const [stalled, setStalled] = useState(false);
+    const mirror = useStoreReplayMirror<tWorld>(demo.remote, {ticks: 0, price: 0, note: "", bag: {}}, {enabled, staleMs: 2500});
     const ticks = useStoreNode(mirror.store.node.ticks);
     const price = useStoreNode(mirror.store.node.price);
     const note = useStoreNode(mirror.store.node.note);
@@ -261,9 +312,15 @@ export const ReplayStoreDemo = () => {
                 sync enabled (uncheck, mutate, recheck -&gt; catches up via journal tail)
             </label>
             <button onClick={() => mirror.restart()}>restart (tail)</button>
+            <label style={{fontSize: 13}}>
+                <input type="checkbox" checked={stalled} onChange={e => { setStalled(e.target.checked); demo.setStalled(e.target.checked); }}/>
+                stall producer (stale after 2.5s)
+            </label>
         </div>
         <div style={{display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13}}>
             <span>ready: <b>{String(mirror.ready)}</b></span>
+            <span>stale: <b style={{color: mirror.stale ? "#cf222e" : "#2da44e"}}>{String(mirror.stale)}</b></span>
+            <span>lastTs: <b>{mirror.lastTs() > 0 ? new Date(mirror.lastTs()).toLocaleTimeString() : "-"}</b></span>
             <span>seq: <b>{mirror.seq()}</b></span>
             <span>mirror ticks: <b>{ticks.value}</b></span>
             <span>mirror price: <b>{price.value}</b></span>

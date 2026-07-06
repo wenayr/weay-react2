@@ -778,17 +778,17 @@ function ActiveChecks() {
                    tall>
                 <ObserveStoreMirrorDemo />
             </Check>
-            <Check n={23} title="Replay hooks - video line, conflation, time travel"
-                   do="Watch A and B play the same synthetic video. Toggle slow network for B, switch resolution, unmount/remount A. In C drag the slider (playback pauses), then press live."
-                   expect="A plays smoothly at 10 fps. B on slow network stays CURRENT (bounded latency): frames drop (dropped/coalesced counters grow), the wire buffer never grows past highWater, and each recovery is one coalesced last-frame envelope. Resolution switches on all clients within a frame. Remounting A continues from the kept seq (seq does not reset, frames counter continues from the tail). C seeks to any archived seq via keyframe+tail fold and hands over to live seamlessly."
-                   note="All in-proc: the socket transport is already proven in wenay-common2 (replay/video-socket.demo, canvas-socket.test). This card tests the React side: useReplaySubscribe lifecycle (off on unmount, reconnect by since), useReplayHistory scrubber, frames drawn to canvas via ref - bypassing VDOM. The producer starts on first render and runs until page reload."
+            <Check n={23} title="Replay hooks - video line, conflation, time travel, freshness"
+                   do="Watch A and B play the same synthetic video. Toggle slow network for B, switch resolution, unmount/remount A. In C drag the slider (playback pauses), then press live. In D: note the renders counter while the line is fresh, check stall producer, wait 2s, uncheck; while stalled press new client (keyframe)."
+                   expect="A plays smoothly at 10 fps. B on slow network stays CURRENT (bounded latency): frames drop (dropped/coalesced counters grow), the wire buffer never grows past highWater, and each recovery is one coalesced last-frame envelope. Resolution switches on all clients within a frame. Remounting A continues from the kept seq (seq does not reset, frames counter continues from the tail). C seeks to any archived seq via keyframe+tail fold and hands over to live seamlessly. D: renders stays FLAT while frames grow (no per-event re-renders); on stall the STALE badge appears after ~2s and disappears on the first frame after resume; a client mounted during a stall goes STALE within staleMs (this in-proc keyframe is stamped at request time; a tail/keyframe carrying an old producer ts goes stale from the first paint); StrictMode double-effect leaves one watchdog and no badge flicker."
+                   note="All in-proc: the socket transport is already proven in wenay-common2 (replay/video-socket.demo, canvas-socket.test). This card tests the React side: useReplaySubscribe lifecycle (off on unmount, reconnect by since), useReplayHistory scrubber, frames drawn to canvas via ref - bypassing VDOM, stale/staleMs mirroring common2's edge-triggered watchdog into React state. The producer starts on first render and runs until page reload."
                    tall>
                 <ReplayVideoDemo />
             </Check>
             <Check n={24} title="Replay hooks - store sync (useStoreReplayMirror)"
-                   do="Watch ticks/price advance. Click server note / add key / delete key. Uncheck sync enabled, mutate the server a few times, recheck. Click restart."
-                   expect="Mirror follows the server store with seq ascending. While sync is disabled the mirror freezes; on re-enable it catches up through the journal tail (seq jumps to head, no full reset flicker). Object key add/delete replicate. restart resubscribes from the kept seq."
-                   note="exposeStoreReplay/syncStoreReplay in-proc: the remote is the exposed {line, since, keyframe} facade, exactly what createRpcServerAuto would expose over a socket.">
+                   do="Watch ticks/price advance. Click server note / add key / delete key. Uncheck sync enabled, mutate the server a few times, recheck. Click restart. Check stall producer, wait 2.5s, then click server note."
+                   expect="Mirror follows the server store with seq ascending. While sync is disabled the mirror freezes; on re-enable it catches up through the journal tail (seq jumps to head, no full reset flicker). Object key add/delete replicate. restart resubscribes from the kept seq. On stall the stale flag flips true after 2.5s and lastTs freezes; any server mutation (e.g. server note) flips it back to fresh."
+                   note="exposeStoreReplay/syncStoreReplay in-proc: the remote is the exposed {line, since, keyframe} facade, exactly what createRpcServerAuto would expose over a socket. staleMs rides the same ReplaySubscribeOpts as the video card.">
                 <ReplayStoreDemo />
             </Check>
             <Check n={13} title="ModalProvider / useModal - Escape and outside click"
