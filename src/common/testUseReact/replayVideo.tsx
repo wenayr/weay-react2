@@ -9,7 +9,7 @@
 
 import React, {StrictMode, useEffect, useMemo, useRef, useState} from "react";
 import {ObserveAll2, Replay} from "wenay-common2";
-import {useReplaySubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreNode, useStoreKeys} from "../src/hooks";
+import {useReplaySubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreReplayEach, useStoreNode, useStoreKeys} from "../src/hooks";
 
 type tFrame = {n: number, w: number, h: number, ts: number, jpeg: string};
 type tFrameRemote = Replay.ReplayRemote<[tFrame]>;
@@ -362,5 +362,94 @@ export const ReplayStoreDemo = () => {
             <span>bag keys: <b>{bagKeys.stringKeys.join(",") || "-"}</b></span>
         </div>
         {mirror.error != null && <div style={{color: "#cf222e"}}>error: {String(mirror.error)}</div>}
+    </div>;
+};
+
+/* ---------- card 25: per-key feed - useStoreReplayEach over exposeStoreReplay ---------- */
+
+type tRow = {qty: number, px: number};
+type tRows = Record<string, tRow>;
+type tRowsRemote = Replay.ReplayRemote<[ObserveAll2.StorePatch]>;
+
+function createStoreEachDemo() {
+    let n = 2;
+    const store = ObserveAll2.createStore<tRows>({r1: {qty: 5, px: 101}, r2: {qty: 3, px: 202}});
+    const exposed = ObserveAll2.exposeStoreReplay(store, {history: 256});
+    setInterval(() => {
+        const keys = Object.keys(store.state);
+        if (!keys.length) return;
+        const k = keys[Math.floor(Math.random() * keys.length)];   // ONE random row per tick
+        store.state[k].px = Math.round(store.state[k].px * (1 + (Math.random() - 0.5) / 40) * 100) / 100;
+    }, 700);
+    return {
+        store,
+        remote: exposed.api.replay,
+        add: () => { n++; store.state["r" + n] = {qty: 1 + n % 7, px: 100 + n}; },
+        del: () => { const keys = Object.keys(store.state); if (keys.length) delete store.state[keys[keys.length - 1]]; },
+        replaceAll: () => {
+            n += 2;
+            store.replace({["r" + (n - 1)]: {qty: 2, px: 100 + n}, ["r" + n]: {qty: 4, px: 200 + n}});
+        },
+    };
+}
+
+type tEachDemo = ReturnType<typeof createStoreEachDemo>;
+let eachDemo: tEachDemo | null = null;
+const getStoreEachDemo = () => eachDemo ??= createStoreEachDemo();
+
+const EachClient = ({remote}: {remote: tRowsRemote}) => {
+    // the fold target lives OUTSIDE React state: a plain Map of rows, exactly like a grid api would
+    const rowsRef = useRef(new Map<string, tRow & {calls: number}>());
+    const callsRef = useRef(0);
+    const [, setTick] = useState(0);
+    const feed = useStoreReplayEach<tRows>(remote, (key, row) => {
+        callsRef.current++;
+        if (row === undefined) rowsRef.current.delete(key);
+        else rowsRef.current.set(key, {...row, calls: (rowsRef.current.get(key)?.calls ?? 0) + 1});
+        setTick(t => t + 1);
+    }, {drain: 100, staleMs: 2500});
+
+    const rows = [...rowsRef.current.entries()].sort(([a], [b]) => a.localeCompare(b, undefined, {numeric: true}));
+    return <div style={{display: "grid", gap: 6}}>
+        <div style={{display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13}}>
+            <span>ready: <b>{String(feed.ready)}</b></span>
+            <span>stale: <b style={{color: feed.stale ? "#cf222e" : "#2da44e"}}>{String(feed.stale)}</b></span>
+            <span>seq: <b>{feed.seq()}</b></span>
+            <span>cb calls: <b>{callsRef.current}</b></span>
+            <span>store keys: <b>{Object.keys(feed.store.state).length}</b></span>
+        </div>
+        <table style={{fontSize: 13, fontFamily: "monospace", borderCollapse: "collapse", width: "fit-content"}}>
+            <thead><tr>{["row", "qty", "px", "cb calls"].map(h =>
+                <th key={h} style={{border: "1px solid #d0d7de", padding: "2px 10px", background: "#f6f8fa"}}>{h}</th>)}</tr></thead>
+            <tbody>{rows.map(([key, r]) => <tr key={key}>
+                <td style={{border: "1px solid #d0d7de", padding: "2px 10px"}}>{key}</td>
+                <td style={{border: "1px solid #d0d7de", padding: "2px 10px"}}>{r.qty}</td>
+                <td style={{border: "1px solid #d0d7de", padding: "2px 10px"}}>{r.px}</td>
+                <td style={{border: "1px solid #d0d7de", padding: "2px 10px"}}>{r.calls}</td>
+            </tr>)}</tbody>
+        </table>
+        {feed.error != null && <div style={{color: "#cf222e"}}>error: {String(feed.error)}</div>}
+    </div>;
+};
+
+export const ReplayStoreEachDemo = () => {
+    const demo = useMemo(() => getStoreEachDemo(), []);
+    const [gen, setGen] = useState(0);
+
+    return <div style={{display: "grid", gap: 8}}>
+        <div style={{display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center"}}>
+            <button onClick={demo.add}>server add row</button>
+            <button onClick={demo.del}>server delete row</button>
+            <button onClick={demo.replaceAll}>server replace ALL (root replace)</button>
+            <button onClick={() => setGen(v => v + 1)}>remount client (fresh keyframe)</button>
+        </div>
+        <StrictMode>
+            <EachClient key={gen} remote={demo.remote}/>
+        </StrictMode>
+        <div style={{fontSize: 12, color: "#57606a", maxWidth: 560}}>
+            per-key contract: the producer touches ONE random row per tick, so between your clicks only that
+            row's "cb calls" counter grows — the whole dict is never re-delivered. keyframe / replace ALL are
+            the only events that touch every row (expansion), delete arrives as (key, undefined).
+        </div>
     </div>;
 };

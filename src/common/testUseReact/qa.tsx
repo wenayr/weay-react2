@@ -14,7 +14,7 @@ import { DivRnd3 } from "../src/components";
 import { MyChartEngine } from "../src/myChart/chartEngine/chartEngineReact";
 import { GridExample, tt } from "./useGrid";
 import { TestParams } from "./testParams";
-import { ReplayVideoDemo, ReplayStoreDemo } from "./replayVideo";
+import { ReplayVideoDemo, ReplayStoreDemo, ReplayStoreEachDemo } from "./replayVideo";
 
 /* ---------- card wrapper ---------- */
 const card: React.CSSProperties = { border: "1px solid #d0d7de", borderRadius: 10, margin: "14px 0", background: "#fff", overflow: "hidden", fontFamily: "system-ui, sans-serif" };
@@ -886,6 +886,13 @@ function ActiveChecks() {
                    expect="Mirror follows the server store with seq ascending. While sync is disabled the mirror freezes; on re-enable it catches up through the journal tail (seq jumps to head, no full reset flicker). Object key add/delete replicate. restart resubscribes from the kept seq. On stall the stale flag flips true after 2.5s and lastTs freezes; any server mutation (e.g. server note) flips it back to fresh."
                    note="exposeStoreReplay/syncStoreReplay in-proc: the remote is the exposed {line, since, keyframe} facade, exactly what createRpcServerAuto would expose over a socket. staleMs rides the same ReplaySubscribeOpts as the video card.">
                 <ReplayStoreDemo />
+            </Check>
+            <Check n={25} title="Replay hooks - per-key feed (useStoreReplayEach)"
+                   do="Watch px of one random row change every 700ms. Click server add row / delete row, replace ALL (root replace), remount client."
+                   expect="On mount every row appears with cb calls=1 (keyframe expanded per key). Between clicks only the mutated row's cb calls counter grows - the whole dict is never re-delivered per tick. Delete removes the row via (key, undefined). replace ALL swaps the table: removed rows leave, new rows enter with cb calls=1. Remount folds a fresh keyframe (all counters reset to 1); StrictMode double-effect does not double-count."
+                   note="React counterpart of ObserveAll2.syncStoreReplayEach (wenay-common2 1.0.61): internal mirror store + syncStoreReplay + store.each(). The mirror lives in a ref, so in-mount resubscribes reconnect by journal tail on top of kept state; the fold target is a plain Map (grid-api style), not React state. drain:100 coalesces multiple writes to one key into one call per window."
+                   tall>
+                <ReplayStoreEachDemo />
             </Check>
             <Check n={13} title="ModalProvider / useModal - Escape and outside click"
                    do="Click open modal. Close it with Escape. Open it again and close with an outside click. Open it again and close with the close button."

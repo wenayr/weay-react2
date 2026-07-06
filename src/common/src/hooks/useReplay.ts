@@ -1,6 +1,9 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {ObserveAll2, Replay} from "wenay-common2";
+import {useStoreEach} from "./useObserveStore";
 
+type StoreDrain = ObserveAll2.StoreDrain;
+type StoreEachCtx = ObserveAll2.StoreEachCtx;
 type StorePatch = ObserveAll2.StorePatch;
 type ReplayEvent<Z extends any[]> = Replay.ReplayEvent<Z>;
 type ReplayRemote<Z extends any[]> = Replay.ReplayRemote<Z>;
@@ -275,6 +278,49 @@ export function useStoreReplayMirror<T extends object>(
     }
     const store = storeRef.current.store;
     const sync = useStoreReplaySync(store, remote, options);
+    return useMemo(() => ({...sync, store}), [sync, store]);
+}
+
+export type UseStoreReplayEachOptions<T extends object> = UseStoreReplaySyncOptions & {
+    /**
+     * Seed of the internal mirror store. Creation-time only (a later identity change does nothing).
+     * Reconnect after a FULL unmount: pass the saved snapshot together with `since`
+     * ({since: prev.seq(), initial: prev.store.snapshot()}) — the tail lands ON TOP of the previous
+     * state; a fresh empty mirror would not converge.
+     */
+    initial?: T;
+    /** Drain of the internal mirror store — the coalescing window of the per-key feed. Creation-time only. */
+    drain?: StoreDrain;
+};
+
+/**
+ * Per-key fold over a store replay line — React counterpart of `ObserveAll2.syncStoreReplayEach`
+ * (internal mirror store + syncStoreReplay + store.each()). cb fires once per CHANGED top-level
+ * key per drain window with the current value; the first delivery is the keyframe EXPANDED per
+ * key; (key, undefined) = key deleted — cold start / reconnect are not special cases for per-key
+ * consumers (grid rows, canvas layers, ...). The fold target should live outside React state.
+ *
+ * Unlike the library one-call (a fresh store per call), the mirror here lives in a ref: within
+ * one mounted component every resubscribe (StrictMode double-effect, restart(), enabled toggling,
+ * staleMs/policy change) reconnects by tail ON TOP of the kept state — no snapshot/initial dance.
+ * A new `remote` identity recreates the store (fresh keyframe). Direct reads / extra
+ * subscriptions: controller.store (useStoreNode/useStoreKeys work on it as usual).
+ */
+export function useStoreReplayEach<T extends object>(
+    remote: ReplayRemote<[StorePatch]> | null | undefined,
+    cb: (key: string, value: T[keyof T] | undefined, ctx: StoreEachCtx) => void,
+    options: UseStoreReplayEachOptions<T> = {},
+): StoreReplayMirrorController<T> {
+    const {initial, drain, ...syncOptions} = options;
+    const storeRef = useRef<{remote: typeof remote, store: ObserveAll2.Store<T>} | null>(null);
+    if (!storeRef.current || storeRef.current.remote !== remote) {
+        storeRef.current = {remote, store: ObserveAll2.createStore<T>((initial ?? {}) as T, drain !== undefined ? {drain} : undefined)};
+    }
+    const store = storeRef.current.store;
+    // each BEFORE sync: effects run in hook-call order, so the per-key subscriber already exists
+    // when the keyframe applies to the store (the expansion is not missed)
+    useStoreEach(store, cb, {enabled: syncOptions.enabled});
+    const sync = useStoreReplaySync(store, remote, syncOptions);
     return useMemo(() => ({...sync, store}), [sync, store]);
 }
 

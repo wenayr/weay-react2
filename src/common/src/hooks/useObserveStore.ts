@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {ObserveAll2} from "wenay-common2";
 
 type StoreChange = ObserveAll2.StoreChange;
+type StoreEachCtx = ObserveAll2.StoreEachCtx;
 type StoreSubOpts = ObserveAll2.StoreSubOpts;
 type StoreSyncOpts = ObserveAll2.StoreSyncOpts;
 type StoreDrain = ObserveAll2.StoreDrain;
@@ -166,6 +167,34 @@ export function useStoreSelect<T, M extends StoreMask<T>>(
         refresh,
         get: () => selection.get(),
     }), [selection, value, refresh]);
+}
+
+export type UseStoreEachOptions = {
+    /** false = do not subscribe (and drop the current subscription). Default true. */
+    enabled?: boolean;
+};
+
+/**
+ * Per-changed-top-level-key feed of a store (`store.each()` of wenay-common2): cb fires once per
+ * CHANGED key per drain window with the current `store.state[key]` (`undefined` = key deleted);
+ * a root replace (store.replace / mirror keyframe) EXPANDS into one call per key, so cold start
+ * is not a special case for per-key consumers (grid rows, canvas layers, ...). The fold target
+ * should live outside React state (ref/store/grid api) — this hook renders nothing by itself.
+ * cb goes through a ref — a new identity does not resubscribe.
+ * The remote (wire) counterpart is useStoreReplayEach in useReplay.ts.
+ */
+export function useStoreEach<T extends object>(
+    store: ObserveAll2.Store<T> | null | undefined,
+    cb: (key: string, value: T[keyof T] | undefined, ctx: StoreEachCtx) => void,
+    options: UseStoreEachOptions = {},
+): void {
+    const {enabled = true} = options;
+    const cbRef = useLatestRef(cb);
+    useEffect(() => {
+        if (!store || !enabled) return;
+        // each() is created lazily per subscription: it runs while it has subscribers and closes on off()
+        return store.each().on((key, value, ctx) => cbRef.current(key, value, ctx));
+    }, [store, enabled, cbRef]);
 }
 
 export type RemoteStoreLike<T extends object> = {
@@ -350,4 +379,4 @@ export function useListenValue<T, TArgs extends readonly unknown[] = readonly [T
     return value;
 }
 
-export type {StoreChange, StoreDrain, StoreMask, StoreNode, StorePick, StoreSelection, StoreSubOpts, StoreSyncOpts};
+export type {StoreChange, StoreDrain, StoreEachCtx, StoreMask, StoreNode, StorePick, StoreSelection, StoreSubOpts, StoreSyncOpts};

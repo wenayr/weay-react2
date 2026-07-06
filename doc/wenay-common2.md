@@ -138,6 +138,7 @@ l.ticks.once(v => console.log(v))                         // one event, then aut
 const [tick, ticks] = UseReplayListen<[number]>({history: 1024, current: 'last'})    // after — same facade, same key
 // legacy subscribers unchanged (byte-for-byte). Replay consumers now also get:
 const sub = replaySubscribe(l.ticks, v => {}, {since: saved, onSeq: s => saved = s})  // catch-up + live, no gaps/dups
+const sub2 = replaySubscribe(c.math.func.ticks, v => {})  // replay members project on func/strict directly — no cast needed
 await l.ticks.frame(mySeq)                                // pull at YOUR pace (50ms timer etc.) — server condenses via the line's frame lambda
 // full guide + examples → rpc.md; frame model / lag policies → 🎞️ recipe below and rare docs
 ```
@@ -164,6 +165,14 @@ store.node.path.to.leaf.on((value, ctx) => {}, {current?, drain?, key?}) -> off
 store.node.path.to.leaf.once(cb, opts?) -> off
 store.update(mask, opts?) -> selection                         // typed selected snapshot
 selection.get() · selection.on((snap, ctx)=>{}, opts?) -> off · selection.onEach((value, ctx)=>{}, opts?) -> off
+store.each(opts?) -> Listen<[key, value, ctx]>                 // changed TOP-LEVEL keys as a plain Listen — THE per-key feed
+  // one call per CHANGED key per drain window: value = current store.state[key] at flush time; undefined = key deleted;
+  //   two writes to one key in a window = ONE call (last value); deeper dirt (state.a.b = ...) reports 'a' once
+  // root replace (store.replace / mirror keyframe) EXPANDS: one call per key of the new state + (key, undefined)
+  //   per key the replace removed — cold start / reconnect are NOT special cases for per-key consumers
+  // plain Listen shape (on(cb) -> off · once · count); zero cost while it has no subscribers
+  // NOT update(true).onEach: onEach fires per SELECTED path, and mask true selects the root —
+  //   ONE call per window with the whole dict (a dev warn points to each())
 store.count() -> number
 
 // network shape: backend exposes snapshots + changed Listen; frontend mirrors selected masks locally
@@ -180,6 +189,13 @@ ObserveAll2.syncStoreReplay(mirror, remote /*{line, since, keyframe, frame?} of 
   // off.ready (catch-up done) · off.seq() (save for reconnect: syncStoreReplay(..., {since: prev.seq()}))
   // lagging/late client NEVER gets a backlog: evicted seq -> ONE fresh keyframe + live
   // freshness is an option, not consumer boilerplate: {staleMs, onStale} flags a silent line / stale keyframe (edge-triggered both ways; 🎞️ in rare docs)
+ObserveAll2.syncStoreReplayEach<T>(remote, (key, value, ctx) => {}, opts?) -> off & {store, ready, seq(), isStale(), lastTs()}
+  // one-call remote fold: mirror store + syncStoreReplay + store.each() — the callback fires per CHANGED
+  //   top-level key; first delivery = keyframe EXPANDED per key; (key, undefined) = key deleted
+  // opts = all replaySubscribe opts (since/onSeq/policy/staleMs/onStale/onError...) + {drain?, initial?}
+  // off() tears down BOTH the store sub and the wire sub; direct reads via off.store.state.KEY
+  // reconnect: syncStoreReplayEach(remote, cb, {since: prev.seq(), initial: prev.store.snapshot()})
+  //   — the tail lands ON TOP of the previous state (a fresh empty mirror would not converge)
 // Slow-client conflation: recipe section 🎞️ below. Full generic surface (any event line, history/time-travel) -> Replay namespace, 🎞️ in rare docs.
 // Object add/delete/deep set are paths. Array mutation dirties the whole array branch, not splice internals.
 ```
@@ -200,6 +216,19 @@ const mirror = ObserveAll2.createStoreMirror<Market>(api, {data: {}, meta: {}})
 const stop = await mirror.sync({data: {BTC: true}, meta: {status: true}}, {current: true, drain: 250})  // uses changedPaths when available
 mirror.node.data.BTC.on(v => {}, {current: true})
 stop()
+
+// per-key feed — dict store -> grid rows; keyframe / reconnect are just expansion, not special cases
+type Rows = Record<string, {qty: number}>
+const rows = ObserveAll2.createStore<Rows>({})
+const offRows = rows.each().on((key, row) => { /* row === undefined ? removeRow(key) : upsertRow(key, row) */ })
+
+// the same per-key contract over the wire — ONE call (mirror store + syncStoreReplay + each)
+const exposed = ObserveAll2.exposeStoreReplay(rows, {history: 1024})   // server side: spread exposed.api into the RPC object
+const feed = ObserveAll2.syncStoreReplayEach<Rows>(exposed.api.replay, (key, row) => {}, {drain: "micro"})
+await feed.ready                                   // catch-up done: keyframe arrived expanded per key
+feed.store.state                                   // the mirror — direct reads / extra subscriptions
+feed()                                             // tears down the store sub AND the wire sub
+// reconnect later: syncStoreReplayEach(remote, cb, {since: feed.seq(), initial: feed.store.snapshot()})
 ```
 Runnable example: `npx tsx observable2/store-mirror.example.ts`.
 

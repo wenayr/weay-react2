@@ -171,6 +171,9 @@ RPC Listen surface on client: stream.on(cb)->off · stream.once(cb)->off · stre
   // typed projection: client.func as unknown as DeepSocketListen<ServerFacade> (usually hidden behind a local webListen(client) helper).
   //   replay members project as ReplaySocketListen<Z> automatically (legacy surface + line/frameLine/since/keyframe/frame,
   //   tuples preserved end-to-end) — client.func.key passes to replaySubscribe as is, no casts.
+  //   The same projection is built into BOTH typed-client paths (ClientAPIAll/ClientAPIStrict): on a plain rpc<T>() client
+  //   replay members are already ReplaySocketListen on client.func/client.strict — no webListen and no casts for them
+  //   (plain Listen members still need the DeepSocketListen projection).
   // off is callable + thenable: off() unsubscribes; await off waits for stream end. Legacy .callback/.removeCallback/.unsubscribe exist for old code only.
   // *First/*All/*Smart differ only in callback arity: first arg / all args / single-vs-tuple smart.
 matchKeys(a,b) · matchKeysList(a, keys) · deepMapByKeys · deepMapByKeysList
@@ -256,8 +259,18 @@ const sel = store.update({data: {BTC: true, ETH: true}, meta: {status: true}}, {
 sel.get() -> {data: {BTC, ETH}, meta: {status}}
 sel.on((snap, ctx) => {})                          // aggregated selected snapshot; coalesced by default
 sel.once((snap) => {}, {current: true})
-sel.onEach((value, ctx) => { ctx.pathString })      // one event per selected path, with route
+sel.onEach((value, ctx) => { ctx.pathString })      // one event per SELECTED path, with route (explicit masks only)
 ```
+`store.each()` — extended notes (the per-key feed itself: signature, expansion contract and the
+canonical example live in wenay-common2.md):
+- A key whose primitive value is unchanged by a root replace does not fire (the set trap skips
+  `Object.is`-equal writes); object values always fire — replay patches apply fresh snapshot copies.
+- `each({depth})` is reserved: only `1` (top-level keys) is accepted today, anything else throws.
+- `ctx` is `{path: [key]}`. `key` is typed `string`; symbol top-level keys pass through at runtime as-is.
+- The `update(true).onEach` dev warn fires once per process (explicit key masks never warn —
+  `onEach` stays correct for them).
+- `{'*': true}` is not a wildcard — it subscribes a literal `'*'` key (zero calls, no warn).
+
 Backend expose + frontend mirror:
 ```
 const facade = { market: ObserveAll2.exposeStore(store) }
@@ -306,7 +319,7 @@ Contract:
 - `node` subscriptions are address-based, so `store.state.data = {BTC: 10}` keeps `store.node.data.BTC` subscriptions alive.
 - Primitive, missing, and later-created paths are subscribable.
 - `{current:true}` emits only when a value exists; absent paths wait for the first value.
-- `drain` is per subscription/sync. Branch subscribers receive whole branch snapshots; mask `.on()` receives the selected snapshot; `.onEach()` receives `(value, ctx)` with route.
+- `drain` is per subscription/sync. Branch subscribers receive whole branch snapshots; mask `.on()` receives the selected snapshot; `.onEach()` receives `(value, ctx)` with route; `store.each()` receives `(key, value, ctx)` per changed top-level key.
 - `pathString` is human-readable; internal route identity is collision-safe for dotted keys and distinct `Symbol()` keys.
 - Mirror sync uses backend `changedPaths` when present: it pulls `selected mask ∩ dirty paths`; with no `changedPaths` or `{partial:false}` it falls back to `changed -> get(mask)`. UI subscribes to the local mirror store.
 - Default `sync` is still pull-after-notify: event is light, reconnect is a fresh `get(mask)`, and each client owns its mask.
@@ -378,6 +391,7 @@ exposeReplay(replay)  <->  replaySubscribe(remote, cb, {since?, onSeq?, staleMs?
   //   IMMEDIATELY; clock-skew caveat: producer/client clocks may disagree, skewMs tolerance absorbs it, default 0).
   //   A since-tail's historical ts never flaps mid-catch-up (one assessment after handover); off() disarms the timer.
 exposeStoreReplay(store, opts?)  <->  syncStoreReplay(mirror, remote, opts?)            // layer B: patch line; keyframe = root patch ({path: [], value: snapshot})
+syncStoreReplayEach<T>(remote, cb, opts?) -> off & {store, ready, seq(), isStale(), lastTs()}   // one-call per-key fold over the patch line (mirror + syncStoreReplay + store.each()); most-used surface — full contract + example in wenay-common2.md
 conflateReplay(replay, {pending, highWater, lowWater?, pollMs?, keyOf?, maxKeys?}) -> {api, close, stats}  // layer D.1: per-connection gate — pending() over highWater -> deltas DROP (never queue);
   // drained -> fresh keyframe on the SAME line, seq dedup cuts the overlap; pending() = e.g. socket.conn.writeBuffer.length
   // build per connection where the rpc server is built; api spreads in place of exposeReplay(...); close() on disconnect

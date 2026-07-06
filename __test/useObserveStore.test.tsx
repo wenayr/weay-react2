@@ -5,6 +5,7 @@ import {
     useListenArgs,
     useListenValue,
     useStoreChangedPaths,
+    useStoreEach,
     useStoreKeys,
     useStoreMirror,
     useStoreNode,
@@ -81,6 +82,47 @@ test("ObserveAll2 local hooks update leaf values, selections, object keys and li
     fireEvent.click(screen.getByText("replace store"));
     await waitFor(() => expect(screen.getByTestId("keys").textContent).toBe("a,b"));
     expect(screen.getByTestId("count").textContent).toBe("0");
+});
+
+function EachProbe() {
+    const store = useMemo(() => ObserveAll2.createStore<Record<string, number>>({a: 1, b: 2}), []);
+    const logRef = React.useRef<string[]>([]);
+    const [, setTick] = useState(0);
+    useStoreEach(store, (key, value) => {
+        logRef.current.push(value === undefined ? `-${String(key)}` : `${String(key)}=${value}`);
+        setTick(t => t + 1);
+    });
+
+    return <div>
+        <output data-testid="each-log">{logRef.current.join(" ")}</output>
+        <button onClick={() => { store.state.c = 3; void ObserveAll2.flushReactive(store.state); }}>each add</button>
+        <button onClick={() => { store.state.a = 10; void ObserveAll2.flushReactive(store.state); }}>each set</button>
+        <button onClick={() => { delete store.state.b; void ObserveAll2.flushReactive(store.state); }}>each delete</button>
+        <button onClick={() => store.replace({z: 9})}>each replace</button>
+    </div>;
+}
+
+test("useStoreEach fires per changed top-level key: add, set, delete, and root replace expansion", async () => {
+    render(<EachProbe />);
+
+    // no changes yet: each() reports changes, not the initial snapshot
+    expect(screen.getByTestId("each-log").textContent).toBe("");
+
+    fireEvent.click(screen.getByText("each add"));
+    await waitFor(() => expect(screen.getByTestId("each-log").textContent).toBe("c=3"));
+
+    fireEvent.click(screen.getByText("each set"));
+    await waitFor(() => expect(screen.getByTestId("each-log").textContent).toBe("c=3 a=10"));
+
+    fireEvent.click(screen.getByText("each delete"));
+    await waitFor(() => expect(screen.getByTestId("each-log").textContent).toBe("c=3 a=10 -b"));
+
+    // replace {a, c} -> {z}: one call per new key + (key, undefined) per removed key
+    fireEvent.click(screen.getByText("each replace"));
+    await waitFor(() => {
+        const calls = (screen.getByTestId("each-log").textContent ?? "").split(" ").slice(3);
+        expect(calls.sort()).toEqual(["-a", "-c", "z=9"]);
+    });
 });
 
 type MirrorState = {

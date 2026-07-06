@@ -276,6 +276,14 @@ mirror.sync()
 mirror.stop()
 ```
 
+Per-key feed (`store.each()` of common2 — one cb per CHANGED top-level key):
+```
+useStoreEach(store, (key, value, ctx) => {
+    value === undefined ? removeRow(key) : upsertRow(key, value)
+}, {enabled?})
+```
+`undefined` = key deleted; a root replace (store.replace / mirror keyframe) expands into one call per key. The fold target should live outside React state (ref/Map/grid api) — the hook renders nothing itself. The wire counterpart is `useStoreReplayEach` below.
+
 Listen helpers:
 ```
 useListenEffect(listen, (...args) => {})
@@ -289,7 +297,7 @@ The hook does not choose transport. `remoteStore` needs `{ get(mask?), changed }
 Client-side hooks over the wenay-common2 Replay stack (snapshot + sequenced delta line). Server parts (`conflateReplay`, `archiveReplay`, `createRpcServerAuto` replayOpts) are per-connection and stay hook-free by design.
 
 ```ts
-import { useReplaySubscribe, useStoreReplaySync, useStoreReplayMirror, useReplayFrame, useReplayHistory } from "wenay-react2"
+import { useReplaySubscribe, useStoreReplaySync, useStoreReplayMirror, useStoreReplayEach, useReplayFrame, useReplayHistory } from "wenay-react2"
 
 // any replay line ({line, since, keyframe, frame?, frameLine?} remote)
 const sub = useReplaySubscribe(remote, (frame) => draw(frame), {onSeq?, onError?, since?, enabled?, staleMs?, onStale?, policy?, hint?})
@@ -303,6 +311,13 @@ const mirror = useStoreReplayMirror(remote, initial, {enabled?})   // creates th
 mirror.store; mirror.ready; mirror.seq(); mirror.restart()
 const sync = useStoreReplaySync(existingStore, remote)              // same, store supplied by the app
 
+// per-key fold over the same line (ObserveAll2.syncStoreReplayEach counterpart): cb per CHANGED top-level key,
+// first delivery = keyframe expanded per key, (key, undefined) = deleted — grid rows without special cases
+const feed = useStoreReplayEach<Rows>(remote, (key, row) => row === undefined ? removeRow(key) : upsertRow(key, row), {drain?, initial?})
+feed.store; feed.ready; feed.stale; feed.seq(); feed.restart()      // same controller surface as the mirror
+// the mirror store lives in a ref: in-mount resubscribes (StrictMode/restart/enabled) reconnect by tail ON TOP of
+// kept state — the consumer sees only the diff. After a full unmount: {since: prev.seq(), initial: prev.store.snapshot()}
+
 // pull at YOUR pace (frame model): timer around remote.frame(seq, hint) — server condenses, no backlog, no live socket sub
 const pf = useReplayFrame(remote, (quote) => apply(quote), {intervalMs: 500, hint?})
 pf.ready; pf.error; pf.seq(); pf.pull(); pf.restart()               // error (e.g. sacred line evicted) STOPS pulling until restart()
@@ -312,7 +327,7 @@ const tt = useReplayHistory(history, (frame) => draw(frame), {head: () => replay
 tt.live; tt.seq; tt.head; tt.pause(); tt.play(); tt.seek({seq})
 ```
 
-Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. Freshness: detection lives in wenay-common2 (`staleMs` watchdog); the hooks mirror its edge-triggered `onStale` into `stale`, so a fresh 100 ev/s line causes zero extra renders. `useReplayHistory` is archive playback — staleness does not apply. QA cards 23 (video line + conflation + time travel + freshness) and 24 (store sync) are the live examples.
+Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. Freshness: detection lives in wenay-common2 (`staleMs` watchdog); the hooks mirror its edge-triggered `onStale` into `stale`, so a fresh 100 ev/s line causes zero extra renders. `useReplayHistory` is archive playback — staleness does not apply. QA cards 23 (video line + conflation + time travel + freshness), 24 (store sync) and 25 (per-key feed) are the live examples.
 ## Logs
 ```
 logsApi.addLogs({id: "api", time: new Date(), txt: "done", var: 1})
