@@ -31,6 +31,10 @@ export * from "./src/utils";
 // 5b. GRID (agGrid4): core buffer + headless hook + AgGridMy. New path instead of applyTransactionAsyncUpdate
 export * from "./src/grid/agGrid4";
 
+// 5c. GRID column state (createColumnState): persisted order/visibility/width/sort/filter,
+// standalone config store + optional two-way ag-grid adapter (attach via onGridReady)
+export * from "./src/grid/columnState";
+
 // 6. BASE COMPONENTS - depend on hooks
 export * from "./src/components/Buttons";
 export * from "./src/components/MyResizeObserver";

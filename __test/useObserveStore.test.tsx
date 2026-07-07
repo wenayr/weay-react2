@@ -1,6 +1,6 @@
 import React, {useMemo, useState} from "react";
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
-import {ListenNext, ObserveAll2} from "wenay-common2";
+import {listen as createListen, Observe} from "wenay-common2";
 import {
     useListenArgs,
     useListenValue,
@@ -22,7 +22,7 @@ type LocalState = {
 const localMask = {count: true, meta: {status: true}, items: {a: true}} as const;
 
 function LocalStoreProbe() {
-    const store = useMemo(() => ObserveAll2.createStore<LocalState>({
+    const store = useMemo(() => Observe.createStore<LocalState>({
         count: 0,
         meta: {status: "idle"},
         items: {a: 1, b: 2},
@@ -31,7 +31,7 @@ function LocalStoreProbe() {
     const status = useStoreNode(store.node.meta.status);
     const keys = useStoreKeys(store.node.items);
     const selection = useStoreSelect(useMemo(() => store.update(localMask), [store]), {drain: "micro"});
-    const [emit, listen] = useMemo(() => ListenNext.UseListen<[number, string]>(), []);
+    const [emit, listen] = useMemo(() => createListen<[number, string]>(), []);
     const listenArgs = useListenArgs(listen, {initial: [0, "initial"]});
     const listenValue = useListenValue<number, [number, string]>(listen, {initial: 0, map: n => n});
 
@@ -44,15 +44,15 @@ function LocalStoreProbe() {
         <output data-testid="listen-value">{listenValue}</output>
         <button onClick={() => count.replace((count.value ?? 0) + 1)}>count</button>
         <button onClick={() => status.replace("replace")}>replace status</button>
-        <button onClick={() => { store.state.meta.status = "plain"; void ObserveAll2.flushReactive(store.state); }}>plain status</button>
-        <button onClick={() => { store.state.items.c = 3; void ObserveAll2.flushReactive(store.state); }}>add key</button>
-        <button onClick={() => { delete store.state.items.b; void ObserveAll2.flushReactive(store.state); }}>delete key</button>
+        <button onClick={() => { store.state.meta.status = "plain"; void Observe.flushReactive(store.state); }}>plain status</button>
+        <button onClick={() => { store.state.items.c = 3; void Observe.flushReactive(store.state); }}>add key</button>
+        <button onClick={() => { delete store.state.items.b; void Observe.flushReactive(store.state); }}>delete key</button>
         <button onClick={() => emit(7, status.value ?? "-")}>emit</button>
         <button onClick={() => store.replace({count: 0, meta: {status: "reset"}, items: {a: 1, b: 2}})}>replace store</button>
     </div>;
 }
 
-test("ObserveAll2 local hooks update leaf values, selections, object keys and listens", async () => {
+test("Observe local hooks update leaf values, selections, object keys and listens", async () => {
     render(<LocalStoreProbe />);
 
     expect(screen.getByTestId("count").textContent).toBe("0");
@@ -85,7 +85,7 @@ test("ObserveAll2 local hooks update leaf values, selections, object keys and li
 });
 
 function EachProbe() {
-    const store = useMemo(() => ObserveAll2.createStore<Record<string, number>>({a: 1, b: 2}), []);
+    const store = useMemo(() => Observe.createStore<Record<string, number>>({a: 1, b: 2}), []);
     const logRef = React.useRef<string[]>([]);
     const [, setTick] = useState(0);
     useStoreEach(store, (key, value) => {
@@ -95,9 +95,9 @@ function EachProbe() {
 
     return <div>
         <output data-testid="each-log">{logRef.current.join(" ")}</output>
-        <button onClick={() => { store.state.c = 3; void ObserveAll2.flushReactive(store.state); }}>each add</button>
-        <button onClick={() => { store.state.a = 10; void ObserveAll2.flushReactive(store.state); }}>each set</button>
-        <button onClick={() => { delete store.state.b; void ObserveAll2.flushReactive(store.state); }}>each delete</button>
+        <button onClick={() => { store.state.c = 3; void Observe.flushReactive(store.state); }}>each add</button>
+        <button onClick={() => { store.state.a = 10; void Observe.flushReactive(store.state); }}>each set</button>
+        <button onClick={() => { delete store.state.b; void Observe.flushReactive(store.state); }}>each delete</button>
         <button onClick={() => store.replace({z: 9})}>each replace</button>
     </div>;
 }
@@ -199,10 +199,10 @@ function PartialToggleProbe({remote}: {remote: RemoteStoreLike<MirrorState>}) {
     </div>;
 }
 
-async function mutateRemote(store: ObserveAll2.Store<MirrorState>, fn: () => void) {
+async function mutateRemote(store: Observe.Store<MirrorState>, fn: () => void) {
     await act(async () => {
         fn();
-        await ObserveAll2.flushReactive(store.state);
+        await Observe.flushReactive(store.state);
     });
 }
 
@@ -215,8 +215,8 @@ function createMirrorState(): MirrorState {
 }
 
 test("useStoreMirror uses changedPaths partial sync, follows remote deep add/delete keys, can stop and resync", async () => {
-    const remoteStore = ObserveAll2.createStore<MirrorState>(createMirrorState());
-    const exposed = ObserveAll2.exposeStore(remoteStore);
+    const remoteStore = Observe.createStore<MirrorState>(createMirrorState());
+    const exposed = Observe.exposeStore(remoteStore);
     const getMasks: any[] = [];
     const remote: RemoteStoreLike<MirrorState> = {
         ...exposed,
@@ -278,8 +278,8 @@ test("useStoreMirror uses changedPaths partial sync, follows remote deep add/del
 });
 
 test("useStoreMirror falls back to full mask when changedPaths is absent", async () => {
-    const remoteStore = ObserveAll2.createStore<MirrorState>(createMirrorState());
-    const exposed = ObserveAll2.exposeStore(remoteStore);
+    const remoteStore = Observe.createStore<MirrorState>(createMirrorState());
+    const exposed = Observe.exposeStore(remoteStore);
     const getMasks: any[] = [];
     const remote: RemoteStoreLike<MirrorState> = {
         get(mask?: any) {
@@ -301,8 +301,8 @@ test("useStoreMirror falls back to full mask when changedPaths is absent", async
 });
 
 test("useStoreMirror restarts auto sync when partial option changes", async () => {
-    const remoteStore = ObserveAll2.createStore<MirrorState>(createMirrorState());
-    const exposed = ObserveAll2.exposeStore(remoteStore);
+    const remoteStore = Observe.createStore<MirrorState>(createMirrorState());
+    const exposed = Observe.exposeStore(remoteStore);
     const getMasks: any[] = [];
     const remote: RemoteStoreLike<MirrorState> = {
         ...exposed,
@@ -333,8 +333,8 @@ test("useStoreMirror restarts auto sync when partial option changes", async () =
     expect(getMasks.at(-1)).toEqual(mirrorMask);
 });
 test("useStoreMirror keeps an inline structurally equal mask from resyncing on rerender", async () => {
-    const remoteStore = ObserveAll2.createStore<MirrorState>(createMirrorState());
-    const exposed = ObserveAll2.exposeStore(remoteStore);
+    const remoteStore = Observe.createStore<MirrorState>(createMirrorState());
+    const exposed = Observe.exposeStore(remoteStore);
     const getMasks: any[] = [];
     const remote: RemoteStoreLike<MirrorState> = {
         ...exposed,

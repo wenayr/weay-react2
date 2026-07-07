@@ -6,9 +6,9 @@
  */
 
 import React, { useState, useMemo, useEffect } from "react";
-import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact, ModalProvider, useModal, useKeyDown, keyDownApi, useAgGrid, AgGridMy, createGridBuffer, createColumnBuffer, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, Cash, type BufferTable, type tToolbarItem, type tToolbarConfig, type tBoardColumn } from "../api";
+import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact, ModalProvider, useModal, useKeyDown, keyDownApi, useAgGrid, AgGridMy, createGridBuffer, createColumnBuffer, createColumnState, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, Cash, type BufferTable, type tToolbarItem, type tToolbarConfig, type tBoardColumn } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
-import { ListenNext, ObserveAll2, Params } from "wenay-common2";
+import { listen as createListen, Observe, Params } from "wenay-common2";
 import { Button, ButtonHover, DivOutsideClick } from "../src/hooks";
 import { DivRnd3 } from "../src/components";
 import { MyChartEngine } from "../src/myChart/chartEngine/chartEngineReact";
@@ -267,7 +267,206 @@ const AgGrid4ColumnBufferDemo = () => {
 };
 
 
-/* ---------- 18. ObserveAll2 local store/listen hooks ---------- */
+/* ---------- 28. columnState: persisted column layout, external layer over a live grid ---------- */
+type tColStateRow = { id: string; name: string; price: number; qty: number };
+const colStateRows: tColStateRow[] = [
+    { id: "a", name: "Alpha", price: 10.5, qty: 3 },
+    { id: "b", name: "Beta", price: 22.1, qty: 7 },
+    { id: "c", name: "Gamma", price: 5.8, qty: 1 },
+];
+const colStateCols = [
+    { colId: "name", field: "name" },
+    { colId: "price", field: "price" },
+    { colId: "qty", field: "qty", headerName: "Qty" },
+] satisfies ColDef<tColStateRow>[];
+// module-level like a real app wrapper: the config survives grid remounts and reloads
+const qaColumnState = createColumnState({
+    key: "qa28.columnState",
+    columns: [
+        { key: "name", title: "Name", fixed: true },
+        { key: "price", title: "Price" },
+        { key: "qty", title: "Qty" },
+    ],
+});
+
+const ColumnStateDemo = () => {
+    const [on, setOn] = useState(true);
+    const cfg = qaColumnState.api.useConfig();
+    return (
+        <div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                <button onClick={() => setOn(v => !v)}>{on ? "unmount grid" : "mount grid"}</button>
+                <button onClick={() => qaColumnState.api.show("price", cfg.visible.price == false)}>{cfg.visible.price == false ? "show price" : "hide price"}</button>
+                <button onClick={() => qaColumnState.api.toggleSort("price")}>sort price: {cfg.sort?.key == "price" ? cfg.sort.dir : "off"}</button>
+                <button onClick={() => qaColumnState.api.reset()}>reset</button>
+            </div>
+            {on ? (
+                <div style={{ height: 190 }}>
+                    <AgGridMy<tColStateRow>
+                        rowData={colStateRows}
+                        getRowId={p => p.data.id}
+                        columnDefs={colStateCols}
+                        autoSizeColumns={false} // auto-fit would rewrite tracked widths on every mount
+                        onGridReady={e => qaColumnState.grid.attach(e.api)}
+                        onGridPreDestroyed={() => qaColumnState.grid.detach()}
+                    />
+                </div>
+            ) : (
+                <div style={{ padding: 20, color: "#57606a" }}>grid is unmounted - config lives in the module</div>
+            )}
+            <pre style={{ fontSize: 11, background: "#f6f8fa", padding: 6, borderRadius: 6, margin: "8px 0 0", overflow: "auto" }}>
+                {JSON.stringify({ order: cfg.order, visible: cfg.visible, width: cfg.width, sort: cfg.sort }, null, 1)}
+            </pre>
+        </div>
+    );
+};
+
+
+/* ---------- 29. columnState mobile: ColumnDots + CardList ---------- */
+type tMobRow = { id: string; name: string; price: number; qty: number; ver: string; note: string };
+const mobRows: tMobRow[] = [
+    { id: "btc", name: "BTCUSDT", price: 64230.5, qty: 3, ver: "v2", note: "spot" },
+    { id: "eth", name: "ETHUSDT", price: 3120.2, qty: 12, ver: "v3", note: "spot" },
+    { id: "sol", name: "SOLUSDT", price: 148.9, qty: 40, ver: "v1", note: "futures" },
+    { id: "ada", name: "ADAUSDT", price: 0.44, qty: 900, ver: "v2", note: "spot" },
+    { id: "dot", name: "DOTUSDT", price: 6.8, qty: 150, ver: "v4", note: "futures" },
+    { id: "xrp", name: "XRPUSDT", price: 0.52, qty: 700, ver: "v1", note: "spot" },
+];
+const qaMobColumns = createColumnState({
+    key: "qa29.mobileColumns",
+    columns: [
+        { key: "name", title: "Symbol", short: "sym", fixed: true, cardRole: "title" },
+        { key: "price", title: "Price", short: "price" },
+        { key: "qty", title: "Quantity", short: "qty", defaultVisible: false },
+        { key: "ver", title: "Version", short: "ver", cardRole: "accent", defaultVisible: false },
+        { key: "note", title: "Note", short: "note", defaultVisible: false },
+    ],
+});
+
+const MobileColumnsDemo = () => (
+    <div style={{ maxWidth: 420 }}>
+        <ColumnDots state={qaMobColumns} max={4} />
+        <CardList<tMobRow> state={qaMobColumns} data={mobRows} getId={r => r.id} style={{ marginTop: 10 }} />
+    </div>
+);
+
+
+/* ---------- 30. columnState icon menu: ColumnsMenu (1:1 grid mirror, button states, standards) ---------- */
+type tMenuRow = { id: string; name: string; price: number; qty: number; fee: number; note: string };
+const menuRows: tMenuRow[] = [
+    { id: "a", name: "Alpha", price: 10.5, qty: 3, fee: 0, note: "" },
+    { id: "b", name: "Beta", price: 22.1, qty: 0, fee: 0, note: "" },
+    { id: "c", name: "Gamma", price: 5.8, qty: 1, fee: 0, note: "" },
+];
+const menuColDefs = [
+    { colId: "name", field: "name" },
+    { colId: "price", field: "price" },
+    { colId: "qty", field: "qty", headerName: "Qty" },
+    { colId: "fee", field: "fee" },
+    { colId: "note", field: "note" },
+] satisfies ColDef<tMenuRow>[];
+const qaMenuState = createColumnState({
+    key: "qa30.columnsMenu",
+    columns: [
+        { key: "name", title: "Name", fixed: true },
+        { key: "price", title: "Price (has sub-fields)", short: "price" },
+        { key: "qty", title: "Quantity", short: "qty" },
+        { key: "fee", title: "Fee", short: "fee" },
+        { key: "note", title: "Note", short: "note" },
+    ],
+});
+// the three table "standards": which columns the TABLE itself keeps. Cycling the
+// standard rebuilds columnDefs - columns get REMOVED from the live grid, the
+// config and the buttons stay (buttons go disabled via presence).
+const menuStandards = [
+    { label: "all", hint: "standard 1/3: show every column", empty: (_: unknown[]) => false },
+    { label: "∅+0", hint: "standard 2/3: drop empty columns, 0 counts as empty", empty: (vals: unknown[]) => vals.every(v => v == null || v === "" || v === 0) },
+    { label: "∅", hint: "standard 3/3: drop empty columns, 0 is a value", empty: (vals: unknown[]) => vals.every(v => v == null || v === "") },
+];
+
+const ColumnsMenuDemo = () => {
+    const [std, setStd] = useState(0);
+    const s = menuStandards[std];
+    const defs = menuColDefs.filter(d => !s.empty(menuRows.map(r => r[d.colId as keyof tMenuRow])));
+    return (
+        <div>
+            <ColumnsMenu
+                state={qaMenuState}
+                style={{ marginBottom: 8 }}
+                marks={k => (k === "price" ? "••" : null)} // "on with extras": e.g. enabled sub-fields
+                tail={[{ key: "std", title: s.hint, short: s.label, state: "on", marks: "•".repeat(std + 1) }]}
+                onTail={() => setStd(v => (v + 1) % menuStandards.length)}
+            />
+            <div style={{ height: 190 }}>
+                <AgGridMy<tMenuRow>
+                    rowData={menuRows}
+                    getRowId={pp => pp.data.id}
+                    columnDefs={defs}
+                    autoSizeColumns={false}
+                    onGridReady={e => qaMenuState.grid.attach(e.api)}
+                    onGridPreDestroyed={() => qaMenuState.grid.detach()}
+                />
+            </div>
+        </div>
+    );
+};
+
+
+/* ---------- 31. Toolbar over columnState: ONE config drives toolbar + menu + grid ---------- */
+type tTbColRow = { id: string; name: string; price: number; qty: number; note: string };
+const tbColRows: tTbColRow[] = [
+    { id: "a", name: "Alpha", price: 10.5, qty: 3, note: "spot" },
+    { id: "b", name: "Beta", price: 22.1, qty: 7, note: "swap" },
+    { id: "c", name: "Gamma", price: 5.8, qty: 1, note: "spot" },
+];
+const tbColDefs = [
+    { colId: "name", field: "name" },
+    { colId: "price", field: "price" },
+    { colId: "qty", field: "qty", headerName: "Qty" },
+    { colId: "note", field: "note" },
+] satisfies ColDef<tTbColRow>[];
+const qaTbColState = createColumnState({
+    key: "qa31.tbColumns",
+    columns: [
+        { key: "name", title: "Name", fixed: true },
+        { key: "price", title: "Price", icon: <span>💰</span> },
+        { key: "qty", title: "Quantity", short: "qty" },
+        { key: "note", title: "Note", short: "note" },
+    ],
+});
+// the toolbar does NOT own order/visibility here: it runs on the columnState
+// config (source) - grid, toolbar, menu and Settings all edit the same thing.
+// Items without an icon get a letter pseudo-icon in icon density.
+const qaTbOverColumns = createToolbar({
+    key: "qa31.toolbar",
+    items: qaTbColState.columns.map(c => ({ key: c.key, title: c.title, short: c.short, icon: c.icon, fixed: c.fixed })),
+    source: qaTbColState.api.listSource,
+});
+
+const ToolbarColumnsDemo = () => (
+    <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 8, flexWrap: "wrap" }}>
+            <qaTbOverColumns.Bar settings popAlign="left" />
+            <ColumnsMenu state={qaTbColState} compact />
+        </div>
+        <div style={{ height: 170 }}>
+            <AgGridMy<tTbColRow>
+                rowData={tbColRows}
+                getRowId={pp => pp.data.id}
+                columnDefs={tbColDefs}
+                autoSizeColumns={false}
+                onGridReady={e => qaTbColState.grid.attach(e.api)}
+                onGridPreDestroyed={() => qaTbColState.grid.detach()}
+            />
+        </div>
+        <div style={{ marginTop: 8, maxWidth: 320 }}>
+            <qaTbOverColumns.Settings />
+        </div>
+    </div>
+);
+
+
+/* ---------- 18. Observe local store/listen hooks ---------- */
 type tObserveLocalState = {
     count: number;
     meta: { status: string };
@@ -277,7 +476,7 @@ type tObserveLocalState = {
 const observeLocalMask = { count: true, meta: { status: true }, items: { a: true } } as const;
 
 const ObserveStoreLocalDemo = () => {
-    const store = useMemo(() => ObserveAll2.createStore<tObserveLocalState>({
+    const store = useMemo(() => Observe.createStore<tObserveLocalState>({
         count: 0,
         meta: { status: "idle" },
         items: { a: 1, b: 2 },
@@ -286,21 +485,21 @@ const ObserveStoreLocalDemo = () => {
     const status = useStoreNode(store.node.meta.status);
     const itemKeys = useStoreKeys(store.node.items);
     const selection = useStoreSelect(useMemo(() => store.update(observeLocalMask), [store]), { drain: "micro" });
-    const [emit, listen] = useMemo(() => ListenNext.UseListen<[number, string]>(), []);
+    const [emit, listen] = useMemo(() => createListen<[number, string]>(), []);
     const listenArgs = useListenArgs(listen, { initial: [0, "initial"] });
     const listenValue = useListenValue<number, [number, string]>(listen, { initial: 0, map: (n) => n });
 
     function mutatePlainState() {
         store.state.meta.status = "plain " + new Date().toLocaleTimeString();
-        void ObserveAll2.flushReactive(store.state);
+        void Observe.flushReactive(store.state);
     }
 
     return <div style={{ display: "grid", gap: 10 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button onClick={() => count.replace((count.value ?? 0) + 1)}>node.at("count") +1</button>
             <button onClick={() => status.replace("replace " + new Date().toLocaleTimeString())}>replace status</button>
-            <button onClick={() => { store.state.items.c = Date.now(); void ObserveAll2.flushReactive(store.state); }}>add key c</button>
-            <button onClick={() => { delete store.state.items.b; void ObserveAll2.flushReactive(store.state); }}>delete key b</button>
+            <button onClick={() => { store.state.items.c = Date.now(); void Observe.flushReactive(store.state); }}>add key c</button>
+            <button onClick={() => { delete store.state.items.b; void Observe.flushReactive(store.state); }}>delete key b</button>
             <button onClick={mutatePlainState}>plain state mutation + flush</button>
             <button onClick={() => emit(Date.now(), status.value ?? "-")}>emit listen</button>
             <button onClick={() => store.replace({ count: 0, meta: { status: "reset" }, items: { a: 1, b: 2 } })}>replace whole store</button>
@@ -318,7 +517,7 @@ const ObserveStoreLocalDemo = () => {
         </div>
     </div>;
 };
-/* ---------- 17. ObserveAll2 store mirror hooks over HTTP/SSE ---------- */
+/* ---------- 17. Observe store mirror hooks over HTTP/SSE ---------- */
 type tObserveQaState = {
     value: number;
     nested: { label: string };
@@ -860,14 +1059,14 @@ const BoardDemo = () => {
 function ActiveChecks() {
     return (
         <>
-            <Check n={18} title="ObserveAll2 hooks - local store and listen"
+            <Check n={18} title="Observe hooks - local store and listen"
                    do="Click node.at(count) +1, replace status, plain state mutation + flush, emit listen, and replace whole store."
                    expect="Leaf node, selection, direct state mutation after flush, add/delete object keys, and listen hooks all rerender. The count key is read through node.at(count), so it does not conflict with node.count()."
                    note="This isolates the React adapter from transport: no fetch/SSE/RPC involved."
                    tall>
                 <ObserveStoreLocalDemo />
             </Check>
-            <Check n={17} title="ObserveAll2 hooks - store mirror over HTTP/SSE"
+            <Check n={17} title="Observe hooks - store mirror over HTTP/SSE"
                    do="Click server +1, label, add/delete key, deep leaf/deep add/deep delete, local mirror +1000, stop sync, then manual sync."
                    expect="Server buttons POST to the Vite QA server, including add/delete object keys and deep mutations. SSE pushes changedPaths; mirror pulls only the intersecting mask when possible. Local mirror edits render immediately and are overwritten by the next server sync."
                    note="This checks the React adapter only in wenay-react2: common2 remains React-free; transport policy stays outside the hook."
@@ -890,7 +1089,7 @@ function ActiveChecks() {
             <Check n={25} title="Replay hooks - per-key feed (useStoreReplayEach)"
                    do="Watch px of one random row change every 700ms. Click server add row / delete row, replace ALL (root replace), remount client."
                    expect="On mount every row appears with cb calls=1 (keyframe expanded per key). Between clicks only the mutated row's cb calls counter grows - the whole dict is never re-delivered per tick. Delete removes the row via (key, undefined). replace ALL swaps the table: removed rows leave, new rows enter with cb calls=1. Remount folds a fresh keyframe (all counters reset to 1); StrictMode double-effect does not double-count."
-                   note="React counterpart of ObserveAll2.syncStoreReplayEach (wenay-common2 1.0.61): internal mirror store + syncStoreReplay + store.each(). The mirror lives in a ref, so in-mount resubscribes reconnect by journal tail on top of kept state; the fold target is a plain Map (grid-api style), not React state. drain:100 coalesces multiple writes to one key into one call per window."
+                   note="React counterpart of Observe.syncStoreReplayEach (wenay-common2 1.0.62): internal mirror store + syncStoreReplay + store.each(). The mirror lives in a ref, so in-mount resubscribes reconnect by journal tail on top of kept state; the fold target is a plain Map (grid-api style), not React state. drain:100 coalesces multiple writes to one key into one call per window."
                    tall>
                 <ReplayStoreEachDemo />
             </Check>
@@ -918,7 +1117,7 @@ function ActiveChecks() {
             <Check n={22} title="createCallbackHub - one slot, many subscribers"
                    do="Note slot bound = false. Click on A (bound becomes true), fire source event, then on B and fire again. Then off A and fire once more."
                    expect="Before the first on() the slot is untouched (lazy bind). With A+B subscribed both receive the same events. After off A, B keeps receiving; hub.count() tracks subscribers."
-                   note="Fixes the real bug where two onX(cb) subscribers silently overwrote each other. Built on UseListen from wenay-common2; bind(emit) runs once.">
+                   note="Fixes the real bug where two onX(cb) subscribers silently overwrote each other. Built on `listen` from wenay-common2; bind(emit) runs once.">
                 <HubDemo />
             </Check>
 
@@ -945,6 +1144,38 @@ function ActiveChecks() {
                 <BoardDemo />
             </Check>
 
+            <Check n={31} title="Toolbar over columnState - one config drives toolbar + menu + grid"
+                   do="Drag the qty column in the GRID before price - watch the toolbar buttons AND the compact menu reorder. Open the toolbar gear: drag rows in Settings, toggle checkboxes - the grid and the menu follow. Toggle a button in the compact menu - the toolbar Bar drops/regains the item. Switch density in Settings (Icons / Icons + labels)."
+                   expect="All four surfaces (grid, toolbar Bar, Settings editor, compact menu) mirror ONE config: any reorder or visibility change made on any of them lands on all others. In icon density, items without an icon show their first letters (NAM, QTY, NOT) as a text pseudo-icon; price keeps its emoji. Density and the gear checkbox are toolbar-local (they do not touch the column config); Name is fixed everywhere - not draggable, not hideable."
+                   note="createToolbar({source}) - the toolbar's order/visibility now can live OUTSIDE it: tUiListSource is the extracted control contract, and columnState.api.listSource implements it over the same config the grid adapter syncs. No bridge, no double storage - Toolbar became a VIEW. Backward compatible: without source the toolbar keeps its own store exactly as in card 25."
+                   tall>
+                <ToolbarColumnsDemo />
+            </Check>
+
+            <Check n={30} title="columnState icon menu - ColumnsMenu (1:1 grid mirror, button states, standards)"
+                   do="Click price/qty buttons - the columns hide/show in the grid (off = struck through). Drag the qty COLUMN in the grid before price - the buttons swap too; then drag a BUTTON - the grid follows (try dropping one before Name). Click the standards button after the divider: all -> ∅+0 (fee AND note leave the grid) -> ∅ (only note leaves, 0 is a value) -> all. While a column is out, click its dashed button."
+                   expect="Order is a 1:1 two-way mirror: grid drag reorders the buttons, button drag reorders the grid; a drop before Name snaps back (fixed). A column removed by a standard keeps its BUTTON - dashed and inert (clicks do nothing) - and the button revives with its column when the standard returns it; the returning column lands at its configured order/width. price shows the marks adornment ('on with extras', e.g. sub-fields); the standards button shows 1-3 dots for its own state."
+                   note="Two decoupled layers by design: MenuStrip is pure presentation (states on/off/disabled + marks + drag + click reporting) and does NOT know what a click means; ColumnsMenu binds it to columnState (default click = toggle visibility, overridable via onItem). The standards cycler is just a tail button whose meaning lives in the demo - the strip renders its state dots and reports clicks. Presence comes from the grid adapter (gridColumnsChanged); with no grid attached every button counts as present."
+                   tall>
+                <ColumnsMenuDemo />
+            </Check>
+
+            <Check n={29} title="columnState mobile - ColumnDots + CardList (dots create the blocks)"
+                   do="Tap an EMPTY mark (qty / ver / note) - a dot appears and the field is created in every card below. Drag a dot along the track onto another empty mark - the field is replaced. Swipe a dot UP (quick vertical flick) - the dot tears off, the field disappears. Tap a dot without moving - the field gets selected (blue); press the sort button several times (asc -> desc -> off). Select ANOTHER dot - note the sort did not change. Enable sort by price, then swipe the price dot away - cards stay ordered by price."
+                   expect="Dots ARE the visible fields: every dot change instantly rebuilds the cards (no table involved). Symbol is fixed (ring): its dot cannot be dragged away or torn off, it is the card title. ver shows as a badge (accent role). The sort is STICKY: it survives selecting other dots AND hiding its own field; the arrow marker above the track shows the sorted column. Max 4 dots: taps on empty marks beyond that are ignored."
+                   note="ColumnDots + CardList run on the columnState config alone - no ag-grid, no storage. The same config could drive a desktop grid via grid.attach (card 28). Touch works: gestures are pointer events with a dominant-axis test, so a horizontal drag never removes and a vertical flick never reorders."
+                   tall>
+                <MobileColumnsDemo />
+            </Check>
+
+            <Check n={28} title="columnState - persisted column layout (external layer)"
+                   do="Drag the qty column before price, resize it, hide price via the button, click the qty header to sort. Try dragging a column BEFORE the fixed Name too. Then: unmount -> mount the grid."
+                   expect="The JSON below mirrors every change (order/visible/width/sort) - the reverse reactivity: whatever the GRID does lands in the config. A column dropped before Name snaps back: Name is fixed and stays first, in the grid AND in the config. After remount the grid restores the exact layout from the in-memory config. sort price cycles asc -> desc -> off and the header arrow follows; sort survives hiding the column (sticky sort)."
+                   note="createColumnState: standalone config store + two-way ag-grid adapter attached via onGridReady - agGrid4 itself is untouched. Name is fixed (fixed: true): it cannot be hidden and always stays first. Storage wiring is deliberately NOT here: what to persist will become a library-level setting later, components stay storage-free."
+                   tall>
+                <ColumnStateDemo />
+            </Check>
+
             <Check n={8} title="Outside-click closing (DivOutsideClick)"
                    do="Click open. Then click ANY place outside the panel, including on the same horizontal line and slightly to the right of the open button, within the panel width where there used to be a dead zone."
                    expect="A click anywhere outside the panel/button closes it, including the area to the right of the button above the panel. Clicking the panel or button does NOT close it."
@@ -968,7 +1199,7 @@ function ArchiveChecks() {
             <Check n={14} title="Keyboard API - useKeyDown / keyDownApi"
                    do="Press any key, then click clear."
                    expect="Last key updates through keyDownApi.on; reset clears the value and also notifies subscribers."
-                   note="The new pub/sub is built with UseListen: listen.on(cb) -> off(). The old KeyDown remains compatible.">
+                   note="The new pub/sub is built with `listen`: listen.on(cb) -> off(). The old KeyDown remains compatible.">
                 <KeyDownDemo />
             </Check>
             <Check n={2} title="Drag + Resize (DivRnd3 / RNDFunc3)"

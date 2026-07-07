@@ -100,11 +100,12 @@ Slot/PlacementSetting subscribe internally via updateBy.
 
 Toolbar (createToolbar, `components/Toolbar/Toolbar.tsx`):
 ```
-createToolbar({key, items, def?, settingsItem?}) -> {Bar, Settings, api: {useConfig, useItems, getConfig, setConfig, reset, onChange}}
+createToolbar({key, items, def?, settingsItem?, source?}) -> {Bar, Settings, api: {useConfig, useItems, getConfig, setConfig, reset, onChange}}
 <tb.Bar className? settings? popAlign? />             // default classes .wenayTb / .wenayTbItem; popAlign
                                                       //   'right' (default, top-right bars) | 'left'
 <tb.Settings className? activeClassName? />           // density segments default .wenaySegBtn(Active)
 registerToolbarDensity({key, name, renderItem?}) / getToolbarDensities()
+toolbarItemIcon(item) -> ReactNode                   // item.icon, or first letters of short/title
 ```
 Three decoupled layers: serializable config `{order, visible, density}` (single source of truth,
 persisted exactly like createUiSlot: staticGetAdd(key), edits mutate in place + renderBy +
@@ -130,7 +131,7 @@ registered settings section, no prop changes. Semantics that are easy to get wro
   row handler focuses the handle itself). No dnd dependency; DivRnd3/react-rnd deliberately not
   used (free-floating windows, wrong tool). `touch-action: none` + `user-select: none` on
   draggable rows (`.wenayTbRowGrab`).
-- `api.onChange` is a wenay-common2 UseListen stream; emits the NORMALIZED config after every
+- `api.onChange` is a wenay-common2 `listen` stream; emits the NORMALIZED config after every
   setConfig. useConfig subscribes via updateBy; getConfig is a non-reactive snapshot.
 - The gear button is a pseudo-item: reserved visible key `__settings` (always normalized in,
   default true), NO order slot (it always sits at the bar edge), toggled from a separated row at
@@ -140,6 +141,17 @@ registered settings section, no prop changes. Semantics that are easy to get wro
 - `api.useItems()` is the headless bar: ordered, visibility-filtered `[{item, density, content}]`
   for fully custom markup. Refs-out was rejected deliberately: order lives in the config, so the
   consumer re-renders from this list - the library never re-parents foreign DOM nodes.
+- `icon` is OPTIONAL: `toolbarItemIcon(item)` returns the icon, else the first 3 letters of
+  short/title as a text pseudo-icon (icon density only - the label density shows the caption, not
+  the letters). Exported so menus (ColumnsMenu compact) share the exact rule.
+- `source?: tUiListSource` inverts ownership of order/visibility. With a source the toolbar is a
+  VIEW: `rawList()` reads the source (not `st`), setConfig writes the item order/visibility THERE
+  (its own change flow re-emits `api.onChange`; the toolbar emits itself only if the source has no
+  `onChange`), while density and the gear flag stay in the toolbar's own `st` under `key`. `ext`
+  is per-instance constant, so hook-call order in useConfig/Bar/Settings never changes. Item keys
+  should match the source's keys 1:1. `columnState.api.listSource` is the reference implementer -
+  one config then drives a grid, its icon menu and the toolbar (QA card 31). Without a source the
+  behaviour is byte-identical to before (own `st`).
 - v1 non-goals: no overflow/"more" menu (hook point: Bar, after the visible-items map), no
   grouping, no cross-bar drag.
 Styling: `--tb-*` tokens (tokens.css, mirror `tokens.tb`), classes `.wenayTb*` in style.css;
@@ -153,6 +165,97 @@ createCallbackHub<Args>(bind) -> {on, count}
 `bind(emit)` runs lazily, ONCE, on the first `on()` - not at creation time, because the slot may
 still be taken by app initialization. The first callback is registered before bind runs, so it
 also catches synchronous emits. `on(cb) -> off`; off removes only that subscriber.
+
+## columnState (createColumnState, `grid/columnState/`)
+A persisted column layer over a keyed column set - order/visibility/width/sort/filter in a
+standalone config store, plus an OPTIONAL two-way ag-grid adapter. Mobile card views consume the
+SAME config with no ag-grid at all. agGrid4 is never modified: this is exactly the app-level
+column wrapper WRAPPER.md postulates, packaged as a primitive; ag-grid enters only as a type
+import + the GridApi handed to grid.attach().
+```
+createColumnState({key, columns: tColumnMeta[], def?, saveMs?=300})
+    -> {columns, api, grid: {attach(api), detach()}}
+tColumnMeta   = {key, title, short?, icon?, group?, fixed?, defaultVisible?, cardRole?: 'title'|'accent'}
+tColumnsConfig= {v, order, visible, width, sort: {key, dir} | null, filter, groups}
+api: {getConfig, setConfig, useConfig, onChange, reset, show(k,on), move(order), setSort(s|null),
+      toggleSort(k), visibleKeys(), getPresent, usePresent, isPresent(k), setPresent(keys|null), listSource}
+```
+Persist + migration (same DNA as createToolbar/createUiSlot): config lives in `staticGetAdd(key)`,
+edits mutate it in place + renderBy + staticMarkDirty, the APP saves via `Cash.onDirty`.
+`normalize()` is the soft migration - unknown keys dropped, missing columns appended
+default-visible, `fixed` pinned to its descriptor index; `v` covers incompatible shape changes.
+The persisted object's IDENTITY is the subscription key, so `Cash.load()` must run BEFORE the grid
+mounts (a grid attached pre-load would apply defaults; QA card 28 gates the grid on `loaded`).
+
+Semantics that are easy to get wrong:
+- STICKY sort: `sort` is independent of visibility and of any UI selection, may point at a hidden
+  OR grid-absent column, and changes only by an explicit toggle/header click. `readFromGrid` keeps
+  it when the live grid lacks that column (the grid cannot express a sort by a column it does not
+  have), so hiding or removing the sorted column never silently resets it.
+- Two-way loop protection: store->grid runs under an `applying` flag; grid->store ignores events
+  while `applying`, with `source=='api'`, or `finished===false` (resize/move fire per animation
+  frame - only the final shape persists), debounced `saveMs`, and a JSON compare before commit. A
+  `fixed` column dragged off its slot in the grid: readFromGrid commits, normalize() pins it back,
+  and if the order changed the adapter re-applies to the grid (snap-back) so the two never disagree.
+- Presence (`usePresent/isPresent/setPresent`): runtime-only, NEVER persisted - which columns the
+  live grid actually HAS. The adapter maintains it on attach and on `gridColumnsChanged`; a column
+  removed from the grid (dynamic columnDefs, a "drop empty columns" standard) keeps its config
+  entry and its menu button (rendered disabled), and when the set changes the adapter RE-IMPOSES
+  the config so a returning column regains its stored order/width/visibility (setting columnDefs
+  resets grid order). No loop: applyColumnState never adds/removes columns. `null` = no grid = all
+  present.
+- `listSource` = the `{order, visible}` slice exposed as a `tUiListSource` (Toolbar's
+  external-config contract): plug it into `createToolbar({source})` and the toolbar, the icon menu
+  and the grid all mirror one config. Its setConfig MERGES visible and re-appends via normalize, so
+  an editor over a SUBSET of columns never drops the rest.
+- `filter`/`width` are written by the grid adapter only; `groups` (group key -> enabled
+  sub-columns) is modelled now, group UI is a later phase; `visibleKeys()` additionally gates a
+  grouped column by its group's enabled set.
+- Attach from the consumer's `onGridReady` (AgGridMy forwards it over its own wiring) with
+  `autoSizeColumns={false}` (auto-fit at mount would rewrite stored widths); detach from
+  `onGridPreDestroyed` - the config outlives the grid (columnBuffer pattern). HMR caveat on the
+  stand: hot-reload recreates a module-level controller while the live grid stays attached to the
+  OLD instance, so store->grid needs an F5; in a real app the module runs once.
+
+Icon menu (ColumnsMenu / MenuStrip, `grid/columnState/ColumnsMenu.tsx`):
+```
+<MenuStrip items={tMenuStripItem[]} onItem? onMove? move? tail? holdMs?=150 compact? />
+    tMenuStripItem = {key, title, short?, icon?, state: 'on'|'off'|'disabled', marks?, fixed?}
+<ColumnsMenu state onItem? marks? tail? onTail? reorder?=true holdMs? compact? />
+```
+Two DECOUPLED layers, because "what a click means" is deliberately not the strip's business:
+- `MenuStrip` is pure presentation - ordered buttons in three states plus a `marks` adornment
+  ("on with extras": sub-columns, naming strategies...); it reports clicks (onItem) and
+  drag-reorders (onMove) but interprets neither. Reusable for ANY multi-state button strip.
+  `disabled` buttons report no clicks; `fixed` ones do not drag; `tail` = buttons after a divider,
+  OUTSIDE the reorder list (mode cyclers/actions). Reorder rides `useReorder` (second consumer
+  after the Toolbar editor) with the same fixed-pinning `move`, so preview == drop.
+- `ColumnsMenu` binds it to a columnState: buttons follow config.order (the grid mirror is free -
+  both read the same config), state = disabled (absent from the live grid) / on / off, default
+  click = toggle visibility (overridable via `onItem` for multi-state columns), drag = api.move.
+- Click-vs-drag guard: a drag that ends on its origin button still fires a browser click; a click
+  that travelled >4px from mousedown is dropped, so a snapped-back drag never also toggles.
+- `compact` = icon-only buttons: the icon, or the first letters of short/title as a text
+  pseudo-icon (full title in the tooltip), the same rule as `toolbarItemIcon`.
+
+Mobile (no ag-grid, no storage - the config alone):
+```
+<ColumnDots state max?=4 className? style? />        // grid/columnState/ColumnDots.tsx
+<CardList<Row> state data getId? renderValue? />     // grid/columnState/CardList.tsx
+```
+- `ColumnDots` is a discrete multi-thumb slider on pointer events (react-range cannot change thumb
+  count): a track of marks (one per column), dots on the shown columns. Gestures use a
+  dominant-axis test so a horizontal drag never removes and a vertical flick never reorders: drag a
+  dot along the track = the column takes another (empty) mark; swipe a dot UP = hide (fixed and the
+  last remaining dot stay); tap an empty mark = show (up to `max`); tap a dot without moving =
+  select the field; the sort button cycles asc->desc->off on the SELECTED field (sticky - selecting
+  another dot does not touch it). 44px touch targets.
+- `CardList` renders rows as blocks: `visibleKeys()` become the card fields (created/removed live
+  as dots move), `cardRole:'title'` = the header (else the first visible key), `cardRole:'accent'`
+  = a badge, the rest are label+value. It sorts by the sticky `config.sort` itself
+  (numeric/locale comparator) even when the sorted column is hidden.
+QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (icon menu + button states +
+table standards), 31 (Toolbar over columnState.listSource + pseudo-icons).
 
 ## Outside / Buttons Compatibility
 ```
@@ -316,7 +419,7 @@ StickerMenu                          // components/Menu re-export
 `mouseMenuApi.map` is intentionally generic. Keys are app-owned.
 
 
-## ObserveAll2 / Listen React Hooks
+## Observe / Listen React Hooks
 Canonical React adapter names:
 ```
 useStoreNode(node, {mode?, fallback?, drain?, key?})
@@ -347,9 +450,9 @@ QA stand coverage:
 ```
 useReplaySubscribe(remote, cb, {since?, keepSeq?=true, enabled?=true, onSeq?, onError?, staleMs?, onStale?, policy?, hint?})
   -> {ready, error, stale, seq(), lastTs(), restart(since?)}
-useStoreReplaySync(store, remote, sameOpts)  -> same controller       // ObserveAll2.syncStoreReplay wrapper
+useStoreReplaySync(store, remote, sameOpts)  -> same controller       // Observe.syncStoreReplay wrapper
 useStoreReplayMirror(remote, initial, sameOpts) -> controller & {store}   // creates the mirror store in a ref
-useStoreReplayEach(remote, cb, sameOpts & {initial?, drain?}) -> controller & {store}   // per-key fold: ObserveAll2.syncStoreReplayEach counterpart
+useStoreReplayEach(remote, cb, sameOpts & {initial?, drain?}) -> controller & {store}   // per-key fold: Observe.syncStoreReplayEach counterpart
 useReplayFrame(remote, cb, {intervalMs?=300, since?, keepSeq?=true, enabled?=true, hint?, onSeq?, onError?})
   -> {ready, error, seq(), pull(hint?), restart(since?)}              // pull-at-own-pace over remote.frame()
 useReplayHistory(history, apply, {head?, reset?, tickMs?=300, autoPlay?=true})
@@ -365,10 +468,10 @@ Semantics that are easy to get wrong:
 - `keepSeq`: within one mount, a resubscribe (StrictMode double effect, `enabled` toggle, `restart()`) reconnects with `{since: lastSeq}` -> journal tail. A NEW `remote` identity always resets seq (another line's seq is meaningless). A full unmount loses the refs: persist the position in the parent via `onSeq` and pass it back as `since` (QA card 23, client A).
 - `seq()` and `useReplayHistory`'s interval-driven `seq/head` keep high-frequency lines from re-rendering per event. Frames/ticks should fold into a canvas/ref/store, not useState.
 - `useReplayHistory.seek` kills the live subscription imperatively (guarded off, double-call safe), folds `history.at(where)` through `apply` (keyframe + tail; a keyframe fully redefines consumer state, so `reset` is rarely needed), and freezes. `play()` resubscribes `{since: pos}` -> archive tail -> live handover.
-- `useStoreReplayEach` composes existing pieces instead of calling `ObserveAll2.syncStoreReplayEach` (which builds a FRESH store per call): the mirror lives in a ref (like `useStoreReplayMirror`), `store.each()` is subscribed in an effect declared BEFORE the sync effect (hook-call order guarantees the per-key subscriber exists when the keyframe applies — the expansion is never missed), then `useStoreReplaySync` drives the wire. Consequences: within one mount every resubscribe (StrictMode, `restart()`, `enabled` toggle, `staleMs`/`policy` change) reconnects by tail ON TOP of kept state and the consumer sees only the diff — no snapshot/`initial` dance (the library one-call needs `{since, initial: snapshot}` for that). After a FULL unmount pass `{since: prev.seq(), initial: prev.store.snapshot()}` like the library contract. `drain` is creation-time (it goes to `createStore`); changing it later does nothing. The fold target must live outside React state (ref/Map/grid api) — the hook renders nothing; `controller.store` is a normal store for `useStoreNode`/`useStoreKeys` extras.
+- `useStoreReplayEach` composes existing pieces instead of calling `Observe.syncStoreReplayEach` (which builds a FRESH store per call): the mirror lives in a ref (like `useStoreReplayMirror`), `store.each()` is subscribed in an effect declared BEFORE the sync effect (hook-call order guarantees the per-key subscriber exists when the keyframe applies — the expansion is never missed), then `useStoreReplaySync` drives the wire. Consequences: within one mount every resubscribe (StrictMode, `restart()`, `enabled` toggle, `staleMs`/`policy` change) reconnects by tail ON TOP of kept state and the consumer sees only the diff — no snapshot/`initial` dance (the library one-call needs `{since, initial: snapshot}` for that). After a FULL unmount pass `{since: prev.seq(), initial: prev.store.snapshot()}` like the library contract. `drain` is creation-time (it goes to `createStore`); changing it later does nothing. The fold target must live outside React state (ref/Map/grid api) — the hook renders nothing; `controller.store` is a normal store for `useStoreNode`/`useStoreKeys` extras.
 - Server primitives (`conflateReplay` per connection, `archiveReplay`) intentionally have no hooks: they live where the RPC server is built.
 
-QA cards 23/24/25 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `UseReplayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror); client E = pull path (`useReplayFrame` over the direct remote with a wrapped counting `frame()`, pace switch 250ms/1s/3s keeps seq). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Card 25 = per-key feed (`useStoreReplayEach` over `exposeStoreReplay`): a dict-of-rows store, producer touches ONE random row per tick, the fold target is a plain Map with per-row cb counters — only the mutated row's counter grows, keyframe/`replace` are the only whole-table expansions, delete arrives as `(key, undefined)`. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
+QA cards 23/24/25 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `Replay.replayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror); client E = pull path (`useReplayFrame` over the direct remote with a wrapped counting `frame()`, pace switch 250ms/1s/3s keeps seq). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Card 25 = per-key feed (`useStoreReplayEach` over `exposeStoreReplay`): a dict-of-rows store, producer touches ONE random row per tick, the fold target is a plain Map with per-row cb counters — only the mutated row's counter grows, keyframe/`replace` are the only whole-table expansions, delete arrives as `(key, undefined)`. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
 ## Logs
 Frequent legacy/global logger:
 ```

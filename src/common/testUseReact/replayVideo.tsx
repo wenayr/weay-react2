@@ -8,7 +8,7 @@
  */
 
 import React, {StrictMode, useEffect, useMemo, useRef, useState} from "react";
-import {ObserveAll2, Replay} from "wenay-common2";
+import {Observe, Replay} from "wenay-common2";
 import {useReplaySubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreReplayEach, useStoreNode, useStoreKeys} from "../src/hooks";
 
 type tFrame = {n: number, w: number, h: number, ts: number, jpeg: string};
@@ -28,7 +28,7 @@ function createVideoDemo() {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
 
-    const [emit, replay] = Replay.UseReplayListen<[tFrame]>({
+    const [emit, replay] = Replay.replayListen<[tFrame]>({
         history: 256,
         current: () => last ? [last] : undefined,   // keyframe source: every frame fully defines the picture
     });
@@ -308,8 +308,8 @@ type tWorld = {ticks: number, price: number, note: string, bag: Record<string, n
 
 function createStoreReplayDemo() {
     let stalled = false;
-    const store = ObserveAll2.createStore<tWorld>({ticks: 0, price: 100, note: "start", bag: {a: 1}});
-    const exposed = ObserveAll2.exposeStoreReplay(store, {history: 128});
+    const store = Observe.createStore<tWorld>({ticks: 0, price: 100, note: "start", bag: {a: 1}});
+    const exposed = Observe.exposeStoreReplay(store, {history: 128});
     setInterval(() => {
         if (stalled) return;
         store.state.ticks++;
@@ -369,12 +369,12 @@ export const ReplayStoreDemo = () => {
 
 type tRow = {qty: number, px: number};
 type tRows = Record<string, tRow>;
-type tRowsRemote = Replay.ReplayRemote<[ObserveAll2.StorePatch]>;
+type tRowsRemote = Replay.ReplayRemote<[Observe.StorePatch]>;
 
 function createStoreEachDemo() {
     let n = 2;
-    const store = ObserveAll2.createStore<tRows>({r1: {qty: 5, px: 101}, r2: {qty: 3, px: 202}});
-    const exposed = ObserveAll2.exposeStoreReplay(store, {history: 256});
+    const store = Observe.createStore<tRows>({r1: {qty: 5, px: 101}, r2: {qty: 3, px: 202}});
+    const exposed = Observe.exposeStoreReplay(store, {history: 256});
     setInterval(() => {
         const keys = Object.keys(store.state);
         if (!keys.length) return;

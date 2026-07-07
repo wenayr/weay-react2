@@ -141,7 +141,7 @@ const slot = createUiSlot({key, places: {top: "Top bar", side: "Sidebar"}, def: 
 
 ## Toolbar
 ```
-const tb = createToolbar({key, items: [{key, title, icon, short?, render?, onClick?, defaultVisible?, fixed?}], def?, settingsItem?})
+const tb = createToolbar({key, items: [{key, title, icon?, short?, render?, onClick?, defaultVisible?, fixed?}], def?, settingsItem?, source?})
 
 <tb.Bar settings />          // the live bar; settings adds a gear opening Settings in a popover
 <tb.Settings />              // the PURE config editor - same element drops into a settings section
@@ -150,12 +150,20 @@ tb.api.useItems()            // headless bar: ordered visible [{item, density, c
 tb.api.onChange.on(cfg => ...) -> off        // fires on every edit
 
 registerToolbarDensity({key, name, renderItem?}) -> unregister   // built-ins: 'icon', 'label'
+toolbarItemIcon(item)        // the item's icon, or its first letters as a text pseudo-icon
 ```
 Config `{order, visible, density}` is serializable and persisted like createUiSlot
 (staticGetAdd -> Cash, the app owns the write policy). Items added in an app update are merged
-into a stale persisted config (appended, default-visible), removed ones are ignored.
+into a stale persisted config (appended, default-visible), removed ones are ignored. `icon` is
+optional: in icon density an icon-less item renders the first letters of its short/title.
 The gear is a pseudo-item: `settingsItem: {title?, icon?}` re-skins it, and the editor has a
 separated toggle row for it (`visible['__settings']`, no order slot - it always sits at the bar edge).
+
+`source?` makes the toolbar a VIEW over an external owner of order/visibility (a `tUiListSource`,
+e.g. `columnState.api.listSource`): Bar/Settings edit THAT config and outside changes reorder the
+toolbar, so one config can drive a grid, its icon menu AND the toolbar together. Density and the
+gear flag stay in the toolbar's own store. Without `source` the toolbar keeps its own store
+(backward compatible).
 
 ## Callback Hub
 ```
@@ -238,11 +246,61 @@ columns.control.detach()
 `createColumnBuffer()` knows nothing about groups, `columnDefs`, business names, or where columns live.
 
 
-## ObserveAll2 React Adapter
+## columnState
+A persisted column layer over a keyed column set - order / visibility / width / sort / filter in a
+standalone config store, with an OPTIONAL two-way ag-grid adapter. Mobile card views consume the
+SAME config with no ag-grid at all. agGrid4 wrappers are never modified: this is the app-level
+column wrapper `WRAPPER.md` postulates, packaged as a primitive.
+```
+const cs = createColumnState({key, columns: [{key, title, short?, icon?, group?, fixed?, defaultVisible?, cardRole?}], def?, saveMs?})
+
+cs.columns                                       // the descriptors (UI renders from these + config)
+cs.api.useConfig() / getConfig() / setConfig(next) / reset()
+cs.api.show(key, on) / move(order) / setSort({key, dir} | null) / toggleSort(key)   // asc->desc->off
+cs.api.visibleKeys()                             // keys to render, in order (group-gated)
+cs.api.onChange.on(cfg => ...) -> off
+cs.api.usePresent() / isPresent(key) / setPresent(keys | null)   // which columns the live grid HAS
+cs.api.listSource                                // {order, visible} slice as a Toolbar `source`
+```
+Config `{v, order, visible, width, sort, filter, groups}` is serializable and persisted like
+createToolbar (staticGetAdd(key) -> Cash, the app owns the write policy); a stale config migrates
+softly (unknown keys dropped, new columns appended default-visible, `fixed` pinned). `sort` is
+STICKY: independent of visibility/selection, may point at a hidden or grid-absent column, changes
+only by an explicit toggle/header click.
+
+Two-way ag-grid adapter (opt-in, agGrid4 untouched):
+```
+<AgGridMy columnDefs={cols} autoSizeColumns={false}
+    onGridReady={e => cs.grid.attach(e.api)}          // restore saved layout, then watch the grid
+    onGridPreDestroyed={() => cs.grid.detach()} />     // config survives remounts
+```
+Grid drag/resize/hide/sort/filter fold back into the config; UI edits apply to the grid; a column
+removed from the live grid (dynamic defs) keeps its config entry and reads `isPresent==false`.
+
+Icon menu - a 1:1 grid mirror (reorder in the grid <-> reorder the buttons):
+```
+<ColumnsMenu state={cs} compact? marks? tail? onItem? onTail? reorder? />      // default click = toggle visibility
+<MenuStrip items={[{key, title, state:'on'|'off'|'disabled', marks?, fixed?}]} onItem? onMove? tail? compact? />
+```
+`ColumnsMenu` binds `MenuStrip` - a presentation-only layer that reports clicks/drags but never
+interprets them - to the config. `compact` = icon-only buttons; an item with no icon shows its
+first letters. `tail` = trailing non-column buttons (a table-standards cycler etc.).
+
+Mobile (no ag-grid): dots selector + card rows over the same config:
+```
+<ColumnDots state={cs} max?=4 />                 // track of marks; dots = shown columns; tap empty=add,
+                                                 //   drag=replace, swipe up=remove, tap dot=select, sort button cycles
+<CardList<Row> state={cs} data={rows} getId? renderValue? />   // visible cols -> card fields; cardRole:'title'/'accent'
+```
+QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (icon menu + button states +
+table standards), 31 (Toolbar over the same config).
+
+
+## Observe React Adapter
 `wenay-common2` owns the store/listen/RPC primitives. `wenay-react2` owns React lifecycle hooks around them.
 
 ```ts
-import { ObserveAll2 } from "wenay-common2"
+import { Observe } from "wenay-common2"
 import { useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenValue } from "wenay-react2"
 ```
 
@@ -306,12 +364,12 @@ sub.stale; sub.lastTs()   // freshness (needs staleMs): stale re-renders on fres
 // policy: 'queue' (default, nothing skipped) | 'frame' (rides the server frameLine when present: on lag the
 // server drops and recovers with a mini-frame; old servers/in-proc degrade to 'queue'). hint -> the line's frame condenser.
 
-// store patch line (ObserveAll2.exposeStoreReplay(...).api.replay)
+// store patch line (Observe.exposeStoreReplay(...).api.replay)
 const mirror = useStoreReplayMirror(remote, initial, {enabled?})   // creates the mirror store; same staleMs/stale/policy surface
 mirror.store; mirror.ready; mirror.seq(); mirror.restart()
 const sync = useStoreReplaySync(existingStore, remote)              // same, store supplied by the app
 
-// per-key fold over the same line (ObserveAll2.syncStoreReplayEach counterpart): cb per CHANGED top-level key,
+// per-key fold over the same line (Observe.syncStoreReplayEach counterpart): cb per CHANGED top-level key,
 // first delivery = keyframe expanded per key, (key, undefined) = deleted — grid rows without special cases
 const feed = useStoreReplayEach<Rows>(remote, (key, row) => row === undefined ? removeRow(key) : upsertRow(key, row), {drain?, initial?})
 feed.store; feed.ready; feed.stale; feed.seq(); feed.restart()      // same controller surface as the mirror

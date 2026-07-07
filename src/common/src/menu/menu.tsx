@@ -6,7 +6,7 @@ import React, {
     useRef,
     useState,
 } from 'react';
-import { PromiseArrayListen, sleepAsync } from "wenay-common2";
+import { promiseProgress, sleepAsync } from "wenay-common2";
 
 /*******************************************************
  * Menu data types
@@ -118,7 +118,7 @@ function MenuElement({
                         | Promise<any>
                         | (() => Promise<any>)
                         )[];
-                    const pa = PromiseArrayListen(tasks); // External helper function
+                    const pa = promiseProgress(tasks);
                     setProgress({});
                     unsubOk.current?.();
                     unsubErr.current?.();
@@ -135,14 +135,15 @@ function MenuElement({
                             setProgress(null);
                         }
                     };
-                    unsubOk.current = pa.listenOk(
+                    unsubOk.current = pa.onOk(
                         (data: any, i: number, countOk: number, countError: number, count: number) =>
                             onTick(countOk, countError, count)
                     );
-                    unsubErr.current = pa.listenError(
+                    unsubErr.current = pa.onError(
                         (error: any, i: number, countOk: number, countError: number, count: number) =>
                             onTick(countOk, countError, count)
                     );
+                    void pa.allSettled();
                 }
                 // If this is a single promise
                 else if (result instanceof Promise) {

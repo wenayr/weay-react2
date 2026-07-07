@@ -1,5 +1,5 @@
 import React, { useCallback, useLayoutEffect, useSyncExternalStore } from "react";
-import { UseListen, waitRun } from "wenay-common2";
+import { listen as createListen, waitRun } from "wenay-common2";
 
 type Listener = (a?: any) => void;
 
@@ -18,12 +18,12 @@ export const mapWait = new Map<object, ReturnType<typeof waitRun>>();
 export type UpdateCallback<T extends object> =
     React.Dispatch<React.SetStateAction<T>> | ((a: T) => void);
 
-const updateListens = new WeakMap<object, ReturnType<typeof UseListen<[object]>>>();
+const updateListens = new WeakMap<object, ReturnType<typeof createListen<[object]>>>();
 
 function getUpdateListen(obj: object) {
     let listen = updateListens.get(obj);
     if (!listen) {
-        listen = UseListen<[object]>();
+        listen = createListen<[object]>();
         updateListens.set(obj, listen);
     }
     return listen;

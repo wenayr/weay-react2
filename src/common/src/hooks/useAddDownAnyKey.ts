@@ -1,6 +1,6 @@
 import {useEffect, useRef} from "react";
 import {renderBy} from "../../updateBy";
-import {UseListen} from "wenay-common2";
+import {listen as createListen} from "wenay-common2";
 
 export const KeyDown = {
     key: "" as string
@@ -16,7 +16,7 @@ export type AnyKeyDownApi = {
     on(listener: (key: string, event?: KeyboardEvent) => void): () => void;
 }
 
-const [emitKeyDown, keyDownListen] = UseListen<[string, KeyboardEvent | undefined]>();
+const [emitKeyDown, keyDownListen] = createListen<[string, KeyboardEvent | undefined]>();
 
 export const keyDownApi: AnyKeyDownApi = {
     get key() { return KeyDown.key; },

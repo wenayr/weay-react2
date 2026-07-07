@@ -1,5 +1,5 @@
 import React, {useState} from 'react'
-import {UseListen} from 'wenay-common2'
+import {listen as createListen} from 'wenay-common2'
 import {renderBy, updateBy} from '../../../updateBy'
 import {staticGetAdd, staticMarkDirty} from '../../utils/mapMemory'
 import {DivOutsideClick} from '../../hooks/useOutside'
@@ -21,8 +21,9 @@ export type tToolbarItem = {
     title: string
     /** short caption for 'label' density (falls back to title) */
     short?: string
-    /** compact glyph/icon for 'icon' density */
-    icon: React.ReactNode
+    /** compact glyph/icon for 'icon' density; absent = the first letters of
+     *  short/title render as a text pseudo-icon */
+    icon?: React.ReactNode
     /** full custom render; default = icon [+ short] by the density registry */
     render?: (density: string) => React.ReactNode
     /** convenience for plain action buttons; interactive items can also handle clicks inside render() */
@@ -41,6 +42,25 @@ export type tToolbarConfig = {
     density: string
 }
 
+/** The order/visibility slice of a config - what an external source owns. */
+export type tUiListConfig = {
+    order: string[]
+    visible: {[key: string]: boolean}
+}
+
+/** An external owner of order/visibility that a Toolbar can run on instead of
+ *  its own store - e.g. columnState's listSource: the SAME config the grid
+ *  syncs with, so dragging a column in the grid reorders the toolbar and
+ *  vice versa. Density and the gear flag stay toolbar-local (persisted under
+ *  the toolbar's own key). useConfig must be a React hook (subscription). */
+export type tUiListSource = {
+    useConfig: () => tUiListConfig
+    getConfig: () => tUiListConfig
+    setConfig: (next: tUiListConfig) => void
+    /** re-emitted as the toolbar's own onChange (grid-driven changes included) */
+    onChange?: (cb: (cfg: tUiListConfig) => void) => () => void
+}
+
 export type tToolbarDensity = {
     key: string
     /** human name for the Settings segmented control */
@@ -57,8 +77,16 @@ const densities = {list: [
     {key: 'label', name: 'Icons + labels'},
 ] as tToolbarDensity[]}
 
+/** Icon with a text fallback: no glyph = the first letters of short/title
+ *  (an "PR"-style pseudo-icon), so icon densities work for icon-less items. */
+export function toolbarItemIcon(item: {icon?: React.ReactNode, short?: string, title: string}): React.ReactNode {
+    return item.icon ?? <span style={{fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase'}}>
+        {(item.short ?? item.title).slice(0, 3)}
+    </span>
+}
+
 function itemIconOnly(item: tToolbarItem) {
-    return item.icon
+    return toolbarItemIcon(item)
 }
 
 /** Register an extra density level. Re-register with the same key replaces the
@@ -87,7 +115,7 @@ function itemContent(item: tToolbarItem, densityKey: string) {
     const d = densities.list.find(e => e.key == densityKey)
     if (d?.renderItem) return d.renderItem(item)
     return <>
-        <span className='wenayTbIcon'>{item.icon}</span>
+        {item.icon != null && <span className='wenayTbIcon'>{item.icon}</span>}
         <span className='wenayTbLabel'>{item.short ?? item.title}</span>
     </>
 }
@@ -107,6 +135,12 @@ export function createToolbar(opts: {
      *  renders only when Bar mounts with settings, AND visible['__settings'] is
      *  not false - the Settings editor shows a separated toggle row for it. */
     settingsItem?: {title?: string, icon?: React.ReactNode}
+    /** external owner of order/visibility (columnState.api.listSource etc.):
+     *  the toolbar becomes a VIEW over that config - Bar/Settings edit it, and
+     *  outside changes (a column dragged in the grid) reorder the toolbar.
+     *  Item keys should match the source's keys 1:1. Density and the gear flag
+     *  remain in the toolbar's own store under `key`. Default: own store. */
+    source?: tUiListSource
 }) {
     const defConfig = (): tToolbarConfig => ({
         order: opts.def?.order?.slice() ?? opts.items.map(i => i.key),
@@ -114,26 +148,38 @@ export function createToolbar(opts: {
         density: opts.def?.density ?? densities.list[0].key,
     })
     const st = staticGetAdd<tToolbarConfig>(opts.key, defConfig())
-    const [emitChange, onChange] = UseListen<[tToolbarConfig]>()
+    const [emitChange, onChange] = createListen<[tToolbarConfig]>()
+    // ext is fixed for the controller's lifetime, so hook call order inside
+    // useConfig/Bar/Settings never changes for a given toolbar instance
+    const ext = opts.source
+    // outside edits of the external config (grid drags...) must reach the
+    // toolbar's own subscribers too; module-lifetime subscription by design
+    ext?.onChange?.(() => emitChange(normalize()))
+
+    /** raw order/visible as stored - own store or the external source */
+    const rawList = () => ext ? ext.getConfig() : {order: st.order, visible: st.visible}
 
     /** The persisted state may be stale or partial (older app version, removed
      *  items, an unregistered density) - never crash, never drop user data that
      *  still applies: unknown keys are filtered out, missing items are appended
      *  (default-visible), fixed items are pinned back to their descriptor index. */
     function normalize(): tToolbarConfig {
+        const raw = rawList()
         const known = new Set(opts.items.map(i => i.key))
-        const rawOrder = Array.isArray(st.order) ? st.order : []
+        const rawOrder = Array.isArray(raw.order) ? raw.order : []
         const order = rawOrder.filter(k => known.has(k) && !opts.items.find(i => i.key == k)?.fixed)
         for (const it of opts.items)
             if (!it.fixed && order.indexOf(it.key) == -1) order.push(it.key)
         opts.items.forEach(function pinFixed(it, i) {
             if (it.fixed) order.splice(Math.min(i, order.length), 0, it.key)
         })
-        const rawVisible = st.visible && typeof st.visible == 'object' ? st.visible : {}
+        const rawVisible = raw.visible && typeof raw.visible == 'object' ? raw.visible : {}
         const visible: {[k: string]: boolean} = {}
         for (const it of opts.items)
             visible[it.key] = it.fixed ? true : (rawVisible[it.key] ?? it.defaultVisible != false)
-        visible[SETTINGS_KEY] = typeof rawVisible[SETTINGS_KEY] == 'boolean' ? rawVisible[SETTINGS_KEY] : true
+        // the gear flag is toolbar-local: an external source only owns items
+        const gearRaw = (ext ? st.visible : rawVisible) ?? {}
+        visible[SETTINGS_KEY] = typeof gearRaw[SETTINGS_KEY] == 'boolean' ? gearRaw[SETTINGS_KEY] : true
         const density = typeof st.density == 'string' && densities.list.some(d => d.key == st.density)
             ? st.density : (opts.def?.density ?? densities.list[0].key)
         return {order, visible, density}
@@ -141,20 +187,40 @@ export function createToolbar(opts: {
 
     /** Every edit funnels through here: mutate the persisted object in place
      *  (identity is the updateBy/renderBy subscription key), announce, mark the
-     *  cache dirty, emit outward. */
+     *  cache dirty, emit outward. With an external source the items' order and
+     *  visibility go THERE (its own change flow re-emits); density + gear flag
+     *  always stay in the toolbar's own store. */
     function setConfig(next: tToolbarConfig) {
-        st.order = next.order.slice()
-        st.visible = {...next.visible}
-        st.density = next.density
-        renderBy(st)
-        staticMarkDirty(opts.key)
-        emitChange(normalize())
+        if (ext) {
+            const visible = {...next.visible}
+            delete visible[SETTINGS_KEY]
+            st.visible = {...st.visible, [SETTINGS_KEY]: next.visible[SETTINGS_KEY] != false}
+            st.density = next.density
+            renderBy(st)
+            staticMarkDirty(opts.key)
+            ext.setConfig({order: next.order.slice(), visible})
+            // the source's own onChange already re-emitted; emit only when it can't
+            if (!ext.onChange) emitChange(normalize())
+        } else {
+            st.order = next.order.slice()
+            st.visible = {...next.visible}
+            st.density = next.density
+            renderBy(st)
+            staticMarkDirty(opts.key)
+            emitChange(normalize())
+        }
     }
 
     const getConfig = () => normalize()
 
-    function useConfig() {
+    /** subscription to everything the toolbar renders from (hook) */
+    function useSubscribe() {
         updateBy(st)
+        ext?.useConfig() // ext is per-instance constant - hook order is stable
+    }
+
+    function useConfig() {
+        useSubscribe()
         return normalize()
     }
 
@@ -165,7 +231,7 @@ export function createToolbar(opts: {
      *  consumer re-renders from this list rather than the library re-parenting
      *  someone else's nodes.) */
     function useItems() {
-        updateBy(st)
+        useSubscribe()
         updateBy(densities)
         const cfg = normalize()
         const byKey = new Map(opts.items.map(i => [i.key, i]))
@@ -200,7 +266,7 @@ export function createToolbar(opts: {
      *  global settings menu. popAlign: which bar edge the popover sticks to -
      *  'right' (default, for bars in a top-right corner) or 'left'. */
     function Bar(p: {className?: string, settings?: boolean, popAlign?: 'left' | 'right'} = {}) {
-        updateBy(st)
+        useSubscribe()
         updateBy(densities)
         const cfg = normalize()
         const [open, setOpen] = useState(false)
@@ -235,7 +301,7 @@ export function createToolbar(opts: {
      *  never move in the preview and a drop never lands elsewhere than shown.
      *  Plus arrow keys on the focused handle; fixed rows have neither. */
     function Settings(p: {className?: string, activeClassName?: string} = {}) {
-        updateBy(st)
+        useSubscribe()
         updateBy(densities)
         const cfg = normalize()
         const base = p.className ?? 'wenaySegBtn'
@@ -295,7 +361,7 @@ export function createToolbar(opts: {
                         <input type='checkbox' disabled={it.fixed}
                                checked={cfg.visible[k] != false}
                                onChange={() => setConfig({...cfg, visible: {...cfg.visible, [k]: !(cfg.visible[k] != false)}})}/>
-                        <span className='wenayTbIcon'>{it.icon}</span>
+                        <span className='wenayTbIcon'>{toolbarItemIcon(it)}</span>
                         <span className='wenayTbRowTitle'>{it.title}</span>
                         {!it.fixed && <div className='wenayTbHandle' tabIndex={0} title='Drag or arrow keys to reorder'
                                            onKeyDown={e => onHandleKey(k, e)}>⠿</div>}

@@ -1,15 +1,15 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {ObserveAll2} from "wenay-common2";
+import {Observe} from "wenay-common2";
 
-type StoreChange = ObserveAll2.StoreChange;
-type StoreEachCtx = ObserveAll2.StoreEachCtx;
-type StoreSubOpts = ObserveAll2.StoreSubOpts;
-type StoreSyncOpts = ObserveAll2.StoreSyncOpts;
-type StoreDrain = ObserveAll2.StoreDrain;
-type StoreMask<T> = ObserveAll2.StoreMask<T>;
-type StorePick<T, M> = ObserveAll2.StorePick<T, M>;
-type StoreNode<T> = ObserveAll2.StoreNode<T>;
-type StoreSelection<T, M> = ObserveAll2.StoreSelection<T, M>;
+type StoreChange = Observe.StoreChange;
+type StoreEachCtx = Observe.StoreEachCtx;
+type StoreSubOpts = Observe.StoreSubOpts;
+type StoreSyncOpts = Observe.StoreSyncOpts;
+type StoreDrain = Observe.StoreDrain;
+type StoreMask<T> = Observe.StoreMask<T>;
+type StorePick<T, M> = Observe.StorePick<T, M>;
+type StoreNode<T> = Observe.StoreNode<T>;
+type StoreSelection<T, M> = Observe.StoreSelection<T, M>;
 
 export type ListenLike<TArgs extends readonly unknown[] = readonly unknown[]> = {
     on(cb: (...args: TArgs) => void, opts?: {key?: string | symbol, current?: boolean | (() => TArgs | undefined)}): () => void;
@@ -184,7 +184,7 @@ export type UseStoreEachOptions = {
  * The remote (wire) counterpart is useStoreReplayEach in useReplay.ts.
  */
 export function useStoreEach<T extends object>(
-    store: ObserveAll2.Store<T> | null | undefined,
+    store: Observe.Store<T> | null | undefined,
     cb: (key: string, value: T[keyof T] | undefined, ctx: StoreEachCtx) => void,
     options: UseStoreEachOptions = {},
 ): void {
@@ -209,7 +209,7 @@ export type UseStoreMirrorOptions<T extends object, M extends StoreMask<T>> = St
 };
 
 export type StoreMirrorController<T extends object, M extends StoreMask<T>> = {
-    readonly store: ObserveAll2.Store<T> & {
+    readonly store: Observe.Store<T> & {
         sync(mask: M, subOpts?: StoreSyncOpts): Promise<() => void>;
     };
     readonly value: StorePick<T, M>;
@@ -238,7 +238,7 @@ export function useStoreMirror<T extends object, M extends StoreMask<T>>(
     if (!storeRef.current || storeRef.current.remote !== remote) {
         storeRef.current = {
             remote,
-            store: ObserveAll2.createStoreMirror<T>(remote, initial) as StoreMirrorController<T, M>["store"],
+            store: Observe.createStoreMirror<T>(remote, initial) as StoreMirrorController<T, M>["store"],
         };
     }
     const store = storeRef.current.store;

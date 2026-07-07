@@ -1,10 +1,10 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {ObserveAll2, Replay} from "wenay-common2";
+import {Observe, Replay} from "wenay-common2";
 import {useStoreEach} from "./useObserveStore";
 
-type StoreDrain = ObserveAll2.StoreDrain;
-type StoreEachCtx = ObserveAll2.StoreEachCtx;
-type StorePatch = ObserveAll2.StorePatch;
+type StoreDrain = Observe.StoreDrain;
+type StoreEachCtx = Observe.StoreEachCtx;
+type StorePatch = Observe.StorePatch;
 type ReplayEvent<Z extends any[]> = Replay.ReplayEvent<Z>;
 type ReplayRemote<Z extends any[]> = Replay.ReplayRemote<Z>;
 type StaleInfo = Replay.StaleInfo;
@@ -180,13 +180,13 @@ export type UseStoreReplaySyncOptions = UseReplaySubscribeOptions;
 export type StoreReplaySyncController = ReplaySubscribeController;
 
 /**
- * Sync an existing mirror store from a store replay line (`ObserveAll2.exposeStoreReplay(...).api.replay`).
- * Thin lifecycle wrapper over `ObserveAll2.syncStoreReplay`: the keyframe (root patch) and the
+ * Sync an existing mirror store from a store replay line (`Observe.exposeStoreReplay(...).api.replay`).
+ * Thin lifecycle wrapper over `Observe.syncStoreReplay`: the keyframe (root patch) and the
  * patch tail are applied to the store by the library; UI subscribes to the store as usual
  * (useStoreNode/useStoreSelect).
  */
 export function useStoreReplaySync<T extends object>(
-    store: ObserveAll2.Store<T> | null | undefined,
+    store: Observe.Store<T> | null | undefined,
     remote: ReplayRemote<[StorePatch]> | null | undefined,
     options: UseStoreReplaySyncOptions = {},
 ): StoreReplaySyncController {
@@ -210,7 +210,7 @@ export function useStoreReplaySync<T extends object>(
         setReady(false);
         setError(null);
         if (staleMs === undefined) setStale(false); // see useReplaySubscribe: stale re-syncs from common2, no reset-to-false flicker
-        const off = ObserveAll2.syncStoreReplay(store, remote, {
+        const off = Observe.syncStoreReplay(store, remote, {
             since: seqRef.current,
             policy,
             hint: hintRef.current,
@@ -259,7 +259,7 @@ export function useStoreReplaySync<T extends object>(
 }
 
 export type StoreReplayMirrorController<T extends object> = StoreReplaySyncController & {
-    readonly store: ObserveAll2.Store<T>;
+    readonly store: Observe.Store<T>;
 };
 
 /**
@@ -272,9 +272,9 @@ export function useStoreReplayMirror<T extends object>(
     initial: T,
     options: UseStoreReplaySyncOptions = {},
 ): StoreReplayMirrorController<T> {
-    const storeRef = useRef<{remote: typeof remote, store: ObserveAll2.Store<T>} | null>(null);
+    const storeRef = useRef<{remote: typeof remote, store: Observe.Store<T>} | null>(null);
     if (!storeRef.current || storeRef.current.remote !== remote) {
-        storeRef.current = {remote, store: ObserveAll2.createStore<T>(initial)};
+        storeRef.current = {remote, store: Observe.createStore<T>(initial)};
     }
     const store = storeRef.current.store;
     const sync = useStoreReplaySync(store, remote, options);
@@ -294,7 +294,7 @@ export type UseStoreReplayEachOptions<T extends object> = UseStoreReplaySyncOpti
 };
 
 /**
- * Per-key fold over a store replay line — React counterpart of `ObserveAll2.syncStoreReplayEach`
+ * Per-key fold over a store replay line — React counterpart of `Observe.syncStoreReplayEach`
  * (internal mirror store + syncStoreReplay + store.each()). cb fires once per CHANGED top-level
  * key per drain window with the current value; the first delivery is the keyframe EXPANDED per
  * key; (key, undefined) = key deleted — cold start / reconnect are not special cases for per-key
@@ -312,9 +312,9 @@ export function useStoreReplayEach<T extends object>(
     options: UseStoreReplayEachOptions<T> = {},
 ): StoreReplayMirrorController<T> {
     const {initial, drain, ...syncOptions} = options;
-    const storeRef = useRef<{remote: typeof remote, store: ObserveAll2.Store<T>} | null>(null);
+    const storeRef = useRef<{remote: typeof remote, store: Observe.Store<T>} | null>(null);
     if (!storeRef.current || storeRef.current.remote !== remote) {
-        storeRef.current = {remote, store: ObserveAll2.createStore<T>((initial ?? {}) as T, drain !== undefined ? {drain} : undefined)};
+        storeRef.current = {remote, store: Observe.createStore<T>((initial ?? {}) as T, drain !== undefined ? {drain} : undefined)};
     }
     const store = storeRef.current.store;
     // each BEFORE sync: effects run in hook-call order, so the per-key subscriber already exists
