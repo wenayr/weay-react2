@@ -6,15 +6,15 @@
 // primitive. ag-grid enters only as a type import plus the GridApi the caller
 // hands to grid.attach() - no runtime coupling for grid-less consumers.
 //
-// Persistence rides the library convention (staticProps -> Cash -> storage),
+// Persistence rides the library convention (memoryProps -> memoryCache -> storage),
 // same mechanics as createToolbar: the caller supplies one string key.
 import type {ReactNode} from 'react'
 import type {ColumnState as AgColumnState, GridApi} from 'ag-grid-community'
 import {listen as createListen} from 'wenay-common2'
 import {renderBy, updateBy} from '../../../updateBy'
-import {staticGetAdd, staticMarkDirty} from '../../utils/mapMemory'
+import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
 
-export type tColumnMeta = {
+export type ColumnMeta = {
     /** stable id (persist key; must equal the grid colId) */
     key: string
     /** full human name - menus, card labels */
@@ -33,9 +33,9 @@ export type tColumnMeta = {
     cardRole?: 'title' | 'accent'
 }
 
-export type tColumnsSort = {key: string, dir: 'asc' | 'desc'}
+export type ColumnsSort = {key: string, dir: 'asc' | 'desc'}
 
-export type tColumnsConfig = {
+export type ColumnsConfig = {
     /** schema version of the persisted shape */
     v: number
     /** column keys, display order */
@@ -45,7 +45,7 @@ export type tColumnsConfig = {
     width: {[key: string]: number}
     /** STICKY sort: independent of visibility and of any UI selection, may point
      *  at a hidden column; changes only by an explicit toggle or a header click */
-    sort: tColumnsSort | null
+    sort: ColumnsSort | null
     /** grid filterModel - written by the grid adapter only */
     filter: {[key: string]: unknown}
     /** group key -> enabled sub-column keys */
@@ -58,19 +58,19 @@ const SCHEMA_V = 1
 const GRID_EVENTS = ['columnMoved', 'columnResized', 'columnVisible', 'sortChanged', 'filterChanged'] as const
 
 export function createColumnState(opts: {
-    /** persistence key (staticProps -> Cash), like createToolbar */
+    /** persistence key (memoryProps -> memoryCache), like createToolbar */
     key: string
     /** column descriptors; the config only ever references them by key */
-    columns: tColumnMeta[]
+    columns: ColumnMeta[]
     /** defaults; missing fields are derived from columns */
-    def?: Partial<tColumnsConfig>
+    def?: Partial<ColumnsConfig>
     /** grid->store save debounce, ms (default 300) */
     saveMs?: number
 }) {
     const groupMembers = (g: string) => opts.columns.filter(c => c.group == g).map(c => c.key)
     const groupKeys = [...new Set(opts.columns.map(c => c.group).filter((g): g is string => !!g))]
 
-    const defConfig = (): tColumnsConfig => ({
+    const defConfig = (): ColumnsConfig => ({
         v: SCHEMA_V,
         order: opts.def?.order?.slice() ?? opts.columns.map(c => c.key),
         visible: opts.def?.visible ? {...opts.def.visible} : Object.fromEntries(opts.columns.map(c => [c.key, c.defaultVisible != false])),
@@ -79,8 +79,8 @@ export function createColumnState(opts: {
         filter: opts.def?.filter ? {...opts.def.filter} : {},
         groups: opts.def?.groups ? {...opts.def.groups} : Object.fromEntries(groupKeys.map(g => [g, groupMembers(g)])),
     })
-    const st = staticGetAdd<tColumnsConfig>(opts.key, defConfig())
-    const [emitChange, onChange] = createListen<[tColumnsConfig]>()
+    const st = memoryGetOrCreate<ColumnsConfig>(opts.key, defConfig())
+    const [emitChange, onChange] = createListen<[ColumnsConfig]>()
 
     /** Runtime-only, never persisted: which column keys the attached grid
      *  actually HAS right now. null = unknown / no grid = treat all as present.
@@ -108,7 +108,7 @@ export function createColumnState(opts: {
      *  unknown keys are filtered out, missing columns are appended
      *  (default-visible), fixed columns are pinned back to their descriptor
      *  index. This IS the soft migration; v covers incompatible shape changes. */
-    function normalize(): tColumnsConfig {
+    function normalize(): ColumnsConfig {
         const known = new Set(opts.columns.map(c => c.key))
         const byKey = new Map(opts.columns.map(c => [c.key, c]))
         const rawOrder = Array.isArray(st.order) ? st.order : []
@@ -126,7 +126,7 @@ export function createColumnState(opts: {
         const width: {[k: string]: number} = {}
         for (const [k, w] of Object.entries(rawWidth))
             if (known.has(k) && typeof w == 'number' && isFinite(w) && w > 0) width[k] = w
-        const sort: tColumnsSort | null =
+        const sort: ColumnsSort | null =
             st.sort && known.has(st.sort.key) && (st.sort.dir == 'asc' || st.sort.dir == 'desc')
                 ? {key: st.sort.key, dir: st.sort.dir} : null
         const rawFilter = st.filter && typeof st.filter == 'object' ? st.filter : {}
@@ -146,7 +146,7 @@ export function createColumnState(opts: {
      *  (identity is the updateBy/renderBy subscription key), announce, mark the
      *  cache dirty, push to the attached grid (unless the grid IS the source),
      *  emit outward. */
-    function commit(next: tColumnsConfig, fromGrid: boolean) {
+    function commit(next: ColumnsConfig, fromGrid: boolean) {
         st.v = SCHEMA_V
         st.order = next.order.slice()
         st.visible = {...next.visible}
@@ -155,13 +155,13 @@ export function createColumnState(opts: {
         st.filter = {...next.filter}
         st.groups = Object.fromEntries(Object.entries(next.groups).map(([g, keys]) => [g, keys.slice()]))
         renderBy(st)
-        staticMarkDirty(opts.key)
+        memoryMarkDirty(opts.key)
         if (!fromGrid) applyToGrid()
         emitChange(normalize())
     }
 
     const getConfig = () => normalize()
-    const setConfig = (next: tColumnsConfig) => commit(next, false)
+    const setConfig = (next: ColumnsConfig) => commit(next, false)
     const reset = () => commit(defConfig(), false)
 
     function useConfig() {
@@ -178,7 +178,7 @@ export function createColumnState(opts: {
         commit({...normalize(), order}, false)
     }
 
-    function setSort(sort: tColumnsSort | null) {
+    function setSort(sort: ColumnsSort | null) {
         commit({...normalize(), sort}, false)
     }
 
@@ -191,7 +191,7 @@ export function createColumnState(opts: {
     }
 
     /** The order/visibility slice of THIS config as an external list source
-     *  (structurally = Toolbar's tUiListSource): plug it into
+     *  (structurally = Toolbar's UiListSource): plug it into
      *  createToolbar({source}) or any order/visibility editor - the editor,
      *  the menu and the attached grid then all mirror one another, because
      *  they edit the SAME config. */
@@ -232,7 +232,7 @@ export function createColumnState(opts: {
     let applying = false
     let saveTimer: ReturnType<typeof setTimeout> | undefined
 
-    function toAgState(cfg: tColumnsConfig): AgColumnState[] {
+    function toAgState(cfg: ColumnsConfig): AgColumnState[] {
         return cfg.order.map(k => ({
             colId: k,
             hide: cfg.visible[k] == false,
@@ -266,7 +266,7 @@ export function createColumnState(opts: {
         const order: string[] = []
         const visible = {...cfg.visible}
         const width = {...cfg.width}
-        let sort: tColumnsSort | null = null
+        let sort: ColumnsSort | null = null
         const gridIds = new Set<string>()
         for (const s of gridApi.getColumnState()) {
             if (!s.colId) continue
@@ -283,7 +283,7 @@ export function createColumnState(opts: {
         for (const k of cfg.order)
             if (order.indexOf(k) == -1) order.push(k)
         const filter = (gridApi.getFilterModel() ?? {}) as {[k: string]: unknown}
-        const next: tColumnsConfig = {...cfg, order, visible, width, sort, filter}
+        const next: ColumnsConfig = {...cfg, order, visible, width, sort, filter}
         if (JSON.stringify(next) == JSON.stringify(cfg)) return
         commit(next, true)
         // normalize() may have corrected the grid's move (a fixed column dragged
@@ -312,7 +312,7 @@ export function createColumnState(opts: {
         if (rt.present != before && !applying) applyToGrid()
     }
 
-    /** Call from onGridReady (AgGridMy forwards it on top of its own wiring) or
+    /** Call from onGridReady (AgGridTable forwards it on top of its own wiring) or
      *  via controller.withApi. Restores the saved state, then watches the grid. */
     function attach(api: GridApi) {
         detach()
@@ -339,7 +339,7 @@ export function createColumnState(opts: {
     return {
         /** The column descriptors this state was created over - UI components
          *  (dots, cards, icon menus) render from these + the config. */
-        columns: opts.columns as readonly tColumnMeta[],
+        columns: opts.columns as readonly ColumnMeta[],
         api: {getConfig, setConfig, useConfig, onChange, reset, show, move, setSort, toggleSort, visibleKeys,
             getPresent, usePresent, isPresent, setPresent, listSource},
         grid: {attach, detach},

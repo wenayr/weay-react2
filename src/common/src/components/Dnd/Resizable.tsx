@@ -3,7 +3,7 @@ import {Resizable, ResizableProps} from "re-resizable";
 import {ObservableMap} from "../../utils/observableMap";
 
 type tSaveMap = {height?: number|string, width?: number|string}
-// Memory for all column sizes; observable - Cash marks itself dirty on its mutations
+// Memory for all column sizes; observable - memoryCache marks itself dirty on its mutations
 export const mapResiReact = new ObservableMap<string,tSaveMap >()
 type t3 = Pick<ResizableProps, "style" | "enable" | "onResize" | "children" | "size" | "maxWidth"| "maxHeight"| "minWidth"| "minHeight">
 

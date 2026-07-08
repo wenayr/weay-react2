@@ -1,7 +1,7 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 
 //
-export function Drag2({
+export function DragArea({
                           children,
                           onY,
                           onX,

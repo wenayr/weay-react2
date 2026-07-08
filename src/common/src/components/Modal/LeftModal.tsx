@@ -1,8 +1,8 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import {Color, colorGenerator2, ColorString, sleepAsync} from "wenay-common2";
 import {renderBy, updateBy} from "../../../updateBy";
-import {GetModalJSX} from "./Modal";
-import { Drag22 } from "../Dnd/RNDFunc3";
+import {createModalElementStore} from "./Modal";
+import { DragBox } from "../Dnd/FloatingWindow";
 function useViewport() {
     const [width, setWidth] = useState(window.innerWidth);
 
@@ -263,7 +263,7 @@ export function LeftModal({arr, zIndex}: {arr: [React.JSX.Element, React.JSX.Ele
     ), [arr, zIndex]);
 
     const draggableWrapper = useMemo(() => (
-        <Drag22
+        <DragBox
             onX={(xNew) => menuApiRef.current?.x(xNew)}
             right={true}
             onY={(yNew) => menuApiRef.current?.y(yNew)}
@@ -273,7 +273,7 @@ export function LeftModal({arr, zIndex}: {arr: [React.JSX.Element, React.JSX.Ele
             onStop={() => menuApiRef.current?.stop?.()}
         >
             {sidebarComponent}
-        </Drag22>
+        </DragBox>
     ), [sidebarComponent]);
 
     return <div className={"maxSize"}>{draggableWrapper}</div>;
@@ -406,7 +406,7 @@ export function getApiLeftMenu() {
         );
     }
 
-    const modal = GetModalJSX();
+    const modal = createModalElementStore();
     return {
         modal,
         renderBy() { renderBy(menuStore); },

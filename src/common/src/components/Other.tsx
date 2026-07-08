@@ -1,8 +1,8 @@
 import React, {useEffect, useRef, useState} from "react";
 import {Params, PromiseResult} from "wenay-common2";
-import {ParametersReact} from "./ParametersEngine";
+import {ParamsEditor} from "./ParamsEditor";
 
-export function EditParams2<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>({onSave, params: paramsDef}: {
+export function ParamsEdit<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>({onSave, params: paramsDef}: {
     params: ()=>Promise<TParams>,
     onSave?: (params: TParams) => any
 }) {
@@ -14,7 +14,7 @@ export function EditParams2<TParams extends Params.IParamsExpandableReadonly = P
     const params = useRef<TParams|null>(null);
 
     return <div className={"maxSize"}>
-        {paramsD && <ParametersReact params={paramsD} onChange={e => params.current = e}/>}
+        {paramsD && <ParamsEditor params={paramsD} onChange={e => params.current = e}/>}
         {onSave && <div className={"msTradeActive msTradeAlt"} onClick={async () => {
             const t = params.current || paramsD
             if (t) onSave(t)
@@ -23,7 +23,7 @@ export function EditParams2<TParams extends Params.IParamsExpandableReadonly = P
     </div>
 }
 
-export function EditParams3<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>({onSave, params: paramsDef}: {
+export function ParamsArrayEdit<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>({onSave, params: paramsDef}: {
     params: ()=>Promise<TParams[]>,
     onSave?: (params: TParams[]) => any
 }) {
@@ -33,7 +33,7 @@ export function EditParams3<TParams extends Params.IParamsExpandableReadonly = P
     }, []);
     const [params, setParams] = useState<PromiseResult<ReturnType<typeof paramsDef>>|null>(null)
     return <div className={"maxSize"}>
-        {params && params.map((z, i)=><ParametersReact key={i} params={z} onChange={e => {
+        {params && params.map((z, i)=><ParamsEditor key={i} params={z} onChange={e => {
             params[i] = e
             setParams(params)
         }}/>)}

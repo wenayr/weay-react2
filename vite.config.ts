@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ObserveAll2 } from 'wenay-common2';
+import { Observe } from 'wenay-common2';
 
 type QaObserveState = {
   value: number;
@@ -35,8 +35,8 @@ const createQaObserveInitial = (): QaObserveState => ({
   },
 });
 
-const qaObserveStore = ObserveAll2.createStore<QaObserveState>(createQaObserveInitial());
-const qaObserveApi = ObserveAll2.exposeStore(qaObserveStore);
+const qaObserveStore = Observe.createStore<QaObserveState>(createQaObserveInitial());
+const qaObserveApi = Observe.exposeStore(qaObserveStore);
 const qaObserveClients = new Set<ServerResponse>();
 const qaObservePathClients = new Set<ServerResponse>();
 
@@ -152,7 +152,7 @@ async function handleQaObserve(req: IncomingMessage, res: ServerResponse, next: 
   if (url.pathname == '/__qa/observe-store/mutate' && req.method == 'POST') {
     const body = await readJsonBody(req);
     mutateQaObserveState(body);
-    await ObserveAll2.flushReactive(qaObserveStore.state);
+    await Observe.flushReactive(qaObserveStore.state);
     sendJson(res, 200, qaObserveApi.get());
     return;
   }

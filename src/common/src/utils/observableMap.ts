@@ -1,17 +1,17 @@
-/** Map that announces its own mutations. The persisted-state maps (ExRNDMap3, mapResiReact,
- *  mapRightMenu, staticProps) are ObservableMap instances, so the dirty signal originates in
+/** Map that announces its own mutations. The persisted-state maps (floatingWindowMap, mapResiReact,
+ *  mapRightMenu, memoryProps) are ObservableMap instances, so the dirty signal originates in
  *  the data layer itself: set/delete/clear emit automatically, touch(key) announces an
- *  in-place mutation of a stored object (invisible to map methods). CacheFuncMapBase
+ *  in-place mutation of a stored object (invisible to map methods). createCacheMapWithStorage
  *  subscribes to the maps it owns - mutation sites never talk to the cache directly. */
 
-export type tMapChangeListener<K> = (key?: K) => void
+export type MapChangeListener<K> = (key?: K) => void
 
 export class ObservableMap<K, V> extends Map<K, V> {
     // no initializer: Map's constructor calls this.set() before class fields are assigned
-    private listeners?: Set<tMapChangeListener<K>>
+    private listeners?: Set<MapChangeListener<K>>
 
     /** Subscribe to mutations (set/delete/clear/touch); returns unsubscribe. */
-    onChange(cb: tMapChangeListener<K>): () => void {
+    onChange(cb: MapChangeListener<K>): () => void {
         (this.listeners ??= new Set()).add(cb)
         return () => { this.listeners?.delete(cb) }
     }

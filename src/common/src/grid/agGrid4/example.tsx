@@ -1,7 +1,7 @@
 // agGrid4 usage samples. Not included in production.
 import React, { useEffect } from 'react'
 import type { ColDef } from 'ag-grid-community'
-import { useAgGrid, AgGridMy, type BufferTable } from './index'
+import { useAgGrid, AgGridTable, type BufferTable } from './index'
 
 type Row = {
     id: string
@@ -16,20 +16,20 @@ const columns = [
 ] satisfies ColDef<Row>[]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. Main pattern: controller + <AgGridMy controller>. Theme/memo/resize/selection
-//    defaults live inside AgGridMy; any AgGridReact prop can be passed and overridden.
+// 1. Main pattern: controller + <AgGridTable controller>. Theme/memo/resize/selection
+//    defaults live inside AgGridTable; any AgGridReact prop can be passed and overridden.
 export function StreamingExample() {
     const grid = useAgGrid<Row>()
 
     // Socket data can arrive before the grid is ready: the buffer catches it, attach->sync catches up.
     useEffect(() => subscribeSocket(rows => grid.update({ newData: rows })), [grid])
 
-    return <AgGridMy<Row> controller={grid} columnDefs={columns} />
+    return <AgGridTable<Row> controller={grid} columnDefs={columns} />
 }
 
 // 2. Declarative mode, with no controller at all.
 export function DeclarativeExample({ rows }: { rows: Row[] }) {
-    return <AgGridMy<Row> data={rows} columnDefs={columns} />
+    return <AgGridTable<Row> data={rows} columnDefs={columns} />
 }
 
 // 3. External buffer: a plain object at module level (like datum.tableArr in production).
@@ -39,7 +39,7 @@ const ordersBuffer: BufferTable<Row> = {}
 export function PersistAcrossRouteExample() {
     const grid = useAgGrid<Row>({ externalBuffer: ordersBuffer })
     useEffect(() => subscribeSocket(rows => grid.update({ newData: rows })), [grid])
-    return <AgGridMy<Row> controller={grid} columnDefs={columns} />
+    return <AgGridTable<Row> controller={grid} columnDefs={columns} />
 }
 
 // 4. Point removal + direct api access (filters, sizing, passing to helpers).
@@ -48,7 +48,7 @@ export function ImperativeApiExample() {
     return (
         <>
             <button onClick={() => grid.fit()}>Fit</button>
-            <AgGridMy<Row>
+            <AgGridTable<Row>
                 controller={grid}
                 columnDefs={columns}
                 onCellClicked={e => grid.remove([{ id: e.data!.id }])}
@@ -57,8 +57,8 @@ export function ImperativeApiExample() {
     )
 }
 
-// 5. Headless without AgGridMy: spread gridProps onto a bare <AgGridReact> (agGrid3 mode
-//    remains available; AgGridMy is only a wrapper over the same controller):
+// 5. Headless without AgGridTable: spread gridProps onto a bare <AgGridReact> (agGrid3 mode
+//    remains available; AgGridTable is only a wrapper over the same controller):
 //
 //    <AgGridReact<Row> {...grid.props} columnDefs={columns} />
 

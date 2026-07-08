@@ -1,11 +1,11 @@
-import {MenuBase, mouseMenuApi, renderBy, tMenuReact, updateBy} from "../api";
+import {Menu, contextMenu, renderBy, MenuItem, updateBy} from "../api";
 import {GridExample, tt} from "./useGrid";
 import {MyChartEngine} from "../src/myChart/chartEngine/chartEngineReact";
 import {TestParams} from "./testParams";
 import {createContext, Suspense, use, useContext, useEffect, useMemo, useState} from "react";
 import {sleepAsync} from "wenay-common2";
-import {Button, ButtonHover} from "../src/hooks";
-import {DivRnd3} from "../src/components";
+import {Button, HoverButton} from "../src/hooks";
+import {FloatingWindow} from "../src/components";
 
 const a = {}
 const b = {}
@@ -53,8 +53,8 @@ export function LegacyTestMain() {
     updateBy(b)
     return <div className={"maxSize"}>
         <div style={{margin: 80}}>
-            <ButtonHover button={()=><div >menu</div>}>
-                <MenuBase zIndex={12} coordinate={{x: 0, y: 0}} data={[
+            <HoverButton button={()=><div >menu</div>}>
+                <Menu zIndex={12} coordinate={{x: 0, y: 0}} data={[
                     {
                         name: "test",
                         next: ()=> [
@@ -87,17 +87,15 @@ export function LegacyTestMain() {
                         ]
                     }
                 ]}/>
-            </ButtonHover>
+            </HoverButton>
         </div>
         <div  style={{background: "#545454", width: 400, height: 400}}>
 
         </div>
-        <mouseMenuApi.ReactMouse zIndex={15}>
+        <contextMenu.Layer zIndex={15}>
             <div style={{height: 2250}}
-                onMouseDown={e=>{
-                    console.log(e.button)
-                    if (e.button == 2) {
-                        const z: tMenuReact[] = [
+                onContextMenu={e=>{
+                        const z: MenuItem[] = [
                             {name: "eee", onClick: ()=> {console.log("eee")}},
                             {name: "eee", next: () => [
                                     {name: "eee", onClick: ()=> {console.log("eee")}},
@@ -111,7 +109,7 @@ export function LegacyTestMain() {
 
                                         ]},
                                 ]},
-                            {name: "eee", func: async () => <MenuBase data={
+                            {name: "eee", func: async () => <Menu data={
                                     [
                                         {name: "eee", onClick: ()=> {console.log("eee")}},
                                         {name: "eee", next: () => [
@@ -120,11 +118,10 @@ export function LegacyTestMain() {
                                     ]
                                 }/>},
                         ]
-                        mouseMenuApi.map.set("sym", z)
-                    }
+                        contextMenu.openAt(e, z)
                 }}
             ></div>
-        </mouseMenuApi.ReactMouse>
+        </contextMenu.Layer>
         <ExampleUsage/>
         <ButtonChart/>
         <App/>
@@ -139,9 +136,9 @@ export function LegacyTestMain() {
                 renderBy(a)
             }}
         >update</div>
-        <mouseMenuApi.ReactMouse>
+        <contextMenu.Layer>
             <GridExample/>
-        </mouseMenuApi.ReactMouse>
+        </contextMenu.Layer>
     </div>
 }
 
@@ -155,7 +152,7 @@ const Container = () => {
 const ExampleUsage = () => {
     return <Button button={e => <div className={!e ? "msTradeAlt" : "msTradeAlt msTradeActive"}>menu</div>}>
         {(api) => {
-            return <DivRnd3 keyForSave={"tt1232"}
+            return <FloatingWindow keyForSave={"tt1232"}
                            key={"sds"}
                            size={{height: 300, width: 300}}
                            className={"fon border fonLight"} // fon border fonLight
@@ -169,14 +166,14 @@ const ExampleUsage = () => {
                     <Container/>
                 </div>
                 {/*<MenuSeries update={update} key={"2323"}/>*/}
-            </DivRnd3>
+            </FloatingWindow>
         }}
     </Button>
 };
 const ButtonChart = () => {
     return <Button button={e => <div className={!e ? "msTradeAlt" : "msTradeAlt msTradeActive"}>chart</div>}>
         {(api) => {
-            return <DivRnd3 keyForSave={"tt123322"}
+            return <FloatingWindow keyForSave={"tt123322"}
                            key={"sds2"}
                            size={{height: 300, width: 300}}
                            className={"fon border fonLight"} // fon border fonLight
@@ -190,14 +187,14 @@ const ButtonChart = () => {
                     <MyChartEngine/>
                 </div>
                 {/*<MenuSeries update={update} key={"2323"}/>*/}
-            </DivRnd3>
+            </FloatingWindow>
         }}
     </Button>
 };
 const ButtonParams = () => {
     return <Button button={e => <div className={!e ? "msTradeAlt" : "msTradeAlt msTradeActive"}>chart</div>}>
         {(api) => {
-            return <DivRnd3 keyForSave={"tt123322"}
+            return <FloatingWindow keyForSave={"tt123322"}
                            key={"sds2"}
                            size={{height: 300, width: 300}}
                            className={"fon border fonLight"} // fon border fonLight
@@ -211,7 +208,7 @@ const ButtonParams = () => {
                     <TestParams/>
                 </div>
                 {/*<MenuSeries update={update} key={"2323"}/>*/}
-            </DivRnd3>
+            </FloatingWindow>
         }}
     </Button>
 };

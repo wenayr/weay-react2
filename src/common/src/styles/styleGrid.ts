@@ -64,4 +64,4 @@ export function StyleCSSHeadGrid() {
     StyleCSSHeadGridEdit('.ag-header-cell-label', 'justify-content: center');
 }
 
-export type tCallFuncAgGrid<T> = (params: CellClassParams & { data: T }) => CSSProperties | Record<string, any>
+export type AgGridClassRule<T> = (params: CellClassParams & { data: T }) => CSSProperties | Record<string, any>

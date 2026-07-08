@@ -4,7 +4,7 @@ export * from './Menu';
 export * from './Modal';
 export * from './Input';
 export * from './Parameters';
-export * from './ParametersEngine';
+export * from './ParamsEditor';
 export * from './MyResizeObserver';
 export * from './Other';
 export * from './Settings';

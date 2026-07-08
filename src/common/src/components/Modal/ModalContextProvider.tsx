@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import {DivOutsideClick} from "../../hooks/useOutside";
+import {OutsideClickArea} from "../../hooks/useOutside";
 import {tokens} from "../../styles/tokens";
 
 export type ModalApi = {
@@ -18,9 +18,7 @@ const ModalContext = createContext<ModalController>(noopModal);
 
 export type ModalProviderProps = {
     children: ReactNode;
-    /** Close on click outside the modal. Defaults to true for legacy behavior. */
     closeOnOutsideClick?: boolean;
-    /** Close on Escape. Defaults to true. */
     closeOnEscape?: boolean;
 };
 
@@ -54,9 +52,9 @@ export const ModalProvider = ({ children, closeOnOutsideClick = true, closeOnEsc
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     backgroundColor: 'rgba(0,0,0,0.5)'
                 }}>
-                    <DivOutsideClick outsideClick={() => { if (closeOnOutsideClick) setModal(null); }} status={true}>
+                    <OutsideClickArea outsideClick={() => { if (closeOnOutsideClick) setModal(null); }} status={true}>
                         {modal}
-                    </DivOutsideClick>
+                    </OutsideClickArea>
                 </div>,
                 document.body
             )}
@@ -64,13 +62,4 @@ export const ModalProvider = ({ children, closeOnOutsideClick = true, closeOnEsc
     );
 };
 
-// Callable for legacy code, controller-style for new code.
 export const useModal = () => useContext(ModalContext);
-
-/** @deprecated Use `useModal()`; it is callable and also has show/open/close/set methods. */
-export const useModalOld = () => useContext(ModalContext);
-
-/** @deprecated Use `useModal()` directly. */
-export function useModalApi(): ModalApi {
-    return useContext(ModalContext);
-}

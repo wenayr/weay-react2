@@ -1,4 +1,4 @@
-export * from './useAddDownAnyKey';
+export * from './useKeyboard';
 export * from './useDraggable';
 export * from './useReorder';
 export * from './useReorderBoard';

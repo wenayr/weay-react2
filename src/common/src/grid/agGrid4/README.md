@@ -1,6 +1,6 @@
 # agGrid4 - buffered ag-grid layer
 
-`agGrid4` is the shared table layer for wenay apps: a pure row buffer core, a headless React controller, an opinionated `AgGridMy` wrapper, dynamic column buffering, and common column defaults.
+`agGrid4` is the shared table layer for wenay apps: a pure row buffer core, a headless React controller, an opinionated `AgGridTable` wrapper, dynamic column buffering, and common column defaults.
 [WRAPPER.md](./WRAPPER.md) documents the hard boundary between generic primitives and app-level wrappers.
 
 ## Layers
@@ -8,7 +8,7 @@
 | File | What |
 |------|------|
 | `core.ts` | `createGridBuffer`: row buffer, add/update/remove delivery, attach/detach/sync lifecycle |
-| `agGrid4.tsx` | `useAgGrid` controller + `AgGridMy` component defaults |
+| `agGrid4.tsx` | `useAgGrid` controller + `AgGridTable` component defaults |
 | `columnBuffer.ts` | `createColumnBuffer`: persisted exact set of dynamic names + grid lifecycle replay |
 | `gridUtils.ts` | `colDefCentered`, `colDefWrap`, `numericComparator` |
 | `theme.ts` | cached ag-grid theme builder/hook |
@@ -47,7 +47,7 @@ Updates are merged into the buffer by stable `getId`. Rows inside one `updateDat
 ```tsx
 const grid = useAgGrid<Row>({ getId })
 
-<AgGridMy<Row> controller={grid} columnDefs={cols} />
+<AgGridTable<Row> controller={grid} columnDefs={cols} />
 
 grid.update({ newData })
 grid.remove([{ id }])
@@ -62,19 +62,19 @@ export const mainTable = createGridBuffer<Row>({ getId, externalBuffer })
 
 ```tsx
 const grid = useAgGrid({ core: mainTable })
-<AgGridMy<Row> controller={grid} columnDefs={cols} />
+<AgGridTable<Row> controller={grid} columnDefs={cols} />
 ```
 
 The controller keeps the existing aliases: `update`, `updateData`, `remove`, `clean`, `sync`, `fit`, `flush`, `sizeColumnsToFit`, `flushAsyncTransactions`, `apiRef`, `props`, `gridProps`, `getApi`, and `withApi`.
 
-## AgGridMy
+## AgGridTable
 
-`AgGridMy` keeps the current component API and forwards normal `AgGridReact` props. With `controller`, it uses that external controller. Without `controller`, it creates an internal overlay-safe controller so a plain `rowData` grid is not cleared during `attach -> sync`.
+`AgGridTable` keeps the current component API and forwards normal `AgGridReact` props. With `controller`, it uses that external controller. Without `controller`, it creates an internal overlay-safe controller so a plain `rowData` grid is not cleared during `attach -> sync`.
 
 For declarative `rowData`, prefer either:
 
 ```tsx
-<AgGridMy<Row> rowData={rows} columnDefs={cols} />
+<AgGridTable<Row> rowData={rows} columnDefs={cols} />
 ```
 
 Plain `rowData` without a controller does not require or force `getRowId`: user-provided `getRowId` is forwarded as-is, and when absent AgGridReact default behavior is preserved. A stable key is required only when using buffered transaction updates (`controller`, `data`, or `createGridBuffer`).
@@ -87,13 +87,13 @@ const grid = useAgGrid({ core })
 
 useEffect(() => core.api.sync(), [rows])
 
-<AgGridMy<Row> controller={grid} rowData={rows} columnDefs={cols} getRowId={p => getId(p.data)} />
+<AgGridTable<Row> controller={grid} rowData={rows} columnDefs={cols} getRowId={p => getId(p.data)} />
 ```
 
 The legacy `data` prop is still an upsert convenience through the buffer:
 
 ```tsx
-<AgGridMy<Row> data={rows} columnDefs={cols} />
+<AgGridTable<Row> data={rows} columnDefs={cols} />
 ```
 
 ## Dynamic Columns

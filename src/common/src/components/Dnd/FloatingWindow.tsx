@@ -11,7 +11,7 @@ import {ObservableMap} from "../../utils/observableMap";
 type tPosition = { x: number; y: number };
 type tSize = { height: number | string; width: number | string };
 type tRND = { position: tPosition; size: tSize };
-export type tRndUpdate = {
+export type FloatingWindowUpdate = {
     e: MouseEvent | TouchEvent;
     dir: string;
     elementRef: HTMLElement;
@@ -22,7 +22,7 @@ type tDivRndBase = {
     zIndex?: number;
     disableDragging?: () => boolean;
     keyForSave?: string;
-    onUpdate?: (data: tRndUpdate) => void;
+    onUpdate?: (data: FloatingWindowUpdate) => void;
     position?: tPosition;
     size?: tSize;
     moveOnlyHeader?: boolean;
@@ -38,8 +38,8 @@ type tDivRndBase = {
     className?: string;
 };
 
-// Map of all popup window sizes; observable - Cash marks itself dirty on its mutations
-export const ExRNDMap3 = new ObservableMap<string, tRND>();
+// Map of all popup window sizes; observable - memoryCache marks itself dirty on its mutations
+export const floatingWindowMap = new ObservableMap<string, tRND>();
 
 // limit={{x:{min:0}, y:{min:0}}}
 let k = 0;
@@ -52,13 +52,13 @@ const MemoChild = React.memo(
     (prev, next) => prev.update === next.update
 );
 
-export const DivRnd3: typeof DivRndBase3 = (a) => {
+export const FloatingWindow: typeof FloatingWindowBase = (a) => {
     const isFunc = typeof a.children === "function";
     const renderChild = (update: number): React.ReactElement =>
         typeof a.children === "function" ? a.children(update) : (a.children as React.ReactElement);
     const ff = (update: number) => <MemoChild update={isFunc ? update : 0} render={renderChild} />;
 
-    return <DivRndBase3 {...a} children={ff} />;
+    return <FloatingWindowBase {...a} children={ff} />;
 };
 
 
@@ -66,7 +66,7 @@ export const DivRnd3: typeof DivRndBase3 = (a) => {
  * Wrapper component around react-rnd.
  * Provides dragging and resizing, an optional header, and a close button.
  */
-export function DivRndBase3({
+export function FloatingWindowBase({
                                 children,
                                 keyForSave: ks,
                                 position,
@@ -94,7 +94,7 @@ export function DivRndBase3({
     // If there is a key, store position and size data in the map
     let map: tRND | undefined;
     if (ks) {
-        map = ExRNDMap3.get(ks) ?? ExRNDMap3.set(ks, { size: sizeDef, position: positionDef }).get(ks);
+        map = floatingWindowMap.get(ks) ?? floatingWindowMap.set(ks, { size: sizeDef, position: positionDef }).get(ks);
     }
     position = map?.position ?? positionDef;
     size = map?.size ?? sizeDef;
@@ -164,7 +164,7 @@ export function DivRndBase3({
             setA(false);
             // drag end commits geometry mutated in place - invisible to the map, so announce
             // it; a no-move click also lands here, the save-side diff turns that into a no-op
-            if (ks) ExRNDMap3.touch(ks);
+            if (ks) floatingWindowMap.touch(ks);
         };
 
         // Touch
@@ -206,7 +206,7 @@ export function DivRndBase3({
                 document.removeEventListener("touchend", touchEndHandler);
                 document.removeEventListener("touchmove", touchMoveHandler);
                 setB(false);
-                if (ks) ExRNDMap3.touch(ks);
+                if (ks) floatingWindowMap.touch(ks);
             }
         };
 
@@ -311,7 +311,7 @@ export function DivRndBase3({
                 setHeight(elementRef.offsetHeight);
                 setWidth(elementRef.offsetWidth);
                 setUpdate(update + 1);
-                if (ks) ExRNDMap3.touch(ks);
+                if (ks) floatingWindowMap.touch(ks);
             }}
             onResize={(e, dir, elementRef, delta, pos) => {
                 onUpdate?.({ e, dir, elementRef, delta, position: pos });
@@ -378,9 +378,9 @@ export function DivRndBase3({
 }
 
 // Removed unused demo components Drag3 and DragBig3
-// Use Drag22 for functional draggable behavior
+// Use DragBox for functional draggable behavior
 
-export type Drag2Props = {
+export type DragBoxProps = {
     /** Child element that should be draggable */
     children: ReactNode;
 
@@ -423,7 +423,7 @@ export type Drag2Props = {
  * Function only as a hook for parameter changes during movement, although it has its own component (for offset counting).
  * Returns the distance traveled when moving the child element.
  */
-export function Drag22({
+export function DragBox({
                            children,
                            onX,
                            onY,
@@ -434,7 +434,7 @@ export function Drag22({
                            dragging,
                            onStart,
                            onStop
-                       }: Drag2Props) {
+                       }: DragBoxProps) {
     const offsetMouse = useRef({ x: 0, y: 0 });
     const offsetTouch = useRef<{ x: number; y: number; id: number } | null>(null);
     const [draggingMouse, setDraggingMouse] = useState(false);

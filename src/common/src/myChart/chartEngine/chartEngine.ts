@@ -1,10 +1,7 @@
 /**
- * @deprecated UNUSED: the file is not imported anywhere (neither api.tsx nor the stand) and is not included
- * in the library build. The canonical engine is chartEngineReact.tsx (it is public).
- * This file is a removal candidate when engines are merged into core/chart (part II of the plan).
- * Until then, engine changes are duplicated here manually; the library tsc does NOT check it.
+ * Reference copy of the chart engine kept outside the public React wrapper.
+ * The canonical public engine is chartEngineReact.tsx.
  */
-
 /** Data point (x,y) */
 export interface DataPoint {
     x: number;

@@ -1,38 +1,15 @@
-import React, {StrictMode, useEffect, useRef, useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
 
-import {
-    ColDef,
-    colorSchemeDarkBlue,
-    GridApi,
-    GridReadyEvent,
-    iconSetMaterial,
-    provideGlobalGridOptions,
-    themeAlpine
-} from "ag-grid-community";
+import {ColDef, GridReadyEvent} from "ag-grid-community";
 import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import {sleepAsync} from "wenay-common2";
-import {renderBy, updateBy} from "../updateBy";
-import {mouseMenuApi} from "../src/menu/menuMouse";
-import {applyTransactionAsyncUpdate, applyTransactionAsyncUpdate2} from "../src/utils";
+import {updateBy} from "../updateBy";
+import {contextMenu} from "../src/menu/menuMouse";
+import {applyGridRows} from "../src/utils";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-// // Register all community features
-// ModuleRegistry.registerModules([AllCommunityModule]);
-// const theme = themeAlpine
-//     .withPart(colorSchemeDarkBlue)
-//     .withPart(iconSetMaterial)
-//     .withParams({
-//         'fontFamily': 'Roboto',
-//         'fontSize': '12px',
-//         'backgroundColor' :'rgb(24,27,33)'
-//     });
-// // Mark all grids as using legacy themes
-// provideGlobalGridOptions({ theme: theme});
-
-
-// Row Data Interface
 interface IRow {
     make: string;
     model: string;
@@ -41,15 +18,22 @@ interface IRow {
 }
 
 export const tt = {}
-// Create new GridExample component
+
 export const GridExample = () => {
+    const gridApi = useRef<GridReadyEvent<IRow> | null>(null);
+    const rowBuffer = useRef<{[id: string]: Partial<IRow>}>({});
 
     updateBy(tt, () => {
         const price = Math.round(Math.random() * 90000) + 10000
-        applyTransactionAsyncUpdate<IRow>(gridApi.current, [{make: "Tesla", model: "Model Y", price, electric: true}], e=> e.make, {})
+        applyGridRows<IRow>({
+            gridRef: gridApi,
+            getId: e => String(e.make),
+            bufTable: rowBuffer.current,
+            newData: [{make: "Tesla", model: "Model Y", price, electric: true}]
+        })
     })
-    // Row Data: The data to be displayed.
-    const [rowData, setRowData] = useState<IRow[]>([
+
+    const [rowData] = useState<IRow[]>([
         { make: "Tesla", model: "Model Y", price: 64950, electric: true },
         { make: "Ford", model: "F-Series", price: 33850, electric: false },
         { make: "Toyota", model: "Corolla", price: 29600, electric: false },
@@ -58,8 +42,7 @@ export const GridExample = () => {
         { make: "Nissan", model: "Juke", price: 20675, electric: false },
     ]);
 
-    // Column Definitions: Defines & controls grid columns.
-    const [colDefs, setColDefs] = useState<ColDef<IRow>[]>([
+    const [colDefs] = useState<ColDef<IRow>[]>([
         { field: "make" },
         { field: "model" },
         { field: "price" },
@@ -69,37 +52,39 @@ export const GridExample = () => {
     const defaultColDef: ColDef = {
         flex: 1,
     };
-    const gridApi = useRef<null| GridReadyEvent<IRow>>(null);
 
     useEffect(() => {
         sleepAsync(1000)
-            .then(e=>{
-                applyTransactionAsyncUpdate<IRow>(gridApi.current, [{make: "Tesla", price: 55555}], e=> e.make, {})
+            .then(() => {
+                applyGridRows<IRow>({
+                    gridRef: gridApi,
+                    getId: e => String(e.make),
+                    bufTable: rowBuffer.current,
+                    newData: [{make: "Tesla", price: 55555}]
+                })
             })
     }, [])
 
-    // Container: Defines the grid's theme & dimensions.
     return (
         <div style={{ width: "100%", height: "100%" }}>
-    <button onClick={() => applyTransactionAsyncUpdate2<IRow>({gridRef: gridApi, getId: e => e.make, bufTable: {}, removeData: [{make: "Tesla"}]})}>remove Tesla</button>
-    <AgGridReact
-        onGridReady={e=> {
-            gridApi.current = e
-
-        }}
-        onCellMouseDown={()=>{
-
-            mouseMenuApi.map.set("sym",[
-                {
-                    name: "test", onClick: ()=> {console.log("test")}
-                }
-            ])
-        }}
-        getRowId={e=>e.data.make}
-        rowData={rowData}
-        columnDefs={colDefs}
-        defaultColDef={defaultColDef}
-    />
-    </div>
-);
+            <button onClick={() => applyGridRows<IRow>({gridRef: gridApi, getId: e => String(e.make), bufTable: rowBuffer.current, removeData: [{make: "Tesla"}]})}>remove Tesla</button>
+            <AgGridReact
+                onGridReady={e => {
+                    gridApi.current = e
+                }}
+                onCellMouseDown={(e) => {
+                    const event = e.event;
+                    if (event instanceof MouseEvent) contextMenu.openAt(event, [
+                        {
+                            name: "test", onClick: () => {console.log("test")}
+                        }
+                    ]);
+                }}
+                getRowId={e => e.data.make}
+                rowData={rowData}
+                columnDefs={colDefs}
+                defaultColDef={defaultColDef}
+            />
+        </div>
+    );
 };

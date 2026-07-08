@@ -19,7 +19,7 @@ import { ColDef, GridReadyEvent } from 'ag-grid-community';
  *  1. Log types
  * -----------------------------
  */
-export interface tLogsInput<T extends object = {}> {
+export interface LogInput<T extends object = {}> {
     id: string;
     var?: number;
     time: Date;
@@ -27,16 +27,16 @@ export interface tLogsInput<T extends object = {}> {
     [key: string]: any; // any additional fields
 }
 
-export interface tLogs<T extends object = {}> extends tLogsInput<T> {
+export interface LogEntry<T extends object = {}> extends LogInput<T> {
     num: number;
 }
 
 /** -----------------------------
- *  2. staticGetAdd function -
+ *  2. memoryGetOrCreate function -
  *     loads and saves data in localStorage.
  * -----------------------------
  */
-function staticGetAdd<T>(key: string, defaultValue: T): T {
+function memoryGetOrCreate<T>(key: string, defaultValue: T): T {
     try {
         const stored = localStorage.getItem(key);
         // If localStorage has no value, write defaultValue
@@ -60,9 +60,9 @@ function staticGetAdd<T>(key: string, defaultValue: T): T {
  */
 interface LogsContextValue {
     // Log array
-    logs: tLogs[];
+    logs: LogEntry[];
     // Function for adding a log
-    addLog: (input: tLogsInput) => void;
+    addLog: (input: LogInput) => void;
 
     // Settings
     minVarLogs: number;
@@ -87,7 +87,7 @@ const LogsContext = createContext<LogsContextValue | null>(null);
 
 export function LogsProvider({ children }: { children: React.ReactNode }) {
     // 4.1. Load settings from localStorage once (lazy init: the provider rerenders on every addLog)
-    const [savedSettings] = useState(() => staticGetAdd("logSettings", {
+    const [savedSettings] = useState(() => memoryGetOrCreate("logSettings", {
         minVarLogs: 0,
         minVarMessage: 0,
         timeShow: 2,
@@ -96,10 +96,10 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
 
     // 4.2. In-memory log list (logs are not saved to localStorage,
     //      only settings are, but logs can be saved too if needed)
-    const [logs, setLogs] = useState<tLogs[]>([]);
+    const [logs, setLogs] = useState<LogEntry[]>([]);
     const counterRef = useRef(0);
 
-    // 4.3. Settings themselves, initialized from staticGetAdd output
+    // 4.3. Settings themselves, initialized from memoryGetOrCreate output
     const [minVarLogs, setMinVarLogs] = useState(savedSettings.minVarLogs);
     const [minVarMessage, setMinVarMessage] = useState(savedSettings.minVarMessage);
     const [timeShow, setTimeShow] = useState(savedSettings.timeShow);
@@ -117,11 +117,11 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
     }, [minVarLogs, minVarMessage, timeShow, showMessages]);
 
     // 4.5. Function for adding a log, generates the num field automatically
-    const addLog = useCallback((input: tLogsInput) => {
+    const addLog = useCallback((input: LogInput) => {
         counterRef.current += 1;
         const num = counterRef.current;
         setLogs((prevLogs) => {
-            const newLog: tLogs = { ...input, num };
+            const newLog: LogEntry = { ...input, num };
             // Limit to 500 logs; this can be changed
             return [newLog, ...prevLogs].slice(0, 500);
         });
@@ -243,7 +243,7 @@ export function LogsTable() {
  */
 interface NotificationItem {
     id: number;
-    log: tLogs;
+    log: LogEntry;
 }
 
 export function LogsNotifications() {
@@ -257,7 +257,7 @@ export function LogsNotifications() {
 
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const counterRef = useRef(0);
-    const lastLogRef = useRef<tLogs | null>(null);
+    const lastLogRef = useRef<LogEntry | null>(null);
     const timersRef = useRef(new Set<ReturnType<typeof setTimeout>>());
 
     useEffect(() => {

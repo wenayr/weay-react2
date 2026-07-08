@@ -10,7 +10,7 @@ import {useDraggableApi} from './useDraggable'
  *  NOT a dnd framework: no nesting, no cross-container moves, no spans or
  *  collision packing - when that day comes, take a ready-made library. */
 
-export type tReorderOptions = {
+export type ReorderOptions = {
     /** keys in render order; the container's children must correspond 1:1 */
     order: string[]
     /** ONE commit on drop; skipped when nothing moved */
@@ -32,7 +32,7 @@ export type tReorderOptions = {
     holdMs?: number
 }
 
-export type tReorderItem = {
+export type ReorderItem = {
     /** spread on the block element */
     props: {
         onMouseDown: React.MouseEventHandler<HTMLElement>
@@ -46,7 +46,7 @@ export type tReorderItem = {
     active: boolean
 }
 
-export function useReorder<E extends HTMLElement = HTMLDivElement>(o: tReorderOptions) {
+export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOptions) {
     const listRef = useRef<E>(null)
     const [dragKey, setDragKey] = useState<string | null>(null)
     const slotsRef = useRef<{x: number, y: number}[]>([])   // child centers at drag start (local px)
@@ -138,7 +138,7 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: tReorderOp
     const target = from != -1 ? dragTarget(from, local(drag.position.x), local(drag.position.y)) : -1
     const preview = from != -1 && dragKey != null ? move(o.order, dragKey, target) : null
 
-    function item(key: string): tReorderItem {
+    function item(key: string): ReorderItem {
         const active = preview != null
         const dragging = key == dragKey
         let style: React.CSSProperties | undefined

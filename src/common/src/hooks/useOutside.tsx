@@ -1,7 +1,7 @@
 import React, {HTMLAttributes, ReactElement, useEffect, useMemo, useRef, useState} from "react";
 
 export const StyleOtherRow: React.CSSProperties = {display: "flex", flexDirection: "row", flex: "auto 1 1"}
-export const StyleOtherColum: React.CSSProperties = {display: "flex", flexDirection: "column", flex: "auto 0 1"}
+export const StyleOtherColumn: React.CSSProperties = {display: "flex", flexDirection: "column", flex: "auto 0 1"}
 
 export type UseOutsideOptions<T extends HTMLElement = HTMLDivElement> = {
     ref?: React.RefObject<T | null>;
@@ -24,7 +24,7 @@ export type UseOutsideApi<T extends HTMLElement = HTMLDivElement> = {
 
 export function useOutsideApi<T extends HTMLElement = HTMLDivElement>(options: UseOutsideOptions<T>): UseOutsideApi<T> {
     const {outsideClick, onOutside, ref, status = options.enabled ?? true} = options;
-    const internalRef = useRef<T|null>(null); // useRef is always inside the body, not in a default parameter - otherwise it breaks the Rules of Hooks
+    const internalRef = useRef<T|null>(null);
     const r = ref ?? internalRef;
     const outsideClickRef = useRef(outsideClick ?? onOutside);
     const [enabled, setEnabled] = useState(status);
@@ -76,38 +76,35 @@ export function useOutside<T extends HTMLElement = HTMLDivElement>(options: UseO
     return useOutsideApi(options);
 }
 
-/** @deprecated Use `useOutside(options)` and read `api.ref`, `api.props`, or `api.current`. */
-export function useOutsideOld<T extends HTMLElement = HTMLDivElement>(options: UseOutsideOptions<T>) {
+export function useOutsideRef<T extends HTMLElement = HTMLDivElement>(options: UseOutsideOptions<T>) {
     return useOutsideApi(options).ref;
 }
-type key = React.Key | null | undefined
-type tChildrenFunc = (api: {onClose: () => void}) => ReactElement | React.JSX.Element
-type tChildrenEl = ReactElement | React. ReactNode
-type tChildren = tChildrenEl | tChildrenFunc
-type tButtonBase = {
-    children: tChildren,
+
+type ChildrenFunc = (api: {onClose: () => void}) => ReactElement | React.JSX.Element
+type ButtonChildren = ReactElement | React.ReactNode | ChildrenFunc
+type ButtonBaseProps = {
+    children: ButtonChildren,
     button: ReactElement | ((status: boolean) => ReactElement),
     style?: React.CSSProperties,
     className?: string
 }
-type tButton = tButtonBase & {
+type ButtonProps = ButtonBaseProps & {
     statusDef?: boolean, keySave?: string,
     outClick?: boolean | (() => void), zIndex?: number,
 }
 
-type tState = {
+type ButtonState = {
     state: [boolean, React.Dispatch<React.SetStateAction<boolean>>],
 }
-export const DivOutsideClick = React.forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & {
+
+export const OutsideClickArea = React.forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & {
     outsideClick: () => void,
     status?: boolean,
     zIndex?: number,
 }>( ({children, outsideClick, zIndex, style={}, status = true, ...other}, forwardedRef) => {
     const style2 = zIndex ? {...style, zIndex} : style
-    const internalRef = useOutside({outsideClick: outsideClick, status});
+    const internalRef = useOutside({outsideClick, status});
 
-    // Combine refs if forwardedRef is provided; stable identity, otherwise React
-    // re-runs the ref (null + node) on every render
     const combinedRef = React.useCallback((node: HTMLDivElement | null) => {
         internalRef.current = node;
         if (typeof forwardedRef === 'function') {
@@ -120,10 +117,7 @@ export const DivOutsideClick = React.forwardRef<HTMLDivElement, HTMLAttributes<H
     return <div ref={forwardedRef ? combinedRef : internalRef} style={style2} {...other}>{children}</div>;
 });
 
-// Deprecated: Use DivOutsideClick instead
-export const DivOutsideClick2 = DivOutsideClick;
-
-function ButtonBase({children, button, style = {}, className = "", state: [a, setA]}: tButtonBase & tState) {
+function ButtonBase({children, button, style = {}, className = "", state: [a, setA]}: ButtonBaseProps & ButtonState) {
     return <div style={{position: "relative", width: "min-content", ...style}} className={className}>
         <div onClick={() => setA(!a)}>
             {typeof button == "function" ? button(a) : button}
@@ -133,9 +127,7 @@ function ButtonBase({children, button, style = {}, className = "", state: [a, se
 }
 
 const saveStatus: {[key: string]: boolean} = {}
-export function Button({keySave, statusDef, outClick, ...data}: tButton) {
-    // The keySave feature was dead: saveStatus was read but not written. Now status
-    // persists in memory for the session on each toggle.
+export function Button({keySave, statusDef, outClick, ...data}: ButtonProps) {
     if (keySave && saveStatus[keySave] != null) statusDef = saveStatus[keySave]
     const [status, setStatusRaw] = useState(statusDef ?? false)
     const setStatus: typeof setStatusRaw = (v) => {
@@ -153,15 +145,15 @@ export function Button({keySave, statusDef, outClick, ...data}: tButton) {
     }
 
     return outClick ? (
-        <DivOutsideClick status={state[0]} outsideClick={handleOutsideClick}>
+        <OutsideClickArea status={state[0]} outsideClick={handleOutsideClick}>
             <ButtonBase {...data} state={state} />
-        </DivOutsideClick>
+        </OutsideClickArea>
     ) : (
         <ButtonBase {...data} state={state} />
     )
 }
 
-export function ButtonHover(props: tButtonBase){
+export function HoverButton(props: ButtonBaseProps){
     const [hover, setHover] = useState(false)
     return <div
         onMouseEnter={()=>setHover(true)}
@@ -173,8 +165,10 @@ export function ButtonHover(props: tButtonBase){
             <div style={{position: "absolute"}}>{typeof props.children == "function" ? props.children({onClose: ()=>setHover(false)}) : props.children}</div>
         }</div>
 }
-export const ButtonOutClick: typeof Button = ({outClick = true, ...a}) => Button({...a, outClick})
-export function ButtonAbs(props: Parameters<typeof Button>[0]) {
+
+export const OutsideButton: typeof Button = ({outClick = true, ...a}) => Button({...a, outClick})
+
+export function AbsoluteButton(props: Parameters<typeof Button>[0]) {
     const children: typeof props.children = (api) =>
         <div style={{position: "relative"}}>
             <div style={{

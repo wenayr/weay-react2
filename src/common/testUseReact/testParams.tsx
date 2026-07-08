@@ -1,5 +1,5 @@
 import {Params} from "wenay-common2";
-import {ParametersReact} from "../src/components";
+import {ParamsEditor} from "../src/components";
 
 const getParams = () => {
     return new class testParams extends Params.CParams{
@@ -11,5 +11,5 @@ const getParams = () => {
 const paramsDef = getParams()
 let params = Params.GetSimpleParams(paramsDef)
 export function TestParams() {
-    return <ParametersReact params={Params.mergeParamValuesToInfos(paramsDef, params)} onChange={e=> {}}/>
+    return <ParamsEditor params={Params.mergeParamValuesToInfos(paramsDef, params)} onChange={e=> {}}/>
 }

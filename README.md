@@ -1,58 +1,14 @@
 # wenay-react2
 
-Common React UI primitives for wenay apps.
+Documentation index only.
 
-Use the new concise API guide first:
+- Brief API guide: [doc/wenay-react2.md](doc/wenay-react2.md)
+- Detailed / rare API guide: [doc/wenay-react2-rare.md](doc/wenay-react2-rare.md)
+- wenay-react2 rename map: [doc/WENAY_REACT2_RENAMES.md](doc/WENAY_REACT2_RENAMES.md)
+- Pulled wenay-common2 brief guide: [doc/wenay-common2.md](doc/wenay-common2.md)
+- Pulled wenay-common2 detailed / rare guide: [doc/wenay-common2-rare.md](doc/wenay-common2-rare.md)
+- Pulled wenay-common2 rename map: [doc/NAMING_RENAMES.md](doc/NAMING_RENAMES.md)
+- Project rules for maintainers and AI agents: [doc/PROJECT_RULES.md](doc/PROJECT_RULES.md)
+- Recent version changes: [doc/changes/](doc/changes/)
 
-- [wenay-react2.md](doc/wenay-react2.md) - canonical everyday API.
-- [wenay-react2-rare.md](doc/wenay-react2-rare.md) - old names, low-level exports, migration notes.
-- [agGrid4 README](./src/common/src/grid/agGrid4/README.md) - table buffer/controller details.
-- [agGrid4 wrapper boundary](./src/common/src/grid/agGrid4/WRAPPER.md) - where generic primitives end and app wrappers begin.
-
-## Import
-
-```ts
-import { useModal, useAgGrid, createGridBuffer, createColumnBuffer, useStoreMirror } from "wenay-react2"
-```
-
-The root export is still flat. A grouped namespace is also exported for large files:
-
-```ts
-import { v2 } from "wenay-react2"
-
-v2.grid.useAgGrid(...)
-v2.modal.useModal()
-```
-
-## API Standard
-
-New code should use the short controller-style surface:
-
-```tsx
-const modal = useModal()
-modal.open(<Dialog />)
-modal.close()
-
-const grid = useAgGrid<Row>({getId: row => row.id})
-grid.update({newData})
-grid.clean()
-grid.flush()
-
-const mirror = useStoreMirror(remoteStore, initialState, {mask, current: true})
-```
-
-Old `Get*`, `*2/*3`, `FuncJSX`, and legacy grid helper names remain documented in `wenay-react2-rare.md` for existing code, but they are not the teaching path for new code.
-
-## QA Stand
-
-```sh
-npm run testReact -- --host 127.0.0.1 --port 3002
-```
-
-The stand source is `src/common/testUseReact/qa.tsx`. Use it for visual checks after changing UI primitives.
-
-## Build
-
-```sh
-npm run build
-```
+Feature-specific docs may also live next to their code, for example agGrid4 docs under `src/common/src/grid/agGrid4/`.

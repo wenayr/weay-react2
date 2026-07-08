@@ -38,7 +38,7 @@ React binding for a row core:
 - owns `apiRef` and grid lifecycle binding;
 - does not decide app-specific data ownership beyond `mirror`/`overlay` semantics.
 
-### `AgGridMy`
+### `AgGridTable`
 
 Thin component wrapper over `AgGridReact`:
 
@@ -149,7 +149,7 @@ A product-specific store can then wrap this with product-specific `base`, `targe
 
 For row transactions, stable `getId` is required because add/update/remove are matched by id.
 
-For plain declarative `rowData` without a controller, `AgGridMy` does not force row ids. User-provided `getRowId` is forwarded as-is; if absent, AgGridReact default behavior is preserved. Use `getRowId` when the grid needs stable identity for selection, row state, transactions, or streaming overlays.
+For plain declarative `rowData` without a controller, `AgGridTable` does not force row ids. User-provided `getRowId` is forwarded as-is; if absent, AgGridReact default behavior is preserved. Use `getRowId` when the grid needs stable identity for selection, row state, transactions, or streaming overlays.
 
 For dynamic columns, wrappers should build stable `colId` values. A good pattern is:
 

@@ -3,14 +3,14 @@
 import { colorSchemeDarkBlue, colorSchemeLight, iconSetMaterial, themeAlpine } from 'ag-grid-community'
 import { tokens } from '../../styles/tokens'
 
-export type tThemeMode = 'light' | 'dark'
+export type ThemeMode = 'light' | 'dark'
 
-const themeCache: Partial<Record<tThemeMode, ReturnType<typeof themeAlpine.withParams>>> = {}
+const themeCache: Partial<Record<ThemeMode, ReturnType<typeof themeAlpine.withParams>>> = {}
 
 /** Pure ag-grid theme builder from mode. No React. Cached per mode: one shared
  *  theme object across all grids instead of one per component instance.
  *  dark uses the same parts and params as legacy GridStyleDefault for a consistent grid look. */
-export function buildAgTheme(mode: tThemeMode) {
+export function buildAgTheme(mode: ThemeMode) {
     return themeCache[mode] ??= themeAlpine
         .withPart(mode == 'dark' ? colorSchemeDarkBlue : colorSchemeLight)
         .withPart(iconSetMaterial)
@@ -18,6 +18,6 @@ export function buildAgTheme(mode: tThemeMode) {
 }
 
 /** Application theme; default is dark, as in production. */
-export function useAgGridTheme(mode: tThemeMode = 'dark') {
+export function useAgGridTheme(mode: ThemeMode = 'dark') {
     return buildAgTheme(mode)
 }

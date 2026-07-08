@@ -1,7 +1,7 @@
 # wenay-react2 - EXTENDED / rare surface
 
 > Everyday API lives in **`wenay-react2.md`**.
-> This file lists compatibility names, low-level primitives, and migration notes.
+> This file lists low-level primitives and migration notes.
 > Root import: `import { ... } from "wenay-react2"`.
 
 ## Migration Rule
@@ -10,7 +10,7 @@ New code teaches and imports the short canonical surface:
   useModal(), useOutside(), useDraggableApi(), useReorder(), useReorderBoard(),
   useAgGrid(), createGridBuffer(), createColumnBuffer(), createUiSlot(), createToolbar()
 
-Old names remain exported for existing apps unless a project deliberately removes them.
+Old names are recorded only in `WENAY_REACT2_RENAMES.md`; do not export compatibility aliases.
 Do not add new examples with Get*, FuncJSX, *2/*3, or business-specific helper names.
 If a primitive needs app policy, build a small app wrapper above it.
 ```
@@ -27,32 +27,30 @@ on -> off                          // subscriptions
 
 ## Root Namespaces
 ```
-import { v2 } from "wenay-react2"
+import { kit } from "wenay-react2"
 
-v2.hooks
-v2.dnd
-v2.utils
-v2.grid
-v2.modal
-v2.menu
-v2.logs
-v2.updateBy
+kit.hooks
+kit.dnd
+kit.utils
+kit.grid
+kit.modal
+kit.menu
+kit.logs
+kit.updateBy
 ```
 
-The root export is still flat. `v2` is useful when a large file needs grouped names.
+The root export is still flat. `kit` is useful when a large file needs grouped names.
 
-## Modal Compatibility
+## Modal Low Level
 ```
-useModalOld()                      // alias of useModal(); deprecated
-useModalApi()                      // returns ModalApi; use useModal()
-
-GetModalJSX()                      // imperative JSX store; use ModalProvider/useModal
-GetModalFuncJSX()                  // function JSX store; use ModalProvider/useModal
-inputModal({setModalJSX, func, name?, txt?})
-confirmModal({setModalJSX, func, password?})
+useModal()                         // callable controller with show/open/close/set
+createModalElementStore()          // imperative JSX store; prefer ModalProvider/useModal
+createModalRenderStore()           // function JSX store; prefer ModalProvider/useModal
+inputModal({modal, func, name?, txt?})
+confirmModal({modal, func, password?})
 ```
 
-`inputModal` and `confirmModal` accept either a legacy setter function or the `useModal()` controller.
+`inputModal` and `confirmModal` accept either a setter function or the `useModal()` controller.
 
 Left-side modal/menu helpers:
 ```
@@ -67,7 +65,7 @@ These are app-shell style utilities. Prefer local app wrappers for new layouts.
 ## Settings Dialog / UI Slot / Callback Hub Details
 Settings dialog (centered panel ~640x420, max 92vw/82vh; sections column left, content right):
 ```
-type tSettingsSection = {key: string, name: string, render: () => ReactNode}
+type SettingsSection = {key: string, name: string, render: () => ReactNode}
 
 <SettingsDialog
     trigger={...}                     // wrapper span is clickable
@@ -78,7 +76,7 @@ type tSettingsSection = {key: string, name: string, render: () => ReactNode}
 />
 
 registerSettingsSection(s) -> unregister
-getSettingsSections() -> readonly tSettingsSection[]
+getSettingsSections() -> readonly SettingsSection[]
 ```
 The registry is a module singleton on updateBy/renderBy (no React context). Registering the same
 `key` replaces the previous section; unregister removes by identity, so a stale unregister after a
@@ -92,9 +90,9 @@ UI slot:
 createUiSlot({key, places, def}) -> {Slot, PlacementSetting, getPlace, setPlace}
 <slot.PlacementSetting className? activeClassName? />   // defaults .wenaySegBtn / .wenaySegBtnActive
 ```
-State lives in `staticGetAdd(key)` -> persisted with the rest of staticProps; `setPlace`
-announces the in-place mutation via `staticMarkDirty(key)` and the APP decides when to save
-via `Cash.onDirty` (the library never writes storage itself, same as window state).
+State lives in `memoryGetOrCreate(key)` -> persisted with the rest of memoryProps; `setPlace`
+announces the in-place mutation via `memoryMarkDirty(key)` and the APP decides when to save
+via `memoryCache.onDirty` (the library never writes storage itself, same as window state).
 A stored place that no longer exists in `places` falls back to `def`. `getPlace()` is not reactive;
 Slot/PlacementSetting subscribe internally via updateBy.
 
@@ -108,8 +106,8 @@ registerToolbarDensity({key, name, renderItem?}) / getToolbarDensities()
 toolbarItemIcon(item) -> ReactNode                   // item.icon, or first letters of short/title
 ```
 Three decoupled layers: serializable config `{order, visible, density}` (single source of truth,
-persisted exactly like createUiSlot: staticGetAdd(key), edits mutate in place + renderBy +
-staticMarkDirty, the APP saves via Cash.onDirty), Bar (visible!==false, in order, at density) and
+persisted exactly like createUiSlot: memoryGetOrCreate(key), edits mutate in place + renderBy +
+memoryMarkDirty, the APP saves via memoryCache.onDirty), Bar (visible!==false, in order, at density) and
 a PURE Settings editor over config - the same element works in the Bar's gear popover and in a
 registered settings section, no prop changes. Semantics that are easy to get wrong:
 - Merge of stale persist: unknown keys in stored order/visible are ignored (view-level; raw
@@ -128,7 +126,7 @@ registered settings section, no prop changes. Semantics that are easy to get wro
   simulated commit as normalize() (splice + fixed pinning), so preview and drop agree by
   construction. Neighbours glide via transitioned transforms (`.wenayTbRowShift`), ONE setConfig
   on drop. Plus arrow keys on the focused handle (the drag hook preventDefaults mousedown, so the
-  row handler focuses the handle itself). No dnd dependency; DivRnd3/react-rnd deliberately not
+  row handler focuses the handle itself). No dnd dependency; FloatingWindow/react-rnd deliberately not
   used (free-floating windows, wrong tool). `touch-action: none` + `user-select: none` on
   draggable rows (`.wenayTbRowGrab`).
 - `api.onChange` is a wenay-common2 `listen` stream; emits the NORMALIZED config after every
@@ -144,7 +142,7 @@ registered settings section, no prop changes. Semantics that are easy to get wro
 - `icon` is OPTIONAL: `toolbarItemIcon(item)` returns the icon, else the first 3 letters of
   short/title as a text pseudo-icon (icon density only - the label density shows the caption, not
   the letters). Exported so menus (ColumnsMenu compact) share the exact rule.
-- `source?: tUiListSource` inverts ownership of order/visibility. With a source the toolbar is a
+- `source?: UiListSource` inverts ownership of order/visibility. With a source the toolbar is a
   VIEW: `rawList()` reads the source (not `st`), setConfig writes the item order/visibility THERE
   (its own change flow re-emits `api.onChange`; the toolbar emits itself only if the source has no
   `onChange`), while density and the gear flag stay in the toolbar's own `st` under `key`. `ext`
@@ -173,18 +171,18 @@ SAME config with no ag-grid at all. agGrid4 is never modified: this is exactly t
 column wrapper WRAPPER.md postulates, packaged as a primitive; ag-grid enters only as a type
 import + the GridApi handed to grid.attach().
 ```
-createColumnState({key, columns: tColumnMeta[], def?, saveMs?=300})
+createColumnState({key, columns: ColumnMeta[], def?, saveMs?=300})
     -> {columns, api, grid: {attach(api), detach()}}
-tColumnMeta   = {key, title, short?, icon?, group?, fixed?, defaultVisible?, cardRole?: 'title'|'accent'}
-tColumnsConfig= {v, order, visible, width, sort: {key, dir} | null, filter, groups}
+ColumnMeta   = {key, title, short?, icon?, group?, fixed?, defaultVisible?, cardRole?: 'title'|'accent'}
+ColumnsConfig= {v, order, visible, width, sort: {key, dir} | null, filter, groups}
 api: {getConfig, setConfig, useConfig, onChange, reset, show(k,on), move(order), setSort(s|null),
       toggleSort(k), visibleKeys(), getPresent, usePresent, isPresent(k), setPresent(keys|null), listSource}
 ```
-Persist + migration (same DNA as createToolbar/createUiSlot): config lives in `staticGetAdd(key)`,
-edits mutate it in place + renderBy + staticMarkDirty, the APP saves via `Cash.onDirty`.
+Persist + migration (same DNA as createToolbar/createUiSlot): config lives in `memoryGetOrCreate(key)`,
+edits mutate it in place + renderBy + memoryMarkDirty, the APP saves via `memoryCache.onDirty`.
 `normalize()` is the soft migration - unknown keys dropped, missing columns appended
 default-visible, `fixed` pinned to its descriptor index; `v` covers incompatible shape changes.
-The persisted object's IDENTITY is the subscription key, so `Cash.load()` must run BEFORE the grid
+The persisted object's IDENTITY is the subscription key, so `memoryCache.load()` must run BEFORE the grid
 mounts (a grid attached pre-load would apply defaults; QA card 28 gates the grid on `loaded`).
 
 Semantics that are easy to get wrong:
@@ -204,14 +202,14 @@ Semantics that are easy to get wrong:
   the config so a returning column regains its stored order/width/visibility (setting columnDefs
   resets grid order). No loop: applyColumnState never adds/removes columns. `null` = no grid = all
   present.
-- `listSource` = the `{order, visible}` slice exposed as a `tUiListSource` (Toolbar's
+- `listSource` = the `{order, visible}` slice exposed as a `UiListSource` (Toolbar's
   external-config contract): plug it into `createToolbar({source})` and the toolbar, the icon menu
   and the grid all mirror one config. Its setConfig MERGES visible and re-appends via normalize, so
   an editor over a SUBSET of columns never drops the rest.
 - `filter`/`width` are written by the grid adapter only; `groups` (group key -> enabled
   sub-columns) is modelled now, group UI is a later phase; `visibleKeys()` additionally gates a
   grouped column by its group's enabled set.
-- Attach from the consumer's `onGridReady` (AgGridMy forwards it over its own wiring) with
+- Attach from the consumer's `onGridReady` (AgGridTable forwards it over its own wiring) with
   `autoSizeColumns={false}` (auto-fit at mount would rewrite stored widths); detach from
   `onGridPreDestroyed` - the config outlives the grid (columnBuffer pattern). HMR caveat on the
   stand: hot-reload recreates a module-level controller while the live grid stays attached to the
@@ -219,8 +217,8 @@ Semantics that are easy to get wrong:
 
 Icon menu (ColumnsMenu / MenuStrip, `grid/columnState/ColumnsMenu.tsx`):
 ```
-<MenuStrip items={tMenuStripItem[]} onItem? onMove? move? tail? holdMs?=150 compact? />
-    tMenuStripItem = {key, title, short?, icon?, state: 'on'|'off'|'disabled', marks?, fixed?}
+<MenuStrip items={MenuStripItem[]} onItem? onMove? move? tail? holdMs?=150 compact? />
+    MenuStripItem = {key, title, short?, icon?, state: 'on'|'off'|'disabled', marks?, fixed?}
 <ColumnsMenu state onItem? marks? tail? onTail? reorder?=true holdMs? compact? />
 ```
 Two DECOUPLED layers, because "what a click means" is deliberately not the strip's business:
@@ -259,27 +257,27 @@ table standards), 31 (Toolbar over columnState.listSource + pseudo-icons).
 
 ## Outside / Buttons Compatibility
 ```
-useOutsideOld(options) -> ref       // use useOutside(options).ref / .props
-DivOutsideClick2                   // alias of DivOutsideClick
+useOutsideRef(options) -> ref       // use useOutside(options).ref / .props
+OutsideClickArea                   // alias of OutsideClickArea
 
 StyleOtherRow
-StyleOtherColum
+StyleOtherColumn
 ```
 
-`Button`, `ButtonOutClick`, `ButtonHover`, and `ButtonAbs` are still direct components rather than hook controllers.
+`Button`, `OutsideButton`, `HoverButton`, and `AbsoluteButton` are still direct components rather than hook controllers.
 
 ## Drag / Resize Low Level
 ```
-DivRndBase3(props)                  // lower-level react-rnd wrapper
-DivRnd3(props)                      // canonical floating window component
-ExRNDMap3                           // persisted RND map (ObservableMap)
-tRndUpdate
+FloatingWindowBase(props)                  // lower-level react-rnd wrapper
+FloatingWindow(props)                      // canonical floating window component
+floatingWindowMap                           // persisted RND map (ObservableMap)
+FloatingWindowUpdate
 
-Drag22(props)                       // old movement component
-Drag2(props)                        // older component from RNDFunc.tsx
+DragBox(props)                       // absolute-position movement component
+DragArea(props)                     // low-level movement component
 FResizableReact(props)
 mapResiReact                        // persisted resize map (ObservableMap)
-DraggableOutlineDiv()
+OutlineDragDemo()
 ```
 
 For new pointer logic, prefer:
@@ -347,19 +345,16 @@ useReorderBoard({columns: [{key, items}], commit(next), canDrag?, holdMs?,
   `over`/`dragKey` are also returned reactively for render-time styling (column highlight).
 - QA card 27 is the live example (5 columns, mixed gravity, empty column, add-column).
 
-## agGrid Legacy Utilities
+## Grid Row Utilities
 ```
-applyTransactionAsyncUpdate(params)
-applyTransactionAsyncUpdate2(params)
-getUpdateTable(params)
-getComparatorGrid(map?)
+applyGridRows(params)
 ```
 
 Use `agGrid4` for new tables:
 ```
 createGridBuffer()
 useAgGrid()
-AgGridMy
+AgGridTable
 createColumnBuffer()
 numericComparator()
 colDefCentered
@@ -389,34 +384,43 @@ The primitive must not contain product group names, base `columnDefs`, visibilit
 
 ## Params / Generated Editors
 ```
-ParametersReact({params, onChange, onExpand?, expandStatus?, expandStatusLvl?})
-EditParams2({params, onSave})        // canonical compact editor
-EditParams3({params, onSave})        // alternate/legacy editor
-CParameter({param, onClick, type?})
-FButton(name)
-FNameButton(type, name)
+ParamsEditor({params, onChange, onExpand?, expandStatus?, expandStatusLvl?})
+ParamsEdit({params, onSave})        // canonical compact editor
+ParamsArrayEdit({params, onSave})        // array params editor
+ParamRow({param, onClick, type?})
+ParamLabelContent(name)
+ParamToggleLabel(type, name)
 ```
 
-`ParametersReact` receives wenay-common2 `Params.IParamsExpandableReadonly` shape.
+`ParamsEditor` receives wenay-common2 `Params.IParamsExpandableReadonly` shape.
 
 ## Menu Low Level
 ```
-MenuBase({other, children, ...})
+Menu({data, coordinate?, zIndex?, className?, menu?, menuElement?})
 MenuElement
-TimeNum
-tMenuReactStrictly / tMenuReact
+MenuProgress
+MenuItemStrict / MenuItem
 
-GetMenuR()                           // lower-level right-click menu factory
-mouseMenuApi                         // shared global mouse menu API
+contextMenu.openAt(eventOrPoint, items, {source?, layerId?}) -> boolean
+contextMenu.openAtPoint({x, y}, items, {source?, layerId?}) -> boolean
+contextMenu.close()
+contextMenu.getState() -> {open, items, point, source?, layerId?, seq}
+<contextMenu.Layer zIndex? statusOn? other? className?>...</contextMenu.Layer>
+contextMenu.map                         // legacy queue consumed by Layer; prefer openAt
+createContextMenu({name?})              // custom isolated instance
+createRightClickMenu()                  // lower-level legacy right-click factory
 
-DropdownMenu({elements, style?, position?, position2?, keyForSave?})
-MenuRightApi()
-mapRightMenu                         // persisted right-menu state (ObservableMap, RightMenuStore)
-MenuRightPosition / MenuRightPosition2 / MenuRightSavedState / MenuRightRenderProps
+DropdownMenu({elements, trigger?, classNames?, styles?, style?, position?, verticalPosition?, keyForSave?})
+createRightMenuController()
+mapRightMenu                         // persisted floating-menu state (ObservableMap, RightMenuStore)
+MenuRightPosition / MenuRightVerticalPosition / MenuRightSavedState / MenuRightRenderProps
+MenuRightTrigger / MenuRightClassNames / MenuRightStyles
 StickerMenu                          // components/Menu re-export
 ```
 
-`mouseMenuApi.map` is intentionally generic. Keys are app-owned.
+Prefer `contextMenu.openAt(e, items)` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, but it should not be the primary API in new code.
+
+`DropdownMenu` is a floating action menu, not the main context-menu primitive. Its trigger glyph/content and visual classes/styles are caller-owned through `trigger`, `classNames`, and `styles`; the default still renders the old hamburger glyph and CSS classes.
 
 
 ## Observe / Listen React Hooks
@@ -473,13 +477,13 @@ Semantics that are easy to get wrong:
 
 QA cards 23/24/25 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `Replay.replayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror); client E = pull path (`useReplayFrame` over the direct remote with a wrapped counting `frame()`, pace switch 250ms/1s/3s keeps seq). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Card 25 = per-key feed (`useStoreReplayEach` over `exposeStoreReplay`): a dict-of-rows store, producer touches ONE random row per tick, the fold target is a plain Map with per-row cb counters — only the mutated row's counter grows, keyframe/`replace` are the only whole-table expansions, delete arrives as `(key, undefined)`. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
 ## Logs
-Frequent legacy/global logger:
+Frequent global logger:
 ```
 getLogsApi({limit?, limitPer, varMin?})
 logsApi
 PageLogs({update?})
 MessageEventLogs({zIndex?})
-PageLogs2({update?})
+LogsPage({update?})
 MiniLogs({data, onClick?})
 ```
 
@@ -497,32 +501,32 @@ The context logger is a larger UI surface; the global `logsApi` is still the sho
 
 ## Cache / Memory / Browser Utilities
 ```
-CacheG
-CacheLocal
-ObjectStringToDate(obj)
-CacheFuncMapBase(entries, save)
-CacheFuncMap(entries)
+browserCacheStorage
+localStorageCache
+restoreDates(obj)
+createCacheMapWithStorage(entries, save)
+createCacheMap(entries)
 
 ObservableMap<K,V> extends Map      // set/delete/clear announce themselves; touch(key?)
-  .onChange(cb) -> off              //   announces an in-place mutation; tMapChangeListener<K>
-Cash.onDirty(cb) -> off             // instance dirty channel (coalesced, async); tDirtyListener
-Cash.isDirty()
-Cash.markDirty(scope?, key?)        // manual announce, for plain-Map entries only
+  .onChange(cb) -> off              //   announces an in-place mutation; MapChangeListener<K>
+memoryCache.onDirty(cb) -> off             // instance dirty channel (coalesced, async); DirtyListener
+memoryCache.isDirty()
+memoryCache.markDirty(scope?, key?)        // manual announce, for plain-Map entries only
 
-staticSet(key, data)
-staticGet(key)
-staticGetAdd(key, def, options?)
-staticGetById(key, def, id)
-staticUpdate(key, mutate)
-staticMarkDirty(key)
+memorySet(key, data)
+memoryGet(key)
+memoryGetOrCreate(key, def, options?)
+memoryGetById(key, def, id)
+memoryUpdate(key, mutate)
+memoryMarkDirty(key)
 deepMergeWithMap(target, source)
-Cash
-MemoryMap
+memoryCache
+memoryMaps
 
 ArrayPromise({arr, catchF?, thenF?})
 PageVisibilityProvider
 PageVisibilityContext
-SetAutoStepForElement(input, {minStep?, maxStep?})
+setAutoStepForElement(input, {minStep?, maxStep?})
 ```
 
 Cache helpers are process/browser storage utilities, not React state management.
@@ -530,15 +534,15 @@ Cache helpers are process/browser storage utilities, not React state management.
 Dirty/save contract: the dirty signal originates in the data layer. The persisted maps are
 `ObservableMap`s, so `set/delete/clear` announce themselves; in-place mutations of stored
 objects are invisible to map methods and are announced with `map.touch(key)` at the commit
-points (DivRnd3 drag/resize stop, FResizableReact resize stop, createUiSlot.setPlace) or,
-app-side, with `staticUpdate(key, mutate)` / `staticMarkDirty(key)`. `CacheFuncMapBase`
+points (FloatingWindow drag/resize stop, FResizableReact resize stop, createUiSlot.setPlace) or,
+app-side, with `memoryUpdate(key, mutate)` / `memoryMarkDirty(key)`. `createCacheMapWithStorage`
 subscribes to the ObservableMaps it owns - the channel is per instance, there is no global
-bus; plain Maps in `arr` stay silent (announce those via `Cash.markDirty`). Announcements
+bus; plain Maps in `arr` stay silent (announce those via `memoryCache.markDirty`). Announcements
 never save anything: scope/key are event metadata, WHAT gets written is decided by the
 save-side serialized-snapshot diff, so a missed announcement degrades to "saved later" and
 an extra one to a no-op write. `isDirty()` is set synchronously; `onDirty` delivery is
 coalesced through a microtask (safe to mutate maps inside render/init paths; not throttled
-in background tabs the way timers are). `Cash.load()` ignores its own map events while
+in background tabs the way timers are). `memoryCache.load()` ignores its own map events while
 loading and resets dirty after; a save cycle waits out an in-flight load() (a save racing
 a load could overwrite storage with in-memory defaults) and resets the flag at its START
 so a change arriving mid-write survives. Caveat: `flush()` is async - on pagehide
@@ -557,15 +561,51 @@ Use these only when a component must participate in the shared resize observer m
 
 ## Styles
 ```
+tokens                         // TS mirror for inline styles and z-index
 GridStyleDefault()
 StyleGridDefault
 StyleCSSHeadGridEdit(name, rules)
 StyleCSSHeadGrid()
-tCallFuncAgGrid<T>
-tokens
+AgGridClassRule<T>
 ```
 
-`tokens` is the canonical source for inline styles and z-index values.
+Style entry points:
+- `src/style/tokens.css` - CSS custom properties shipped to consumers.
+- `src/common/src/styles/tokens.ts` - TS mirror for inline styles, modal z-index, and ag-grid theme params. Values must stay aligned with `tokens.css`.
+- `src/style/style.css` - shared component classes and token consumers.
+- `src/style/menuRight.css` - right-menu classes and outline-demo CSS.
+- `src/common/src/styles/styleGrid.ts` and `src/common/src/grid/agGrid4/theme.ts` - ag-grid theme setup from `tokens.grid`.
+- QA stand: `npm run testReact -- --host 127.0.0.1 --port 3002`, entry `src/common/testUseReact/qa.tsx`.
+
+Current tokenized prefixes:
+- `--color-*` for base palette.
+- `--menu-*` for popup/right-menu visuals.
+- `--wnd-*` for `FloatingWindow` chrome.
+- `--dlg-*` for `SettingsDialog` chrome.
+- `--tb-*` for toolbar chrome.
+- `--wenay-z-modal` for modal/overlay stacking.
+
+Normalization rule: new shared CSS should first try an existing token. Add a new token only when a value is reused by a shared primitive or is expected to be theme-overridden by apps. One-off app/demo styles should stay in the demo/app wrapper, not in library tokens.
+
+Open normalization candidates:
+- `src/style/style.css`: `.msTradeAlt`, `.msTradeActive`, `.newButtonSimple`, `.toIndicatorMenuButton:hover`, submit-button green, and several toolbar row hover/drag literals still use raw colors.
+- `src/style/menuRight.css`: `OutlineDragDemo` uses `#007bff` directly.
+- `src/common/src/logs/*`: logger cards/tabs/notifications keep raw inline colors; if the context logger stays public, it needs `--logs-*` tokens or a small style contract.
+- `src/common/src/grid/columnState/*`: card/list/menu visuals use GitHub-like inline colors. If these are generic product primitives, introduce `--cols-*` tokens; if they are demo-ish, keep them isolated.
+- `src/common/src/components/Modal/ModalContextProvider.tsx`: scrim color duplicates `--dlg-scrim`; prefer token usage when touching modal chrome.
+- `src/common/src/styles/commentaryStyles.css`: standalone `.commentary` CSS is not imported by the root style bundle; either import/tokenize it if still used, or mark it as a local component concern.
+
+## Cleanup Inventory
+
+Do not delete a public export just because it looks unused inside this repo. External apps may import it. For cleanup, first move an item into this inventory, then decide in a separate breaking version whether it remains public, moves to a demo namespace, or is removed.
+
+Suspicious but still public:
+- `OutlineDragDemo`, `RightMenuDemo`, `ChartDemo` - demo/test-style exports. They are useful for the QA stand, but look like demo surface rather than core API.
+- `StickerMenu` - exported from `components/Menu`; visually app-specific and should probably become an app wrapper or be documented as an example component.
+- `logsApi` global logger and the context logger (`LogsProvider`, `LogsTable`, `LogsNotifications`, `LogsSettings`, `MainPage`) overlap. Keep both for now; document one as the short integration path and the other as the larger UI surface.
+- Chart engine primitives (`DataSet`, `Panel`, `Renderer`, `Interaction`, `ChartEngine`, etc.) are very low-level. They are public through `chartEngineReact.tsx`; product apps should wrap them before use.
+- `src/common/src/myChart/chartEngine/chartEngine.ts` is a reference copy next to the public React engine. It is not exported from root; treat it as suspicious maintenance debt, not as public API.
+- `StyleCSSHeadGridEdit` and `StyleCSSHeadGrid` mutate `<head>` directly. They are exported and can have consumers, but new grid styling should prefer ag-grid theme params and tokens.
 
 ## Charts
 Canvas chart:
@@ -594,7 +634,7 @@ The chart engine exports many internal interfaces (`DataPoint`, `DataSet`, `Pane
 Get*             // usually a factory from older style; prefer create* or use*
 *FuncJSX         // imperative JSX store; prefer React context/controller
 *2 / *3          // version suffix; document the intended canonical one in brief
-applyTransactionAsyncUpdate* // old grid path; prefer agGrid4
+removed old grid update names -> applyGridRows / agGrid4
 ```
 
 Do not add new generic utilities with app words in their signature. For example, a column primitive should accept

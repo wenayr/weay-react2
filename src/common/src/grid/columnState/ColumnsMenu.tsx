@@ -21,9 +21,9 @@
 // comes back to life when the column returns. No ag-grid, no storage here.
 import React, {useRef} from 'react'
 import {useReorder} from '../../hooks/useReorder'
-import type {ColumnStateController, tColumnsConfig} from './columnState'
+import type {ColumnStateController, ColumnsConfig} from './columnState'
 
-export type tMenuStripItem = {
+export type MenuStripItem = {
     /** stable id; reported back on click / in the reorder commit */
     key: string
     /** full name - tooltip / accessible label */
@@ -41,7 +41,7 @@ export type tMenuStripItem = {
 }
 
 function MenuButton(p: {
-    item: tMenuStripItem
+    item: MenuStripItem
     onItem?: (key: string, e: React.MouseEvent) => void
     drag?: {onMouseDown: React.MouseEventHandler, onTouchStart: React.TouchEventHandler}
     style?: React.CSSProperties
@@ -81,7 +81,7 @@ function MenuButton(p: {
  *  clicks (onItem) and drag-reorders (onMove) - never interprets either.
  *  Disabled buttons do not report clicks; fixed ones do not drag. */
 export function MenuStrip(p: {
-    items: tMenuStripItem[]
+    items: MenuStripItem[]
     /** a click happened on this key - the MEANING lives a layer up */
     onItem?: (key: string, e: React.MouseEvent) => void
     /** present = items are drag-reorderable (one commit per drop) */
@@ -91,7 +91,7 @@ export function MenuStrip(p: {
     move?: (order: string[], key: string, to: number) => string[]
     /** trailing buttons after a divider, OUTSIDE the reorder list (mode
      *  cyclers, actions...); their clicks go to onItem like any other key */
-    tail?: tMenuStripItem[]
+    tail?: MenuStripItem[]
     /** hold before a touch drag starts, ms (default 150 - keeps page scroll usable) */
     holdMs?: number
     /** icon-only buttons (letters stand in for a missing icon) */
@@ -155,9 +155,9 @@ export function ColumnsMenu(p: {
      *  column's visibility (fixed columns ignore the default). */
     onItem?: (key: string, e: React.MouseEvent) => void
     /** "on with extras" adornment per column (enabled sub-columns, strategies...) */
-    marks?: (key: string, cfg: tColumnsConfig) => React.ReactNode
+    marks?: (key: string, cfg: ColumnsConfig) => React.ReactNode
     /** trailing non-column buttons (table standards cycler etc.) */
-    tail?: tMenuStripItem[]
+    tail?: MenuStripItem[]
     /** clicks on tail buttons */
     onTail?: (key: string, e: React.MouseEvent) => void
     /** drag reorder of the column buttons, mirrored to the grid (default on) */
@@ -172,7 +172,7 @@ export function ColumnsMenu(p: {
     const cfg = p.state.api.useConfig()
     const present = p.state.api.usePresent()
     const byKey = new Map(p.state.columns.map(c => [c.key, c]))
-    const items: tMenuStripItem[] = cfg.order.filter(k => byKey.has(k)).map(k => {
+    const items: MenuStripItem[] = cfg.order.filter(k => byKey.has(k)).map(k => {
         const c = byKey.get(k)!
         return {
             key: k, title: c.title, short: c.short, icon: c.icon, fixed: c.fixed,

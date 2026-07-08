@@ -1,5 +1,5 @@
-// Layer 2 (React): headless hook over the core + custom <AgGridMy> component.
-// The hook does NOT render; it returns a controller. AgGridMy is our AgGridReact with
+// Layer 2 (React): headless hook over the core + custom <AgGridTable> component.
+// The hook does NOT render; it returns a controller. AgGridTable is our AgGridReact with
 // project defaults (theme, memo, auto sizing, selection, lifecycle). Wiring is the
 // controller prop; bare <AgGridReact> can still spread gridProps (as in agGrid3).
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
@@ -38,7 +38,7 @@ export type UseAgGridOptions<T> = {
  *
  *   const grid = useAgGrid<Row>({ getId })
  *   const grid = useAgGrid({ core: mainTable })
- *   <AgGridMy<Row> controller={grid} columnDefs={cols} />
+ *   <AgGridTable<Row> controller={grid} columnDefs={cols} />
  *   grid.update({ newData })
  */
 export function useAgGrid<T>(options?: UseAgGridOptions<T>) {
@@ -114,13 +114,13 @@ export function useAgGrid<T>(options?: UseAgGridOptions<T>) {
 
 export type AgGridController<T> = ReturnType<typeof useAgGrid<T>>
 
-// --- AgGridMy: our grid with project defaults --------------------------------
+// --- AgGridTable: our grid with project defaults --------------------------------
 
 // v35: the canonical row-selection form is an object, not the legacy "multiple" string.
 // Stable module-level reference so the grid does not re-evaluate the option on each render.
 const ROW_SELECTION = { mode: 'multiRow' } as const
 
-export type AgGridMyProps<T> = AgGridReactProps<T> & {
+export type AgGridTableProps<T> = AgGridReactProps<T> & {
     /** Controller from useAgGrid: all wiring (getRowId, ready/destroy, sync) is inside. */
     controller?: AgGridController<T>
     /** Declarative row upsert for simple cases without a controller. */
@@ -129,7 +129,7 @@ export type AgGridMyProps<T> = AgGridReactProps<T> & {
     autoSizeColumns?: boolean
 }
 
-function AgGridMyInner<T>(props: AgGridMyProps<T>) {
+function AgGridTableInner<T>(props: AgGridTableProps<T>) {
     const {
         controller, data, autoSizeColumns = true,
         defaultColDef, theme, getRowId, onGridReady, onGridPreDestroyed,
@@ -202,4 +202,4 @@ function AgGridMyInner<T>(props: AgGridMyProps<T>) {
 
 // memo: the grid does not re-render from unrelated page state; data updates bypass
 // render (controller.updateData). The cast is required because memo() erases the component generic.
-export const AgGridMy = memo(AgGridMyInner) as typeof AgGridMyInner
+export const AgGridTable = memo(AgGridTableInner) as typeof AgGridTableInner

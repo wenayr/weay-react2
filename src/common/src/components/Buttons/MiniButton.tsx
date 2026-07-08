@@ -26,7 +26,7 @@ export function MiniButton({name, arr, get, onClick, style}: { name: string, arr
         </Button>
 }
 
-export function MiniButton2({name, children, statusDef, className = "newButtonSimple"}: {
+export function PopupButton({name, children, statusDef, className = "newButtonSimple"}: {
     name: string,
     statusDef?: boolean,
     children: React.ReactElement | (() => React.ReactElement),
@@ -41,6 +41,3 @@ export function MiniButton2({name, children, statusDef, className = "newButtonSi
         {content}
     </Button>
 }
-
-/** @deprecated Use MiniButton2 instead */
-export const MiniButton3 = MiniButton2;

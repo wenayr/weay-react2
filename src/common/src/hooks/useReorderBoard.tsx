@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react'
 import {useDraggableApi} from './useDraggable'
-import {tReorderItem} from './useReorder'
+import {ReorderItem} from './useReorder'
 
 /** useReorderBoard - the columns extension of useReorder: keyed blocks live in
  *  VERTICAL columns (plain consumer divs), one block drags between/within them,
@@ -12,31 +12,31 @@ import {tReorderItem} from './useReorder'
  *  Same non-goals as useReorder: no nesting, no spans/collision packing, no
  *  autoscroll - that day is a ready-made dnd library. */
 
-export type tBoardPos = {col: string, index: number}
-export type tBoardColumn = {key: string, items: string[]}
+export type BoardPosition = {col: string, index: number}
+export type BoardColumn = {key: string, items: string[]}
 
-export type tReorderBoardOptions = {
+export type ReorderBoardOptions = {
     /** columns in board order; each column's div children must render items 1:1 */
-    columns: tBoardColumn[]
+    columns: BoardColumn[]
     /** ONE commit on drop; skipped when nothing moved */
-    commit: (next: tBoardColumn[]) => void
+    commit: (next: BoardColumn[]) => void
     /** false = this key cannot start a drag (default: all can) */
     canDrag?: (key: string) => boolean
     /** hold before the drag starts; default 0 */
     holdMs?: number
     /** the block was grabbed */
-    onDragStart?: (e: {key: string, from: tBoardPos}) => void
+    onDragStart?: (e: {key: string, from: BoardPosition}) => void
     /** every pointer move while dragging; position = pointer delta in local px */
-    onDragMove?: (e: {key: string, over: tBoardPos, position: {x: number, y: number}}) => void
+    onDragMove?: (e: {key: string, over: BoardPosition, position: {x: number, y: number}}) => void
     /** the target slot changed (compare prev.col != over.col for column crossings) */
-    onOverChange?: (e: {key: string, over: tBoardPos, prev: tBoardPos | null}) => void
+    onOverChange?: (e: {key: string, over: BoardPosition, prev: BoardPosition | null}) => void
     /** drop; committed=false when nothing moved (plain click) */
-    onDragEnd?: (e: {key: string, from: tBoardPos, over: tBoardPos, committed: boolean}) => void
+    onDragEnd?: (e: {key: string, from: BoardPosition, over: BoardPosition, committed: boolean}) => void
 }
 
-type tGeom = {
+type BoardGeometry = {
     scale: number
-    from: tBoardPos
+    from: BoardPosition
     colRect: Map<string, {x: number, y: number, w: number, h: number}>
     /** item centers per column at drag start (local px, viewport basis) */
     centers: Map<string, {key: string, y: number}[]>
@@ -47,13 +47,13 @@ type tGeom = {
     draggedSize: {w: number, h: number}
 }
 
-export function useReorderBoard(o: tReorderBoardOptions) {
+export function useReorderBoard(o: ReorderBoardOptions) {
     const oRef = useRef(o)
     oRef.current = o
     const colEls = useRef(new Map<string, HTMLElement>())
     const refCbs = useRef(new Map<string, (el: HTMLElement | null) => void>())
     const [dragKey, setDragKey] = useState<string | null>(null)
-    const geom = useRef<tGeom | null>(null)
+    const geom = useRef<BoardGeometry | null>(null)
     const measureCache = useRef<{key: string, pos: Map<string, {x: number, y: number}>} | null>(null)
 
     /** stable callback ref for a column div; columns can be added at runtime */
@@ -72,7 +72,7 @@ export function useReorderBoard(o: tReorderBoardOptions) {
      *  = how many of that column's items (start centers, excluding the dragged
      *  one) sit above the dragged center. Targeting always runs against the
      *  geometry measured at drag START (anti-oscillation, same as useReorder). */
-    function dragTarget(dx: number, dy: number): tBoardPos {
+    function dragTarget(dx: number, dy: number): BoardPosition {
         const g = geom.current
         if (!g) return {col: '', index: 0}
         const cx = g.draggedCenter.x + dx, cy = g.draggedCenter.y + dy
@@ -92,7 +92,7 @@ export function useReorderBoard(o: tReorderBoardOptions) {
 
     /** Simulated commit: the dragged key removed from its column and inserted at
      *  over - preview and drop share this, so they agree by construction. */
-    function movedColumns(key: string, over: tBoardPos): tBoardColumn[] {
+    function movedColumns(key: string, over: BoardPosition): BoardColumn[] {
         return oRef.current.columns.map(c => {
             let items = c.items.filter(k => k != key)
             if (c.key == over.col) {
@@ -109,7 +109,7 @@ export function useReorderBoard(o: tReorderBoardOptions) {
      *  (draggedHeight + row-gap) on the neighbour - so the column's own CSS
      *  gravity decides who moves aside (flex-end pushes the blocks ABOVE up).
      *  One synchronous apply-read-revert, cached per target slot. */
-    function measured(key: string, over: tBoardPos): Map<string, {x: number, y: number}> {
+    function measured(key: string, over: BoardPosition): Map<string, {x: number, y: number}> {
         const cacheKey = over.col + '#' + over.index
         if (measureCache.current?.key == cacheKey) return measureCache.current.pos
         const g = geom.current!
@@ -173,7 +173,7 @@ export function useReorderBoard(o: tReorderBoardOptions) {
         if (oRef.current.canDrag && !oRef.current.canDrag(key)) return false
         if ((e.target as HTMLElement).closest('input, button, select, textarea, a')) return false
         const cols = oRef.current.columns
-        let from: tBoardPos | null = null
+        let from: BoardPosition | null = null
         for (const c of cols) {
             const i = c.items.indexOf(key)
             if (i != -1) { from = {col: c.key, index: i}; break }
@@ -181,7 +181,7 @@ export function useReorderBoard(o: tReorderBoardOptions) {
         const fromEl = from && colEls.current.get(from.col)
         if (!from || !fromEl) return false
         const scale = fromEl.offsetWidth ? fromEl.getBoundingClientRect().width / fromEl.offsetWidth : 1
-        const g: tGeom = {scale, from, colRect: new Map(), centers: new Map(), startOffset: new Map(), rowGap: new Map(), draggedCenter: {x: 0, y: 0}, draggedSize: {w: 0, h: 0}}
+        const g: BoardGeometry = {scale, from, colRect: new Map(), centers: new Map(), startOffset: new Map(), rowGap: new Map(), draggedCenter: {x: 0, y: 0}, draggedSize: {w: 0, h: 0}}
         for (const c of cols) {
             const el = colEls.current.get(c.key)
             if (!el) continue
@@ -210,11 +210,11 @@ export function useReorderBoard(o: tReorderBoardOptions) {
         return true
     }
 
-    const over: tBoardPos | null = dragKey != null && geom.current
+    const over: BoardPosition | null = dragKey != null && geom.current
         ? dragTarget(local(drag.position.x), local(drag.position.y)) : null
 
     // callbacks ride effects (post-render), reading fresh options via oRef
-    const prevOverRef = useRef<tBoardPos | null>(null)
+    const prevOverRef = useRef<BoardPosition | null>(null)
     useEffect(() => {
         if (dragKey == null || !over) { prevOverRef.current = null; return }
         const prev = prevOverRef.current
@@ -228,7 +228,7 @@ export function useReorderBoard(o: tReorderBoardOptions) {
         if (dragKey != null && over) oRef.current.onDragMove?.({key: dragKey, over, position: {x: px, y: py}})
     }, [dragKey, px, py]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    function item(key: string): tReorderItem {
+    function item(key: string): ReorderItem {
         const active = dragKey != null
         const dragging = key == dragKey
         let style: React.CSSProperties | undefined

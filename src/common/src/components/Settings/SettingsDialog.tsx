@@ -2,15 +2,15 @@ import React, {useEffect, useState} from "react";
 import {createPortal} from "react-dom";
 import {renderBy, updateBy} from "../../../updateBy";
 
-export type tSettingsSection = {key: string, name: string, render: () => React.ReactNode}
+export type SettingsSection = {key: string, name: string, render: () => React.ReactNode}
 
 // Module singleton (closure + updateBy subscription, no React context): any module
 // registers a section on mount and removes it on unmount; the dialog re-renders on changes.
-const registry = {list: [] as tSettingsSection[]}
+const registry = {list: [] as SettingsSection[]}
 
 /** Register an external section. Re-register with the same key replaces the previous one.
  *  The returned function removes exactly this registration (a no-op if it was replaced). */
-export function registerSettingsSection(s: tSettingsSection): () => void {
+export function registerSettingsSection(s: SettingsSection): () => void {
     const i = registry.list.findIndex(e => e.key == s.key)
     if (i == -1) registry.list.push(s)
     else registry.list.splice(i, 1, s)
@@ -25,7 +25,7 @@ export function registerSettingsSection(s: tSettingsSection): () => void {
 }
 
 /** Current external sections (static props sections are not included). */
-export function getSettingsSections(): readonly tSettingsSection[] {
+export function getSettingsSections(): readonly SettingsSection[] {
     return registry.list
 }
 
@@ -34,7 +34,7 @@ export function getSettingsSections(): readonly tSettingsSection[] {
  *  Look is themed via --dlg-* CSS variables (dark defaults), same contract as --wnd-*. */
 export function SettingsDialog(props: {
     trigger: React.ReactNode
-    sections?: tSettingsSection[]
+    sections?: SettingsSection[]
     defaultSection?: string
     /** Section buttons: apps pass their own .chip / .chipActive; defaults are minimal library styles */
     sectionClassName?: string

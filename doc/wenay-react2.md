@@ -2,8 +2,8 @@
 
 > Root import: `import { ... } from "wenay-react2"`.
 > Notation: `name(args) -> ret`. JSX examples show the intended public path, not every prop.
-> Short controller-style names are canonical. Old `Get*`, `*2/*3`, and low-level engine names are in
-> **`wenay-react2-rare.md`** for compatibility and migrations.
+> Short controller-style names are canonical. Removed names are recorded in
+> **WENAY_REACT2_RENAMES.md** for migration only; old aliases are not exported.
 
 ## Standard
 ```
@@ -36,30 +36,30 @@ const api2 = useUpdateByApi(state)               // hook + controller in one cal
 
 Persistent process memory:
 ```
-staticGetAdd(key, def, {abs?, deepAutoMerge?, reversDeep?}) -> def-or-stored
-staticGetById(key, def, id) -> stored only while id is the same
-staticSet(key, data)
-staticGet(key)
-staticUpdate(key, mutate) -> cur?               // mutate + rerender + announce in one call
-staticMarkDirty(key)                            // announce an in-place mutation of a staticGetAdd object
-MemoryMap                                       // rnd / resize / other maps
+memoryGetOrCreate(key, def, {abs?, deepAutoMerge?, reversDeep?}) -> def-or-stored
+memoryGetById(key, def, id) -> stored only while id is the same
+memorySet(key, data)
+memoryGet(key)
+memoryUpdate(key, mutate) -> cur?               // mutate + rerender + announce in one call
+memoryMarkDirty(key)                            // announce an in-place mutation of a memoryGetOrCreate object
+memoryMaps                                       // rnd / resize / other maps
 ```
 
-Persistence contract (Cash): the library NEVER writes storage by itself. The persisted maps
-(ExRNDMap3, mapResiReact, mapRightMenu, staticProps) are `ObservableMap`s - set/delete/clear
+Persistence contract (memoryCache): the library NEVER writes storage by itself. The persisted maps
+(floatingWindowMap, mapResiReact, mapRightMenu, memoryProps) are `ObservableMap`s - set/delete/clear
 announce themselves, in-place mutations are announced at the commit points (drag/resize stop,
-menu drag end, setPlace). Cash observes the maps it owns; the app owns the write policy:
+menu drag end, setPlace). memoryCache observes the maps it owns; the app owns the write policy:
 ```
-Cash.load()                                      // once on start; remembers the saved snapshot
-Cash.onDirty((scope?, key?) => ...) -> off       // dirty channel (coalesced, async)
-Cash.saveDebounced(ms?) / save() / flush()       // write only payloads that differ from the snapshot
-Cash.isDirty()                                   // cheap hint, e.g. a beforeunload guard
+memoryCache.load()                                      // once on start; remembers the saved snapshot
+memoryCache.onDirty((scope?, key?) => ...) -> off       // dirty channel (coalesced, async)
+memoryCache.saveDebounced(ms?) / save() / flush()       // write only payloads that differ from the snapshot
+memoryCache.isDirty()                                   // cheap hint, e.g. a beforeunload guard
 
-Cash.load()
-const off = Cash.onDirty(() => Cash.saveDebounced(800))
+memoryCache.load()
+const off = memoryCache.onDirty(() => memoryCache.saveDebounced(800))
 document.addEventListener("visibilitychange",
-    () => { if (document.visibilityState == "hidden") void Cash.flush() })
-window.addEventListener("pagehide", () => { void Cash.flush() })  // backstop: flush is async
+    () => { if (document.visibilityState == "hidden") void memoryCache.flush() })
+window.addEventListener("pagehide", () => { void memoryCache.flush() })  // backstop: flush is async
 ```
 
 ## Outside Click / Buttons
@@ -70,12 +70,12 @@ outside.enable()
 outside.disable()
 outside.contains(event.target)
 
-<DivOutsideClick outsideClick={close} status={open}>...</DivOutsideClick>
+<OutsideClickArea outsideClick={close} status={open}>...</OutsideClickArea>
 
 <Button button={<button>Open</button>} outClick>{...}</Button>
-<ButtonOutClick button={...}>{...}</ButtonOutClick>
-<ButtonHover button={...}>{...}</ButtonHover>
-<ButtonAbs button={...}>{...}</ButtonAbs>
+<OutsideButton button={...}>{...}</OutsideButton>
+<HoverButton button={...}>{...}</HoverButton>
+<AbsoluteButton button={...}>{...}</AbsoluteButton>
 ```
 
 ## Drag / Floating Windows
@@ -98,9 +98,9 @@ const b = useReorderBoard({columns: [{key, items}], commit,                 // d
 b.over                                                                      // {col, index} | null - live target
 // column gravity is YOUR CSS: justify-content flex-start packs up, flex-end packs down
 
-<DivRnd3 keyForSave="tool" size={{width: 320, height: 240}} header={<div>Tool</div>}>
+<FloatingWindow keyForSave="tool" size={{width: 320, height: 240}} header={<div>Tool</div>}>
     <Panel />
-</DivRnd3>
+</FloatingWindow>
 ```
 
 ## Modal / Input
@@ -113,16 +113,16 @@ const modal = useModal()
 modal.open(<Dialog />)
 modal.set(<Dialog />)
 modal.close()
-modal(null)                                      // callable legacy shape, still supported
+modal(null)                                      // callable shortcut for clearing
 ```
 
 Input helpers:
 ```
-<InputPage callback={txt => {}} name="Name" txt="" />
-<InputFile callback={file => {}} name="File" />
-<InputPageModal callback={...} outClick={modal.close} />
-<InputFileModal callback={...} outClick={modal.close} />
-<PageModalFree outClick={modal.close} size={{width: 400, height: 260}}>...</PageModalFree>
+<TextInputPanel callback={txt => {}} name="Name" txt="" />
+<FileInputPanel callback={file => {}} name="File" />
+<TextInputModal callback={...} outClick={modal.close} />
+<FileInputModal callback={...} outClick={modal.close} />
+<FreeModal outClick={modal.close} size={{width: 400, height: 260}}>...</FreeModal>
 ```
 
 ## Settings Dialog
@@ -136,7 +136,7 @@ registerSettingsSection({key, name, render}) -> unregister   // external section
 const slot = createUiSlot({key, places: {top: "Top bar", side: "Sidebar"}, def: "top"})
 
 <slot.Slot place="top">{content}</slot.Slot>     // each mount point decides by itself
-<slot.PlacementSetting />                        // segmented place switcher; setPlace marks Cash dirty
+<slot.PlacementSetting />                        // segmented place switcher; setPlace marks memoryCache dirty
 ```
 
 ## Toolbar
@@ -153,17 +153,17 @@ registerToolbarDensity({key, name, renderItem?}) -> unregister   // built-ins: '
 toolbarItemIcon(item)        // the item's icon, or its first letters as a text pseudo-icon
 ```
 Config `{order, visible, density}` is serializable and persisted like createUiSlot
-(staticGetAdd -> Cash, the app owns the write policy). Items added in an app update are merged
+(memoryGetOrCreate -> memoryCache, the app owns the write policy). Items added in an app update are merged
 into a stale persisted config (appended, default-visible), removed ones are ignored. `icon` is
 optional: in icon density an icon-less item renders the first letters of its short/title.
 The gear is a pseudo-item: `settingsItem: {title?, icon?}` re-skins it, and the editor has a
 separated toggle row for it (`visible['__settings']`, no order slot - it always sits at the bar edge).
 
-`source?` makes the toolbar a VIEW over an external owner of order/visibility (a `tUiListSource`,
+`source?` makes the toolbar a VIEW over an external owner of order/visibility (a `UiListSource`,
 e.g. `columnState.api.listSource`): Bar/Settings edit THAT config and outside changes reorder the
 toolbar, so one config can drive a grid, its icon menu AND the toolbar together. Density and the
 gear flag stay in the toolbar's own store. Without `source` the toolbar keeps its own store
-(backward compatible).
+(standalone mode).
 
 ## Callback Hub
 ```
@@ -173,7 +173,7 @@ hub.on(cb) -> off
 
 ## Params
 ```
-<ParametersReact
+<ParamsEditor
     params={params}
     onChange={next => setParams(next)}
     onExpand={next => setParams(next)}
@@ -181,32 +181,40 @@ hub.on(cb) -> off
     expandStatusLvl?
 />
 
-<EditParams2 params={params} onSave={next => save(next)} />
-<CParameter param={param} onClick={() => {}} />
+<ParamsEdit params={params} onSave={next => save(next)} />
+<ParamRow name="Name">...</ParamRow>
 ```
 
 ## Menu
 ```
-type tMenuReact = { name, onClick?, next?, func?, status? } | false | null | undefined
+type MenuItem = { name, onClick?, next?, func?, status? } | false | null | undefined
 
-<MenuBase other={() => items}>...</MenuBase>
+<Menu data={items} coordinate={{x: 0, y: 0}} />
 
-mouseMenuApi.map.set("page", [{name: "Copy", onClick: copy}])
-<mouseMenuApi.ReactMouse>{children}</mouseMenuApi.ReactMouse>
+<contextMenu.Layer>{children}</contextMenu.Layer>
+contextMenu.openAt(event, [{name: "Copy", onClick: copy}])
+contextMenu.close()
 ```
 
-`mouseMenuApi.map` is an integration point. The library stores menu items, but the app decides what actions exist.
+Use `contextMenu.openAt(e, items)` for new right-click integrations. `contextMenu.map` still exists as a legacy Layer queue, but it is not the recommended path for new code.
+
+Floating right menu:
+```
+<DropdownMenu elements={items} trigger={iconOrRender} classNames={...} styles={...} />
+```
+
+`DropdownMenu` is a floating action menu with caller-owned trigger/content styling, not the main context-menu primitive.
 
 ## agGrid4
 Plain declarative rows:
 ```
-<AgGridMy<Row> rowData={rows} columnDefs={cols} />
+<AgGridTable<Row> rowData={rows} columnDefs={cols} />
 ```
 
 Buffered mirror table:
 ```
 const grid = useAgGrid<Row>({getId: row => row.id})
-<AgGridMy<Row> controller={grid} columnDefs={cols} />
+<AgGridTable<Row> controller={grid} columnDefs={cols} />
 
 grid.update({newData: rows})
 grid.remove([{id}])
@@ -220,7 +228,7 @@ Shared module store:
 export const mainTable = createGridBuffer<Row>({getId, externalBuffer})
 
 const grid = useAgGrid({core: mainTable})
-<AgGridMy<Row> controller={grid} columnDefs={cols} />
+<AgGridTable<Row> controller={grid} columnDefs={cols} />
 ```
 
 Overlay patches over React-owned `rowData`:
@@ -228,7 +236,7 @@ Overlay patches over React-owned `rowData`:
 const core = createGridBuffer<Row>({getId, mode: "overlay", pushDefaults: {add: false}})
 const grid = useAgGrid({core})
 
-<AgGridMy<Row> controller={grid} rowData={rows} columnDefs={cols} getRowId={p => getId(p.data)} />
+<AgGridTable<Row> controller={grid} rowData={rows} columnDefs={cols} getRowId={p => getId(p.data)} />
 ```
 
 Dynamic columns are pure names + lifecycle replay:
@@ -263,14 +271,14 @@ cs.api.usePresent() / isPresent(key) / setPresent(keys | null)   // which column
 cs.api.listSource                                // {order, visible} slice as a Toolbar `source`
 ```
 Config `{v, order, visible, width, sort, filter, groups}` is serializable and persisted like
-createToolbar (staticGetAdd(key) -> Cash, the app owns the write policy); a stale config migrates
+createToolbar (memoryGetOrCreate(key) -> memoryCache, the app owns the write policy); a stale config migrates
 softly (unknown keys dropped, new columns appended default-visible, `fixed` pinned). `sort` is
 STICKY: independent of visibility/selection, may point at a hidden or grid-absent column, changes
 only by an explicit toggle/header click.
 
 Two-way ag-grid adapter (opt-in, agGrid4 untouched):
 ```
-<AgGridMy columnDefs={cols} autoSizeColumns={false}
+<AgGridTable columnDefs={cols} autoSizeColumns={false}
     onGridReady={e => cs.grid.attach(e.api)}          // restore saved layout, then watch the grid
     onGridPreDestroyed={() => cs.grid.detach()} />     // config survives remounts
 ```

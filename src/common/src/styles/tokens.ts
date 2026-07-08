@@ -22,7 +22,7 @@ export const tokens = {
         itemHoverBgColor: '#fff',
         shadow: '0 0 20px 14px rgba(34, 60, 80, 0.2)',
     },
-    /** DivRnd3 window chrome (--wnd-*). Defaults = legacy look; apps re-skin via :root[data-theme].
+    /** FloatingWindow window chrome (--wnd-*). Defaults = legacy look; apps re-skin via :root[data-theme].
      *  --wnd-header-height/color/font-size/letter-spacing/transform are intentionally undeclared
      *  (inherit/auto) until a theme sets them. */
     wnd: {

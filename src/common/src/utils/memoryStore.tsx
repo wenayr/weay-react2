@@ -1,20 +1,20 @@
 import { deepClone } from "wenay-common2";
 import { renderBy } from "../../updateBy";
-import { ExRNDMap3 } from "../components/Dnd/RNDFunc3";
+import { floatingWindowMap } from "../components/Dnd/FloatingWindow";
 import { mapResiReact } from "../components/Dnd/Resizable";
 import { mapRightMenu } from "../components/Menu/RightMenuStore";
-import {CacheFuncMap} from "./cache";
+import {createCacheMap} from "./cache";
 import { ObservableMap } from "./observableMap";
 
-// observable - Cash marks itself dirty on its mutations
-const staticProps = new ObservableMap<string,object>()
+// observable - memoryCache marks itself dirty on its mutations
+const memoryProps = new ObservableMap<string,object>()
 
-export function staticSet(key: any, data: object) {
-    if (!staticProps.has(key)) staticProps.set(key,data)
+export function memorySet(key: any, data: object) {
+    if (!memoryProps.has(key)) memoryProps.set(key,data)
 }
 
-export function staticGet(key: any) {
-    return staticProps.get(key)
+export function memoryGet(key: any) {
+    return memoryProps.get(key)
 }
 
 function isObject(item: any): boolean {
@@ -47,57 +47,57 @@ export function deepMergeWithMap(target: any, source: any, visited = new Map<any
 // WeakSet: a strict Map kept every def object alive forever
 const merged = new WeakSet<object>()
 
-export function staticGetAdd<T extends object>(key: any, def: T, options: {abs?: boolean, deepAutoMerge?: boolean, reversDeep?: boolean} = {reversDeep: false}) {
+export function memoryGetOrCreate<T extends object>(key: any, def: T, options: {abs?: boolean, deepAutoMerge?: boolean, reversDeep?: boolean} = {reversDeep: false}) {
     if (options.deepAutoMerge && !merged.has(def)) {
         merged.add(def)
-        if (!options.reversDeep) staticProps.set(key, deepMergeWithMap(staticProps.get(key) ?? {}, def))
-        else staticProps.set(key, deepMergeWithMap(deepClone(def), staticProps.get(key) ?? {}))
+        if (!options.reversDeep) memoryProps.set(key, deepMergeWithMap(memoryProps.get(key) ?? {}, def))
+        else memoryProps.set(key, deepMergeWithMap(deepClone(def), memoryProps.get(key) ?? {}))
     }
-    if (options.abs) staticProps.set(key, def)
-    const t = (staticProps.has(key) ? staticProps.get(key) : staticProps.set(key, def).get(key)!) as T
+    if (options.abs) memoryProps.set(key, def)
+    const t = (memoryProps.has(key) ? memoryProps.get(key) : memoryProps.set(key, def).get(key)!) as T
     return t// Object.assign(def, t) // t //
 }
 
-/** Announce a direct in-place mutation of an object taken from staticGetAdd - such
- *  mutations are invisible to map methods. staticSet/staticGetAdd need no announcement:
- *  their set() calls are observed by Cash automatically. */
-export function staticMarkDirty(key: any) {
-    staticProps.touch(typeof key == "string" ? key : undefined)
+/** Announce a direct in-place mutation of an object taken from memoryGetOrCreate - such
+ *  mutations are invisible to map methods. memorySet/memoryGetOrCreate need no announcement:
+ *  their set() calls are observed by memoryCache automatically. */
+export function memoryMarkDirty(key: any) {
+    memoryProps.touch(typeof key == "string" ? key : undefined)
 }
 
-/** App-facing change of a persisted staticProps entry in one call:
+/** App-facing change of a persisted memoryProps entry in one call:
  *  mutate + rerender subscribers + mark the cache dirty. No-op if the key is absent. */
-export function staticUpdate<T extends object>(key: any, mutate: (cur: T) => void): T | undefined {
-    const cur = staticProps.get(key) as T | undefined
+export function memoryUpdate<T extends object>(key: any, mutate: (cur: T) => void): T | undefined {
+    const cur = memoryProps.get(key) as T | undefined
     if (cur === undefined) return undefined
     mutate(cur)
     renderBy(cur)
-    staticMarkDirty(key)
+    memoryMarkDirty(key)
     return cur
 }
 
-export function staticGetById<T extends object>(key: any, def: T, id: string|number){
+export function memoryGetById<T extends object>(key: any, def: T, id: string|number){
     type W = {__id: string|number, data: T}
-    const stored = staticProps.get(key) as W | undefined
+    const stored = memoryProps.get(key) as W | undefined
     if (!stored || stored.__id !== id) {
         const fresh: W = {__id: id, data: def}
-        staticProps.set(key, fresh)
+        memoryProps.set(key, fresh)
         return fresh.data
     }
     return stored.data
 }
-export const Cash = CacheFuncMap(
+export const memoryCache = createCacheMap(
     [
         ["mapResiReact", mapResiReact],
-        ["ExRNDMap3", ExRNDMap3],
+        ["floatingWindowMap", floatingWindowMap],
         ["mapRightMenu", mapRightMenu],
-        ["staticProps", staticProps]
+        ["memoryProps", memoryProps]
     ]
 )
 
-export const MemoryMap = {
-    rnd: ExRNDMap3,
+export const memoryMaps = {
+    rnd: floatingWindowMap,
     resize: mapResiReact,
     rightMenu: mapRightMenu,
-    other: staticProps
+    other: memoryProps
 }

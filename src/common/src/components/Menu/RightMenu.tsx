@@ -8,13 +8,13 @@ import React, {
 } from 'react';
 import { sleepAsync } from 'wenay-common2';
 import {type Position, useDraggable} from "../../hooks/useDraggable";
-import {DivOutsideClick} from "../../hooks/useOutside";
-import { DraggableOutlineDiv } from "../Dnd/DraggableOutlineDiv";
-import { GetModalFuncJSX } from "../Modal/Modal";
+import {OutsideClickArea} from "../../hooks/useOutside";
+import { OutlineDragDemo } from "../Dnd/OutlineDragDemo";
+import { createModalRenderStore } from "../Modal/Modal";
 import {
     mapRightMenu,
     type MenuRightPosition,
-    type MenuRightPosition2,
+    type MenuRightVerticalPosition,
     type MenuRightSavedState
 } from "./RightMenuStore";
 
@@ -23,11 +23,40 @@ export type MenuElement = {
     subMenuContent: () => JSX.Element;
 };
 
+export type MenuRightTriggerState = {isOpen: boolean; isFixed: boolean};
+export type MenuRightTrigger = React.ReactNode | ((state: MenuRightTriggerState) => React.ReactNode);
+export type MenuRightClassNames = Partial<{
+    container: string;
+    activeContainer: string;
+    trigger: string;
+    flyout: string;
+    flyoutUp: string;
+    list: string;
+    item: string;
+    itemActive: string;
+    submenu: string;
+}>;
+export type MenuRightStyles = Partial<Record<
+    'container' | 'trigger' | 'flyout' | 'list' | 'item' | 'submenu',
+    React.CSSProperties
+>>;
+
+function cx(...parts: (string | false | null | undefined)[]) {
+    return parts.filter(Boolean).join(' ');
+}
+
+function renderTrigger(trigger: MenuRightTrigger, state: MenuRightTriggerState) {
+    return typeof trigger == 'function' ? trigger(state) : trigger;
+}
+
 export type DropdownMenuProps = {
     elements: MenuElement[];
     style?: React.CSSProperties;
+    styles?: MenuRightStyles;
+    classNames?: MenuRightClassNames;
+    trigger?: MenuRightTrigger;
     position?: MenuRightPosition;
-    position2?: MenuRightPosition2;
+    verticalPosition?: MenuRightVerticalPosition;
     keyForSave?: string;
 };
 
@@ -36,14 +65,17 @@ export type MenuRightRenderProps = Omit<DropdownMenuProps, 'elements'>;
 export function DropdownMenu({
                                  elements,
                                  style,
+                                 styles,
+                                 classNames = {},
+                                 trigger = '☰',
                                  position: initialPosition = 'right',
-                                 position2: initialPos2 = 'top',
+                                 verticalPosition: initialVerticalPosition = 'top',
                                  keyForSave
                              }: DropdownMenuProps) {
     const [initialState] = useState<MenuRightSavedState>(() => {
         const fallback: MenuRightSavedState = {
             position: initialPosition,
-            position2: initialPos2,
+            verticalPosition: initialVerticalPosition,
             offset: { x: 0, y: 0 }
         };
         if (!keyForSave) return fallback;
@@ -59,10 +91,10 @@ export function DropdownMenu({
     const [select, setSelect] = useState<number | null>(null);
     const data = useRef({ m1: false, m2: false });
     // Get modal JSX functions
-    const jsx = useMemo(GetModalFuncJSX, []);
+    const jsx = useMemo(createModalRenderStore, []);
     const jsxRender = useMemo(() => <jsx.Render />, [jsx]);
     const [position, setPosition] = useState<MenuRightPosition>(initialState.position);
-    const [isTop, setIsTop] = useState(initialState.position2 === 'top');
+    const [isTop, setIsTop] = useState(initialState.verticalPosition === 'top');
     const positionLast = useRef<{ x: number; y: number }>({ ...initialState.offset });
     const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -107,7 +139,7 @@ export function DropdownMenu({
             // mapRightMenu is observable: set() itself marks the cache dirty
             mapRightMenu.set(keyForSave, {
                 position: nextPosition,
-                position2: toTop ? 'top' : 'bottom',
+                verticalPosition: toTop ? 'top' : 'bottom',
                 offset: { ...nextOffset }
             });
         }
@@ -160,23 +192,26 @@ export function DropdownMenu({
         <div
             onMouseEnter={handleContentMouseEnter}
             onMouseLeave={handleContentMouseLeave}
-            className={`dropdown-content2 ${!isTop ? 'dropdown-up' : ''}`}
+            className={cx(classNames.flyout ?? 'dropdown-content2', !isTop ? (classNames.flyoutUp ?? 'dropdown-up') : undefined)}
             style={{
                 display: 'flex',
                 [position]: 0,
                 right: position === 'left' ? 'auto' : 0,
-                flexDirection: position === 'left' ? 'row' : 'row-reverse'
+                flexDirection: position === 'left' ? 'row' : 'row-reverse',
+                ...styles?.flyout
             }}
         >
             <div
-                className="dropdown-content"
+                className={classNames.list ?? "dropdown-content"}
+                style={styles?.list}
                 onMouseEnter={handleContentMouseEnter}
                 onMouseLeave={handleContentMouseLeave}
             >
                 {elements.map((item, index) => (
                     <div
                         key={item.label}
-                        className={`menu-item ${select === index ? 'force-hover' : ''}`}
+                        className={cx(classNames.item ?? 'menu-item', select === index ? (classNames.itemActive ?? 'force-hover') : undefined)}
+                        style={styles?.item}
                         onMouseEnter={() => handleSelect(item, index)}
                         onClick={() => handleSelect(item, index)}
                     >
@@ -191,8 +226,8 @@ export function DropdownMenu({
                 {jsx.JSX ? (
                     // clamp to the viewport: with hard 40vw/70vh the submenu ran
                     // off screen when the menu sat near a bottom/side edge
-                    <div className="submenu" style={{ width: '40vw', minHeight: '70vh',
-                        maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto' }}>
+                    <div className={classNames.submenu ?? "submenu"} style={{ width: '40vw', minHeight: '70vh',
+                        maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto', ...styles?.submenu }}>
                         {jsxRender}
                     </div>
                 ) : null}
@@ -213,6 +248,7 @@ export function DropdownMenu({
     const containerStyle = useMemo<React.CSSProperties>(() => {
         const computedStyle: React.CSSProperties = {
             ...style,
+            ...styles?.container,
             display: 'flex'
         };
 
@@ -233,26 +269,26 @@ export function DropdownMenu({
             computedStyle.top = 'auto';
         }
         return computedStyle;
-    }, [style, position, isTop, computedX, computedY]);
+    }, [style, styles?.container, position, isTop, computedX, computedY]);
 
     return (
-        <DivOutsideClick
+        <OutsideClickArea
             ref={containerRef}
             outsideClick={handleClickOutside}
-            className={`menu-container ${isFixed ? 'activeM' : ''}`}
+            className={cx(classNames.container ?? 'menu-container', isFixed ? (classNames.activeContainer ?? 'activeM') : undefined)}
             style={containerStyle}
             onMouseEnter={() => !isFixed && setIsOpen(true)}
             onMouseLeave={() => !isFixed && setIsOpen(false)}
         >
-            <div {...dragProps} className="menu-button" onClick={handleToggle}>
-                ☰
+            <div {...dragProps} className={classNames.trigger ?? "menu-button"} style={styles?.trigger} onClick={handleToggle}>
+                {renderTrigger(trigger, {isOpen, isFixed})}
             </div>
             {dop}
-        </DivOutsideClick>
+        </OutsideClickArea>
     );
 }
 
-export function MenuRightApi() {
+export function createRightMenuController() {
     const elements: MenuElement[] = [];
     let render: null | (React.Dispatch<React.SetStateAction<MenuElement[]>>) = null;
 
@@ -286,13 +322,13 @@ export function MenuRightApi() {
     };
 }
 
-export function DropdownMenuTest() {
+export function RightMenuDemo() {
     const testData: MenuElement[] = [
         {label: "Item 1", subMenuContent: () => <SubMenu/>},
         {label: "Item 2", subMenuContent: () => <SubMenu2/>},
         {label: "Item 3", subMenuContent: () => <SubMenu/>}
     ]
-    const menu = useMemo(MenuRightApi,[]);
+    const menu = useMemo(createRightMenuController,[]);
     useEffect(() => {
         menu.set(testData)
     }, []);
@@ -304,7 +340,7 @@ export function DropdownMenuTest() {
 const SubMenu = () => {
     return (
         <div className="maxSize">
-            <DraggableOutlineDiv/>
+            <OutlineDragDemo/>
             <div className="submenu-item">Subitem 1</div>
             <div className="submenu-item">Subitem 2</div>
             <div className="submenu-item">Subitem 3</div>

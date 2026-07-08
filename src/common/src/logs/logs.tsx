@@ -3,19 +3,19 @@ import React, {useCallback, useEffect, useRef} from "react";
 import {copyToClipboard, Params, timeLocalToStr_hhmmss, ArrayElementType} from "wenay-common2";
 import {renderBy, updateBy} from "../../updateBy";
 import {ColDef, ColGroupDef, GridReadyEvent} from "ag-grid-community";
-import {mouseMenuApi} from "../menu/menuMouse";
-import { staticGetAdd } from "../utils/mapMemory";
-import { ParametersReact } from "../components/ParametersEngine";
+import {contextMenu} from "../menu/menuMouse";
+import { memoryGetOrCreate } from "../utils/memoryStore";
+import { ParamsEditor } from "../components/ParamsEditor";
 
-type tLogsInput<T extends object> = T & {id : string, var?: number, time: Date, txt: string}
-type tLogs<T extends object = {}> = tLogsInput<T> & {num: number}
-const cashLogs = new Map<string, tLogs<any>[]>()
+type LogInput<T extends object> = T & {id : string, var?: number, time: Date, txt: string}
+type LogEntry<T extends object = {}> = LogInput<T> & {num: number}
+const cashLogs = new Map<string, LogEntry<any>[]>()
 
 const datumConst = {
     map: cashLogs,
 }
 const datumMiniConst = {
-    last: [] as tLogs[]
+    last: [] as LogEntry[]
 }
 const getSettingLogs = () => ({
     minVarLogs: {name:"min. importance for notifications", range: {min: 0 , max: 25, step: 1}, value: 0},
@@ -33,7 +33,7 @@ export function getLogsApi<T extends object = {}>(
         limitPer: number,
         varMin?: number
     }) {
-    const datum = staticGetAdd("settingLogs",settingLogs)
+    const datum = memoryGetOrCreate("settingLogs",settingLogs)
     function addToArr<T>(arr: T[], data: T, limit: number){
         arr.unshift(data)
         if (arr.length > limit) arr.length = limit
@@ -41,7 +41,7 @@ export function getLogsApi<T extends object = {}>(
     let num = 0
 
     return {
-        addLogs(a: tLogsInput<T>){
+        addLogs(a: LogInput<T>){
             const item = {...a, num: num++}
             addToArr(datumMiniConst.last, item, setting.limit ?? 50)
             addToArr(datumConst.map.get(a.id) ?? datumConst.map.set(a.id,[]).get(a.id)!, item, setting.limitPer)
@@ -68,8 +68,8 @@ export function getLogsApi<T extends object = {}>(
 export const logsApi = getLogsApi<{}>({limitPer: 500})
 
 function InputSettingLogs({}:{update?: number}) {
-    const datum = staticGetAdd("settingLogs",settingLogs)
-    return <ParametersReact
+    const datum = memoryGetOrCreate("settingLogs",settingLogs)
+    return <ParamsEditor
         // @ts-ignore
         params={Params.mergeParamValuesToInfos(getSettingLogs(), datum.params)}
         onChange = {(e)=>{
@@ -83,7 +83,7 @@ export function PageLogs({update}: {update?: number}) {
     const rowData = [...datumFull.map.values()].flat()
     type el = ArrayElementType<typeof rowData >
     const datum = datumMiniConst
-    const setting = staticGetAdd("settingLogs",settingLogs)
+    const setting = memoryGetOrCreate("settingLogs",settingLogs)
     const apiGrid = useRef<GridReadyEvent<el>|null>(null)
     useEffect(()=> {
         apiGrid.current?.api.sizeColumnsToFit()
@@ -182,14 +182,12 @@ export function PageLogs({update}: {update?: number}) {
                 rowData = {rowData}
                 columnDefs = {columns}
                 onCellMouseDown = {(e)=>{
-                    // @ts-ignore
-                    if (e.event?.button == 2) {
-                        // copyToClipboard(e.value)
-                        mouseMenuApi.map.set("sym",[
+                    if (e.event instanceof MouseEvent && e.event.button == 2) {
+                        contextMenu.openAt(e.event, [
                             {
                                 name: "copy", onClick: ()=> {copyToClipboard(e.value)}
                             }
-                        ])
+                        ]);
                     }
                 }}
             >
@@ -201,7 +199,7 @@ export function PageLogs({update}: {update?: number}) {
     return <Main/>
 }
 
-function Message({logs}: {logs: tLogs}) {
+function Message({logs}: {logs: LogEntry}) {
     let red = (logs.var ?? 0) * 10
     if (red > 255) red = 255
     return <div className={"testAnime"}
@@ -225,7 +223,7 @@ function Message({logs}: {logs: tLogs}) {
 const tt: {[key: string]: React.ReactElement} = {}
 let r = 0
 export function MessageEventLogs({zIndex} :{zIndex?: number}) {
-    const setting = staticGetAdd("settingLogs",settingLogs)
+    const setting = memoryGetOrCreate("settingLogs",settingLogs)
     updateBy(tt)
     updateBy(datumMiniConst, ()=>{
         const last = datumMiniConst.last[0]
@@ -272,7 +270,7 @@ const pages   = [
 ] satisfies ty[]
 
 const map = Object.fromEntries(pages.map(e=>[e.key,e.page]))
-export function PageLogs2({update}: {update?: number}) {
+export function LogsPage({update}: {update?: number}) {
     const datum = defPageBase
     updateBy(datum)
 

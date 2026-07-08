@@ -32,7 +32,7 @@
   /* Menu shadow (was a literal in .MenuR) */
   --menu-shadow: 0 0 20px 14px rgba(34, 60, 80, 0.2);
 
-  /* Window (DivRnd3) chrome. Defaults = legacy look, so apps without themes do not change.
+  /* Window (FloatingWindow) chrome. Defaults = legacy look, so apps without themes do not change.
      Apps re-skin via :root[data-theme='...'] overrides, same contract as --color-* / --menu-*.
      Intentionally NOT declared here (fall back to inherit/auto until a theme declares them):
      --wnd-header-height, --wnd-header-color, --wnd-header-font-size,

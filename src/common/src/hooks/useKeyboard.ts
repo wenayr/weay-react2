@@ -2,11 +2,11 @@ import {useEffect, useRef} from "react";
 import {renderBy} from "../../updateBy";
 import {listen as createListen} from "wenay-common2";
 
-export const KeyDown = {
+export const keyboardState = {
     key: "" as string
 }
 
-export type AnyKeyDownApi = {
+export type KeyboardApi = {
     readonly key: string;
     getKey(): string;
     get(): string;
@@ -16,29 +16,29 @@ export type AnyKeyDownApi = {
     on(listener: (key: string, event?: KeyboardEvent) => void): () => void;
 }
 
-const [emitKeyDown, keyDownListen] = createListen<[string, KeyboardEvent | undefined]>();
+const [emitKeyDown, keyboardListen] = createListen<[string, KeyboardEvent | undefined]>();
 
-export const keyDownApi: AnyKeyDownApi = {
-    get key() { return KeyDown.key; },
-    getKey() { return KeyDown.key; },
-    get() { return KeyDown.key; },
+export const keyboard: KeyboardApi = {
+    get key() { return keyboardState.key; },
+    getKey() { return keyboardState.key; },
+    get() { return keyboardState.key; },
     clear() {
-        KeyDown.key = "";
-        renderBy(KeyDown);
+        keyboardState.key = "";
+        renderBy(keyboardState);
         emitKeyDown("", undefined);
     },
     reset() {
-        keyDownApi.clear();
+        keyboard.clear();
     },
     subscribe(listener) {
-        return keyDownListen.on(listener);
+        return keyboardListen.on(listener);
     },
     on(listener) {
-        return keyDownListen.on(listener);
+        return keyboardListen.on(listener);
     }
 }
 
-export function useAddDownAnyKey(options: {
+export function useKeyboard(options: {
     enabled?: boolean,
     target?: Document | HTMLElement,
     onKeyDown?: (key: string, event: KeyboardEvent) => void,
@@ -53,8 +53,8 @@ export function useAddDownAnyKey(options: {
         if (!currentTarget) return;
         const func: EventListener = (event) => {
             if (!(event instanceof KeyboardEvent)) return;
-            KeyDown.key = event.key;
-            renderBy(KeyDown);
+            keyboardState.key = event.key;
+            renderBy(keyboardState);
             emitKeyDown(event.key, event);
             onKeyDownRef.current?.(event.key, event);
         };
@@ -64,16 +64,5 @@ export function useAddDownAnyKey(options: {
         };
     }, [enabled, target]);
 
-    return keyDownApi;
+    return keyboard;
 }
-
-export const useKeyDown = useAddDownAnyKey;
-export const useAnyKey = useAddDownAnyKey;
-
-/** @deprecated Use `useKeyDown(options)` or `useAnyKey(options)`. */
-export function addDownAnyKey() {
-    return useAddDownAnyKey();
-}
-
-/** @deprecated Use `useKeyDown(options)` or `useAnyKey(options)`. */
-export const useAddDownAnyKeyOld = useAddDownAnyKey;

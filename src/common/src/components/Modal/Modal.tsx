@@ -1,44 +1,44 @@
 import React from "react";
 import {renderBy, updateBy} from "../../../updateBy";
-import {InputPageModal} from "../Input";
+import {TextInputModal} from "../Input";
 import type {ModalApi} from "./ModalContextProvider";
 
-type LegacyModalSetter = (jsx: React.ReactNode | null) => void;
-type ModalTarget = LegacyModalSetter | ModalApi;
+type ModalSetter = (jsx: React.ReactNode | null) => void;
+type ModalTarget = ModalSetter | ModalApi;
 
 function setModalTarget(target: ModalTarget, jsx: React.ReactNode | null) {
     if (typeof target == "function") target(jsx);
     else target.replace(jsx);
 }
 
-export function inputModal({setModalJSX, func, name, txt}: {
+export function inputModal({modal, func, name, txt}: {
     txt?: string,
     name?: string,
     /** Any modal setter: setState/useModal or ModalApi from useModal */
-    setModalJSX: ModalTarget,
+    modal: ModalTarget,
     func: (txt: string) => void
 }) {
-    setModalTarget(setModalJSX, <InputPageModal callback={txt => {
+    setModalTarget(modal, <TextInputModal callback={txt => {
         func(txt)
-        setModalTarget(setModalJSX, null)
-    }} outClick={() => setModalTarget(setModalJSX, null)} name={name ?? "name"} txt={txt}/>)
+        setModalTarget(modal, null)
+    }} outClick={() => setModalTarget(modal, null)} name={name ?? "name"} txt={txt}/>)
 }
 
-export function confirmModal({setModalJSX, func, password = "111"}: {
+export function confirmModal({modal, func, password = "111"}: {
     /** Any modal setter: setState/useModal or ModalApi from useModal */
-    setModalJSX: ModalTarget,
+    modal: ModalTarget,
     func: () => any,
-    /** Confirmation code word. Default "111" is kept for compatibility; pass your own. */
+    /** Confirmation code word. Default is "111"; pass your own for app flows. */
     password?: string
 }) {
-    // Do not expose custom passwords in the hint; show the legacy default as before.
+    // Do not expose custom passwords in the hint; show only the default hint.
     const hint = password == "111" ? "password 111" : "password"
-    setModalTarget(setModalJSX, <InputPageModal callback={txt => {
+    setModalTarget(modal, <TextInputModal callback={txt => {
         if (txt == password) func()
-        setModalTarget(setModalJSX, null)
-    }} outClick={() => setModalTarget(setModalJSX, null)} name={hint}/>)
+        setModalTarget(modal, null)
+    }} outClick={() => setModalTarget(modal, null)} name={hint}/>)
 }
-// Shared store for GetModalJSX/GetModalFuncJSX: identical logic, the only
+// Shared store for createModalElementStore/createModalRenderStore: identical logic, the only
 // difference is how a stored value turns into an element (renderItem)
 function createJsxStore<J extends object>(renderItem: (jsx: J) => React.JSX.Element | null) {
     let _jsx = null as J | null
@@ -82,19 +82,13 @@ function createJsxStore<J extends object>(renderItem: (jsx: J) => React.JSX.Elem
     return data
 }
 
-/**
- * @deprecated Imperative JSX storage based on updateBy/renderBy.
- * Use `ModalProvider`/`useModal` (ModalContextProvider): context plus portal.
- */
-export function GetModalJSX(){
+/** Low-level imperative JSX storage based on updateBy/renderBy. Prefer `ModalProvider`/`useModal` for app modals. */
+export function createModalElementStore(){
     return createJsxStore<React.JSX.Element>(jsx => jsx)
 }
 
-/**
- * @deprecated Imperative JSX storage based on updateBy/renderBy.
- * Use `ModalProvider`/`useModal` (ModalContextProvider): context plus portal.
- */
-export function GetModalFuncJSX(){
+/** Low-level imperative JSX storage based on updateBy/renderBy. Prefer `ModalProvider`/`useModal` for app modals. */
+export function createModalRenderStore(){
     return createJsxStore<() => React.JSX.Element | null>(f => f())
 }
 

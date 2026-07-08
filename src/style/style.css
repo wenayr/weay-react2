@@ -319,7 +319,7 @@ body {
   margin-left: -1px;
 }
 
-/* DivRnd3 window chrome. All visuals go through --wnd-* tokens (tokens.css);
+/* FloatingWindow window chrome. All visuals go through --wnd-* tokens (tokens.css);
    defaults reproduce the legacy look, apps re-skin via :root[data-theme] token overrides. */
 .wenayWnd {
   background: var(--wnd-bg);
@@ -350,7 +350,7 @@ body {
   background: var(--wnd-header-stripes);
 }
 
-/* Window close button (DivRnd3 and others) */
+/* Window close button (FloatingWindow and others) */
 .wenayCloseBtn {
   width: var(--wnd-close-size, 28px);
   height: var(--wnd-close-size, 28px);
@@ -378,7 +378,7 @@ body {
 .wenayCloseBtn:active {
   transform: scale(0.95);
 }
-/* Positioning of the close button inside DivRnd3. Kept separate from .wenayCloseBtn,
+/* Positioning of the close button inside FloatingWindow. Kept separate from .wenayCloseBtn,
    which may be used outside windows and must not become position:absolute there. */
 .wenayWndClose {
   position: absolute;

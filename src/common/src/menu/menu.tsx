@@ -11,7 +11,7 @@ import { promiseProgress, sleepAsync } from "wenay-common2";
 /*******************************************************
  * Menu data types
  *******************************************************/
-export type tMenuReactStrictly<T = any> = {
+export type MenuItemStrict<T = any> = {
     name: string | ((status?: T) => string);
     getStatus?: (() => T) | null;
     onClick?: ((
@@ -20,25 +20,25 @@ export type tMenuReactStrictly<T = any> = {
     active?: (() => boolean) | null;
     status?: boolean;
     // Supports returning a menu array synchronously or asynchronously
-    next?: (() => (tMenuReact<any> | false)[] | Promise<(tMenuReact<any> | false)[]>) | null;
+    next?: (() => (MenuItem<any> | false)[] | Promise<(MenuItem<any> | false)[]>) | null;
     // Supports returning a React element synchronously or asynchronously
     func?: (() => React.ReactElement | Promise<React.ReactElement>) | null;
     // Supports returning an onFocus menu array synchronously or asynchronously
-    onFocus?: (() => tMenuReact<any>[] | Promise<tMenuReact<any>[]>) | null;
+    onFocus?: (() => MenuItem<any>[] | Promise<MenuItem<any>[]>) | null;
     menuElement?: typeof MenuElement;
 };
 
-export type tMenuReact<T = any> = tMenuReactStrictly<T> | false | null | undefined;
+export type MenuItem<T = any> = MenuItemStrict<T> | false | null | undefined;
 
 /*******************************************************
  * Helper type
  *******************************************************/
-type tCounters = { ok?: number; error?: number; count?: number };
+type MenuProgressCounters = { ok?: number; error?: number; count?: number };
 
 /*******************************************************
  * Displays counter/progress with animation and ok/error counts
  *******************************************************/
-function TimeNum({ data }: { data: tCounters }): ReactElement {
+function MenuProgress({ data }: { data: MenuProgressCounters }): ReactElement {
     const [count, setCount] = useState(0);
 
     const formatLabel = (): string | number => {
@@ -78,7 +78,7 @@ function MenuElement({
                          className,
                          update,
                      }: {
-    data: Pick<tMenuReactStrictly, "onClick" | "active" | "name" | "getStatus">;
+    data: Pick<MenuItemStrict, "onClick" | "active" | "name" | "getStatus">;
     toLeft: boolean;
     className?: (active?: boolean) => string;
     update: () => void;
@@ -96,7 +96,7 @@ function MenuElement({
         };
     }, []);
 
-    const [progress, setProgress] = useState<tCounters | null>(null);
+    const [progress, setProgress] = useState<MenuProgressCounters | null>(null);
 
     return (
         <div
@@ -154,7 +154,7 @@ function MenuElement({
                                 // If an array from Promise.allSettled was returned
                                 // Count ok/error results
                                 if (val[0]?.status === "fulfilled" || val[0]?.status === "rejected") {
-                                    const t = { ok: 0, error: 0 } as tCounters;
+                                    const t = { ok: 0, error: 0 } as MenuProgressCounters;
                                     val.forEach((res: any) => {
                                         if (res?.status === "fulfilled") t.ok!++;
                                         if (res?.status === "rejected") t.error!++;
@@ -179,7 +179,7 @@ function MenuElement({
                 {typeof item.name === "string"
                     ? item.name
                     : item.name(item.getStatus?.())}
-                {progress && <TimeNum data={progress} />}
+                {progress && <MenuProgress data={progress} />}
             </div>
         </div>
     );
@@ -190,14 +190,14 @@ function MenuElement({
  * adding async value support for next, func, and onFocus.
  *******************************************************/
 type MenuItemWrapperProps = {
-    item: tMenuReactStrictly;
+    item: MenuItemStrict;
     index: number;
     update: () => void;
     className?: (active?: boolean) => string;
     isLeftAligned: boolean;
     leftPos: number;
-    menuElement?: (item: tMenuReact) => ReactElement;
-    fullArray: tMenuReactStrictly[];
+    menuElement?: (item: MenuItem) => ReactElement;
+    fullArray: MenuItemStrict[];
 };
 
 const MenuItemWrapper = ({
@@ -210,9 +210,9 @@ const MenuItemWrapper = ({
                              menuElement,
                              fullArray,
                          }: MenuItemWrapperProps): ReactElement => {
-    const [childMenu, setChildMenu] = useState<tMenuReactStrictly[]>([]);
+    const [childMenu, setChildMenu] = useState<MenuItemStrict[]>([]);
     const [asyncFuncElement, setAsyncFuncElement] = useState<React.ReactElement | null>(null);
-    const [onFocusMenu, setOnFocusMenu] = useState<tMenuReactStrictly[]>([]);
+    const [onFocusMenu, setOnFocusMenu] = useState<MenuItemStrict[]>([]);
 
     useEffect(() => {
         if (item.status && item.next) {
@@ -220,10 +220,10 @@ const MenuItemWrapper = ({
             const result = item.next();
             if (result instanceof Promise) {
                 result.then((val) => {
-                    if (alive) setChildMenu(val.filter(Boolean) as tMenuReactStrictly[]);
+                    if (alive) setChildMenu(val.filter(Boolean) as MenuItemStrict[]);
                 });
             } else {
-                setChildMenu(result.filter(Boolean) as tMenuReactStrictly[]);
+                setChildMenu(result.filter(Boolean) as MenuItemStrict[]);
             }
             return () => { alive = false; };
         } else {
@@ -254,10 +254,10 @@ const MenuItemWrapper = ({
             const result = item.onFocus();
             if (result instanceof Promise) {
                 result.then((val) => {
-                    if (alive) setOnFocusMenu(val.filter(Boolean) as tMenuReactStrictly[]);
+                    if (alive) setOnFocusMenu(val.filter(Boolean) as MenuItemStrict[]);
                 });
             } else {
-                setOnFocusMenu(result.filter(Boolean) as tMenuReactStrictly[]);
+                setOnFocusMenu(result.filter(Boolean) as MenuItemStrict[]);
             }
             return () => { alive = false; };
         } else {
@@ -293,7 +293,7 @@ const MenuItemWrapper = ({
             <div>
                 {item.status && childMenu.length > 0 && (
                     <div style={{ position: "relative" }}>
-                        <MenuBase
+                        <Menu
                             data={childMenu}
                             coordinate={{
                                 x: 3,
@@ -306,7 +306,7 @@ const MenuItemWrapper = ({
                 )}
                 {item.status && asyncFuncElement && (
                     <div style={{ position: "relative" }}>
-                        <MenuBase
+                        <Menu
                             menu={() => asyncFuncElement}
                             data={[]}
                             coordinate={{
@@ -320,7 +320,7 @@ const MenuItemWrapper = ({
                 )}
                 {item.status && onFocusMenu.length > 0 && (
                     <div style={{ position: "relative" }}>
-                        <MenuBase
+                        <Menu
                             data={onFocusMenu}
                             coordinate={{
                                 x: 3,
@@ -337,7 +337,7 @@ const MenuItemWrapper = ({
 };
 
 /*******************************************************
- * MenuBase renders the popup menu with support for
+ * Menu renders the popup menu with support for
  * nested submenus and their state management.
  *
  * @param {Object} props - Component props.
@@ -346,7 +346,7 @@ const MenuItemWrapper = ({
  * @param {number} props.coordinate.y - Y coordinate for menu placement.
  * @param {boolean} [props.coordinate.toLeft=false] - Whether the menu should be shifted left.
  * @param {number} [props.coordinate.left=0] - Additional left offset when the menu has nested items.
- * @param {tMenuReactStrictly[]} props.data - Array of objects describing menu items.
+ * @param {MenuItemStrict[]} props.data - Array of objects describing menu items.
  * @param {number} [props.zIndex] - Menu z-index for overlap visibility.
  * @param {Function} [props.menu] - Function that generates a custom React element for the whole menu.
  * @param {Function} [props.menuElement] - Function that generates a custom React element for one menu item.
@@ -354,10 +354,10 @@ const MenuItemWrapper = ({
  *
  * @returns {ReactElement} Visual menu element.
  */
-type MenuBaseProps = {
-    menu?: (arr: tMenuReact[]) => ReactElement;
-    menuElement?: (item: tMenuReact) => ReactElement;
-    data: tMenuReact[];
+type MenuProps = {
+    menu?: (arr: MenuItem[]) => ReactElement;
+    menuElement?: (item: MenuItem) => ReactElement;
+    data: MenuItem[];
     zIndex?: number;
     className?: (active?: boolean) => string;
     coordinate?: {
@@ -368,20 +368,20 @@ type MenuBaseProps = {
     };
 };
 
-export function MenuBase({
+export function Menu({
                              coordinate = { x: 0, y: 0, toLeft: false, left: 0 },
                              data,
                              zIndex,
                              menu,
                              className,
                              menuElement,
-                         }: MenuBaseProps): ReactElement {
+                         }: MenuProps): ReactElement {
     const [, forceUpdate] = useState(false);
     const update = () => forceUpdate((p) => !p);
     const refMenu = useRef<HTMLDivElement | null>(null);
 
     const dataMemo = useMemo(
-        () => data.filter(Boolean) as tMenuReactStrictly[],
+        () => data.filter(Boolean) as MenuItemStrict[],
         [data, data.length]
     );
 
@@ -454,4 +454,4 @@ export function MenuBase({
     );
 }
 
-export { TimeNum, MenuElement };
+export { MenuProgress, MenuElement };

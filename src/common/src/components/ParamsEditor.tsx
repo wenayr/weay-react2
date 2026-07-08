@@ -1,8 +1,8 @@
 import React, {ReactElement, useEffect, useMemo, useRef, useState} from "react";
 import {const_Date, deepCloneMutable, isDate, Params, TF, timeLocalToStr_yyyymmdd, timeLocalToStr_yyyymmdd_hhmm, timeLocalToStr_yyyymmdd_hhmmss, timeLocalToStr_yyyymmdd_hhmmss_ms} from "wenay-common2";
 import {setResizeableElement, removeResizeableElement} from "./MyResizeObserver";
-import {CParameter, FNameButton} from "./Parameters";
-import {SetAutoStepForElement} from "../utils";
+import {ParamRow, ParamToggleLabel} from "./Parameters";
+import {setAutoStepForElement} from "../utils";
 
 function timeToStr(time: number | string | const_Date, step?: number) {
     function getTimeStep(time: number) {
@@ -239,7 +239,7 @@ function InputNumber(set: (data: number)=>void, value: number, range: Readonly<P
                    if (ref) {
                        _ref = ref;
                        ref.step = step + "";
-                       SetAutoStepForElement(ref, {minStep: range.step});
+                       setAutoStepForElement(ref, {minStep: range.step});
                    }
                }}
         />
@@ -282,7 +282,7 @@ function InputListArray<T extends number | string>(set: (data: T[]) => void, val
         }
     </select>
 }
-export function ParametersReact<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>(data : {
+export function ParamsEditor<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>(data : {
     params: TParams,
     expandStatus?: boolean,
     expandStatusLvl?: number,
@@ -294,14 +294,14 @@ export function ParametersReact<TParams extends Params.IParamsExpandableReadonly
     const callbacks = useRef({onChange: data.onChange, onExpand: data.onExpand});
     callbacks.current = {onChange: data.onChange, onExpand: data.onExpand};
     const result = useMemo(() => {
-        return <ParametersBaseReact params={data.params}
+        return <ParamsEditorBase params={data.params}
                                     onChange={(p) => callbacks.current.onChange(p)}
                                     onExpand={(p) => callbacks.current.onExpand?.(p)}
                                     expandStatus={data.expandStatus} expandStatusLvl={data.expandStatusLvl}/>
     }, [data.params]);
     return result
 }
-function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>(data : {
+function ParamsEditorBase<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>(data : {
     params: TParams,
     expandStatus?: boolean,
     expandStatusLvl?: number,
@@ -368,11 +368,11 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                         obj[key] = data as boolean | string; // this branch only renders boolean/string params
                         onSetValue(data);
                     }
-                    return <CParameter key={key + "#"+typeof(param)} name={key} enabled={parentEnabled}>
+                    return <ParamRow key={key + "#"+typeof(param)} name={key} enabled={parentEnabled}>
                         {
                             Param(set, param)
                         }
-                    </CParameter>
+                    </ParamRow>
                 }
 
             if (typeof(param)=="function") {
@@ -381,7 +381,7 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
             if (typeof(param)=="object") {
                 if (param.hidden) return null;
                 const {value, range, name = key, enabled} = param;
-                const nameButton = (type: boolean) => FNameButton(type, name)
+                const nameButton = (type: boolean) => ParamToggleLabel(type, name)
                 const nameT = <p className={"toPTextIndicator"}>{name}</p>
 
                 const set = (a: typeof value) => {
@@ -399,7 +399,7 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
 
                 const simpleParameter = (element: React.JSX.Element | null) => {
                     if (!element) return null;
-                    return <CParameter key={key + "a1"} name={nameT} enabled={parentEnabled && enabled != false} commentary={param.commentary}>
+                    return <ParamRow key={key + "a1"} name={nameT} enabled={parentEnabled && enabled != false} commentary={param.commentary}>
                         {element}
                         {enabled != null ?
                             CheckBox(
@@ -411,7 +411,7 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                             )
                             : undefined
                         }
-                    </CParameter>
+                    </ParamRow>
                 }
                 const nestedMarginLeft = 20;
 
@@ -496,7 +496,7 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                                     set(array);
                                 }
                                 const paramL = (hover: boolean) =>
-                                    <CParameter name={<>{hover && !param.constLength && onHoverElement}{nameElement}</>} commentary={param.commentary}>
+                                    <ParamRow name={<>{hover && !param.constLength && onHoverElement}{nameElement}</>} commentary={param.commentary}>
                                         {
                                             Param(onSet, itemVal, type, range, (param as Params.IParamEnum).labels)
                                         }
@@ -512,7 +512,7 @@ function ParametersBaseReact<TParams extends Params.IParamsExpandableReadonly = 
                                             )
                                             : undefined
                                         }
-                                    </CParameter>
+                                    </ParamRow>
                                 return <DivHover key={name_ + "#$"}>{(hover) => paramL(hover)}</DivHover>
                             }
                         );

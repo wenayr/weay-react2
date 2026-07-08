@@ -1,20 +1,20 @@
 import React, {useState} from 'react'
 import {listen as createListen} from 'wenay-common2'
 import {renderBy, updateBy} from '../../../updateBy'
-import {staticGetAdd, staticMarkDirty} from '../../utils/mapMemory'
-import {DivOutsideClick} from '../../hooks/useOutside'
+import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
+import {OutsideClickArea} from '../../hooks/useOutside'
 import {useReorder} from '../../hooks/useReorder'
 
 /** createToolbar - a customizable, self-describing toolbar primitive.
  *  Three decoupled layers: config (plain serializable data, persisted via
- *  staticProps -> Cash, same mechanics as createUiSlot), Bar (renders visible
+ *  memoryProps -> memoryCache, same mechanics as createUiSlot), Bar (renders visible
  *  items in config order at config density) and Settings (a pure editor that
  *  only reads/writes config) - so the SAME Settings element works both in the
  *  Bar's own gear popover and in a global settings section.
  *  v1 non-goals: no overflow/"more" menu (an overflow hook would live in Bar,
  *  right after the visible-items map), no grouping, no cross-bar drag. */
 
-export type tToolbarItem = {
+export type ToolbarItem = {
     /** stable id (persist key) */
     key: string
     /** full human name - shown in the Settings list */
@@ -34,7 +34,7 @@ export type tToolbarItem = {
     fixed?: boolean
 }
 
-export type tToolbarConfig = {
+export type ToolbarConfig = {
     /** item keys, display order */
     order: string[]
     visible: {[key: string]: boolean}
@@ -43,7 +43,7 @@ export type tToolbarConfig = {
 }
 
 /** The order/visibility slice of a config - what an external source owns. */
-export type tUiListConfig = {
+export type UiListConfig = {
     order: string[]
     visible: {[key: string]: boolean}
 }
@@ -53,20 +53,20 @@ export type tUiListConfig = {
  *  syncs with, so dragging a column in the grid reorders the toolbar and
  *  vice versa. Density and the gear flag stay toolbar-local (persisted under
  *  the toolbar's own key). useConfig must be a React hook (subscription). */
-export type tUiListSource = {
-    useConfig: () => tUiListConfig
-    getConfig: () => tUiListConfig
-    setConfig: (next: tUiListConfig) => void
+export type UiListSource = {
+    useConfig: () => UiListConfig
+    getConfig: () => UiListConfig
+    setConfig: (next: UiListConfig) => void
     /** re-emitted as the toolbar's own onChange (grid-driven changes included) */
-    onChange?: (cb: (cfg: tUiListConfig) => void) => () => void
+    onChange?: (cb: (cfg: UiListConfig) => void) => () => void
 }
 
-export type tToolbarDensity = {
+export type ToolbarDensity = {
     key: string
     /** human name for the Settings segmented control */
     name: string
     /** how one item renders at this density; absent = icon + (short ?? title) */
-    renderItem?: (item: tToolbarItem) => React.ReactNode
+    renderItem?: (item: ToolbarItem) => React.ReactNode
 }
 
 // Module singleton (closure + updateBy subscription, no React context) - same
@@ -75,7 +75,7 @@ export type tToolbarDensity = {
 const densities = {list: [
     {key: 'icon', name: 'Icons', renderItem: itemIconOnly},
     {key: 'label', name: 'Icons + labels'},
-] as tToolbarDensity[]}
+] as ToolbarDensity[]}
 
 /** Icon with a text fallback: no glyph = the first letters of short/title
  *  (an "PR"-style pseudo-icon), so icon densities work for icon-less items. */
@@ -85,13 +85,13 @@ export function toolbarItemIcon(item: {icon?: React.ReactNode, short?: string, t
     </span>
 }
 
-function itemIconOnly(item: tToolbarItem) {
+function itemIconOnly(item: ToolbarItem) {
     return toolbarItemIcon(item)
 }
 
 /** Register an extra density level. Re-register with the same key replaces the
  *  previous one. The returned function removes exactly this registration. */
-export function registerToolbarDensity(d: tToolbarDensity) {
+export function registerToolbarDensity(d: ToolbarDensity) {
     const i = densities.list.findIndex(e => e.key == d.key)
     if (i == -1) densities.list.push(d)
     else densities.list.splice(i, 1, d)
@@ -106,11 +106,11 @@ export function registerToolbarDensity(d: tToolbarDensity) {
 }
 
 /** Current density registry (built-ins + registered). */
-export function getToolbarDensities(): readonly tToolbarDensity[] {
+export function getToolbarDensities(): readonly ToolbarDensity[] {
     return densities.list
 }
 
-function itemContent(item: tToolbarItem, densityKey: string) {
+function itemContent(item: ToolbarItem, densityKey: string) {
     if (item.render) return item.render(densityKey)
     const d = densities.list.find(e => e.key == densityKey)
     if (d?.renderItem) return d.renderItem(item)
@@ -125,12 +125,12 @@ function itemContent(item: tToolbarItem, densityKey: string) {
 const SETTINGS_KEY = '__settings'
 
 export function createToolbar(opts: {
-    /** persistence key (staticProps -> Cash), like createUiSlot */
+    /** persistence key (memoryProps -> memoryCache), like createUiSlot */
     key: string
     /** item descriptors; the config only ever references them by key */
-    items: tToolbarItem[]
+    items: ToolbarItem[]
     /** defaults; missing fields are derived from items */
-    def?: Partial<tToolbarConfig>
+    def?: Partial<ToolbarConfig>
     /** the gear button's face: icon/title default to a plain gear svg. The gear
      *  renders only when Bar mounts with settings, AND visible['__settings'] is
      *  not false - the Settings editor shows a separated toggle row for it. */
@@ -140,15 +140,15 @@ export function createToolbar(opts: {
      *  outside changes (a column dragged in the grid) reorder the toolbar.
      *  Item keys should match the source's keys 1:1. Density and the gear flag
      *  remain in the toolbar's own store under `key`. Default: own store. */
-    source?: tUiListSource
+    source?: UiListSource
 }) {
-    const defConfig = (): tToolbarConfig => ({
+    const defConfig = (): ToolbarConfig => ({
         order: opts.def?.order?.slice() ?? opts.items.map(i => i.key),
         visible: opts.def?.visible ? {...opts.def.visible} : Object.fromEntries(opts.items.map(i => [i.key, i.defaultVisible != false])),
         density: opts.def?.density ?? densities.list[0].key,
     })
-    const st = staticGetAdd<tToolbarConfig>(opts.key, defConfig())
-    const [emitChange, onChange] = createListen<[tToolbarConfig]>()
+    const st = memoryGetOrCreate<ToolbarConfig>(opts.key, defConfig())
+    const [emitChange, onChange] = createListen<[ToolbarConfig]>()
     // ext is fixed for the controller's lifetime, so hook call order inside
     // useConfig/Bar/Settings never changes for a given toolbar instance
     const ext = opts.source
@@ -163,7 +163,7 @@ export function createToolbar(opts: {
      *  items, an unregistered density) - never crash, never drop user data that
      *  still applies: unknown keys are filtered out, missing items are appended
      *  (default-visible), fixed items are pinned back to their descriptor index. */
-    function normalize(): tToolbarConfig {
+    function normalize(): ToolbarConfig {
         const raw = rawList()
         const known = new Set(opts.items.map(i => i.key))
         const rawOrder = Array.isArray(raw.order) ? raw.order : []
@@ -190,14 +190,14 @@ export function createToolbar(opts: {
      *  cache dirty, emit outward. With an external source the items' order and
      *  visibility go THERE (its own change flow re-emits); density + gear flag
      *  always stay in the toolbar's own store. */
-    function setConfig(next: tToolbarConfig) {
+    function setConfig(next: ToolbarConfig) {
         if (ext) {
             const visible = {...next.visible}
             delete visible[SETTINGS_KEY]
             st.visible = {...st.visible, [SETTINGS_KEY]: next.visible[SETTINGS_KEY] != false}
             st.density = next.density
             renderBy(st)
-            staticMarkDirty(opts.key)
+            memoryMarkDirty(opts.key)
             ext.setConfig({order: next.order.slice(), visible})
             // the source's own onChange already re-emitted; emit only when it can't
             if (!ext.onChange) emitChange(normalize())
@@ -206,7 +206,7 @@ export function createToolbar(opts: {
             st.visible = {...next.visible}
             st.density = next.density
             renderBy(st)
-            staticMarkDirty(opts.key)
+            memoryMarkDirty(opts.key)
             emitChange(normalize())
         }
     }
@@ -237,7 +237,7 @@ export function createToolbar(opts: {
         const byKey = new Map(opts.items.map(i => [i.key, i]))
         return cfg.order
             .map(k => byKey.get(k))
-            .filter((it): it is tToolbarItem => !!it && cfg.visible[it.key] != false)
+            .filter((it): it is ToolbarItem => !!it && cfg.visible[it.key] != false)
             .map(it => ({item: it, density: cfg.density, content: itemContent(it, cfg.density)}))
     }
 
@@ -250,7 +250,7 @@ export function createToolbar(opts: {
                   fill='none' stroke='currentColor' strokeWidth='1.2' strokeLinejoin='round'/>
         </svg>
 
-    function moveKey(cfg: tToolbarConfig, key: string, to: number) {
+    function moveKey(cfg: ToolbarConfig, key: string, to: number) {
         const order = cfg.order.slice()
         const from = order.indexOf(key)
         if (from == -1) return
@@ -281,7 +281,7 @@ export function createToolbar(opts: {
                     {itemContent(it, cfg.density)}
                 </div>
             })}
-            {p.settings && cfg.visible[SETTINGS_KEY] != false && <DivOutsideClick className='wenayTbGear' status={open} outsideClick={() => setOpen(false)}>
+            {p.settings && cfg.visible[SETTINGS_KEY] != false && <OutsideClickArea className='wenayTbGear' status={open} outsideClick={() => setOpen(false)}>
                 <div className='wenayTbItem' title={settingsTitle()}
                      onClick={() => setOpen(v => !v)}>
                     {settingsIcon()}
@@ -289,7 +289,7 @@ export function createToolbar(opts: {
                 {open && <div className={p.popAlign == 'left' ? 'wenayTbPop wenayTbPopLeft' : 'wenayTbPop'}>
                     <Settings/>
                 </div>}
-            </DivOutsideClick>}
+            </OutsideClickArea>}
         </div>
     }
 

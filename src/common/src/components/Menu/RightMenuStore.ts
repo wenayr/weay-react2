@@ -1,9 +1,9 @@
 export type MenuRightPosition = 'left' | 'right';
-export type MenuRightPosition2 = 'top' | 'bottom';
+export type MenuRightVerticalPosition = 'top' | 'bottom';
 
 export type MenuRightSavedState = {
     position: MenuRightPosition;
-    position2: MenuRightPosition2;
+    verticalPosition: MenuRightVerticalPosition;
     offset: {
         x: number;
         y: number;
@@ -12,5 +12,5 @@ export type MenuRightSavedState = {
 
 import { ObservableMap } from "../../utils/observableMap";
 
-// observable - Cash marks itself dirty on its mutations (drag end re-set()s the state)
+// observable - memoryCache marks itself dirty on its mutations (drag end re-set()s the state)
 export const mapRightMenu = new ObservableMap<string, MenuRightSavedState>();

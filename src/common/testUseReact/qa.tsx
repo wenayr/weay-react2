@@ -6,11 +6,11 @@
  */
 
 import React, { useState, useMemo, useEffect } from "react";
-import { MenuBase, mouseMenuApi, renderBy, updateBy, logsApi, EditParams2, EditParams3, ParametersReact, ModalProvider, useModal, useKeyDown, keyDownApi, useAgGrid, AgGridMy, createGridBuffer, createColumnBuffer, createColumnState, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, Cash, type BufferTable, type tToolbarItem, type tToolbarConfig, type tBoardColumn } from "../api";
+import { Menu, contextMenu, renderBy, updateBy, logsApi, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { listen as createListen, Observe, Params } from "wenay-common2";
-import { Button, ButtonHover, DivOutsideClick } from "../src/hooks";
-import { DivRnd3 } from "../src/components";
+import { Button, HoverButton, OutsideClickArea } from "../src/hooks";
+import { FloatingWindow } from "../src/components";
 import { MyChartEngine } from "../src/myChart/chartEngine/chartEngineReact";
 import { GridExample, tt } from "./useGrid";
 import { TestParams } from "./testParams";
@@ -47,9 +47,9 @@ const shared = { count: 0 };
 const Subscriber = () => { updateBy(shared); return <span style={{ fontSize: 22, fontWeight: 700 }}>count = {shared.count}</span>; };
 
 const KeyDownDemo = () => {
-    const api = useKeyDown();
-    const [last, setLast] = useState(keyDownApi.get());
-    useEffect(() => keyDownApi.on((key) => setLast(key)), []);
+    const api = useKeyboard();
+    const [last, setLast] = useState(keyboard.get());
+    useEffect(() => keyboard.on((key) => setLast(key)), []);
     return <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <span>Last key: <b style={{ fontSize: 22 }}>{last || "-"}</b></span>
         <button onClick={() => api.reset()}>reset via API</button>
@@ -64,17 +64,17 @@ const ReactivityDemo = () => (
     </div>
 );
 
-// Outside click via DivOutsideClick directly: display:inline-block keeps the close zone wrapped around
+// Outside click via OutsideClickArea directly: display:inline-block keeps the close zone wrapped around
 // the content, with no full-width strip like Button+outClick.
 // The popup uses position:absolute; otherwise it expands the wrapper rectangle, and a click to the right of the button
 // (within the popup width) lands inside the wrapper itself, so contains() treats it as inside.
 const OutsideDemo = () => {
     const [open, setOpen] = useState(false);
     return (
-        <DivOutsideClick status={open} outsideClick={() => setOpen(false)} style={{ display: "inline-block", position: "relative" }}>
+        <OutsideClickArea status={open} outsideClick={() => setOpen(false)} style={{ display: "inline-block", position: "relative" }}>
             <div onClick={() => setOpen(v => !v)} style={{ display: "inline-block", padding: "6px 12px", border: "1px solid #6e7781", borderRadius: 6, cursor: "pointer", background: open ? "#6e7781" : "#fff", color: open ? "#fff" : "#000" }}>open</div>
             {open && <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 8, padding: 16, width: 220, border: "1px solid #6e7781", borderRadius: 8, background: "#fafbfc", zIndex: 5 }}>Closes on clicks anywhere except this panel and the button</div>}
-        </DivOutsideClick>
+        </OutsideClickArea>
     );
 };
 
@@ -89,7 +89,7 @@ const LogsDemo = () => {
     );
 };
 
-// EditParams3, which used to save pre-edit values, vs EditParams2, which is correct.
+// ParamsArrayEdit, which used to save pre-edit values, vs ParamsEdit, which is correct.
 const paramsDefSave = new class extends Params.CParams {
     test = { value: 1, range: { min: 1, max: 10, step: 1 } };
     test2 = { value: 1, range: { min: 1, max: 10, step: 1 } };
@@ -104,14 +104,14 @@ const ParamsSaveDemo = () => {
     return (
         <div style={{ display: "flex", gap: 24 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6, color: "#cf222e" }}>EditParams3 - expected BUG</div>
-                <EditParams3 params={async () => [makeInfos()]} onSave={(d: any) => { console.log("EditParams3 → onSave:", d); setSaved3(fmt(d)); }} />
+                <div style={{ fontWeight: 700, marginBottom: 6, color: "#cf222e" }}>ParamsArrayEdit - expected BUG</div>
+                <ParamsArrayEdit params={async () => [makeInfos()]} onSave={(d: any) => { console.log("ParamsArrayEdit → onSave:", d); setSaved3(fmt(d)); }} />
                 <div style={{ fontSize: 12, marginTop: 6 }}>what was sent to onSave:</div>
                 <pre style={{ background: "#f6f8fa", padding: 8, borderRadius: 6, maxHeight: 150, overflow: "auto", fontSize: 11 }}>{saved3}</pre>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6, color: "#1a7f37" }}>EditParams2 - correct</div>
-                <EditParams2 params={async () => makeInfos()} onSave={(d: any) => { console.log("EditParams2 → onSave:", d); setSaved2(fmt(d)); }} />
+                <div style={{ fontWeight: 700, marginBottom: 6, color: "#1a7f37" }}>ParamsEdit - correct</div>
+                <ParamsEdit params={async () => makeInfos()} onSave={(d: any) => { console.log("ParamsEdit → onSave:", d); setSaved2(fmt(d)); }} />
                 <div style={{ fontSize: 12, marginTop: 6 }}>what was sent to onSave:</div>
                 <pre style={{ background: "#f6f8fa", padding: 8, borderRadius: 6, maxHeight: 150, overflow: "auto", fontSize: 11 }}>{saved2}</pre>
             </div>
@@ -125,7 +125,7 @@ const DebounceDemo = () => {
     return (
         <div>
             <div style={{ marginBottom: 8 }}>onChange called: <b style={{ fontSize: 18 }}>{count}</b> times <button onClick={() => setCount(0)}>reset</button></div>
-            <ParametersReact params={infos} onChange={() => setCount((c) => c + 1)} />
+            <ParamsEditor params={infos} onChange={() => setCount((c) => c + 1)} />
         </div>
     );
 };
@@ -149,7 +149,7 @@ const AgGrid4Inner = () => {
                 <button onClick={() => grid.update({ removeData: [{ id: "tsla" }] })}>remove Tesla</button>
                 <button onClick={() => grid.fit()}>fit via API</button>
             </div>
-            <div style={{ height: 220 }}><AgGridMy<tQARow> controller={grid} columnDefs={agQACols} /></div>
+            <div style={{ height: 220 }}><AgGridTable<tQARow> controller={grid} columnDefs={agQACols} /></div>
         </div>
     );
 };
@@ -203,7 +203,7 @@ const AgGrid4OverlayDemo = () => {
                 <button onClick={() => grid.sync()}>sync overlay</button>
             </div>
             <div style={{ height: 230 }}>
-                <AgGridMy<tOverlayRow>
+                <AgGridTable<tOverlayRow>
                     controller={grid}
                     rowData={rows}
                     columnDefs={overlayColumns}
@@ -252,7 +252,7 @@ const AgGrid4ColumnBufferDemo = () => {
                 <button onClick={() => columns.api.setNames([])}>clear dynamic</button>
             </div>
             <div style={{ height: 230 }}>
-                <AgGridMy<tDynamicRow>
+                <AgGridTable<tDynamicRow>
                     rowData={dynamicRows}
                     getRowId={p => p.data.id}
                     columnDefs={dynamicBaseCols}
@@ -302,7 +302,7 @@ const ColumnStateDemo = () => {
             </div>
             {on ? (
                 <div style={{ height: 190 }}>
-                    <AgGridMy<tColStateRow>
+                    <AgGridTable<tColStateRow>
                         rowData={colStateRows}
                         getRowId={p => p.data.id}
                         columnDefs={colStateCols}
@@ -398,7 +398,7 @@ const ColumnsMenuDemo = () => {
                 onTail={() => setStd(v => (v + 1) % menuStandards.length)}
             />
             <div style={{ height: 190 }}>
-                <AgGridMy<tMenuRow>
+                <AgGridTable<tMenuRow>
                     rowData={menuRows}
                     getRowId={pp => pp.data.id}
                     columnDefs={defs}
@@ -450,7 +450,7 @@ const ToolbarColumnsDemo = () => (
             <ColumnsMenu state={qaTbColState} compact />
         </div>
         <div style={{ height: 170 }}>
-            <AgGridMy<tTbColRow>
+            <AgGridTable<tTbColRow>
                 rowData={tbColRows}
                 getRowId={pp => pp.data.id}
                 columnDefs={tbColDefs}
@@ -751,14 +751,14 @@ const ResizeBugRepro = () => {
         <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div>
                 <div ref={autoRef} style={{ display: "inline-flex", flexDirection: "column", alignItems: "stretch", border: "1px solid #cf222e", padding: 6 }}>
-                    <ParametersReact params={makeResizeParams(asset)} onChange={onChange}/>
+                    <ParamsEditor params={makeResizeParams(asset)} onChange={onChange}/>
                     <button onClick={() => setN(v => v + 1)}>rerender {n}</button>
                 </div>
                 <div style={selectInfo}>auto-width select: <b>{autoWidth}px</b></div>
             </div>
             <div>
                 <div ref={fixedRef} style={{ width: fixedWidth, minWidth: 90, maxWidth: 300, resize: "horizontal", overflow: "auto", border: "1px solid #0969da", padding: 6 }}>
-                    <ParametersReact params={makeResizeParams(asset)} onChange={onChange}/>
+                    <ParamsEditor params={makeResizeParams(asset)} onChange={onChange}/>
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
                     <button onClick={() => setFixedWidth(w => w == 150 ? 240 : 150)}>parent {fixedWidth}px</button>
@@ -809,12 +809,12 @@ const qaSlot = createUiSlot({
 const slotContent = <span style={{ padding: "4px 10px", background: "#0969da", color: "#fff", borderRadius: 6, fontSize: 12 }}>the block</span>;
 
 const UiSlotDemo = () => {
-    // App-side persistence contract: Cash.load() on start, then subscribe to the dirty
-    // channel - the persisted maps are observable and mark their Cash dirty themselves,
+    // App-side persistence contract: memoryCache.load() on start, then subscribe to the dirty
+    // channel - the persisted maps are observable and mark their memoryCache dirty themselves,
     // the app owns the write policy.
     useEffect(() => {
-        void Cash.load();
-        const off = Cash.onDirty(() => Cash.saveDebounced(300));
+        void memoryCache.load();
+        const off = memoryCache.onDirty(() => memoryCache.saveDebounced(300));
         return off;
     }, []);
     return <div style={{ display: "grid", gap: 10 }}>
@@ -869,7 +869,7 @@ function tbAct(name: string) {
         renderBy(tbActions);
     };
 }
-const tbBaseItems: tToolbarItem[] = [
+const tbBaseItems: ToolbarItem[] = [
     { key: "home", title: "Home (fixed)", short: "Home", icon: <span>🏠</span>, fixed: true, onClick: tbAct("home") },
     { key: "star", title: "Add to favorites", short: "Star", icon: <span>⭐</span>, onClick: tbAct("star") },
     { key: "bell", title: "Notifications", short: "Alerts", icon: <span>🔔</span>, onClick: tbAct("bell") },
@@ -890,13 +890,13 @@ const ToolbarDemo = () => {
     const [extra, setExtra] = useState(false);
     const [thirdDensity, setThirdDensity] = useState(false);
     const [changes, setChanges] = useState(0);
-    const [lastCfg, setLastCfg] = useState<tToolbarConfig | null>(null);
+    const [lastCfg, setLastCfg] = useState<ToolbarConfig | null>(null);
     const tb = extra ? getQaToolbarExtra() : qaToolbar;
 
     // App-side persistence contract - same wiring as the UiSlot card.
     useEffect(() => {
-        void Cash.load();
-        return Cash.onDirty(() => Cash.saveDebounced(300));
+        void memoryCache.load();
+        return memoryCache.onDirty(() => memoryCache.saveDebounced(300));
     }, []);
     // Same pure Settings element registered as a global settings section (see card 20's dialog).
     useEffect(() => registerSettingsSection({
@@ -987,7 +987,7 @@ const boardState = {
         { key: "c3", items: ["C1", "C2", "C3", "C4"] },
         { key: "c4", items: ["D1"] },
         { key: "c5", items: [] as string[] },
-    ] as tBoardColumn[],
+    ] as BoardColumn[],
     gravity: { c1: "top", c2: "bottom", c3: "top", c4: "bottom", c5: "top" } as { [k: string]: string },
     commits: 0, events: 0, last: "-", nextCol: 6,
 };
@@ -1096,7 +1096,7 @@ function ActiveChecks() {
             <Check n={13} title="ModalProvider / useModal - Escape and outside click"
                    do="Click open modal. Close it with Escape. Open it again and close with an outside click. Open it again and close with the close button."
                    expect="All three methods close it. The dimmed backdrop is above everything (z-index from token --wenay-z-modal)."
-                   note="M1: Escape and closeOnEscape/closeOnOutsideClick options were added; useModal and previous behavior are unchanged. GetModalJSX is marked @deprecated.">
+                   note="M1: Escape and closeOnEscape/closeOnOutsideClick options were added; useModal remains the app-level path and createModalElementStore remains low-level.">
                 <ModalDemo />
             </Check>
 
@@ -1109,8 +1109,8 @@ function ActiveChecks() {
 
             <Check n={21} title="createUiSlot - configurable block placement"
                    do="Switch Top bar / Sidebar. Then reload the page (F5)."
-                   expect="The block moves between the two containers WITHOUT a reload; only one mount point shows it at a time. After F5 the chosen place is restored (staticGetAdd -> Cash)."
-                   note="Mount points render <Slot place=...> themselves and stay ignorant of each other. The demo calls Cash.load() on mount and subscribes Cash.onDirty -> saveDebounced(300): the persisted maps are observable and mark Cash dirty themselves, the app owns the write policy.">
+                   expect="The block moves between the two containers WITHOUT a reload; only one mount point shows it at a time. After F5 the chosen place is restored (memoryGetOrCreate -> memoryCache)."
+                   note="Mount points render <Slot place=...> themselves and stay ignorant of each other. The demo calls memoryCache.load() on mount and subscribes memoryCache.onDirty -> saveDebounced(300): the persisted maps are observable and mark memoryCache dirty themselves, the app owns the write policy.">
                 <UiSlotDemo />
             </Check>
 
@@ -1123,7 +1123,7 @@ function ActiveChecks() {
 
             <Check n={25} title="createToolbar - customizable toolbar (config / Bar / Settings)"
                    do="Click toolbar items (last action updates). Open the gear popover: toggle Clear workspace on, drag rows to reorder - grab ANYWHERE on the row, mouse or touch, try dragging above the fixed Home too (or focus the handle and press arrow keys), switch density Icons / Icons + labels. Open global settings -> Toolbar section and repeat an edit there. Register the 3rd density and switch to Full text. Uncheck the separated Toolbar settings row at the bottom - the gear (and this popover) disappears from the bar; re-enable it via global settings -> Toolbar. Click simulate app update. Reload the page (F5). Click reset config."
-                   expect="The bar renders visible items in config order; density switches icon-only <-> icon+label (tooltips show titles in icon mode). Home is fixed: checkbox disabled, no drag handle, pinned first - it never moves during a drag preview and a row dragged above it lands right below it, exactly as previewed (no snap-back on drop). The gear popover and the global settings section are THE SAME editor - an edit in one is instantly visible in the other and on the bar. The 3rd density appears in the editor as one more segment and renders icon + full title. The app update appends Help as visible WITHOUT wiping your order/visibility. After F5 everything is restored (staticGetAdd -> Cash). onChange fires on every edit with the new config (JSON below); reset restores defaults (Clear workspace hidden again)."
+                   expect="The bar renders visible items in config order; density switches icon-only <-> icon+label (tooltips show titles in icon mode). Home is fixed: checkbox disabled, no drag handle, pinned first - it never moves during a drag preview and a row dragged above it lands right below it, exactly as previewed (no snap-back on drop). The gear popover and the global settings section are THE SAME editor - an edit in one is instantly visible in the other and on the bar. The 3rd density appears in the editor as one more segment and renders icon + full title. The app update appends Help as visible WITHOUT wiping your order/visibility. After F5 everything is restored (memoryGetOrCreate -> memoryCache). onChange fires on every edit with the new config (JSON below); reset restores defaults (Clear workspace hidden again)."
                    note="Three decoupled layers: serializable config (single source of truth, persisted like createUiSlot), Bar, and a PURE Settings editor over config. Density levels live in an extensible module registry (registerToolbarDensity); reorder is a built-in nearest-slot pointer sort (no dnd deps, layout-agnostic: list / bar / grid) + keyboard arrows; the preview simulates the commit incl. fixed pinning, so what you see is what you drop. v1 has no overflow menu - visibility is the space tool."
                    tall>
                 <ToolbarDemo />
@@ -1147,7 +1147,7 @@ function ActiveChecks() {
             <Check n={31} title="Toolbar over columnState - one config drives toolbar + menu + grid"
                    do="Drag the qty column in the GRID before price - watch the toolbar buttons AND the compact menu reorder. Open the toolbar gear: drag rows in Settings, toggle checkboxes - the grid and the menu follow. Toggle a button in the compact menu - the toolbar Bar drops/regains the item. Switch density in Settings (Icons / Icons + labels)."
                    expect="All four surfaces (grid, toolbar Bar, Settings editor, compact menu) mirror ONE config: any reorder or visibility change made on any of them lands on all others. In icon density, items without an icon show their first letters (NAM, QTY, NOT) as a text pseudo-icon; price keeps its emoji. Density and the gear checkbox are toolbar-local (they do not touch the column config); Name is fixed everywhere - not draggable, not hideable."
-                   note="createToolbar({source}) - the toolbar's order/visibility now can live OUTSIDE it: tUiListSource is the extracted control contract, and columnState.api.listSource implements it over the same config the grid adapter syncs. No bridge, no double storage - Toolbar became a VIEW. Backward compatible: without source the toolbar keeps its own store exactly as in card 25."
+                   note="createToolbar({source}) - the toolbar's order/visibility now can live OUTSIDE it: UiListSource is the extracted control contract, and columnState.api.listSource implements it over the same config the grid adapter syncs. No bridge, no double storage - Toolbar became a VIEW. Backward compatible: without source the toolbar keeps its own store exactly as in card 25."
                    tall>
                 <ToolbarColumnsDemo />
             </Check>
@@ -1176,10 +1176,10 @@ function ActiveChecks() {
                 <ColumnStateDemo />
             </Check>
 
-            <Check n={8} title="Outside-click closing (DivOutsideClick)"
+            <Check n={8} title="Outside-click closing (OutsideClickArea)"
                    do="Click open. Then click ANY place outside the panel, including on the same horizontal line and slightly to the right of the open button, within the panel width where there used to be a dead zone."
                    expect="A click anywhere outside the panel/button closes it, including the area to the right of the button above the panel. Clicking the panel or button does NOT close it."
-                   note="Library BUG, this card used to fail on it: Button+outClick wraps in DivOutsideClick, which is a full-width block div, so the entire horizontal strip counts as inside. Here DivOutsideClick uses display:inline-block, and the popup uses position:absolute; otherwise it expands the wrapper rectangle and creates a dead zone to the right of the button. Real library fix: wrap content by default, or let Button narrow the wrapper.">
+                   note="Library BUG, this card used to fail on it: Button+outClick wraps in OutsideClickArea, which is a full-width block div, so the entire horizontal strip counts as inside. Here OutsideClickArea uses display:inline-block, and the popup uses position:absolute; otherwise it expands the wrapper rectangle and creates a dead zone to the right of the button. Real library fix: wrap content by default, or let Button narrow the wrapper.">
                 <OutsideDemo />
             </Check>
         </>
@@ -1196,45 +1196,45 @@ function ArchiveChecks() {
                 <ReactivityDemo />
             </Check>
 
-            <Check n={14} title="Keyboard API - useKeyDown / keyDownApi"
+            <Check n={14} title="Keyboard API - useKeyboard / keyboard"
                    do="Press any key, then click clear."
-                   expect="Last key updates through keyDownApi.on; reset clears the value and also notifies subscribers."
-                   note="The new pub/sub is built with `listen`: listen.on(cb) -> off(). The old KeyDown remains compatible.">
+                   expect="Last key updates through keyboard.on; reset clears the value and also notifies subscribers."
+                   note="The new pub/sub is built with `listen`: listen.on(cb) -> off(). The old keyboardState remains compatible.">
                 <KeyDownDemo />
             </Check>
-            <Check n={2} title="Drag + Resize (DivRnd3 / RNDFunc3)"
+            <Check n={2} title="Drag + Resize (FloatingWindow / FloatingWindow)"
                    do="Click window, drag the window by its header, resize it from the edges, and close it with the x button. Open the console (F12)."
                    expect="The window moves and resizes smoothly; the x button closes it; position and size are restored on reopen (keyForSave)."
-                   note="Plan bug: the console must NOT contain xxx spam (RNDFunc3:532); listener resubscription on every tick is a candidate for usePointerDrag."
+                   note="Plan bug: the console must NOT contain xxx spam (FloatingWindow:532); listener resubscription on every tick is a candidate for usePointerDrag."
                    tall>
                 <Button button={(e: any) => <div style={{ display: "inline-block", padding: "6px 12px", border: "1px solid #0969da", borderRadius: 6, cursor: "pointer", background: e ? "#0969da" : "#fff", color: e ? "#fff" : "#0969da" }}>window</div>}>
                     {(api: any) => (
-                        <DivRnd3 keyForSave={"qa-rnd"} key={"qa-rnd"} size={{ height: 220, width: 280 }}
+                        <FloatingWindow keyForSave={"qa-rnd"} key={"qa-rnd"} size={{ height: 220, width: 280 }}
                                  className={"fon border fonLight"} moveOnlyHeader={true} onCLickClose={api.onClose} limit={{ y: { min: 0 } }} onUpdate={() => {}}>
                             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#eef2f6" }}>drag header / resize / close</div>
-                        </DivRnd3>
+                        </FloatingWindow>
                     )}
                 </Button>
             </Check>
 
-            <Check n={3} title="Nested menu (MenuBase) + hover"
+            <Check n={3} title="Nested menu (Menu) + hover"
                    do="Hover menu, then move the cursor to the item with ▶ and into its submenu."
                    expect="The menu opens ONLY when hovering the menu trigger itself, not the full row width."
-                   note="Library BUG confirmed: ButtonHover wraps in a <div> with no width, so it becomes a full-row block, unlike ButtonBase (width:min-content). This board wraps it with width:min-content as a workaround; add width:min-content to ButtonHover in the library.">
+                   note="Library BUG confirmed: HoverButton wraps in a <div> with no width, so it becomes a full-row block, unlike ButtonBase (width:min-content). This board wraps it with width:min-content as a workaround; add width:min-content to HoverButton in the library.">
                 <div style={{ width: "min-content" }}>
-                    <ButtonHover button={() => <div style={{ display: "inline-block", padding: "6px 12px", border: "1px solid #888", borderRadius: 6, cursor: "pointer", whiteSpace: "nowrap" }}>menu</div>}>
-                        <MenuBase zIndex={50} coordinate={{ x: 0, y: 0 }} data={[
+                    <HoverButton button={() => <div style={{ display: "inline-block", padding: "6px 12px", border: "1px solid #888", borderRadius: 6, cursor: "pointer", whiteSpace: "nowrap" }}>menu</div>}>
+                        <Menu zIndex={50} coordinate={{ x: 0, y: 0 }} data={[
                             { name: "item 1", onClick: () => alert("item 1") },
                             { name: "submenu ▶", next: () => [{ name: "leaf A", onClick: () => alert("A") }, { name: "leaf B", onClick: () => alert("B") }] },
                         ]} />
-                    </ButtonHover>
+                    </HoverButton>
                 </div>
             </Check>
 
-            <Check n={5} title="Grid + transactions (applyTransactionAsyncUpdate)"
+            <Check n={5} title="Grid + transactions (applyGridRows)"
                    do="update Tesla uses a random price and updates by ID. Then remove Tesla should make the row disappear."
                    expect="Update by ID without duplicates. remove Tesla removes the row. ✅ Remove-only updates used to be lost, leaving the row in place."
-                   note="Fix: applyTransactionAsyncUpdate applies remove once, INDEPENDENTLY of add/update. Previously remove was lost when add/update were empty, and duplicated when both were present."
+                   note="Fix: applyGridRows applies remove once, INDEPENDENTLY of add/update. Previously remove was lost when add/update were empty, and duplicated when both were present."
                    tall>
                 <div>
                     <button style={{ marginBottom: 8 }} onClick={() => renderBy(tt)}>update Tesla (random price)</button>
@@ -1250,10 +1250,10 @@ function ArchiveChecks() {
                 <div style={{ height: 300 }}><MyChartEngine style={{ height: "100%" }} /></div>
             </Check>
 
-            <Check n={7} title="Parameters (ParametersReact / ParametersEngine)"
+            <Check n={7} title="Parameters (ParamsEditor / ParamsEditor)"
                    do="Move sliders and fields. The test3 field has a name and a hover comment."
                    expect="The value changes in the UI while editing; range/number stay in sync; commentary appears on hover."
-                   note="Plan bugs: EditParams3 loses edits (Other.tsx); broken debounce and missing ResizeObserver cleanup in ParametersEngine."
+                   note="Plan bugs: ParamsArrayEdit loses edits (Other.tsx); broken debounce and missing ResizeObserver cleanup in ParamsEditor."
                    tall>
                 <div style={{ minHeight: 260 }}><TestParams /></div>
             </Check>
@@ -1268,7 +1268,7 @@ function ArchiveChecks() {
             <Check n={12} title="agGrid4 - controller, removal, external buffer"
                    do="add/update Tesla and Apple should make rows appear/update. remove Tesla should remove it. Then: unmount grid -> write MSFT directly to the buffer -> mount grid."
                    expect="Updates by ID have no duplicates; removal works. After remount, the grid catches up with the buffer itself: Tesla/Apple are still present, MSFT appears (attach->sync). Theme is dark, like production grids (GridStyleDefault)."
-                   note="New path instead of applyTransactionAsyncUpdate (v1 is marked @deprecated). The createGridBuffer core also works outside React."
+                   note="Controller path over createGridBuffer; the old transaction helper names were removed. The createGridBuffer core also works outside React."
                    tall>
                 <AgGrid4Demo />
             </Check>
@@ -1289,20 +1289,18 @@ function ArchiveChecks() {
                 <AgGrid4ColumnBufferDemo />
             </Check>
 
-            <Check n={4} title="Right-click context menu (mouseMenuApi)"
+            <Check n={4} title="Right-click context menu (contextMenu)"
                    do="Right-click the gray area to open the menu. Then right-click somewhere ELSE."
                    expect="Right-clicking elsewhere closes the previous menu and opens a new one with items. ✅ Fixed."
                    note="Fix: menuR stores an item snapshot on open + menuMouse onConsume. The bb / no stale items invariants are preserved."
                    tall>
-                <mouseMenuApi.ReactMouse zIndex={40}>
+                <contextMenu.Layer zIndex={40}>
                     <div style={{ width: "100%", height: 300, background: "#e7ebef", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#57606a" }}
-                         onMouseDown={(e) => {
-                             if (e.button === 2) mouseMenuApi.map.set("sym", [
-                                 { name: "action 1", onClick: () => alert("action 1") },
-                                 { name: "submenu ▶", next: () => [{ name: "nested", onClick: () => alert("nested") }] },
-                             ]);
-                         }}>right-click here</div>
-                </mouseMenuApi.ReactMouse>
+                         onContextMenu={(e) => contextMenu.openAt(e, [
+                             { name: "action 1", onClick: () => alert("action 1") },
+                             { name: "submenu ▶", next: () => [{ name: "nested", onClick: () => alert("nested") }] },
+                         ])}>right-click here</div>
+                </contextMenu.Layer>
             </Check>
 
             <Check n={9} title="Logs - time format (valueFormatter)"
@@ -1313,9 +1311,9 @@ function ArchiveChecks() {
                 <LogsDemo />
             </Check>
 
-            <Check n={10} title="EditParams3 vs EditParams2 - what is sent to onSave"
+            <Check n={10} title="ParamsArrayEdit vs ParamsEdit - what is sent to onSave"
                    do="Change the value in EACH column (test/test2), then click save. Compare what was sent to onSave and the console (F12)."
-                   expect="BOTH save the CHANGED value (EditParams3 matches EditParams2). ✅ Fixed (regression check)."
+                   expect="BOTH save the CHANGED value (ParamsArrayEdit matches ParamsEdit). ✅ Fixed (regression check)."
                    note="Fix in Other.tsx: params[i]=z -> params[i]=e. z was a placeholder and discarded the edited clone e."
                    tall>
                 <ParamsSaveDemo />

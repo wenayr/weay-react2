@@ -1,11 +1,11 @@
 import React from "react";
 import {renderBy, updateBy} from "../../../updateBy";
-import {staticGetAdd, staticMarkDirty} from "../../utils/mapMemory";
+import {memoryGetOrCreate, memoryMarkDirty} from "../../utils/memoryStore";
 
 /** One UI block shown in exactly one of several mount points; the point is a persisted setting.
- *  Persistence rides the existing staticProps -> Cash mechanics: staticProps is observable,
- *  setPlace announces its in-place mutation (staticMarkDirty), the app decides when to save
- *  via Cash.onDirty - same as window state (ExRNDMap3 etc.).
+ *  Persistence rides the existing memoryProps -> memoryCache mechanics: memoryProps is observable,
+ *  setPlace announces its in-place mutation (memoryMarkDirty), the app decides when to save
+ *  via memoryCache.onDirty - same as window state (floatingWindowMap etc.).
  *  Mount points render <Slot place="..."> themselves and decide nothing: the slot compares
  *  the persisted place with its own and renders children only on a match. */
 export function createUiSlot<Places extends string>(opts: {
@@ -15,7 +15,7 @@ export function createUiSlot<Places extends string>(opts: {
     // Places = typeof def and rejects the other keys in places
     def: NoInfer<Places>
 }) {
-    const st = staticGetAdd<{place: Places}>(opts.key, {place: opts.def})
+    const st = memoryGetOrCreate<{place: Places}>(opts.key, {place: opts.def})
     // a stored place may no longer exist after an app update - fall back to def
     const isPlace = (p: unknown): p is Places => typeof p == "string" && p in opts.places
 
@@ -24,7 +24,7 @@ export function createUiSlot<Places extends string>(opts: {
         if (st.place == p) return
         st.place = p
         renderBy(st)
-        staticMarkDirty(opts.key)
+        memoryMarkDirty(opts.key)
     }
 
     function Slot(p: {place: Places, children: React.ReactNode}): React.JSX.Element | null {

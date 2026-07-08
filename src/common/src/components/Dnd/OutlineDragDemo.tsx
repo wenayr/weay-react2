@@ -1,8 +1,7 @@
 import {useEffect, useRef, useState} from "react";
 
 const ANIMATION_DURATION = 500; // animation duration in ms
-/** @deprecated Demo component with hardcoded content; used only by the test SubMenu. Will be removed in a major version. */
-export function DraggableOutlineDiv(){
+export function OutlineDragDemo(){
     const [isDragging, setIsDragging] = useState(false);
     const [animationFinished, setAnimationFinished] = useState(false);
     const timerRef = useRef<number | null>(null);

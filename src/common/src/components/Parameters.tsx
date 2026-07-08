@@ -1,13 +1,13 @@
 import React, {ReactElement} from "react";
 
 // Button view
-export function FButton(name :string|ReactElement){
+export function ParamLabelContent(name :string|ReactElement){
     return <div className="" style={{width:"100%"}}> {name}</div>
 }
 // Arrow for the button
-export function FNameButton(type :boolean, name:string|ReactElement) {return FButton(<p className={"toPTextIndicator"}>{(type?"▼ ":"▶ ")+name}</p>);}
+export function ParamToggleLabel(type :boolean, name:string|ReactElement) {return ParamLabelContent(<p className={"toPTextIndicator"}>{(type?"▼ ":"▶ ")+name}</p>);}
 
-export function CParameter(props: {
+export function ParamRow(props: {
     name: ReactElement | string,
     children?: React.ReactNode | readonly React.ReactNode[], //ReactElement|JSX.Element|null,
     style?: React.CSSProperties | undefined,

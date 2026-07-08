@@ -1,16 +1,16 @@
 import React, {useEffect, useRef} from "react";
-import {MenuBase, tMenuReact, tMenuReactStrictly} from "./menu";
-import {DivOutsideClick} from "../hooks/useOutside";
+import {Menu, MenuItem, MenuItemStrict} from "./menu";
+import {OutsideClickArea} from "../hooks/useOutside";
 
 // Wrapper function for creating MenuR and managing the global `bb` variable.
-export function GetMenuR(){
+export function createRightClickMenu(){
     let bb = false; // Global activity flag that prevents opening multiple menus.
 
     // Main MenuR component
     function MenuR({children, other = () => [], statusOn = true, onUnClick, onConsume, zIndex, className}: {
         children: React.ReactElement,                        // Child component
         zIndex?: number,                                     // Context menu z-index value
-        other?: () => (tMenuReact)[],                        // Additional menu items
+        other?: () => (MenuItem)[],                        // Additional menu items
         statusOn?: boolean,                                  // Enable or disable the menu
         onUnClick?: (e: boolean) => void,                    // Callback when the menu closes
         onConsume?: () => void,                              // Called on open after snapshotting items
@@ -19,8 +19,8 @@ export function GetMenuR(){
         const data = {x: 0, y: 0}; // Current position of the interaction element
         const [show, setShow] = React.useState<{
             status: boolean,                                 // Whether to show the menu
-            plusMenu?: tMenuReactStrictly[],                 // Additional menu
-            menu?: tMenuReactStrictly[],                     // Main menu
+            plusMenu?: MenuItemStrict[],                 // Additional menu
+            menu?: MenuItemStrict[],                     // Main menu
             coordinate?: {x: number, y: number}              // Coordinates where the menu opens
         }>({status: false});
 
@@ -76,7 +76,7 @@ export function GetMenuR(){
                              touchXY.current.x = touchXY.current.y = 0;
                              if (bb) return; // Menu is already active
                              bb = true;
-                             const menu = other().filter(el => el) as tMenuReactStrictly[];
+                             const menu = other().filter(el => el) as MenuItemStrict[];
                              onConsume?.();
                              setShow({
                                  status: true,
@@ -99,7 +99,7 @@ export function GetMenuR(){
                          if (event.button == 2 || Date.now() - timeEvent.current < 300) {
                              if (bb) return; // Menu is already active
                              bb = true;
-                             const menu = other().filter(el => el) as tMenuReactStrictly[];
+                             const menu = other().filter(el => el) as MenuItemStrict[];
                              onConsume?.();
                              setShow({status: true, menu, coordinate: {x: event.clientX - data.x, y: event.clientY - data.y}});
                          }
@@ -109,7 +109,7 @@ export function GetMenuR(){
                 {children /* Child element whose events are tracked */}
                 {show.status && statusOn && (
                     // Show the context menu
-                    <DivOutsideClick
+                    <OutsideClickArea
                         outsideClick={() => {
                             if (!bb) return; // Menu is already inactive; do not call close handler
                             bb = false; // Menu is no longer active
@@ -117,7 +117,7 @@ export function GetMenuR(){
                             setShow({status: false}); // Hide the menu
                         }}
                     >
-                        <MenuBase
+                        <Menu
                             className={className}
                             data={[
                                 ...(show.plusMenu ?? []),
@@ -126,7 +126,7 @@ export function GetMenuR(){
                             coordinate={{...show.coordinate!}} // Pass current menu coordinates
                             zIndex={zIndex}                   // Pass z-index
                         />
-                    </DivOutsideClick>
+                    </OutsideClickArea>
                 )}
             </div>
         );

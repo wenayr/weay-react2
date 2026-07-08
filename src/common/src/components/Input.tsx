@@ -1,6 +1,6 @@
 import React, {useRef} from "react";
-import {DivOutsideClick} from "../hooks/useOutside";
-import { DivRnd3 } from "./Dnd/RNDFunc3";
+import {OutsideClickArea} from "../hooks/useOutside";
+import { FloatingWindow } from "./Dnd/FloatingWindow";
 
 // Unified modal wrapper component
 function ModalWrapper({
@@ -20,8 +20,8 @@ function ModalWrapper({
 }) {
     const defaultPosition = position ?? {y: -(size.height/2), x: -(size.width/2)};
 
-    return <DivOutsideClick outsideClick={outClick} style={{position: "absolute", top: "50%", left: "50%"}}>
-        <DivRnd3
+    return <OutsideClickArea outsideClick={outClick} style={{position: "absolute", top: "50%", left: "50%"}}>
+        <FloatingWindow
             keyForSave={keyForSave}
             size={size}
             zIndex={zIndex}
@@ -30,11 +30,11 @@ function ModalWrapper({
             moveOnlyHeader={true}
         >
             {children}
-        </DivRnd3>
-    </DivOutsideClick>
+        </FloatingWindow>
+    </OutsideClickArea>
 }
 
-export function InputPage({callback, name = "", txt =""}: {callback: (txt: string)=>void, name?: string, txt?: string}) {
+export function TextInputPanel({callback, name = "", txt =""}: {callback: (txt: string)=>void, name?: string, txt?: string}) {
     const txtName = useRef(txt)
     return <div className={"maxSize"} style={{padding: 20,}}>
         <label>{name}</label>
@@ -47,27 +47,27 @@ export function InputPage({callback, name = "", txt =""}: {callback: (txt: strin
     </div>
 }
 
-export function InputPageModal({callback, name, outClick, keyForSave = "InputPage2", txt}: Parameters<typeof InputPage>[0] & {outClick: ()=>any, keyForSave?: string}) {
+export function TextInputModal({callback, name, outClick, keyForSave = "TextInputModal", txt}: Parameters<typeof TextInputPanel>[0] & {outClick: ()=>any, keyForSave?: string}) {
     return <ModalWrapper
         outClick={outClick}
         keyForSave={keyForSave}
         size={{height: 150, width: 300}}
         position={{y: -150, x: -250}}
     >
-        <InputPage callback={callback} name={name} txt={txt} />
+        <TextInputPanel callback={callback} name={name} txt={txt} />
     </ModalWrapper>
 }
-export function InputFileModal({callback, name, outClick, keyForSave = "InputFile2"}: Parameters<typeof InputFile>[0] & {outClick: ()=>any, keyForSave?: string}) {
+export function FileInputModal({callback, name, outClick, keyForSave = "FileInputModal"}: Parameters<typeof FileInputPanel>[0] & {outClick: ()=>any, keyForSave?: string}) {
     return <ModalWrapper
         outClick={outClick}
         keyForSave={keyForSave}
         size={{height: 150, width: 300}}
         position={{y: -150, x: -250}}
     >
-        <InputFile callback={callback} name={name} />
+        <FileInputPanel callback={callback} name={name} />
     </ModalWrapper>
 }
-export function InputFile({callback, name = ""}: {callback: (file: File | null)=>void, name?: string}) {
+export function FileInputPanel({callback, name = ""}: {callback: (file: File | null)=>void, name?: string}) {
     const file = useRef<File | null>(null)
     return <div className={"maxSize"} style={{padding: 20,}}>
         <label>{name}</label>
@@ -77,7 +77,7 @@ export function InputFile({callback, name = ""}: {callback: (file: File | null)=
         <div style={{marginTop: 20}} className={"msTradeAlt msTradeActive"} onClick={()=>{callback(file.current)}}>send</div>
     </div>
 }
-export function PageModalFree({outClick, children, zIndex, size = {height: 150, width: 300}, keyForSave = "PageModalFree2"}: {zIndex?: number, outClick: ()=>any, children: React.JSX.Element, size?: {height: number, width: number}, keyForSave?: string}) {
+export function FreeModal({outClick, children, zIndex, size = {height: 150, width: 300}, keyForSave = "FreeModal"}: {zIndex?: number, outClick: ()=>any, children: React.JSX.Element, size?: {height: number, width: number}, keyForSave?: string}) {
     return <ModalWrapper
         outClick={outClick}
         keyForSave={keyForSave}
