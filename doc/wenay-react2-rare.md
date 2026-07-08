@@ -438,7 +438,7 @@ useListenValue(listen, {initial?, current?, key?, map?})
 ```
 
 These hooks are intentionally in `wenay-react2`, not in `wenay-common2`.
-Do not add React hooks for every helper in `wenay-common2-rare.md`; hooks are useful only around subscriptions, lifecycle, or external resources.
+Do not add React hooks for every helper exposed by `wenay-common2`; read the installed common2 package docs when needed, and document only the React-facing contract here. Hooks are useful only around subscriptions, lifecycle, or external resources.
 Network sync stays explicit through `useStoreMirror`; reading a node must not secretly start RPC/fetch/WebSocket work. When `remote.changedPaths` exists and `partial !== false`, mirror uses common2 partial sync; otherwise it falls back to `remote.changed -> get(mask)`. `initial` seeds the mirror only. Structurally equal inline masks are stable, because StoreMask is expected to be a small plain object/tree.
 
 QA stand coverage:
