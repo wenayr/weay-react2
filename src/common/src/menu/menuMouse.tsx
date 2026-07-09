@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from "react";
-import {Menu, MenuItem, MenuItemStrict} from "./menu";
+import {Menu, MenuActionEvent, MenuItem, MenuItemStrict} from "./menu";
 import {OutsideClickArea} from "../hooks/useOutside";
 
 export type ContextMenuPoint = {x: number; y: number};
@@ -27,6 +27,23 @@ export type ContextMenuLayerProps = {
     onConsume?: () => void;
     className?: (active?: boolean) => string;
 };
+export type ContextMenuActionCounters = {
+    click: number;
+    ok: number;
+    error: number;
+    taskOk: number;
+    taskError: number;
+    submenuOpen: number;
+    submenuOk: number;
+    submenuError: number;
+    funcOpen: number;
+    funcOk: number;
+    funcError: number;
+    focusOpen: number;
+    focusOk: number;
+    focusError: number;
+};
+
 export type ContextMenuStatsSnapshot = {
     openAt: number;
     openAtPoint: number;
@@ -36,7 +53,40 @@ export type ContextMenuStatsSnapshot = {
     empty: number;
     sources: Record<string, number>;
     layers: Record<string, number>;
+    actionTotals: ContextMenuActionCounters;
+    actions: Record<string, ContextMenuActionCounters>;
 };
+
+type ContextMenuOpenStat = "openAt" | "openAtPoint" | "legacyLayer" | "close" | "replace" | "empty";
+
+function createActionCounters(): ContextMenuActionCounters {
+    return {
+        click: 0,
+        ok: 0,
+        error: 0,
+        taskOk: 0,
+        taskError: 0,
+        submenuOpen: 0,
+        submenuOk: 0,
+        submenuError: 0,
+        funcOpen: 0,
+        funcOk: 0,
+        funcError: 0,
+        focusOpen: 0,
+        focusOk: 0,
+        focusError: 0,
+    };
+}
+
+function cloneActionCounters(counters: ContextMenuActionCounters): ContextMenuActionCounters {
+    return {...counters};
+}
+
+function cloneActions(actions: Record<string, ContextMenuActionCounters>) {
+    const result: Record<string, ContextMenuActionCounters> = {};
+    for (const [key, counters] of Object.entries(actions)) result[key] = cloneActionCounters(counters);
+    return result;
+}
 export type ContextMenuStats = {
     getSnapshot(): ContextMenuStatsSnapshot;
     reset(): void;
@@ -87,6 +137,8 @@ export function createContextMenu(data?: {name?: string}) {
         empty: 0,
         sources: {},
         layers: {},
+        actionTotals: createActionCounters(),
+        actions: {},
     };
     const layers = new Set<string>();
     let layerSeq = 0;
@@ -111,6 +163,8 @@ export function createContextMenu(data?: {name?: string}) {
             empty: statsState.empty,
             sources: {...statsState.sources},
             layers: {...statsState.layers},
+            actionTotals: cloneActionCounters(statsState.actionTotals),
+            actions: cloneActions(statsState.actions),
         };
     }
 
@@ -119,7 +173,7 @@ export function createContextMenu(data?: {name?: string}) {
         for (const cb of [...statsListeners]) cb(snapshot);
     }
 
-    function bumpStat(key: keyof Omit<ContextMenuStatsSnapshot, "sources" | "layers">) {
+    function bumpStat(key: ContextMenuOpenStat) {
         statsState[key] += 1;
         emitStats();
     }
@@ -127,6 +181,15 @@ export function createContextMenu(data?: {name?: string}) {
     function bumpMapStat(map: Record<string, number>, key: string | undefined) {
         if (!key) return;
         map[key] = (map[key] ?? 0) + 1;
+    }
+    function recordMenuAction(event: MenuActionEvent) {
+        const stat = event.type;
+        statsState.actionTotals[stat] += 1;
+        if (event.actionKey) {
+            const counters = statsState.actions[event.actionKey] ??= createActionCounters();
+            counters[stat] += 1;
+        }
+        emitStats();
     }
 
     const stats: ContextMenuStats = {
@@ -140,6 +203,8 @@ export function createContextMenu(data?: {name?: string}) {
             statsState.empty = 0;
             statsState.sources = {};
             statsState.layers = {};
+            statsState.actionTotals = createActionCounters();
+            statsState.actions = {};
             emitStats();
         },
         onChange(cb) {
@@ -316,7 +381,7 @@ export function createContextMenu(data?: {name?: string}) {
         >
             {children}
             {state.open && enabled && state.layerId == layerId && <OutsideClickArea outsideClick={handleClose}>
-                <Menu className={className} data={state.items} coordinate={relativePoint()} zIndex={zIndex}/>
+                <Menu className={className} data={state.items} coordinate={relativePoint()} zIndex={zIndex} onActionEvent={recordMenuAction}/>
             </OutsideClickArea>}
         </div>;
     }

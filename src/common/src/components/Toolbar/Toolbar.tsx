@@ -1,6 +1,6 @@
-import React, {useState} from 'react'
+import React, {useLayoutEffect, useRef, useState} from 'react'
 import {listen as createListen} from 'wenay-common2'
-import {renderBy, updateBy} from '../../../updateBy'
+import {createUpdateApi} from '../../../updateBy'
 import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
 import {OutsideClickArea} from '../../hooks/useOutside'
 import {useReorder} from '../../hooks/useReorder'
@@ -78,6 +78,7 @@ const densities = {list: [
     {key: 'icon', name: 'Icons', renderItem: itemIconOnly},
     {key: 'label', name: 'Icons + labels'},
 ] as ToolbarDensity[]}
+const densitiesApi = createUpdateApi(densities)
 
 /** Icon with a text fallback: no glyph = the first letters of short/title
  *  (an "PR"-style pseudo-icon), so icon densities work for icon-less items. */
@@ -99,12 +100,12 @@ export function registerToolbarDensity(d: ToolbarDensity) {
     const i = densities.list.findIndex(e => e.key == d.key)
     if (i == -1) densities.list.push(d)
     else densities.list.splice(i, 1, d)
-    renderBy(densities)
+    densitiesApi.render()
     return function offToolbarDensity() {
         const j = densities.list.indexOf(d)
         if (j != -1) {
             densities.list.splice(j, 1)
-            renderBy(densities)
+            densitiesApi.render()
         }
     }
 }
@@ -128,6 +129,50 @@ function itemContent(item: ToolbarItem, densityKey: string) {
  *  order (the gear always sits at the bar edge), but toggleable like an item. */
 const SETTINGS_KEY = '__settings'
 const RESET_KEY = '__reset'
+
+function useToolbarFlip(layoutKey: string) {
+    const itemRefs = useRef(new Map<string, HTMLDivElement>())
+    const prevRects = useRef(new Map<string, {left: number, top: number}>())
+    const rafs = useRef<number[]>([])
+
+    useLayoutEffect(() => {
+        const prev = prevRects.current
+        const next = new Map<string, {left: number, top: number}>()
+        rafs.current.forEach(cancelAnimationFrame)
+        rafs.current = []
+
+        itemRefs.current.forEach((node, key) => {
+            const rect = node.getBoundingClientRect()
+            next.set(key, {left: rect.left, top: rect.top})
+            const old = prev.get(key)
+            if (old == null) return
+            const dx = old.left - rect.left
+            const dy = old.top - rect.top
+            if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return
+            node.style.transition = 'none'
+            node.style.transform = `translate(${dx}px, ${dy}px)`
+            node.getBoundingClientRect()
+            const raf = requestAnimationFrame(() => {
+                node.style.transition = 'transform 180ms ease'
+                node.style.transform = ''
+            })
+            rafs.current.push(raf)
+        })
+
+        prevRects.current = next
+        return () => {
+            rafs.current.forEach(cancelAnimationFrame)
+            rafs.current = []
+        }
+    }, [layoutKey])
+
+    return function bind(key: string) {
+        return (node: HTMLDivElement | null) => {
+            if (node) itemRefs.current.set(key, node)
+            else itemRefs.current.delete(key)
+        }
+    }
+}
 
 export function createToolbar(opts: {
     /** persistence key (memoryProps -> memoryCache), like createUiSlot */
@@ -163,6 +208,7 @@ export function createToolbar(opts: {
         density: opts.def?.density ?? densities.list[0].key,
     })
     const st = memoryGetOrCreate<ToolbarConfig>(opts.key, defConfig())
+    const stApi = createUpdateApi(st)
     const [emitChange, onChange] = createListen<[ToolbarConfig]>()
     // ext is fixed for the controller's lifetime, so hook call order inside
     // useConfig/Bar/Settings never changes for a given toolbar instance
@@ -240,7 +286,7 @@ export function createToolbar(opts: {
                 [RESET_KEY]: metaVisible(next, RESET_KEY, resetDefaultVisible()),
             }
             st.density = next.density
-            renderBy(st)
+            stApi.render()
             memoryMarkDirty(opts.key)
             ext.setConfig({order: next.order.slice(), visible})
             // the source's own onChange already re-emitted; emit only when it can't
@@ -254,7 +300,7 @@ export function createToolbar(opts: {
             st.order = next.order.slice()
             st.visible = {...next.visible}
             st.density = next.density
-            renderBy(st)
+            stApi.render()
             memoryMarkDirty(opts.key)
             const orderChanged = !sameOrder(curSourceOrder, nextSourceOrder)
             if (orderChanged)
@@ -267,7 +313,7 @@ export function createToolbar(opts: {
             st.order = next.order.slice()
             st.visible = {...next.visible}
             st.density = next.density
-            renderBy(st)
+            stApi.render()
             memoryMarkDirty(opts.key)
             emitChange(normalize())
         }
@@ -277,7 +323,7 @@ export function createToolbar(opts: {
 
     /** subscription to everything the toolbar renders from (hook) */
     function useSubscribe() {
-        updateBy(st)
+        stApi.use()
         ext?.useConfig() // ext is per-instance constant - hook order is stable
     }
 
@@ -294,7 +340,7 @@ export function createToolbar(opts: {
      *  someone else's nodes.) */
     function useItems() {
         useSubscribe()
-        updateBy(densities)
+        densitiesApi.use()
         const cfg = normalize()
         const byKey = new Map(opts.items.map(i => [i.key, i]))
         return cfg.order
@@ -349,28 +395,30 @@ export function createToolbar(opts: {
      *  the popover sticks to - 'right' (default, for bars in a top-right corner)
      *  or 'left'. */
     function Bar(p: {className?: string, settings?: boolean, reset?: boolean, popAlign?: 'left' | 'right'} = {}) {
-        useSubscribe()
-        updateBy(densities)
+        const items = useItems()
         const cfg = normalize()
         const [open, setOpen] = useState(false)
-        const byKey = new Map(opts.items.map(i => [i.key, i]))
         const resetOn = opts.resetItem !== false && (p.reset ?? p.settings ?? false) && cfg.visible[RESET_KEY] != false
+        const settingsOn = !!p.settings && cfg.visible[SETTINGS_KEY] != false
+        const layoutKey = [
+            ...items.map(x => `${x.item.key}:${x.density}`),
+            resetOn ? `${RESET_KEY}:on` : '',
+            settingsOn ? `${SETTINGS_KEY}:on` : '',
+        ].join('|')
+        const bindFlip = useToolbarFlip(layoutKey)
+
         return <div className={p.className ?? 'wenayTb'}>
-            {cfg.order.map(k => {
-                const it = byKey.get(k)
-                if (!it || cfg.visible[k] == false) return null
-                return <div key={k} className='wenayTbItem'
-                            title={cfg.density == 'icon' ? it.title : undefined}
-                            onClick={it.onClick}>
-                    {itemContent(it, cfg.density)}
-                </div>
-            })}
-            {resetOn && <div className='wenayTbItem' title={resetTitle()}
+            {items.map(x => <div key={x.item.key} ref={bindFlip(x.item.key)} className='wenayTbItem'
+                             title={x.density == 'icon' ? x.item.title : undefined}
+                             onClick={x.item.onClick}>
+                {x.content}
+            </div>)}
+            {resetOn && <div ref={bindFlip(RESET_KEY)} className='wenayTbItem' title={resetTitle()}
                              onClick={() => reset()}>
                 {resetIcon()}
             </div>}
-            {p.settings && cfg.visible[SETTINGS_KEY] != false && <OutsideClickArea className='wenayTbGear' status={open} outsideClick={() => setOpen(false)}>
-                <div className='wenayTbItem' title={settingsTitle()}
+            {settingsOn && <OutsideClickArea className='wenayTbGear' status={open} outsideClick={() => setOpen(false)}>
+                <div ref={bindFlip(SETTINGS_KEY)} className='wenayTbItem' title={settingsTitle()}
                      onClick={() => setOpen(v => !v)}>
                     {settingsIcon()}
                 </div>
@@ -390,7 +438,7 @@ export function createToolbar(opts: {
      *  Plus arrow keys on the focused handle; fixed rows have neither. */
     function Settings(p: {className?: string, activeClassName?: string} = {}) {
         useSubscribe()
-        updateBy(densities)
+        densitiesApi.use()
         const cfg = normalize()
         const base = p.className ?? 'wenaySegBtn'
         const activeCls = p.activeClassName ?? 'wenaySegBtnActive'

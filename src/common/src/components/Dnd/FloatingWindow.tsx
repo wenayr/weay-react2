@@ -4,27 +4,30 @@ import React, {
     useRef,
     useState
 } from "react";
-import { Rnd } from "react-rnd";
-import {renderBy, updateBy} from "../../../updateBy";
+import { Rnd, type RndResizeCallback } from "react-rnd";
+import {createUpdateApi} from "../../../updateBy";
 import {ObservableMap} from "../../utils/observableMap";
 
-type tPosition = { x: number; y: number };
-type tSize = { height: number | string; width: number | string };
-type tRND = { position: tPosition; size: tSize };
+export type FloatingWindowPosition = { x: number; y: number };
+export type FloatingWindowSize = { height: number | string; width: number | string };
+export type FloatingWindowSavedGeometry = { position: FloatingWindowPosition; size: FloatingWindowSize };
+type tPosition = FloatingWindowPosition;
+type tSize = FloatingWindowSize;
+type tRND = FloatingWindowSavedGeometry;
 export type FloatingWindowUpdate = {
     e: MouseEvent | TouchEvent;
     dir: string;
     elementRef: HTMLElement;
     delta: { width: number; height: number };
-    position: tPosition;
+    position: FloatingWindowPosition;
 };
-type tDivRndBase = {
+export type FloatingWindowProps = {
     zIndex?: number;
     disableDragging?: () => boolean;
     keyForSave?: string;
     onUpdate?: (data: FloatingWindowUpdate) => void;
-    position?: tPosition;
-    size?: tSize;
+    position?: FloatingWindowPosition;
+    size?: FloatingWindowSize;
     moveOnlyHeader?: boolean;
     onCLickClose?: () => void;
     header?: React.ReactElement | boolean;
@@ -37,6 +40,26 @@ type tDivRndBase = {
     children: React.ReactElement | ((update: number) => React.ReactElement);
     className?: string;
 };
+export type FloatingWindowControllerOptions = Omit<
+    FloatingWindowProps,
+    "children" | "className" | "header" | "moveOnlyHeader" | "overflow" | "onCLickClose"
+>;
+
+export type FloatingWindowController = {
+    position: FloatingWindowPosition;
+    size: FloatingWindowSize;
+    update: number;
+    stackIndex: number;
+    zIndex: number;
+    overlayZIndex: number;
+    dragging: boolean;
+    headerRef: React.RefObject<HTMLDivElement | null>;
+    onHeaderTouchStart: React.TouchEventHandler<HTMLDivElement>;
+    onHeaderMouseDown: React.MouseEventHandler<HTMLDivElement>;
+    onWindowMouseDown: React.MouseEventHandler<HTMLDivElement>;
+    onResize: RndResizeCallback;
+    onResizeStop: RndResizeCallback;
+};
 
 // Map of all popup window sizes; observable - memoryCache marks itself dirty on its mutations
 export const floatingWindowMap = new ObservableMap<string, tRND>();
@@ -44,6 +67,7 @@ export const floatingWindowMap = new ObservableMap<string, tRND>();
 // limit={{x:{min:0}, y:{min:0}}}
 let k = 0;
 const openWindows: { ar: { k: number }[] } = { ar: [] };
+const openWindowsApi = createUpdateApi(openWindows);
 
 // Freezes the subtree until update changes (intentionally ignores render closure changes) -
 // the previous useMemo-in-callback semantics, but without calling a hook from an arbitrary place
@@ -62,42 +86,24 @@ export const FloatingWindow: typeof FloatingWindowBase = (a) => {
 };
 
 
-/**
- * Wrapper component around react-rnd.
- * Provides dragging and resizing, an optional header, and a close button.
- */
-export function FloatingWindowBase({
-                                children,
-                                keyForSave: ks,
-                                position,
-                                size,
-                                overflow = true,
-                                zIndex = 9,
-                                onUpdate,
-                                disableDragging,
-                                className,
-                                header,
-                                moveOnlyHeader,
-                                limit,
-                                onCLickClose,
-                                sizeByWindow = true
-                            }: tDivRndBase) {
-    // NOTE: no implicit limit for onCLickClose windows. `limit` is parent-relative,
-    // so {y:{min:0}} pinned windows to their DOM parent's top: a window opened from a
-    // centered wrapper (ModalProvider / ModalWrapper at top:50%) could not be dragged
-    // above mid-screen. Keeping the window on screen is already handled by the
-    // viewport clamp below (header rect vs viewport in useLayoutEffect).
-
+export function useFloatingWindowController({
+    keyForSave: ks,
+    position,
+    size,
+    zIndex = 9,
+    onUpdate,
+    limit,
+    sizeByWindow = true
+}: FloatingWindowControllerOptions = {}): FloatingWindowController {
     const positionDef: tPosition = { x: 0, y: 0, ...(position ?? {}) };
     const sizeDef: tSize = { height: 0, width: 0, ...(size ?? {}) };
 
-    // If there is a key, store position and size data in the map
     let map: tRND | undefined;
     if (ks) {
         map = floatingWindowMap.get(ks) ?? floatingWindowMap.set(ks, { size: sizeDef, position: positionDef }).get(ks);
     }
-    position = map?.position ?? positionDef;
-    size = map?.size ?? sizeDef;
+    const savedPosition = map?.position ?? positionDef;
+    const savedSize = map?.size ?? sizeDef;
 
     const id2 = useRef({ k: k++ });
     const id = id2.current;
@@ -108,36 +114,28 @@ export function FloatingWindowBase({
     const [a, setA] = useState(false);
     const [b, setB] = useState(false);
 
-    const [x, setX] = useState(position.x);
-    const [y, setY] = useState(position.y);
-    const [width, setWidth] = useState(size.width);
-    const [height, setHeight] = useState(size.height);
+    const [x, setX] = useState(savedPosition.x);
+    const [y, setY] = useState(savedPosition.y);
+    const [width, setWidth] = useState(savedSize.width);
+    const [height, setHeight] = useState(savedSize.height);
     const [update, setUpdate] = useState(0);
 
     const zindex = useRef(zIndexX);
     zindex.current = zIndexX;
 
-    // Update the window zIndex if it was brought to the top
-    updateBy(openWindows, () => {
+    openWindowsApi.use(() => {
         const z = openWindows.ar.findIndex((v) => v.k === id.k);
         if (z >= 0 && z !== zindex.current) {
             setZIndexX(z);
         }
     });
 
-    // limit via ref: an inline object in props must not resubscribe document listeners on every render
     const limitRef = useRef(limit);
     useLayoutEffect(() => { limitRef.current = limit; });
 
-    /**
-     * Hook for mouse dragging (a) and touch-device dragging (b).
-     * Remove subscriptions on unmount and when dependencies change (a/b).
-     */
     useEffect(() => {
-        // Mouse
         const mouseMoveHandler = (e: MouseEvent) => {
             e.stopPropagation();
-            // mousedown always sets lastC before this subscription exists
             if (lastC.current == null) return;
             const data = lastC.current;
             if (e.buttons === 1) {
@@ -162,12 +160,9 @@ export function FloatingWindowBase({
             document.removeEventListener("mousemove", mouseMoveHandler);
             lastC.current = null;
             setA(false);
-            // drag end commits geometry mutated in place - invisible to the map, so announce
-            // it; a no-move click also lands here, the save-side diff turns that into a no-op
             if (ks) floatingWindowMap.touch(ks);
         };
 
-        // Touch
         const touchMoveHandler = (e: TouchEvent) => {
             const data = lastT.current;
             if (!data) return touchEndHandler(e);
@@ -210,18 +205,15 @@ export function FloatingWindowBase({
             }
         };
 
-        // If mouse dragging mode is active
         if (a) {
             document.addEventListener("mousemove", mouseMoveHandler);
             document.addEventListener("mouseup", mouseUpHandler);
         }
-        // If touch-event dragging mode is active
         if (b) {
             document.addEventListener("touchmove", touchMoveHandler);
             document.addEventListener("touchend", touchEndHandler);
         }
 
-        // Return the cleanup function for unmount and a/b changes:
         return () => {
             document.removeEventListener("mousemove", mouseMoveHandler);
             document.removeEventListener("mouseup", mouseUpHandler);
@@ -230,32 +222,24 @@ export function FloatingWindowBase({
         };
     }, [a, b]);
 
-    // On the first render, add the window to the array; remove it on unmount
     useEffect(() => {
         openWindows.ar.push(id);
-        renderBy(openWindows);
+        openWindowsApi.render();
         return () => {
             const z = openWindows.ar.findIndex((v) => v.k === id.k);
             if (z >= 0) {
                 openWindows.ar.splice(z, 1);
-                renderBy(openWindows);
+                openWindowsApi.render();
             }
         };
     }, []);
 
-    // Update coordinates and size in the map if keyForSave is set
-    if (size) {
-        size.height = height;
-        size.width = width;
-    }
-    if (position) {
-        position.x = x;
-        position.y = y;
-    }
+    savedSize.height = height;
+    savedSize.width = width;
+    savedPosition.x = x;
+    savedPosition.y = y;
 
     const headerRef = useRef<HTMLDivElement | null>(null);
-    // clamp to the viewport in a layout effect: an inline ref-callback ran twice per render
-    // (null + element) with a forced reflow from getBoundingClientRect on each call
     useLayoutEffect(() => {
         const el = headerRef.current;
         if (!el || !sizeByWindow) return;
@@ -270,28 +254,110 @@ export function FloatingWindowBase({
         }
     }, [x, y, width, height, sizeByWindow]);
 
+    const onHeaderTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
+        const t = e.changedTouches[0];
+        if (t) {
+            lastT.current = {
+                x: x - t.clientX,
+                y: y - t.clientY,
+                id: t.identifier
+            };
+        }
+        setB(true);
+    };
+
+    const onHeaderMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
+        lastC.current = {
+            x: x - e.clientX,
+            y: y - e.clientY
+        };
+        setA(true);
+    };
+
+    const onWindowMouseDown: React.MouseEventHandler<HTMLDivElement> = () => {
+        const z = openWindows.ar.findIndex((v) => v === id);
+        if (z !== openWindows.ar.length - 1 || zindex.current !== z) {
+            const buf = openWindows.ar[z];
+            openWindows.ar.splice(z, 1);
+            openWindows.ar.push(buf);
+            openWindowsApi.render();
+        }
+    };
+
+    const onResizeStop: RndResizeCallback = (e, dir, elementRef, delta, { x: nx, y: ny }) => {
+        setX(nx);
+        setY(ny);
+        setHeight(elementRef.offsetHeight);
+        setWidth(elementRef.offsetWidth);
+        setUpdate(update + 1);
+        if (ks) floatingWindowMap.touch(ks);
+    };
+
+    const onResize: RndResizeCallback = (e, dir, elementRef, delta, pos) => {
+        onUpdate?.({ e, dir, elementRef, delta, position: pos });
+    };
+
+    const windowZIndex = zIndexX * 2 + zIndex;
+    return {
+        position: { x, y },
+        size: { width, height },
+        update,
+        stackIndex: zIndexX,
+        zIndex: windowZIndex,
+        overlayZIndex: windowZIndex + 1,
+        dragging: a || b,
+        headerRef,
+        onHeaderTouchStart,
+        onHeaderMouseDown,
+        onWindowMouseDown,
+        onResize,
+        onResizeStop,
+    };
+}
+
+/**
+ * Wrapper component around react-rnd.
+ * Provides dragging and resizing, an optional header, and a close button.
+ */
+export function FloatingWindowBase({
+                                children,
+                                keyForSave: ks,
+                                position,
+                                size,
+                                overflow = true,
+                                zIndex = 9,
+                                onUpdate,
+                                disableDragging,
+                                className,
+                                header,
+                                moveOnlyHeader,
+                                limit,
+                                onCLickClose,
+                                sizeByWindow = true
+                            }: FloatingWindowProps) {
+    // NOTE: no implicit limit for onCLickClose windows. `limit` is parent-relative,
+    // so {y:{min:0}} pinned windows to their DOM parent's top: a window opened from a
+    // centered wrapper (ModalProvider / ModalWrapper at top:50%) could not be dragged
+    // above mid-screen. Keeping the window on screen is already handled by the
+    // viewport clamp below (header rect vs viewport in useLayoutEffect).
+
+    const controller = useFloatingWindowController({
+        keyForSave: ks,
+        position,
+        size,
+        zIndex,
+        onUpdate,
+        disableDragging,
+        limit,
+        sizeByWindow,
+    });
+
     const headerD = (
         <div
-            ref={headerRef}
+            ref={controller.headerRef}
             className="wenayWndHeader"
-            onTouchStart={(e) => {
-                const t = e.changedTouches[0];
-                if (t) {
-                    lastT.current = {
-                        x: x - t.clientX,
-                        y: y - t.clientY,
-                        id: t.identifier
-                    };
-                }
-                setB(true);
-            }}
-            onMouseDown={(e) => {
-                lastC.current = {
-                    x: x - e.clientX,
-                    y: y - e.clientY
-                };
-                setA(true);
-            }}
+            onTouchStart={controller.onHeaderTouchStart}
+            onMouseDown={controller.onHeaderMouseDown}
         >
             {header ?? <div className="wenayWndHeaderDef"></div>}
         </div>
@@ -301,26 +367,16 @@ export function FloatingWindowBase({
         <Rnd
             disableDragging={true}
             style={{
-                zIndex: zIndexX * 2 + zIndex
+                zIndex: controller.zIndex
             }}
             className={className}
-            onResizeStop={(e, dir, elementRef, delta, { x: nx, y: ny }) => {
-                setX(nx);
-                setY(ny);
-                // actual element size: `+height + delta.height` gave NaN for string sizes like "100%"
-                setHeight(elementRef.offsetHeight);
-                setWidth(elementRef.offsetWidth);
-                setUpdate(update + 1);
-                if (ks) floatingWindowMap.touch(ks);
-            }}
-            onResize={(e, dir, elementRef, delta, pos) => {
-                onUpdate?.({ e, dir, elementRef, delta, position: pos });
-            }}
-            position={{ x, y }}
-            size={{ width, height }}
+            onResizeStop={controller.onResizeStop}
+            onResize={controller.onResize}
+            position={controller.position}
+            size={controller.size}
             default={{
-                ...position,
-                ...size
+                ...controller.position,
+                ...controller.size
             }}
         >
             <div
@@ -333,29 +389,20 @@ export function FloatingWindowBase({
                     position: "relative",
                     flex: "auto"
                 }}
-                onMouseDown={() => {
-                    // Bring the window to the top
-                    const z = openWindows.ar.findIndex((v) => v === id);
-                    if (z !== openWindows.ar.length - 1 || zindex.current !== z) {
-                        const buf = openWindows.ar[z];
-                        openWindows.ar.splice(z, 1);
-                        openWindows.ar.push(buf);
-                        renderBy(openWindows);
-                    }
-                }}
+                onMouseDown={controller.onWindowMouseDown}
             >
                 {moveOnlyHeader || header ? headerD : null}
                 <div className="maxSize" style={{ overflow: overflow ? "auto" : undefined }}>
-                    {(a || b) && (
+                    {controller.dragging && (
                         <div
                             className="maxSize"
                             style={{
                                 position: "absolute",
-                                zIndex: zIndexX * 2 + zIndex + 1
+                                zIndex: controller.overlayZIndex
                             }}
                         ></div>
                     )}
-                    {typeof children === "function" ? children(update) : children}
+                    {typeof children === "function" ? children(controller.update) : children}
                 </div>
                 {onCLickClose && (
                     <div
@@ -363,7 +410,7 @@ export function FloatingWindowBase({
                         className="wenayCloseBtn wenayWndClose"
                         title="Close"
                         style={{
-                            zIndex: zIndexX * 2 + zIndex + 1
+                            zIndex: controller.overlayZIndex
                         }}
                         onClick={onCLickClose}
                     >

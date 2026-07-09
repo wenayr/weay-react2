@@ -1,5 +1,5 @@
 import React from "react";
-import {renderBy, updateBy} from "../../../updateBy";
+import {createUpdateApi} from "../../../updateBy";
 import {memoryGetOrCreate, memoryMarkDirty} from "../../utils/memoryStore";
 
 /** One UI block shown in exactly one of several mount points; the point is a persisted setting.
@@ -16,6 +16,7 @@ export function createUiSlot<Places extends string>(opts: {
     def: NoInfer<Places>
 }) {
     const st = memoryGetOrCreate<{place: Places}>(opts.key, {place: opts.def})
+    const stApi = createUpdateApi(st)
     // a stored place may no longer exist after an app update - fall back to def
     const isPlace = (p: unknown): p is Places => typeof p == "string" && p in opts.places
 
@@ -23,18 +24,18 @@ export function createUiSlot<Places extends string>(opts: {
     const setPlace = (p: Places) => {
         if (st.place == p) return
         st.place = p
-        renderBy(st)
+        stApi.render()
         memoryMarkDirty(opts.key)
     }
 
     function Slot(p: {place: Places, children: React.ReactNode}): React.JSX.Element | null {
-        updateBy(st)
+        stApi.use()
         return getPlace() == p.place ? <>{p.children}</> : null
     }
 
     /** Segmented row over opts.places; apps pass their own .chip / .chipActive classes */
     function PlacementSetting(p: {className?: string, activeClassName?: string} = {}) {
-        updateBy(st)
+        stApi.use()
         const cur = getPlace()
         const base = p.className ?? "wenaySegBtn"
         const activeCls = p.activeClassName ?? "wenaySegBtnActive"

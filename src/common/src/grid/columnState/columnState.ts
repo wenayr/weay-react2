@@ -11,7 +11,7 @@
 import type {ReactNode} from 'react'
 import type {ColumnState as AgColumnState, GridApi} from 'ag-grid-community'
 import {listen as createListen} from 'wenay-common2'
-import {renderBy, updateBy} from '../../../updateBy'
+import {createUpdateApi, renderBy, updateBy} from '../../../updateBy'
 import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
 
 export type ColumnMeta = {
@@ -80,6 +80,7 @@ export function createColumnState(opts: {
         groups: opts.def?.groups ? {...opts.def.groups} : Object.fromEntries(groupKeys.map(g => [g, groupMembers(g)])),
     })
     const st = memoryGetOrCreate<ColumnsConfig>(opts.key, defConfig())
+    const stApi = createUpdateApi(st)
     const [emitChange, onChange] = createListen<[ColumnsConfig]>()
 
     /** Runtime-only, never persisted: actual = which keys the attached grid has;
@@ -89,6 +90,7 @@ export function createColumnState(opts: {
         present: null as null | {[key: string]: true},
         presentGate: null as null | {[key: string]: true},
     }
+    const rtApi = createUpdateApi(rt)
     const keyMap = (keys: string[] | null) => keys ? Object.fromEntries(keys.map(k => [k, true as const])) : null
     const sameMap = (a: null | {[key: string]: true}, b: null | {[key: string]: true}) => JSON.stringify(a) == JSON.stringify(b)
     function combinedPresent() {
@@ -105,13 +107,13 @@ export function createColumnState(opts: {
         const next = keyMap(keys)
         if (sameMap(next, rt.present)) return
         rt.present = next
-        renderBy(rt)
+        rtApi.render()
     }
     function setPresentGate(keys: string[] | null) {
         const next = keyMap(keys)
         if (sameMap(next, rt.presentGate)) return
         rt.presentGate = next
-        renderBy(rt)
+        rtApi.render()
         applyToGrid()
     }
     const getPresent = combinedPresent
@@ -122,7 +124,7 @@ export function createColumnState(opts: {
     }
     const passesPresentGate = (key: string) => !rt.presentGate || rt.presentGate[key] == true
     function usePresent() {
-        updateBy(rt)
+        rtApi.use()
         return combinedPresent()
     }
 
@@ -177,7 +179,7 @@ export function createColumnState(opts: {
         st.sort = next.sort ? {...next.sort} : null
         st.filter = {...next.filter}
         st.groups = Object.fromEntries(Object.entries(next.groups).map(([g, keys]) => [g, keys.slice()]))
-        renderBy(st)
+        stApi.render()
         memoryMarkDirty(opts.key)
         if (!fromGrid) applyToGrid()
         emitChange(normalize())
@@ -188,7 +190,7 @@ export function createColumnState(opts: {
     const reset = () => commit(defConfig(), false)
 
     function useConfig() {
-        updateBy(st)
+        stApi.use()
         return normalize()
     }
 

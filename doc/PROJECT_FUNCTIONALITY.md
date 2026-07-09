@@ -114,11 +114,11 @@ Main APIs:
 
 - `useOutside`, `OutsideClickArea`
 - `Button`, `OutsideButton`, `HoverButton`, `AbsoluteButton`
-- `FloatingWindow`
+- `FloatingWindow`, `useFloatingWindowController`
 - `useDraggableApi`, `useReorder`, `useReorderBoard`
 
 Use these when the UI problem is generic: outside-click closing, draggable
-position, ordered drag-and-drop, or a persistent floating window.
+position, ordered drag-and-drop, or a persistent floating window. Use `useFloatingWindowController` only for custom chrome around the same geometry/stack/resize behavior.
 
 Do not hide business flow inside these components. For example, a trade ticket
 window is an app component that may use `FloatingWindow`, not a library
@@ -144,12 +144,13 @@ settings registry, placement switcher, and toolbar editor.
 
 Main APIs:
 
-- `SettingsDialog`, `registerSettingsSection`
+- `SettingsDialog`, `useSettingsDialogController`, `registerSettingsSection`
 - `createUiSlot`
 - `createToolbar`, `registerToolbarDensity`, `toolbarItemIcon`
 
 Use `SettingsDialog` when the app has multiple settings sections or needs a
-searchable settings tree.
+searchable settings tree. Use `useSettingsDialogController` when custom settings
+chrome needs the same open/search/tree/history/resize behavior.
 
 Use `createUiSlot` when the same UI fragment may live in several places and
 the user can choose the placement.
@@ -175,13 +176,15 @@ Main APIs:
 - `contextMenu.Layer`
 - `contextMenu.openAt(event, items)`
 - `DropdownMenu`
+- `useRightMenuController`
 
 Use `contextMenu.openAt(e, items)` for new right-click integrations. It opens
 one current menu from a concrete event/point. Older queued/global paths remain
 for compatibility through `1.x` but should not be taught in new examples.
 
 `DropdownMenu` is a floating action menu with caller-owned trigger/content
-styling. It is not the main right-click primitive.
+styling. It is not the main right-click primitive. `useRightMenuController`
+keeps open/fixed/select/submenu/drag state reusable for custom floating-menu views.
 
 Menu diagnostics should start from the right-click surface: count `openAt` vs legacy queued opens, sources/layers, close reasons, item clicks by explicit stable keys, submenu opens, and async menu errors. These counters should be local/opt-in, not hidden analytics.
 
@@ -285,11 +288,11 @@ Main APIs:
 
 - `logsApi`
 - `getLogsApi`
+- `createLogsController`
 - `logsApi.React.Message`, `PageLogs`, `Setting`
-- context logger components in the rare surface
+- context logger hooks/components in the rare surface (`useLogsTableController`, `useLogsNotificationsController`)
 
-Use `logsApi` for quick global logging. Use context logger components when an
-app needs a larger logger surface.
+Use `logsApi` for quick global logging. Use `createLogsController` when an app needs headless append/limit/settings state without the shared UI. Use context logger components when an app needs a larger logger surface.
 
 ### Params
 
@@ -299,13 +302,15 @@ simple row/section editors.
 Main APIs:
 
 - `ParamsEditor`
+- `useParamsEditorController`
 - `ParamsEdit`
 - `ParamRow`
 - `useTextInputPanel`, `useFileInputPanel`
 - `TextInputPanel`, `FileInputPanel`
 
-Use these for generic param editing. Product-specific validation and save
-policy stay in the app.
+Use these for generic param editing. `useParamsEditorController` owns the draft clone,
+immediate/delayed change notification, expand callback, and cleanup for custom renderers.
+Product-specific validation and save policy stay in the app.
 
 ### Styles And Theme
 

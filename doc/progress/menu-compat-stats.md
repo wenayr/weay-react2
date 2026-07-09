@@ -1,6 +1,6 @@
 # Menu compatibility and statistics
 
-Status: policy/backlog recorded.
+Status: action-level stats implemented; RightMenu diagnostics deferred.
 
 ## Compatibility policy
 
@@ -33,7 +33,8 @@ Useful counters:
 Privacy/default rule:
 
 - Do not store arbitrary item labels by default.
-- Prefer explicit `key` / `source` fields from the app.
+- Prefer explicit `actionKey` / `source` fields from the app.
+- Per-action counters use only `MenuItemStrict.actionKey`; unkeyed items update aggregate `actionTotals` only.
 - Keep counters in memory by default; persistence should be app-owned.
 
 ## Right-button menu focus
@@ -82,9 +83,33 @@ Verification:
 - `npm run testjest -- --runInBand __test/contextMenuStats.test.tsx`
 - `git diff --check -- src/common/src/menu/menuMouse.tsx __test/contextMenuStats.test.tsx doc/wenay-react2.md doc/wenay-react2-rare.md doc/changes/v1.0.39.md doc/target/my.md doc/progress/menu-compat-stats.md`
 
-Deferred:
+Deferred after first pass:
 
 - Item click counters by action key.
 - Submenu open counters.
 - Async menu error counters.
 - RightMenu/DropdownMenu diagnostics.
+
+## 2026-07-09 action-key pass
+
+Status: implemented, pending full final verification after docs/target updates.
+
+Implemented:
+
+- `MenuItemStrict.actionKey?: string | null` as the explicit diagnostics key.
+- `MenuActionEvent` / `MenuActionHandler` wiring through `Menu`, nested menu layers, and `contextMenu.Layer`.
+- `ContextMenuStatsSnapshot.actionTotals` aggregate counters for click/ok/error/task/submenu/func/focus outcomes.
+- `ContextMenuStatsSnapshot.actions` keyed counters for explicit `actionKey` values only.
+- Snapshot cloning and reset cover action counters; labels and errors are not stored.
+- QA card 4 now supplies `qa4.*` action keys for manual right-click checks.
+
+Tests added:
+
+- keyed action increments totals and `actions[actionKey]` without storing the visible label;
+- unkeyed action increments totals only;
+- keyed submenu open increments submenu counters.
+
+Still deferred:
+
+- RightMenu/DropdownMenu diagnostics and controller cleanup; this is the next small related task.
+- A deeper `useMenuActionController` extraction. Current pass kept the visual DOM/classes stable and only added event wiring; a full hook/controller split is larger than needed for action stats.

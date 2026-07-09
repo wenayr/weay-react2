@@ -1,5 +1,5 @@
 import React from "react";
-import {renderBy, updateBy} from "../../../updateBy";
+import {createUpdateApi} from "../../../updateBy";
 import {TextInputModal} from "../Input";
 import type {ModalApi} from "./ModalContextProvider";
 
@@ -48,21 +48,21 @@ function createJsxStore<J extends object>(renderItem: (jsx: J) => React.JSX.Elem
     const data = {
         set(jsx: J | null) {
             _jsx = jsx
-            renderBy(data)
+            dataApi.render()
         },
         set JSX(jsx: J | null) {
             _jsx = jsx
-            renderBy(data)
+            dataApi.render()
         },
         get JSX() {return _jsx},
         Render(){
-            updateBy(data)
+            dataApi.use()
             return _jsx && renderItem(_jsx)
         },
         addJSX<A extends J | null>(jsx: A): A {
             if (check(jsx) == -1) {
                 _jsxArr.push({jsx, key: key++});
-                renderBy(data)
+                dataApi.render()
             }
             return jsx
         },
@@ -70,15 +70,16 @@ function createJsxStore<J extends object>(renderItem: (jsx: J) => React.JSX.Elem
             const c = check(jsx)
             if (c != -1) {
                 _jsxArr.splice(c,1)
-                renderBy(data)
+                dataApi.render()
             }
         },
         get arrJSX() {return _jsxArr.map(e=> e.jsx && <div key={e.key}>{renderItem(e.jsx)}</div>)},
         RenderArr(){
-            updateBy(data)
+            dataApi.use()
             return data.arrJSX
         }
     }
+    const dataApi = createUpdateApi(data)
     return data
 }
 

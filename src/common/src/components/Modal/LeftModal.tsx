@@ -1,6 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import {Color, colorGenerator2, ColorString, sleepAsync} from "wenay-common2";
-import {renderBy, updateBy} from "../../../updateBy";
+import {createUpdateApi} from "../../../updateBy";
 import {createModalElementStore} from "./Modal";
 import { DragBox } from "../Dnd/FloatingWindow";
 function useViewport() {
@@ -349,6 +349,7 @@ export function getApiLeftMenu() {
     };
 
     const menuStore = new Map<string, MenuItem[]>();
+    const menuStoreApi = createUpdateApi(menuStore);
 
     const setMenu = (items: (MenuItemPartial | MenuItem)[], key = "base") => {
         const colorGen = colorGenerator2({min: 0, max: 90});
@@ -395,9 +396,9 @@ export function getApiLeftMenu() {
                 && prev.menu.every((el, i) => el === menu[i])) return;
             lastSet.current = {menu, menuKey};
             setMenu(menu, menuKey);
-            renderBy(menuStore);
+            menuStoreApi.render();
         }, [menu, menuKey]);
-        updateBy(menuStore);
+        menuStoreApi.use();
         return (
             <div className={"maxSize"} style={{position: "absolute", zIndex: zIndex0}}>
                 <modal.Render/>
@@ -409,7 +410,7 @@ export function getApiLeftMenu() {
     const modal = createModalElementStore();
     return {
         modal,
-        renderBy() { renderBy(menuStore); },
+        renderBy() { menuStoreApi.render(); },
         getMenu: () => menuStore,
         setMenu: setMenu,
         Modal2: Modal2

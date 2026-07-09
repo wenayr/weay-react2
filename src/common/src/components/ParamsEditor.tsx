@@ -1,4 +1,4 @@
-import React, {ReactElement, useEffect, useMemo, useRef, useState} from "react";
+import React, {ReactElement, useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {const_Date, deepCloneMutable, isDate, Params, TF, timeLocalToStr_yyyymmdd, timeLocalToStr_yyyymmdd_hhmm, timeLocalToStr_yyyymmdd_hhmmss, timeLocalToStr_yyyymmdd_hhmmss_ms} from "wenay-common2";
 import {setResizeableElement, removeResizeableElement} from "./MyResizeObserver";
 import {ParamRow, ParamToggleLabel} from "./Parameters";
@@ -282,6 +282,67 @@ function InputListArray<T extends number | string>(set: (data: T[]) => void, val
         }
     </select>
 }
+export type ParamsEditorControllerOptions<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly> = {
+    params: TParams,
+    onChange: (params: TParams) => void,
+    onExpand?: (params: TParams) => void
+};
+
+export type ParamsEditorController<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly> = {
+    paramsRef: React.MutableRefObject<TParams>;
+    params: TParams;
+    refresh(): void;
+    notifyChange(): void;
+    notifyChangeDelayed(): void;
+    notifyExpand(): void;
+};
+
+export function useParamsEditorController<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>({
+                                                                                                             params,
+                                                                                                             onChange,
+                                                                                                             onExpand
+                                                                                                         }: ParamsEditorControllerOptions<TParams>): ParamsEditorController<TParams> {
+    const [, setUpdate] = useState(0);
+    const cloned = useMemo(() => deepCloneMutable(params), [params]) as TParams;
+    const paramsRef = useRef<TParams>(cloned);
+    if (paramsRef.current !== cloned) paramsRef.current = cloned;
+
+    const callbacks = useRef({onChange, onExpand});
+    callbacks.current = {onChange, onExpand};
+    const timeoutId = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => () => {
+        if (timeoutId.current != null) clearTimeout(timeoutId.current);
+    }, []);
+
+    const refresh = useCallback(() => {
+        setUpdate(e => e + 1);
+    }, []);
+
+    const notifyChange = useCallback(() => {
+        callbacks.current.onChange(paramsRef.current);
+    }, []);
+
+    const notifyChangeDelayed = useCallback(() => {
+        if (timeoutId.current != null) clearTimeout(timeoutId.current);
+        timeoutId.current = setTimeout(() => {
+            notifyChange();
+        }, 200);
+    }, [notifyChange]);
+
+    const notifyExpand = useCallback(() => {
+        callbacks.current.onExpand?.(paramsRef.current);
+    }, []);
+
+    return {
+        paramsRef,
+        params: paramsRef.current,
+        refresh,
+        notifyChange,
+        notifyChangeDelayed,
+        notifyExpand,
+    };
+}
 export function ParamsEditor<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>(data : {
     params: TParams,
     expandStatus?: boolean,
@@ -308,24 +369,16 @@ function ParamsEditorBase<TParams extends Params.IParamsExpandableReadonly = Par
     onChange: (params: TParams) => void,  // when a value changes
     onExpand?: (params: TParams) => void  // when expanded
 }) {
-    const [_, setUpdate] = useState(0)
-    function Refresh() {setUpdate(e=>++e)}
+    const controller = useParamsEditorController(data);
+    const myParams = controller.paramsRef;
+    function Refresh() {controller.refresh()}
     const styleColorDisable = "rgb(146,146,146)";
-    const p = useMemo(() => deepCloneMutable(data.params), [data.params]);
-    const myParams = useRef(p);
-    // sync during render: the effect+Refresh variant committed a frame of stale params first
-    if (myParams.current !== p) myParams.current = p;
-    const timeoutId = useRef<ReturnType<typeof setTimeout> | null>(null);
-    useEffect(() => () => { if (timeoutId.current != null) clearTimeout(timeoutId.current); }, []);
     function refreshIndicator() {
-        data.onChange(myParams.current as TParams);
+        controller.notifyChange();
     }
 
     function refreshIndicatorDelayed() {
-        if (timeoutId.current != null) clearTimeout(timeoutId.current)
-        timeoutId.current = setTimeout(() => {
-            refreshIndicator();
-        }, 200);
+        controller.notifyChangeDelayed();
     }
 
     function Param( //<T extends boolean|number|string|const_Date>(
@@ -352,7 +405,7 @@ function ParamsEditorBase<TParams extends Params.IParamsExpandableReadonly = Par
     }
 
     function onExpandA(param: Params.IParam, flag: boolean) {
-        data.onExpand?.(myParams.current as TParams);
+        controller.notifyExpand();
     }
 
     function ListParams(obj: Params.IParamsExpandable, parentEnabled: boolean | undefined = true, expandLevel: number = 0) {
@@ -547,5 +600,5 @@ function ParamsEditorBase<TParams extends Params.IParamsExpandableReadonly = Par
         })
     }
 
-    return <>{ListParams(myParams.current, undefined, data.expandStatusLvl).filter((el) => el != null)}</>;
+    return <>{ListParams(myParams.current as unknown as Params.IParamsExpandable, undefined, data.expandStatusLvl).filter((el) => el != null)}</>;
 }

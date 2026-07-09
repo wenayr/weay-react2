@@ -25,6 +25,18 @@ Examples:
 The reason is lifecycle ownership. The canonical primitive already knows how to
 attach, detach, replay current state, notify React, and preserve user config.
 
+## Hook/Controller Layering Standard
+
+For new reusable functionality, design the hook/controller API first. A visual component should usually be a thin layer over that API, and old component-only entry points should remain as compatibility wrappers when practical.
+
+Preferred shape:
+
+- Layer 1: `use*` hook or `create*` controller that owns state, lifecycle, subscriptions, persistence, commands, and callbacks.
+- Layer 2: visual `*View` / `*Table` / `*Panel` component that consumes the hook/controller and renders DOM.
+- Layer 3: compatibility component with the old name/props, implemented through Layer 1 and Layer 2.
+
+Do not add a hook just to add a hook. The hook/controller should expose real control: methods, subscription state, refs/controllers, persistence hooks, or an API object that a stand card/app can use without copying JSX.
+
 ## Compatibility Standard
 
 New examples should teach the canonical hook/controller API first. Old public APIs should usually remain supported during internal refactors, but an aggressive migration is allowed when it is explicitly planned and recorded in changelog/migration notes. Do not present a removed API as supported.
@@ -440,7 +452,7 @@ Standard:
 Use when app settings need a searchable tree.
 
 ```tsx
-import { SettingsDialog, registerSettingsSection } from "wenay-react2"
+import { SettingsDialog, registerSettingsSection, useSettingsDialogController } from "wenay-react2"
 import { useEffect } from "react"
 
 const ColumnsSettings = columnsToolbar.Settings
@@ -470,12 +482,22 @@ export function SettingsButton() {
         />
     )
 }
+
+export function CustomSettingsTrigger() {
+    const settings = useSettingsDialogController({
+        sections: [{ key: "orders", name: "Orders", render: () => null }],
+        defaultSection: "orders",
+    })
+
+    return <button onClick={settings.openDialog}>{settings.open ? "Open" : "Settings"}</button>
+}
 ```
 
 Why:
 
 - Sections can be registered by feature modules.
 - Search and tree behavior stays consistent across apps.
+- `useSettingsDialogController` exposes the same open/search/tree/history/resize actions for custom settings chrome.
 
 Standard:
 
@@ -483,7 +505,40 @@ Standard:
 - Put searchable synonyms in `keywords` or `searchText`.
 - Do not put settings registry state in product globals when the shared
   registry already fits.
+- Do not rewrite tree/search/divider UX just to customize the trigger; use the controller actions.
 
+## Params Editor
+
+Use `ParamsEditor` for the normal generated editor. Use `useParamsEditorController` only when the app needs a custom renderer over the same draft/debounce/expand contract.
+
+```tsx
+import { ParamsEditor, useParamsEditorController } from "wenay-react2"
+
+export function DefaultParams({params, save}: {params: any; save: (next: any) => void}) {
+    return <ParamsEditor params={params} onChange={save} onExpand={save} />
+}
+
+export function CustomParamsHeader({params, save}: {params: any; save: (next: any) => void}) {
+    const editor = useParamsEditorController({params, onChange: save})
+
+    return (
+        <button onClick={() => editor.notifyChange()}>
+            Save draft
+        </button>
+    )
+}
+```
+
+Why:
+
+- `ParamsEditor` keeps the existing generated rows and input behavior.
+- The controller owns the mutable draft clone, immediate/delayed notify, expand callback, and timer cleanup.
+- Product-specific validation and save policy stay outside the shared editor.
+
+Standard:
+
+- Do not rewrite row/input rendering just to use the controller.
+- Keep `ParamsEdit` and `ParamsArrayEdit` as compatibility wrappers unless the async load/save policy is being redesigned explicitly.
 ## Context Menu
 
 Use for right-click actions.
@@ -496,10 +551,10 @@ export function RowSurface() {
         <contextMenu.Layer>
             <div
                 onContextMenu={event => contextMenu.openAt(event, [
-                    { name: "Copy", onClick: copy },
-                    { name: "Delete", onClick: removeSelected },
-                    { name: "More", next: () => [
-                        { name: "Open details", onClick: openDetails },
+                    { name: "Copy", actionKey: "row.copy", onClick: copy },
+                    { name: "Delete", actionKey: "row.delete", onClick: removeSelected },
+                    { name: "More", actionKey: "row.more", next: () => [
+                        { name: "Open details", actionKey: "row.openDetails", onClick: openDetails },
                     ] },
                 ])}
             />
@@ -519,8 +574,52 @@ Standard:
 - Prefer `contextMenu.openAt(event, items)`.
 - Keep legacy queued/global context menu paths working for compatibility; instrument them before considering removal.
 - Keep menu item construction close to the surface that owns the action.
+- Add explicit `actionKey` for actions that should appear in `contextMenu.stats.actions`; unkeyed actions are counted only in aggregate totals.
+- Do not use labels as diagnostics keys: labels can be translated or sensitive.
 - Do not mutate menu item objects to track hover/open state.
 
+## Floating Right Menu
+
+Use `DropdownMenu` for the default floating action menu. Use `useRightMenuController` when the app needs its own DOM while keeping the same open/fixed/select/submenu state contract.
+
+```tsx
+import { DropdownMenu, useRightMenuController } from "wenay-react2"
+
+const elements = [
+    { label: "Columns", subMenuContent: () => <ColumnsPanel /> },
+]
+
+export function DefaultFloatingMenu() {
+    return <DropdownMenu elements={elements} keyForSave="orders.rightMenu" />
+}
+
+export function CustomFloatingMenu() {
+    const menu = useRightMenuController({ elements })
+
+    return (
+        <div onMouseEnter={menu.open} onMouseLeave={() => !menu.isFixed && menu.setOpen(false)}>
+            <button onClick={menu.toggleFixed}>{menu.isFixed ? "Pinned" : "Menu"}</button>
+            {menu.isOpen && elements.map((item, index) => (
+                <button key={item.label} onMouseEnter={() => menu.selectItem(item, index)}>
+                    {item.label}
+                </button>
+            ))}
+            {menu.submenuRender}
+        </div>
+    )
+}
+```
+
+Why:
+
+- `DropdownMenu` remains the compatibility visual wrapper.
+- `useRightMenuController` owns state and drag/persist contracts when a custom view is needed.
+- The app decides trigger/content styling instead of changing shared default styles.
+
+Standard:
+
+- Do not duplicate right-menu hover/fixed/submenu timers in product code.
+- Keep persisted placement in `keyForSave` / `mapRightMenu`; do not create another store for the same menu.
 ## Floating Settings Window
 
 Use when a settings editor needs to stay stable while the bar itself reflows.
@@ -560,6 +659,35 @@ Standard:
 - Do not bake floating-window behavior into `createToolbar`.
 - Choose the settings container in the app.
 - Reuse `FloatingWindow` rather than inventing another movable modal.
+
+Controller-first variant for custom chrome:
+
+```tsx
+import type { ReactNode } from "react"
+import { useFloatingWindowController } from "wenay-react2"
+
+export function CustomFloatingPanel({ children }: { children: ReactNode }) {
+    const wnd = useFloatingWindowController({
+        keyForSave: "orders.custom.panel",
+        size: { width: 360, height: 260 },
+        limit: { x: { min: 0 }, y: { min: 0 } },
+    })
+
+    return (
+        <section
+            onMouseDown={wnd.onWindowMouseDown}
+            style={{ position: "absolute", left: wnd.position.x, top: wnd.position.y, zIndex: wnd.zIndex }}
+        >
+            <header ref={wnd.headerRef} onMouseDown={wnd.onHeaderMouseDown} onTouchStart={wnd.onHeaderTouchStart}>
+                Custom panel
+            </header>
+            {children}
+        </section>
+    )
+}
+```
+
+Use the hook only when the default `FloatingWindow` DOM/chrome is not suitable. Keep `FloatingWindow` as the normal path for standard draggable windows.
 
 ## Observe Store Mirror
 
@@ -670,9 +798,43 @@ export function LogsPanel() {
 }
 ```
 
+For headless custom log stores, use `createLogsController`; `getLogsApi` remains the compatibility entrypoint for the shared global logger:
+
+```ts
+import { createLogsController } from "wenay-react2"
+
+const logs = createLogsController({options: {limit: 50, limitPer: 500}})
+logs.addLogs({id: "orders", time: new Date(), txt: "queued", var: 1})
+logs.getLatest()
+```
+
+For compact embedded log tables, use the MiniLogs hook/controller first when the parent needs grid control:
+
+```tsx
+import { AgGridTable, MiniLogsTable, useMiniLogsTable } from "wenay-react2"
+
+type LogRow = { time: Date; id: string; var: number; txt: string; address?: string }
+
+export function CompactLogs({rows}: {rows: LogRow[]}) {
+    const table = useMiniLogsTable<LogRow>({
+        data: rows,
+        onClick: e => console.log(e.data),
+    })
+
+    return <AgGridTable<LogRow> {...table.props} />
+}
+
+export function SimpleCompactLogs({rows}: {rows: LogRow[]}) {
+    return <MiniLogsTable<LogRow> data={rows} />
+}
+```
+
 Why:
 
 - The shared logger already has notification/table chrome.
+- `createLogsController` keeps append/limit/settings state testable without rewriting logger UI.
+- `useMiniLogsTable` keeps the compact table defaults, click contract, and grid control API in one reusable layer.
+- `MiniLogsTable` is the visual layer; `MiniLogs` remains the old compatibility wrapper.
 - Styling is tokenized through `--logs-*`.
 
 Standard:
@@ -683,13 +845,19 @@ Standard:
 
 ## QA Stand Standards
 
+The QA stand and in-repository example files are maintained usage examples, not disposable tests. When a public standard changes, update the affected card/example in the same pass, or record why no example change is needed.
+
 Use the QA stand to validate behavior, but read it critically.
 
 Current strong examples:
 
+- `qa.tsx` card 20 for `SettingsDialog` search/tree registry behavior.
+- `qa.tsx` card 21 for `createUiSlot` persisted placement behavior.
+- `qa.tsx` card 25 for local `createToolbar` config/settings behavior.
 - `qa.tsx` cards 28-31 for `columnState`, `ColumnsMenu`, `ColumnDots`,
   `CardList`, and `createToolbar({source})`.
 - `qa.tsx` cards 23-26 for Replay hooks.
+- `src/common/src/grid/agGrid4/example.tsx` for `useAgGrid` / `AgGridTable` controller examples.
 - `qa.tsx` active cards for current work.
 
 Legacy or low-level examples:

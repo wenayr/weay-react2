@@ -62,16 +62,43 @@ export type DropdownMenuProps = {
 
 export type MenuRightRenderProps = Omit<DropdownMenuProps, 'elements'>;
 
-export function DropdownMenu({
-                                 elements,
-                                 style,
-                                 styles,
-                                 classNames = {},
-                                 trigger = '☰',
-                                 position: initialPosition = 'right',
-                                 verticalPosition: initialVerticalPosition = 'top',
-                                 keyForSave
-                             }: DropdownMenuProps) {
+export type UseRightMenuControllerOptions = Pick<DropdownMenuProps,
+    'elements' | 'style' | 'styles' | 'position' | 'verticalPosition' | 'keyForSave'
+>;
+
+export type RightMenuController = {
+    elements: MenuElement[];
+    isOpen: boolean;
+    isFixed: boolean;
+    select: number | null;
+    position: MenuRightPosition;
+    isTop: boolean;
+    containerRef: React.RefObject<HTMLDivElement | null>;
+    dragProps: ReturnType<typeof useDraggable>['dragProps'];
+    triggerState: MenuRightTriggerState;
+    containerStyle: React.CSSProperties;
+    flyoutStyle: React.CSSProperties;
+    submenuRender: React.ReactElement;
+    hasSubmenu: boolean;
+    open(): void;
+    close(): void;
+    toggleFixed(): void;
+    setOpen(open: boolean): void;
+    selectItem(item: MenuElement, index: number): void;
+    contentMouseEnter(): void;
+    contentMouseLeave(): Promise<void>;
+    submenuMouseEnter(): void;
+    submenuMouseLeave(): Promise<void>;
+};
+
+export function useRightMenuController({
+                                           elements,
+                                           style,
+                                           styles,
+                                           position: initialPosition = 'right',
+                                           verticalPosition: initialVerticalPosition = 'top',
+                                           keyForSave
+                                       }: UseRightMenuControllerOptions): RightMenuController {
     const [initialState] = useState<MenuRightSavedState>(() => {
         const fallback: MenuRightSavedState = {
             position: initialPosition,
@@ -90,9 +117,8 @@ export function DropdownMenu({
     const [isFixed, setIsFixed] = useState(false);
     const [select, setSelect] = useState<number | null>(null);
     const data = useRef({ m1: false, m2: false });
-    // Get modal JSX functions
     const jsx = useMemo(createModalRenderStore, []);
-    const jsxRender = useMemo(() => <jsx.Render />, [jsx]);
+    const submenuRender = useMemo(() => <jsx.Render />, [jsx]);
     const [position, setPosition] = useState<MenuRightPosition>(initialState.position);
     const [isTop, setIsTop] = useState(initialState.verticalPosition === 'top');
     const positionLast = useRef<{ x: number; y: number }>({ ...initialState.offset });
@@ -146,27 +172,25 @@ export function DropdownMenu({
     }, [isTop, keyForSave, position]);
     const { position: pos, dragProps } = useDraggable(0, 0, 50, handleDragEnd, () => {});
 
-    // Click and hover handlers
-    const handleClickOutside = useCallback(() => {
+    const close = useCallback(() => {
         setIsOpen(false);
     }, []);
 
-    const handleToggle = useCallback(() => {
+    const toggleFixed = useCallback(() => {
         setIsFixed((prev) => !prev);
         setIsOpen((prev) => !prev);
     }, []);
 
-    const handleSelect = useCallback((item: MenuElement, index: number) => {
+    const selectItem = useCallback((item: MenuElement, index: number) => {
         jsx.set(item.subMenuContent);
         setSelect(index);
     }, [jsx]);
 
-    const handleContentMouseEnter = useCallback(() => {
+    const contentMouseEnter = useCallback(() => {
         data.current.m1 = true;
     }, []);
 
-    const handleContentMouseLeave = useCallback(async () => {
-        data.current.m1 = false;
+    const clearSelectIfIdle = useCallback(async () => {
         await sleepAsync(50);
         if (!data.current.m1 && !data.current.m2) {
             jsx.set(null);
@@ -174,77 +198,27 @@ export function DropdownMenu({
         }
     }, [jsx]);
 
-    const handleSubmenuMouseEnter = useCallback(() => {
+    const contentMouseLeave = useCallback(async () => {
+        data.current.m1 = false;
+        await clearSelectIfIdle();
+    }, [clearSelectIfIdle]);
+
+    const submenuMouseEnter = useCallback(() => {
         data.current.m2 = true;
     }, []);
 
-    const handleSubmenuMouseLeave = useCallback(async () => {
+    const submenuMouseLeave = useCallback(async () => {
         data.current.m2 = false;
-        await sleepAsync(50);
-        if (!data.current.m1 && !data.current.m2) {
-            jsx.set(null);
-            setSelect(null);
-        }
-    }, [jsx]);
+        await clearSelectIfIdle();
+    }, [clearSelectIfIdle]);
 
-    // Render dropdown menu (dop)
-    const dop = (isFixed || isOpen) && (
-        <div
-            onMouseEnter={handleContentMouseEnter}
-            onMouseLeave={handleContentMouseLeave}
-            className={cx(classNames.flyout ?? 'dropdown-content2', !isTop ? (classNames.flyoutUp ?? 'dropdown-up') : undefined)}
-            style={{
-                display: 'flex',
-                [position]: 0,
-                right: position === 'left' ? 'auto' : 0,
-                flexDirection: position === 'left' ? 'row' : 'row-reverse',
-                ...styles?.flyout
-            }}
-        >
-            <div
-                className={classNames.list ?? "dropdown-content"}
-                style={styles?.list}
-                onMouseEnter={handleContentMouseEnter}
-                onMouseLeave={handleContentMouseLeave}
-            >
-                {elements.map((item, index) => (
-                    <div
-                        key={item.label}
-                        className={cx(classNames.item ?? 'menu-item', select === index ? (classNames.itemActive ?? 'force-hover') : undefined)}
-                        style={styles?.item}
-                        onMouseEnter={() => handleSelect(item, index)}
-                        onClick={() => handleSelect(item, index)}
-                    >
-                        {item.label}
-                    </div>
-                ))}
-            </div>
-            <div
-                onMouseEnter={handleSubmenuMouseEnter}
-                onMouseLeave={handleSubmenuMouseLeave}
-            >
-                {jsx.JSX ? (
-                    // clamp to the viewport: with hard 40vw/70vh the submenu ran
-                    // off screen when the menu sat near a bottom/side edge
-                    <div className={classNames.submenu ?? "submenu"} style={{ width: '40vw', minHeight: '70vh',
-                        maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto', ...styles?.submenu }}>
-                        {jsxRender}
-                    </div>
-                ) : null}
-            </div>
-        </div>
-    );
-
-    // Calculate offsets
-    const computedX =
-        position === 'left'
-            ? positionLast.current.x + pos.x
-            : positionLast.current.x - pos.x;
+    const computedX = position === 'left'
+        ? positionLast.current.x + pos.x
+        : positionLast.current.x - pos.x;
     const computedY = isTop
         ? positionLast.current.y + pos.y
         : positionLast.current.y - pos.y;
 
-    // Calculate menu container styles
     const containerStyle = useMemo<React.CSSProperties>(() => {
         const computedStyle: React.CSSProperties = {
             ...style,
@@ -252,7 +226,6 @@ export function DropdownMenu({
             display: 'flex'
         };
 
-        // Horizontal positioning
         if (position === 'left') {
             computedStyle.left = Math.max(0, Math.min(computedX, window.innerWidth - 50));
             computedStyle.right = 'auto';
@@ -260,7 +233,6 @@ export function DropdownMenu({
             computedStyle.right = Math.max(0, Math.min(computedX, window.innerWidth - 50));
             computedStyle.left = 'auto';
         }
-        // Vertical positioning
         if (isTop) {
             computedStyle.top = Math.max(0, Math.min(computedY, window.innerHeight - 50));
             computedStyle.bottom = 'auto';
@@ -271,23 +243,115 @@ export function DropdownMenu({
         return computedStyle;
     }, [style, styles?.container, position, isTop, computedX, computedY]);
 
+    const flyoutStyle = useMemo<React.CSSProperties>(() => ({
+        display: 'flex',
+        [position]: 0,
+        right: position === 'left' ? 'auto' : 0,
+        flexDirection: position === 'left' ? 'row' : 'row-reverse',
+        ...styles?.flyout
+    }), [position, styles?.flyout]);
+
+    return {
+        elements,
+        isOpen,
+        isFixed,
+        select,
+        position,
+        isTop,
+        containerRef,
+        dragProps,
+        triggerState: {isOpen, isFixed},
+        containerStyle,
+        flyoutStyle,
+        submenuRender,
+        hasSubmenu: !!jsx.JSX,
+        open: () => setIsOpen(true),
+        close,
+        toggleFixed,
+        setOpen: setIsOpen,
+        selectItem,
+        contentMouseEnter,
+        contentMouseLeave,
+        submenuMouseEnter,
+        submenuMouseLeave,
+    };
+}
+
+export function DropdownMenu({
+                                 elements,
+                                 style,
+                                 styles,
+                                 classNames = {},
+                                 trigger = '☰',
+                                 position,
+                                 verticalPosition,
+                                 keyForSave
+                             }: DropdownMenuProps) {
+    const controller = useRightMenuController({
+        elements,
+        style,
+        styles,
+        position,
+        verticalPosition,
+        keyForSave,
+    });
+    const dop = (controller.isFixed || controller.isOpen) && (
+        <div
+            onMouseEnter={controller.contentMouseEnter}
+            onMouseLeave={controller.contentMouseLeave}
+            className={cx(classNames.flyout ?? 'dropdown-content2', !controller.isTop ? (classNames.flyoutUp ?? 'dropdown-up') : undefined)}
+            style={controller.flyoutStyle}
+        >
+            <div
+                className={classNames.list ?? "dropdown-content"}
+                style={styles?.list}
+                onMouseEnter={controller.contentMouseEnter}
+                onMouseLeave={controller.contentMouseLeave}
+            >
+                {elements.map((item, index) => (
+                    <div
+                        key={item.label}
+                        className={cx(classNames.item ?? 'menu-item', controller.select === index ? (classNames.itemActive ?? 'force-hover') : undefined)}
+                        style={styles?.item}
+                        onMouseEnter={() => controller.selectItem(item, index)}
+                        onClick={() => controller.selectItem(item, index)}
+                    >
+                        {item.label}
+                    </div>
+                ))}
+            </div>
+            <div
+                onMouseEnter={controller.submenuMouseEnter}
+                onMouseLeave={controller.submenuMouseLeave}
+            >
+                {controller.hasSubmenu ? (
+                    // clamp to the viewport: with hard 40vw/70vh the submenu ran
+                    // off screen when the menu sat near a bottom/side edge
+                    <div className={classNames.submenu ?? "submenu"} style={{ width: '40vw', minHeight: '70vh',
+                        maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto', ...styles?.submenu }}>
+                        {controller.submenuRender}
+                    </div>
+                ) : null}
+            </div>
+        </div>
+    );
+
     return (
         <OutsideClickArea
-            ref={containerRef}
-            outsideClick={handleClickOutside}
-            className={cx(classNames.container ?? 'menu-container', isFixed ? (classNames.activeContainer ?? 'activeM') : undefined)}
-            style={containerStyle}
-            onMouseEnter={() => !isFixed && setIsOpen(true)}
-            onMouseLeave={() => !isFixed && setIsOpen(false)}
+            ref={controller.containerRef}
+            outsideClick={controller.close}
+            className={cx(classNames.container ?? 'menu-container', controller.isFixed ? (classNames.activeContainer ?? 'activeM') : undefined)}
+            style={controller.containerStyle}
+            onMouseEnter={() => !controller.isFixed && controller.setOpen(true)}
+            onMouseLeave={() => !controller.isFixed && controller.setOpen(false)}
         >
-            <div {...dragProps} className={classNames.trigger ?? "menu-button"} style={styles?.trigger} onClick={handleToggle}>
-                {renderTrigger(trigger, {isOpen, isFixed})}
+            <div {...controller.dragProps} className={classNames.trigger ?? "menu-button"} style={styles?.trigger} onClick={controller.toggleFixed}>
+                {renderTrigger(trigger, controller.triggerState)}
             </div>
             {dop}
         </OutsideClickArea>
     );
 }
-
 export function createRightMenuController() {
     const elements: MenuElement[] = [];
     let render: null | (React.Dispatch<React.SetStateAction<MenuElement[]>>) = null;

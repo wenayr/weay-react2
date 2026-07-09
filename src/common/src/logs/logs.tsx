@@ -1,4 +1,3 @@
-import {AgGridReact} from "ag-grid-react";
 import React, {useCallback, useEffect, useRef} from "react";
 import {copyToClipboard, Params, timeLocalToStr_hhmmss, ArrayElementType} from "wenay-common2";
 import {renderBy, updateBy} from "../../updateBy";
@@ -7,9 +6,29 @@ import {contextMenu} from "../menu/menuMouse";
 import { memoryGetOrCreate } from "../utils/memoryStore";
 import { ParamsEditor } from "../components/ParamsEditor";
 import {logDividerGradient, logSeverityBackground, logStyleTokens} from "./logStyles";
+import {AgGridTable, colDefCentered} from "../grid/agGrid4";
+import {
+    createLogsController,
+    createLogsControllerState,
+    getSettingLogs,
+    type LogEntry,
+    type LogsApiOptions,
+} from "./logsController";
 
-type LogInput<T extends object> = T & {id : string, var?: number, time: Date, txt: string}
-type LogEntry<T extends object = {}> = LogInput<T> & {num: number}
+export {
+    createLogsController,
+    createLogsControllerState,
+    getSettingLogs,
+} from "./logsController";
+export type {
+    CreateLogsControllerOptions,
+    LogsApiOptions,
+    LogsController,
+    LogsControllerState,
+    LogsFullState,
+    LogsMiniState,
+} from "./logsController";
+
 const cashLogs = new Map<string, LogEntry<any>[]>()
 
 const datumConst = {
@@ -18,47 +37,28 @@ const datumConst = {
 const datumMiniConst = {
     last: [] as LogEntry[]
 }
-const getSettingLogs = () => ({
-    minVarLogs: {name:"min. importance for notifications", range: {min: 0 , max: 25, step: 1}, value: 0},
-    minVarMessage: {name:"min. importance for log table", range: {min: 0 , max: 25, step: 1}, value: 0},
-    timeShow: {name:"screen display time", range: {min: 1, max: 20, step: 1}, value: 2},
-    show: {name: "show", value: true as boolean}
-}) satisfies Params.IParams
 const settingLogs = {params: Params.GetSimpleParams(getSettingLogs())}
 
 type tColum2<TData extends any = any> = (ColDef<TData> | ColGroupDef<TData>)
+const logGridDefaultColDef = {...colDefCentered, wrapText: true} satisfies ColDef<any>
 // varMin - minimum importance
-export function getLogsApi<T extends object = {}>(
-    setting: {
-        limit?: number,
-        limitPer: number,
-        varMin?: number
-    }) {
+export function getLogsApi<T extends object = {}>(setting: LogsApiOptions) {
     const datum = memoryGetOrCreate("settingLogs",settingLogs)
-    function addToArr<T>(arr: T[], data: T, limit: number){
-        arr.unshift(data)
-        if (arr.length > limit) arr.length = limit
-    }
-    let num = 0
+    const controller = createLogsController<T>({
+        options: setting,
+        state: createLogsControllerState<T>({
+            full: datumConst,
+            mini: datumMiniConst as {last: LogEntry<T>[]},
+            settings: datum,
+        }),
+        onFullChange: () => renderBy(datumConst),
+        onMiniChange: () => renderBy(datumMiniConst),
+        onSettingsChange: () => renderBy(datum),
+    })
 
     return {
-        addLogs(a: LogInput<T>){
-            const item = {...a, num: num++}
-            addToArr(datumMiniConst.last, item, setting.limit ?? 50)
-            addToArr(datumConst.map.get(a.id) ?? datumConst.map.set(a.id,[]).get(a.id)!, item, setting.limitPer)
-            renderBy(datumConst)
-            renderBy(datumMiniConst)
-        },
-        params: {
-            def: getSettingLogs,
-            get() {return datum.params},
-            set(a: Params.SimpleParams<ReturnType<typeof getSettingLogs>>) {
-                datum.params = a
-                renderBy(datumMiniConst)
-                renderBy(datumConst)
-            },
-
-        },
+        addLogs: controller.addLogs,
+        params: controller.params,
         React: {
             Setting: InputSettingLogs,
             Message: MessageEventLogs,
@@ -151,7 +151,7 @@ export function PageLogs({update}: {update?: number}) {
             },
         ] satisfies tColum2<el>[]
         return <div className={"maxSize"}>
-            <AgGridReact
+            <AgGridTable
                 // className = "ag-theme-alpine-dark ag-theme-alpine2" // ag-theme-alpine-dark3
                 suppressCellFocus = {true}
                 onGridReady = {(a)=>{
@@ -169,14 +169,7 @@ export function PageLogs({update}: {update?: number}) {
                 onSortChanged={(e)=>{
 
                 }}
-                defaultColDef = {{
-                    headerClass: ()=> ("gridTable-header"),
-                    resizable: true,
-                    cellStyle: {textAlign: "center"},
-                    sortable: true,
-                    filter: true,
-                    wrapText: true,
-                }}
+                defaultColDef = {logGridDefaultColDef}
                 headerHeight = {30}
                 rowHeight = {26}
                 autoSizePadding = {1}
@@ -186,14 +179,14 @@ export function PageLogs({update}: {update?: number}) {
                     if (e.event instanceof MouseEvent && e.event.button == 2) {
                         contextMenu.openAt(e.event, [
                             {
-                                name: "copy", onClick: ()=> {copyToClipboard(e.value)}
+                                name: "copy", actionKey: "logs.copyCell", onClick: ()=> {copyToClipboard(e.value)}
                             }
                         ]);
                     }
                 }}
             >
 
-            </AgGridReact>
+            </AgGridTable>
         </div>
     },[true])
 

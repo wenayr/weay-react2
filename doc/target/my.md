@@ -4,14 +4,63 @@
 
 ## In Progress
 
-_Пусто._
+- **Второй проход по публичной поверхности `wenay-react2`: нормализация внутренних слоёв библиотеки** — идём от простых useful passes к более рискованным; сомнительные задачи пропускаем и помечаем.
+  - Прогресс: [../progress/public-surface-normalization.md](../progress/public-surface-normalization.md)
+  - Правило прохода: обновлять не только production-код, но и `doc/EXAMPLE_USAGE.md`, `src/common/testUseReact/qa.tsx` cards, `replayVideo.tsx`, `agGrid4/example.tsx`/docs, если меняется canonical usage; если пример уже корректен — записывать, что менять не нужно.
+  - Hook/controller-first стандарт: новый reusable функционал проектировать через `use*` hook или `create*` controller с API управления; визуальный компонент делать тонким слоем сверху, старое имя оставлять compatibility wrapper, если это не ломает код.
+  - Оценка задач: эффективность high/medium/low, простота simple/medium/hard, риск low/medium/high. Low-effectiveness или hard/high-risk без явного выигрыша пропускать и помечать причиной.
+  - Сделано: `useKeyboard.ts` переведён с прямого `renderBy(keyboardState)` на `createUpdateApi(keyboardState)`; публичный `keyboard` / `useKeyboard` API не менялся.
+  - Сделано: `MiniLogs` / `PageLogs` используют `colDefCentered` + локальный `wrapText: true` вместо ручного `defaultColDef`.
+  - Сделано: `MiniLogs` / `PageLogs` переведены с raw `AgGridReact` на `AgGridTable` без переписывания logger state/timing; card 9 готова для ручной проверки.
+  - Сделано: `createModalElementStore` / `createModalRenderStore` переведены с прямого `renderBy/updateBy(data)` на `createUpdateApi(data)` без изменения публичного compatibility API.
+  - Сделано: `createUiSlot` переведён с прямого `renderBy/updateBy(st)` на `createUpdateApi(st)`; card 21 проверена как usage-пример, менять не нужно.
+  - Сделано: `Toolbar.tsx` density registry переведён с прямого `renderBy/updateBy(densities)` на `createUpdateApi(densities)`; card 25 проверена как usage-пример, менять не нужно.
+  - Сделано: `SettingsDialog.tsx` section registry переведён с прямого `renderBy/updateBy(registry)` на `createUpdateApi(registry)`; card 20 проверена как usage-пример, менять не нужно; layout-store пропущен как low-effectiveness без явного consumer.
+  - Сделано: `columnState.ts` runtime `rt` (`present/presentGate`) и persisted `st` переведены на `createUpdateApi`; cards 28-31 проверены как usage-примеры, менять не нужно.
+  - Сделано: `createSearchHistory` переведён на `createUpdateApi`; публичный API истории поиска не менялся.
+  - Сделано: `createToolbar` local persisted store `st` переведён на `createUpdateApi`; `sourceMode`, external source hook и memory dirty flow не менялись.
+  - Сделано: `FloatingWindow.tsx` open-window z-index registry переведён на `createUpdateApi`; drag/resize geometry не менялась.
+  - Сделано: `LeftModal.tsx` menuStore переведён на `createUpdateApi`; compatibility `ApiLeftMenu.renderBy()` сохранён.
+  - Сделано: отдельный audit-pass по hook/controller-first кандидатам записан в [../progress/hook-controller-opportunities.md](../progress/hook-controller-opportunities.md); в очередь попали только задачи с понятной пользой/риском, сомнительные отмечены как skip.
+  - Сделано: `MiniLogs` layered redesign — добавлены `useMiniLogsTable`, `MiniLogsView`, `MiniLogsTable`, старый `MiniLogs` оставлен compatibility wrapper; store/history намеренно не добавлялись без consumer.
+  - Сделано: `Menu` action-level stats — добавлен явный `actionKey`, `actionTotals`/`actions` counters, focused tests и QA card 4; полный `useMenuActionController` split отложен как отдельный более крупный pass.
+  - Сделано: `RightMenu` cleanup — добавлен `useRightMenuController`, `DropdownMenu` оставлен compatibility wrapper, `createRightMenuController().Render` сохранён; registry rewrite пропущен как низкоэффективный без нового consumer.
+  - Сделано: `ParamsEditor` first controller layer — добавлен `useParamsEditorController` для draft clone / immediate+delayed notify / expand / cleanup; full renderer/view split и `ParamsEdit` async-save hook отложены как hard/high-risk без отдельного pass.
+  - Сделано: Logs inventory + low-risk primitive reuse — `logsContext.LogsTable` переведён на `AgGridTable`/`colDefCentered`, `PageLogs` copy action получил `actionKey: "logs.copyCell"`.
+  - Сделано: Logs headless controller — добавлен `createLogsController` / `createLogsControllerState` для append/limits/latest/settings emitters; `getLogsApi` оставлен compatibility wrapper, UI/timers/tabs не переписывались.
+  - Сделано: `SettingsDialog` first controller layer — добавлен `useSettingsDialogController` для open/search/history/tree-cycle/nav-resize/Escape actions; JSX/portal/FloatingWindow/classes не переписывались.
+  - Сделано: context logger UI hooks — добавлены `useLogsTableController` и `useLogsNotificationsController`; `LogsTable`/`LogsNotifications` оставлены compatibility wrappers.
+  - Сделано: `FloatingWindow` first controller layer — добавлен `useFloatingWindowController` для saved geometry / update counter / z-index stack / drag state / resize callbacks / viewport clamp; `FloatingWindowBase` оставлен compatibility wrapper над тем же `Rnd` и DOM/classes.
+  - Пропущено: `FResizableReact` hook — в `src`/`__test` нет render-consumers, только export/docs и `mapResiReact` persistence wiring; без consumer это low-effectiveness speculative refactor.
+  - Hook/controller-first backlog после audit-pass выполнен; дальше не делать `memoryStore`, `PageVisibilityProvider`, `StickerMenu`, `DragBox` broad rewrite или `FResizableReact` hook без отдельного consumer/test сценария.
+  - Сделано: final primitive-reuse inventory — raw `AgGridReact` / `useGrid.tsx`, `logsContext.localStorage`, PageVisibility/replay/chart timers, Settings/Toolbar registries and ModalProvider paths проверены; оставшиеся места помечены как low-effectiveness/high-risk без отдельного consumer/test.
+  - Сделано: QA card 25 toolbar `tb.api.onChange` переведён с ручного `useEffect(() => listen.on(...))` на `useListenEffect(tb.api.onChange, ...)` как canonical listen-hook usage.
+  - Сделано: `Toolbar.Bar` получил FLIP-анимацию перемещения элементов; cards 25 и 31 теперь ведут себя как card 30-эталон, card 30 не переписывался.
 
 ## Ready
 
 _Пусто._
 
 ## Inbox
-_Пусто._
+
+_Actionable задач по текущему repo-pass нет; пункты ниже оставлены как исходные specs со статусом выполнено/parked._
+
+- **Недоиспользуемые методы `wenay-react2`: пройти по коду и внедрять свои primitives там, где они реально заменяют ручной код**.
+  - Порядок выполнения: начинать с самых простых и низкорисковых замен; если место спорное — пропускать, фиксировать причину в progress-файле и идти дальше.
+  - Grid helpers: искать локальные `comparator`, `cellStyle`, `wrapText`, theme/defaultColDef и заменять на `numericComparator`, `colDefCentered`, `colDefWrap`, `useAgGridTheme` / `buildAgTheme`, когда это не меняет UX.
+  - `AgGridTable`: искать голый `AgGridReact` и ручное lifecycle/resize/getRowId wiring; переводить на `AgGridTable` / `useAgGrid` только там, где можно сохранить текущую тему, selection, events и row identity.
+  - `createColumnBuffer`: проверить места с динамическими колонками и ручным хранением набора имён; использовать буфер, если нужен reusable lifecycle exact-set/apply/detach.
+  - Store/listen hooks: заменить ручные `listen.on(...) + useEffect/useState` и чтение `Observe.Store` на `useListenEffect`, `useListenValue`, `useListenArgs`, `useStoreNode`, `useStoreSelect`, `useStoreEach`, `useStoreMirror`, где есть явный `wenay-common2` store/listen source.
+  - Settings/Toolbar registries: активнее использовать `registerSettingsSection` для саморегистрации настроек и `registerToolbarDensity` для стандартных режимов плотности вместо локальных вариантов кнопок.
+  - Modal layer: для новых модалок использовать `ModalProvider` + `useModal`; старые imperative modal stores оставлять только как compatibility path.
+  - Replay hooks: применять `useReplaySubscribe`, route-варианты, `useStoreReplayEach`, `useReplayFrame`, `useReplayHistory` только в местах с реальным streaming/history/replay сценарием; не внедрять в обычный UI ради переиспользования.
+  - Page visibility: проверить polling, анимации, replay/canvas и тяжёлые обновления; если поведение должно паузиться в скрытой вкладке, использовать `PageVisibilityProvider` / `PageVisibilityContext`.
+  - Статус текущего repo-pass: выполнено в рамках [../progress/public-surface-normalization.md](../progress/public-surface-normalization.md); новые пункты добавлять сюда только при появлении реального consumer/test сценария.
+- **Hook/controller-first backlog после audit-pass**.
+  - Прогресс/детали: [../progress/hook-controller-opportunities.md](../progress/hook-controller-opportunities.md)
+  - Очередь по смыслу выполнена: `FloatingWindow` first controller layer сделан; `FResizableReact` hook пропущен до появления реального consumer.
+  - Не делать сейчас без отдельного consumer/test: `memoryStore` core rewrite, `PageVisibilityProvider` в обычный UI, `StickerMenu` как shared primitive, broad rewrite `DragBox`.
+  - Оценка: после `FloatingWindow` first layer осмысленных hook/controller задач без новых consumers не осталось; дальнейшие пункты из audit-pass имеют низкую эффективность или высокий риск.
 
 ## Verify
 - **Hook-first архитектура для функционала библиотеки** — первый inventory pass и safe input hook extraction готовы, ждут ручной/релизной проверки.
@@ -36,13 +85,14 @@ _Пусто._
   - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand`; `git diff --check`.
   - Не сделано: спорные UX-решения card 27 add/delete semantics, shared `Qa30AnimatedMenuBar` API и перенос `ColumnsMenu` inline styles — оставлены для отдельных target/style-system решений.
 
-- **Совместимость старых API и статистика меню** — первый слой `contextMenu.stats` готов, ждёт ручной/релизной проверки.
+- **Совместимость старых API и статистика меню** — open-level stats и action-level stats готовы, ждут ручной/релизной проверки.
   - Прогресс: [../progress/menu-compat-stats.md](../progress/menu-compat-stats.md)
   - Сделано: добавлен `contextMenu.stats.getSnapshot/reset/onChange` с локальными in-memory counters для `openAt`, `openAtPoint`, legacy Layer queued opens, empty opens, close/replace и `source`/`layerId` usage.
+  - Сделано: добавлен явный `MenuItemStrict.actionKey` contract; `contextMenu.stats` считает `actionTotals` и `actions[actionKey]` для click/ok/error/task/submenu/func/focus outcomes, не сохраняя labels/errors.
   - Сделано: старый `contextMenu.map` путь сохранён; legacy Layer open теперь учитывается в статистике и после consume очищает map как раньше.
-  - Документация: обновлены `doc/wenay-react2.md`, `doc/wenay-react2-rare.md`, `doc/changes/v1.0.39.md`.
-  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand __test/contextMenuStats.test.tsx`; scoped `git diff --check`.
-  - Не сделано в этом проходе: item click/submenu/async-error counters — нужен отдельный стабильный action-key contract.
+  - Документация: обновлены `doc/wenay-react2.md`, `doc/wenay-react2-rare.md`, `doc/EXAMPLE_USAGE.md`, `doc/changes/v1.0.39.md`.
+  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand contextMenuStats.test.tsx`; финальный full test/build pass будет выполнен после текущей очереди.
+  - Не сделано в этом проходе: полный `useMenuActionController` split и RightMenu/DropdownMenu diagnostics — вынесено в следующие осмысленные задачи.
 - **Global Settings: история поиска и компактное управление деревом** — реализация готова, ждёт ручной проверки стенда.
   - Прогресс: [../progress/settings-dialog-search-history.md](../progress/settings-dialog-search-history.md)
   - Сделано: добавлен reusable `createSearchHistory({key,max?})`, экспортирован из utils; `SettingsDialog` search пишет историю через memory store / `memoryCache` dirty channel.

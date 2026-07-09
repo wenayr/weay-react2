@@ -13,6 +13,8 @@ import { promiseProgress, sleepAsync } from "wenay-common2";
  *******************************************************/
 export type MenuItemStrict<T = any> = {
     name: string | ((status?: T) => string);
+    /** Stable diagnostics key. Stats never fall back to visible labels. */
+    actionKey?: string | null;
     getStatus?: (() => T) | null;
     onClick?: ((
         e: any
@@ -29,6 +31,15 @@ export type MenuItemStrict<T = any> = {
 };
 
 export type MenuItem<T = any> = MenuItemStrict<T> | false | null | undefined;
+
+export type MenuActionEventType = "click" | "ok" | "error" | "taskOk" | "taskError" | "submenuOpen" | "submenuOk" | "submenuError" | "funcOpen" | "funcOk" | "funcError" | "focusOpen" | "focusOk" | "focusError";
+export type MenuActionEvent = {
+    type: MenuActionEventType;
+    item: MenuItemStrict;
+    actionKey?: string;
+    error?: unknown;
+};
+export type MenuActionHandler = (event: MenuActionEvent) => void;
 
 /*******************************************************
  * Helper type
@@ -78,12 +89,14 @@ function MenuElement({
                          className,
                          update,
                          open,
+                         onActionEvent,
                      }: {
-    data: Pick<MenuItemStrict, "onClick" | "active" | "name" | "getStatus">;
+    data: Pick<MenuItemStrict, "onClick" | "active" | "name" | "getStatus" | "actionKey">;
     toLeft: boolean;
     className?: (active?: boolean) => string;
     update: () => void;
     open?: boolean;
+    onActionEvent?: MenuActionHandler;
 }): ReactElement {
     const unsubOk = useRef<null | (() => any)>(null);
     const unsubErr = useRef<null | (() => any)>(null);
@@ -110,8 +123,17 @@ function MenuElement({
             style={{ float: toLeft ? "left" : "right" }}
             onClick={() => {
                 if (!item.onClick) return;
-                const result = item?.onClick?.(item);
+                const actionKey = item.actionKey ?? undefined;
+                onActionEvent?.({type: "click", item: item as MenuItemStrict, actionKey});
+                let result;
+                try {
+                    result = item.onClick(item);
+                } catch (error) {
+                    onActionEvent?.({type: "error", item: item as MenuItemStrict, actionKey, error});
+                    throw error;
+                }
                 if (!result) {
+                    onActionEvent?.({type: "ok", item: item as MenuItemStrict, actionKey});
                     update();
                     return;
                 }
@@ -138,13 +160,18 @@ function MenuElement({
                             setProgress(null);
                         }
                     };
+
                     unsubOk.current = pa.onOk(
-                        (data: any, i: number, countOk: number, countError: number, count: number) =>
-                            onTick(countOk, countError, count)
+                        (data: any, i: number, countOk: number, countError: number, count: number) => {
+                            onActionEvent?.({type: "taskOk", item: item as MenuItemStrict, actionKey});
+                            return onTick(countOk, countError, count);
+                        }
                     );
                     unsubErr.current = pa.onError(
-                        (error: any, i: number, countOk: number, countError: number, count: number) =>
-                            onTick(countOk, countError, count)
+                        (error: any, i: number, countOk: number, countError: number, count: number) => {
+                            onActionEvent?.({type: "taskError", item: item as MenuItemStrict, actionKey, error});
+                            return onTick(countOk, countError, count);
+                        }
                     );
                     void pa.allSettled();
                 }
@@ -153,6 +180,7 @@ function MenuElement({
                     setProgress({});
                     result
                         .then(async (val) => {
+                            onActionEvent?.({type: "ok", item: item as MenuItemStrict, actionKey});
                             if (Array.isArray(val) && val.length) {
                                 // If an array from Promise.allSettled was returned
                                 // Count ok/error results
@@ -169,11 +197,16 @@ function MenuElement({
                                 await sleepAsync(0);
                             }
                         })
+                        .catch((error) => {
+                            onActionEvent?.({type: "error", item: item as MenuItemStrict, actionKey, error});
+                            throw error;
+                        })
                         .finally(async () => {
                             await sleepAsync(500);
                             setProgress(null);
                         });
                 } else {
+                    onActionEvent?.({type: "ok", item: item as MenuItemStrict, actionKey});
                     update();
                 }
             }}
@@ -202,6 +235,7 @@ type MenuItemWrapperProps = {
     menuElement?: (item: MenuItem) => ReactElement;
     open: boolean;
     setOpenIndex: (index: number) => void;
+    onActionEvent?: MenuActionHandler;
 };
 
 const MenuItemWrapper = ({
@@ -214,6 +248,7 @@ const MenuItemWrapper = ({
                              menuElement,
                              open,
                              setOpenIndex,
+                              onActionEvent,
                          }: MenuItemWrapperProps): ReactElement => {
     const [childMenu, setChildMenu] = useState<MenuItemStrict[]>([]);
     const [asyncFuncElement, setAsyncFuncElement] = useState<React.ReactElement | null>(null);
@@ -221,54 +256,93 @@ const MenuItemWrapper = ({
 
     useEffect(() => {
         if (open && item.next) {
+            const actionKey = item.actionKey ?? undefined;
+            onActionEvent?.({type: "submenuOpen", item, actionKey});
             let alive = true; // guard: do not set state after unmount or item change
-            const result = item.next();
+            let result;
+            try {
+                result = item.next();
+            } catch (error) {
+                onActionEvent?.({type: "submenuError", item, actionKey, error});
+                throw error;
+            }
             if (result instanceof Promise) {
                 result.then((val) => {
                     if (alive) setChildMenu(val.filter(Boolean) as MenuItemStrict[]);
+                    onActionEvent?.({type: "submenuOk", item, actionKey});
+                }).catch((error) => {
+                    onActionEvent?.({type: "submenuError", item, actionKey, error});
+                    throw error;
                 });
             } else {
                 setChildMenu(result.filter(Boolean) as MenuItemStrict[]);
+                onActionEvent?.({type: "submenuOk", item, actionKey});
             }
             return () => { alive = false; };
         } else {
             setChildMenu([]);
         }
-    }, [open, item.next]);
+    }, [open, item, item.next, onActionEvent]);
 
     useEffect(() => {
         if (open && item.func) {
+            const actionKey = item.actionKey ?? undefined;
+            onActionEvent?.({type: "funcOpen", item, actionKey});
             let alive = true;
-            const result = item.func();
+            let result;
+            try {
+                result = item.func();
+            } catch (error) {
+                onActionEvent?.({type: "funcError", item, actionKey, error});
+                throw error;
+            }
             if (result instanceof Promise) {
                 result.then((val) => {
                     if (alive) setAsyncFuncElement(val);
+                    onActionEvent?.({type: "funcOk", item, actionKey});
+                }).catch((error) => {
+                    onActionEvent?.({type: "funcError", item, actionKey, error});
+                    throw error;
                 });
             } else {
                 setAsyncFuncElement(result);
+                onActionEvent?.({type: "funcOk", item, actionKey});
             }
             return () => { alive = false; };
         } else {
             setAsyncFuncElement(null);
         }
-    }, [open, item.func]);
+    }, [open, item, item.func, onActionEvent]);
 
     useEffect(() => {
         if (open && item.onFocus) {
+            const actionKey = item.actionKey ?? undefined;
+            onActionEvent?.({type: "focusOpen", item, actionKey});
             let alive = true;
-            const result = item.onFocus();
+            let result;
+            try {
+                result = item.onFocus();
+            } catch (error) {
+                onActionEvent?.({type: "focusError", item, actionKey, error});
+                throw error;
+            }
             if (result instanceof Promise) {
                 result.then((val) => {
                     if (alive) setOnFocusMenu(val.filter(Boolean) as MenuItemStrict[]);
+                    onActionEvent?.({type: "focusOk", item, actionKey});
+                }).catch((error) => {
+                    onActionEvent?.({type: "focusError", item, actionKey, error});
+                    throw error;
                 });
             } else {
                 setOnFocusMenu(result.filter(Boolean) as MenuItemStrict[]);
+                onActionEvent?.({type: "focusOk", item, actionKey});
             }
             return () => { alive = false; };
         } else {
             setOnFocusMenu([]);
         }
-    }, [open, item.onFocus]);
+    }, [open, item, item.onFocus, onActionEvent]);
 
     const onMouseEnter = () => {
         if (open) return;
@@ -292,6 +366,7 @@ const MenuItemWrapper = ({
                     className={className}
                     update={update}
                     open={open}
+                    onActionEvent={onActionEvent}
                 />
             )}
             <div>
@@ -305,6 +380,7 @@ const MenuItemWrapper = ({
                                 toLeft: isLeftAligned,
                                 left: leftPos,
                             }}
+                            onActionEvent={onActionEvent}
                         />
                     </div>
                 )}
@@ -319,6 +395,7 @@ const MenuItemWrapper = ({
                                 toLeft: isLeftAligned,
                                 left: leftPos,
                             }}
+                            onActionEvent={onActionEvent}
                         />
                     </div>
                 )}
@@ -332,6 +409,7 @@ const MenuItemWrapper = ({
                                 toLeft: isLeftAligned,
                                 left: leftPos,
                             }}
+                            onActionEvent={onActionEvent}
                         />
                     </div>
                 )}
@@ -364,6 +442,7 @@ type MenuProps = {
     data: MenuItem[];
     zIndex?: number;
     className?: (active?: boolean) => string;
+    onActionEvent?: MenuActionHandler;
     coordinate?: {
         x: number;
         y: number;
@@ -379,6 +458,7 @@ export function Menu({
                              menu,
                              className,
                              menuElement,
+                              onActionEvent,
                          }: MenuProps): ReactElement {
     const [, forceUpdate] = useState(false);
     const update = () => forceUpdate((p) => !p);
@@ -462,6 +542,7 @@ export function Menu({
                         menuElement={menuElement}
                         open={activeIndex === i}
                         setOpenIndex={setActiveIndex}
+                        onActionEvent={onActionEvent}
                     />
                 ))}
         </div>

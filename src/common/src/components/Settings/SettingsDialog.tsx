@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from "react";
 import {createPortal} from "react-dom";
-import {renderBy, updateBy} from "../../../updateBy";
+import {createUpdateApi, renderBy} from "../../../updateBy";
 import {OutsideClickArea} from "../../hooks/useOutside";
 import {FloatingWindowBase} from "../Dnd/FloatingWindow";
 import {createSearchHistory} from "../../utils/searchHistory";
@@ -56,6 +56,7 @@ const settingsDialogNav = {min: 160, def: 220, max: 360}
 // Module singleton (closure + updateBy subscription, no React context): any module
 // registers a section on mount and removes it on unmount; the dialog re-renders on changes.
 const registry = {list: [] as SettingsSection[]}
+const registryApi = createUpdateApi(registry)
 const settingsSearchHistory = createSearchHistory({key: "SettingsDialog.searchHistory", max: 8})
 const settingsDialogLayout = memoryGetOrCreate<SettingsDialogLayoutState>("SettingsDialog.layout", {navWidth: settingsDialogNav.def})
 
@@ -65,12 +66,12 @@ export function registerSettingsSection(s: SettingsSection): () => void {
     const i = registry.list.findIndex(e => e.key == s.key)
     if (i == -1) registry.list.push(s)
     else registry.list.splice(i, 1, s)
-    renderBy(registry)
+    registryApi.render()
     return () => {
         const j = registry.list.indexOf(s)
         if (j != -1) {
             registry.list.splice(j, 1)
-            renderBy(registry)
+            registryApi.render()
         }
     }
 }
@@ -284,18 +285,58 @@ function filterSettingsTree(roots: SettingsTreeNode[], terms: SettingsSearchTerm
     return {visibleKeys, matchedKeys, expandedKeys}
 }
 
-/** Centered settings dialog with a searchable JetBrains-style settings tree on the left.
- *  Sections = props.sections (first) + everything from registerSettingsSection.
- *  Flat {key, name, render} sections remain valid; use children/parentKey for hierarchy.
- *  Look is themed via --dlg-* CSS variables (dark defaults), same contract as --wnd-*. */
-export function SettingsDialog(props: {
+export type SettingsDialogProps = {
     trigger?: React.ReactNode
     sections?: SettingsSection[]
     defaultSection?: string
     /** Section buttons: apps pass their own .chip / .chipActive; defaults are minimal library styles */
     sectionClassName?: string
     sectionActiveClassName?: string
-}) {
+}
+
+export type SettingsDialogTreeToolState = "collapsed" | "expanded" | "branch"
+
+export type SettingsDialogController = {
+    open: boolean
+    setOpen: React.Dispatch<React.SetStateAction<boolean>>
+    active?: string
+    setActive: React.Dispatch<React.SetStateAction<string | undefined>>
+    search: string
+    setSearch: React.Dispatch<React.SetStateAction<string>>
+    expanded: Set<string>
+    historyOpen: boolean
+    setHistoryOpen: React.Dispatch<React.SetStateAction<boolean>>
+    navWidth: number
+    navResizing: boolean
+    searchInputRef: React.RefObject<HTMLInputElement | null>
+    searchBoxRef: React.RefObject<HTMLDivElement | null>
+    tree: SettingsTree
+    filtered: SettingsTreeFilter
+    current?: SettingsSection
+    currentNode?: SettingsTreeNode
+    firstVisibleNode?: SettingsTreeNode
+    searchTerms: SettingsSearchTerm[]
+    searchHistory: readonly string[]
+    base: string
+    activeCls: string
+    treeToolsVisible: boolean
+    treeToolState: SettingsDialogTreeToolState
+    treeToolTitle: string
+    openDialog(): void
+    closeDialog(): void
+    onTriggerKeyDown(e: React.KeyboardEvent<HTMLSpanElement>): void
+    toggleExpanded(key: string): void
+    commitSearch(value?: string): void
+    useHistoryItem(value: string): void
+    clearHistory(): void
+    commitNavWidth(value: number): void
+    beginNavResize(e: React.PointerEvent<HTMLDivElement>): void
+    onNavResizeKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void
+    closeHistoryWhenSearchFocusLeaves(e: React.FocusEvent<HTMLDivElement>): void
+    cycleTreeTool(): void
+}
+
+export function useSettingsDialogController(props: SettingsDialogProps): SettingsDialogController {
     const [open, setOpen] = useState(false)
     const [active, setActive] = useState(props.defaultSection)
     const [search, setSearch] = useState("")
@@ -307,7 +348,7 @@ export function SettingsDialog(props: {
     const searchBoxRef = useRef<HTMLDivElement>(null)
     const navResizeRef = useRef<{startX: number, startWidth: number} | null>(null)
     const navWidthRef = useRef(navWidth)
-    updateBy(registry)
+    registryApi.use()
     const searchHistory = settingsSearchHistory.use()
 
     const sections = [...(props.sections ?? []), ...registry.list]
@@ -329,7 +370,7 @@ export function SettingsDialog(props: {
     const activeCls = props.sectionActiveClassName ?? "wenayDlgSectionActive"
     const branchOpenCount = branchKeys.filter(key => expanded.has(key)).length
     const treeToolsVisible = branchKeys.length > 1
-    const treeToolState = branchOpenCount == 0 ? "collapsed" : branchOpenCount == branchKeys.length ? "expanded" : "branch"
+    const treeToolState: SettingsDialogTreeToolState = branchOpenCount == 0 ? "collapsed" : branchOpenCount == branchKeys.length ? "expanded" : "branch"
     const treeToolTitle = treeToolState == "expanded" ? "Show current branch only" : treeToolState == "branch" ? "Collapse tree" : "Expand tree"
 
     useEffect(() => {
@@ -381,6 +422,10 @@ export function SettingsDialog(props: {
         setSearch("")
         setHistoryOpen(false)
         setOpen(true)
+    }
+
+    function closeDialog() {
+        setOpen(false)
     }
 
     function onTriggerKeyDown(e: React.KeyboardEvent<HTMLSpanElement>) {
@@ -456,6 +501,12 @@ export function SettingsDialog(props: {
         searchInputRef.current?.focus()
     }
 
+    function clearHistory() {
+        settingsSearchHistory.clear()
+        setHistoryOpen(false)
+        searchInputRef.current?.focus()
+    }
+
     function closeHistoryWhenSearchFocusLeaves(e: React.FocusEvent<HTMLDivElement>) {
         const next = e.relatedTarget as Node | null
         if (next && e.currentTarget.contains(next)) return
@@ -464,11 +515,94 @@ export function SettingsDialog(props: {
             if (box == null || !box.contains(document.activeElement)) setHistoryOpen(false)
         }, 0)
     }
+
     function cycleTreeTool() {
         if (treeToolState == "expanded") collapseOutsideCurrent()
         else if (treeToolState == "branch") collapseAll()
         else expandAll()
     }
+
+    return {
+        open,
+        setOpen,
+        active,
+        setActive,
+        search,
+        setSearch,
+        expanded,
+        historyOpen,
+        setHistoryOpen,
+        navWidth,
+        navResizing,
+        searchInputRef,
+        searchBoxRef,
+        tree,
+        filtered,
+        current,
+        currentNode,
+        firstVisibleNode,
+        searchTerms,
+        searchHistory,
+        base,
+        activeCls,
+        treeToolsVisible,
+        treeToolState,
+        treeToolTitle,
+        openDialog,
+        closeDialog,
+        onTriggerKeyDown,
+        toggleExpanded,
+        commitSearch,
+        useHistoryItem,
+        clearHistory,
+        commitNavWidth,
+        beginNavResize,
+        onNavResizeKeyDown,
+        closeHistoryWhenSearchFocusLeaves,
+        cycleTreeTool,
+    }
+}
+/** Centered settings dialog with a searchable JetBrains-style settings tree on the left.
+ *  Sections = props.sections (first) + everything from registerSettingsSection.
+ *  Flat {key, name, render} sections remain valid; use children/parentKey for hierarchy.
+ *  Look is themed via --dlg-* CSS variables (dark defaults), same contract as --wnd-*. */
+export function SettingsDialog(props: SettingsDialogProps) {
+    const {
+        open,
+        setOpen,
+        setActive,
+        search,
+        setSearch,
+        expanded,
+        historyOpen,
+        setHistoryOpen,
+        navWidth,
+        navResizing,
+        searchInputRef,
+        searchBoxRef,
+        tree,
+        filtered,
+        current,
+        firstVisibleNode,
+        searchTerms,
+        searchHistory,
+        base,
+        activeCls,
+        treeToolsVisible,
+        treeToolState,
+        treeToolTitle,
+        openDialog,
+        onTriggerKeyDown,
+        toggleExpanded,
+        commitSearch,
+        useHistoryItem,
+        clearHistory,
+        commitNavWidth,
+        beginNavResize,
+        onNavResizeKeyDown,
+        closeHistoryWhenSearchFocusLeaves,
+        cycleTreeTool,
+    } = useSettingsDialogController(props)
 
     function renderTreeNode(node: SettingsTreeNode): React.ReactNode {
         if (!filtered.visibleKeys.has(node.section.key)) return null
@@ -611,9 +745,7 @@ export function SettingsDialog(props: {
                                         className="wenayDlgSearchHistoryClear"
                                         onMouseDown={e => e.preventDefault()}
                                         onClick={() => {
-                                            settingsSearchHistory.clear()
-                                            setHistoryOpen(false)
-                                            searchInputRef.current?.focus()
+                                            clearHistory()
                                         }}
                                     >Clear history</button>
                                 </div>}

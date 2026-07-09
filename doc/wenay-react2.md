@@ -102,6 +102,9 @@ b.over                                                                      // {
 <FloatingWindow keyForSave="tool" size={{width: 320, height: 240}} header={<div>Tool</div>}>
     <Panel />
 </FloatingWindow>
+
+const wnd = useFloatingWindowController({keyForSave: "custom-tool", size: {width: 320, height: 240}})
+wnd.position                 // {x,y}; bind wnd.onHeaderMouseDown/onHeaderTouchStart for custom chrome
 ```
 
 ## Modal / Input
@@ -131,6 +134,7 @@ const file = useFileInputPanel({callback: file => {}})          // headless file
 ## Settings Dialog
 ```
 <SettingsDialog trigger={<span>settings</span>} sections={[{key, name, render, children?, parentKey?, searchText?, keywords?}]} defaultSection? /> // searchable tree + persisted search history; history closes when search focus leaves
+const settings = useSettingsDialogController({sections, defaultSection?}) // open/search/tree/history/resize actions for custom chrome
 registerSettingsSection({key, name, render, parentKey?, searchText?, keywords?}) -> unregister
 ```
 
@@ -146,7 +150,7 @@ const slot = createUiSlot({key, places: {top: "Top bar", side: "Sidebar"}, def: 
 ```
 const tb = createToolbar({key, items: [{key, title, icon?, short?, render?, onClick?, defaultVisible?, fixed?}], def?, settingsItem?, resetItem?, source?, sourceMode?})
 
-<tb.Bar settings reset? />   // the live bar; settings adds a gear; reset button is hidden by default
+<tb.Bar settings reset? />   // the live bar; settings adds a gear; reset is hidden by default; item moves animate
 <tb.Settings />              // the PURE config editor - same element drops into a settings section
 tb.api.useConfig() / getConfig() / setConfig(next) / setOrder(order) / show(key,on) / setDensity(key) / reset()
 tb.api.showSettings(on) / showReset(on)             // pseudo-controls visibility
@@ -185,32 +189,35 @@ hub.on(cb) -> off
     expandStatusLvl?
 />
 
+const controller = useParamsEditorController({params, onChange, onExpand?})
+
 <ParamsEdit params={params} onSave={next => save(next)} />
 <ParamRow name="Name">...</ParamRow>
 ```
 
 ## Menu
 ```
-type MenuItem = { name, onClick?, next?, func?, status? } | false | null | undefined
+type MenuItem = { name, actionKey?, onClick?, next?, func?, status? } | false | null | undefined
 
 <Menu data={items} coordinate={{x: 0, y: 0}} />
 
 <contextMenu.Layer>{children}</contextMenu.Layer>
-contextMenu.openAt(event, [{name: "Copy", onClick: copy}], {source: "grid"})
-contextMenu.stats.getSnapshot()   // local counters only: opens, legacy Layer opens, close/replace/empty, source/layer usage
+contextMenu.openAt(event, [{name: "Copy", actionKey: "grid.copy", onClick: copy}], {source: "grid"})
+contextMenu.stats.getSnapshot()   // local counters: opens, source/layer usage, actionTotals, keyed actions
 contextMenu.close()
 ```
 
-Use `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` still exists as a legacy Layer queue, but it is not the recommended path for new code. `contextMenu.stats` is an in-memory diagnostics API; it never persists data and never reports over the network.
+Use `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` still exists as a legacy Layer queue, but it is not the recommended path for new code. `contextMenu.stats` is an in-memory diagnostics API; it never persists data, never reports over the network, and records per-action counters only for explicit `actionKey` values. Unkeyed items are counted in aggregate totals without storing labels.
 
 `Menu` keeps the hovered/open item in internal React state. `status` is only an initial open hint and a compatibility field passed to custom renderers; menu objects are not mutated.
 
 Floating right menu:
 ```
 <DropdownMenu elements={items} trigger={iconOrRender} classNames={...} styles={...} />
+const menu = useRightMenuController({elements, keyForSave?})
 ```
 
-`DropdownMenu` is a floating action menu with caller-owned trigger/content styling, not the main context-menu primitive.
+`DropdownMenu` is a floating action menu with caller-owned trigger/content styling, not the main context-menu primitive. `useRightMenuController` exposes the same open/fixed/select/submenu/drag state for custom views; `DropdownMenu` remains the compatible visual wrapper.
 
 ## agGrid4
 Plain declarative rows:
@@ -419,9 +426,17 @@ logsApi.addLogs({id: "api", time: new Date(), txt: "done", var: 1})
 <logsApi.React.Setting />
 
 const customLogs = getLogsApi<MyFields>({limitPer: 500, limit?: 50, varMin?: 0})
+const headless = createLogsController<MyFields>({options: {limitPer: 500, limit: 50}})
+
+const contextTable = useLogsTableController()
+const contextNotifications = useLogsNotificationsController()
+
+const mini = useMiniLogsTable({data: rows, onClick: e => console.log(e.data)})
+<AgGridTable {...mini.props} />
+<MiniLogsTable data={rows} />
 ```
 
-Logger notification/tabs chrome uses `--logs-*` CSS variables; apps can theme it without forking logger components.
+Logger notification/tabs chrome uses `--logs-*` CSS variables; apps can theme it without forking logger components. `createLogsController` owns the headless append/limit/settings state for custom integrations. `MiniLogs` remains the compatibility wrapper; new compact-table code can use `useMiniLogsTable` or `MiniLogsTable`.
 
 ## Styles / Theme
 ```

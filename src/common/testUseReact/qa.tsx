@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
-import { Menu, contextMenu, renderBy, updateBy, logsApi, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
+import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { listen as createListen, Observe, Params } from "wenay-common2";
 import { Button, HoverButton, OutsideClickArea } from "../src/hooks";
@@ -81,10 +81,19 @@ const OutsideDemo = () => {
 // Logs: add a record with time:Date and check the time column, which used to be always empty.
 const LogsDemo = () => {
     const PageLogs = logsApi.React.PageLogs;
+    const [miniClick, setMiniClick] = useState("none");
+    const miniRows = useMemo(() => [
+        { time: new Date("2026-01-01T10:00:00"), id: "mini", var: 1, txt: "mini one", address: "qa" },
+        { time: new Date("2026-01-01T10:00:01"), id: "mini", var: 2, txt: "mini two", address: "qa" },
+    ], []);
     return (
         <div>
             <button style={{ marginBottom: 8 }} onClick={() => logsApi.addLogs({ id: "demo", var: 1, time: new Date(), txt: "log " + new Date().toLocaleTimeString() })}>add log</button>
             <div style={{ height: 260 }}><PageLogs /></div>
+            <div style={{ marginTop: 12, fontSize: 12 }}>MiniLogs click: {miniClick}</div>
+            <div style={{ height: 170, marginTop: 6 }}>
+                <MiniLogsTable data={miniRows} onClick={e => setMiniClick(String(e.data?.txt ?? "empty"))} />
+            </div>
         </div>
     );
 };
@@ -361,14 +370,15 @@ const qa29MobileCss = `
   bottom: 10px;
   z-index: 3;
   padding: 6px 8px 8px;
-  border: 1px solid rgba(208, 215, 222, 0.92);
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: rgba(246, 248, 250, 0.94);
-  box-shadow: 0 8px 22px rgba(36, 41, 47, 0.18);
-  backdrop-filter: blur(6px);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 .qa29MobileDots .wenayColDotsHead {
-  gap: 6px;
+  justify-content: flex-end;
+  gap: 0;
   margin-bottom: 2px;
   font-size: 11px;
 }
@@ -376,14 +386,22 @@ const qa29MobileCss = `
   height: 48px;
   margin: 0 16px;
 }
+.qa29MobileDots .wenayColDotsMeta,
+.qa29MobileDots .wenayColDotsSpacer {
+  display: none;
+}
 .qa29MobileDots .wenayColDotsSort {
-  padding: 1px 6px;
-  font-size: 11px;
-  opacity: 0.72;
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  font-size: 0;
+  opacity: 0.82;
   background: transparent;
 }
-.qa29MobileDots .wenayColDotsMeta {
-  font-size: 11px;
+.qa29MobileDots .wenayColDotsSort::before {
+  content: "⇅";
+  font-size: 16px;
+  line-height: 1;
 }
 `;
 
@@ -1317,10 +1335,10 @@ const ToolbarDemo = () => {
         render: () => <tb.Settings />,
     }), [tb]);
     // Both bars share one persist key -> both apis emit; subscribe to the visible one.
-    useEffect(() => tb.api.onChange.on(cfg => {
+    useListenEffect(tb.api.onChange, cfg => {
         setChanges(v => v + 1);
         setLastCfg(cfg);
-    }), [tb]);
+    });
     // Density registry extensibility: a third level is just one more registration.
     useEffect(() => {
         if (!thirdDensity) return;
@@ -1729,21 +1747,21 @@ function ArchiveChecks() {
             <Check n={4} title="Right-click context menu (contextMenu)"
                    do="Right-click the gray area to open the menu. Then right-click somewhere ELSE."
                    expect="Right-clicking elsewhere closes the previous menu and opens a new one with items. ✅ Fixed."
-                   note="Fix: menuR stores an item snapshot on open + menuMouse onConsume. The bb / no stale items invariants are preserved."
+                   note="Fix: menuR stores an item snapshot on open + menuMouse onConsume. Menu items now use explicit actionKey for local action stats."
                    tall>
                 <contextMenu.Layer zIndex={40}>
                     <div style={{ width: "100%", height: 300, background: "#e7ebef", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#57606a" }}
                          onContextMenu={(e) => contextMenu.openAt(e, [
-                             { name: "action 1", onClick: () => alert("action 1") },
-                             { name: "submenu ▶", next: () => [{ name: "nested", onClick: () => alert("nested") }] },
+                             { name: "action 1", actionKey: "qa4.action1", onClick: () => alert("action 1") },
+                             { name: "submenu ▶", actionKey: "qa4.submenu", next: () => [{ name: "nested", actionKey: "qa4.nested", onClick: () => alert("nested") }] },
                          ])}>right-click here</div>
                 </contextMenu.Layer>
             </Check>
 
-            <Check n={9} title="Logs - time format (valueFormatter)"
-                   do="Click add log several times."
-                   expect="The time column shows time in hh:mm:ss format. ✅ Fixed."
-                   note="Fix: it was e.value.time, but Date has no .time so it was always undefined; now it is e.value, the Date itself. Affects logs.tsx and miniLogs.tsx."
+            <Check n={9} title="Logs - time format + MiniLogs layers"
+                   do="Click add log several times, then click a row in the compact MiniLogs table."
+                   expect="PageLogs and MiniLogs show time in hh:mm:ss format; MiniLogs row click updates the small click label."
+                   note="MiniLogs is now hook/controller-first: useMiniLogsTable -> MiniLogsView/MiniLogsTable -> compatibility MiniLogs. Row identity stays rowData-based."
                    tall>
                 <LogsDemo />
             </Check>

@@ -7,8 +7,8 @@ import React, {
     useRef,
     useState
 } from 'react';
-import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridReadyEvent } from 'ag-grid-community';
+import {AgGridTable, colDefCentered} from '../grid/agGrid4';
 import {logDividerGradient, logSeverityBackground, logStyleTokens} from './logStyles';
 
 // Uncomment AG Grid styles if needed:
@@ -166,11 +166,19 @@ export function useLogsContext() {
  *     (PageLogs equivalent)
  * -----------------------------
  */
-export function LogsTable() {
+export type LogsTableController = {
+    logs: LogEntry[];
+    minVarLogs: number;
+    gridRef: React.MutableRefObject<GridReadyEvent | null>;
+    columnDefs: ColDef[];
+    defaultColDef: ColDef;
+    onGridReady(params: GridReadyEvent): void;
+};
+
+export function useLogsTableController(): LogsTableController {
     const { logs, minVarLogs } = useLogsContext();
     const gridRef = useRef<GridReadyEvent | null>(null);
 
-    // Column definitions
     const columnDefs: ColDef[] = useMemo(() => [
         {
             field: 'time',
@@ -195,13 +203,10 @@ export function LogsTable() {
     ], []);
 
     const defaultColDef: ColDef = useMemo(() => ({
-        resizable: true,
-        sortable: true,
-        filter: true,
+        ...colDefCentered,
         wrapText: true,
     }), []);
 
-    // Watch minVarLogs and configure the AG Grid filter
     useEffect(() => {
         if (gridRef.current?.api) {
             if (minVarLogs > 0) {
@@ -218,36 +223,49 @@ export function LogsTable() {
         }
     }, [minVarLogs]);
 
+    const onGridReady = useCallback((params: GridReadyEvent) => {
+        gridRef.current = params;
+        params.api.sizeColumnsToFit();
+    }, []);
+
+    return {logs, minVarLogs, gridRef, columnDefs, defaultColDef, onGridReady};
+}
+
+export function LogsTable() {
+    const table = useLogsTableController();
+
     return (
         // <div className="ag-theme-alpine-dark" style={{ width: '100%', height: '100%' }}>
         <div style={{ width: '100%', height: '100%' }}>
-            <AgGridReact
-                ref={gridRef as any}
-                onGridReady={(params) => {
-                    gridRef.current = params;
-                    params.api.sizeColumnsToFit();
-                }}
-                rowData={logs}
-                columnDefs={columnDefs}
-                defaultColDef={defaultColDef}
+            <AgGridTable
+                onGridReady={table.onGridReady}
+                rowData={table.logs}
+                columnDefs={table.columnDefs}
+                defaultColDef={table.defaultColDef}
                 headerHeight={30}
                 rowHeight={26}
             />
         </div>
     );
 }
-
 /** -----------------------------
  *  7. LogsNotifications component
  *     (MessageEventLogs equivalent)
  * -----------------------------
  */
-interface NotificationItem {
+export interface NotificationItem {
     id: number;
     log: LogEntry;
 }
 
-export function LogsNotifications() {
+export type LogsNotificationsController = {
+    showMessages: boolean;
+    setShowMessages(value: boolean): void;
+    notifications: NotificationItem[];
+    visibleNotifications: NotificationItem[];
+};
+
+export function useLogsNotificationsController(): LogsNotificationsController {
     const {
         logs,
         minVarMessage,
@@ -284,7 +302,18 @@ export function LogsNotifications() {
 
     useEffect(() => () => { timersRef.current.forEach(clearTimeout); }, []);
 
-    if (!showMessages) {
+    return {
+        showMessages,
+        setShowMessages,
+        notifications,
+        visibleNotifications: notifications.slice(0, 10),
+    };
+}
+
+export function LogsNotifications() {
+    const controller = useLogsNotificationsController();
+
+    if (!controller.showMessages) {
         // If popups are hidden, show only "log"
         return (
             <div style={{ position: 'absolute', right: 10, top: 10, zIndex: 999 }}>
@@ -294,7 +323,7 @@ export function LogsNotifications() {
                         padding: '6px 10px',
                         cursor: 'pointer'
                     }}
-                    onClick={() => setShowMessages(true)}
+                    onClick={() => controller.setShowMessages(true)}
                 >
                     log
                 </div>
@@ -312,12 +341,12 @@ export function LogsNotifications() {
                     padding: '6px 10px',
                     cursor: 'pointer'
                 }}
-                onClick={() => setShowMessages(false)}
+                onClick={() => controller.setShowMessages(false)}
             >
                 X
             </div>
             <div>
-                {notifications.slice(0, 10).map(({ id, log }) => (
+                {controller.visibleNotifications.map(({ id, log }) => (
                         <div
                             key={id}
                             className="testAnime example-exit"
@@ -352,7 +381,6 @@ export function LogsNotifications() {
         </div>
     );
 }
-
 /** -----------------------------
  *  8. LogsSettings component
  *     (InputSettingLogs equivalent)

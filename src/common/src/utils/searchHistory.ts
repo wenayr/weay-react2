@@ -1,4 +1,4 @@
-import {renderBy, updateBy} from "../../updateBy";
+import {createUpdateApi} from "../../updateBy";
 import {memoryGetOrCreate, memoryMarkDirty} from "./memoryStore";
 
 export type SearchHistoryState = {
@@ -14,6 +14,7 @@ function normalizeSearchHistoryItem(value: string) {
 export function createSearchHistory(opts: {key: string, max?: number}) {
     const max = Math.max(1, opts.max ?? 8);
     const st = memoryGetOrCreate<SearchHistoryState>(opts.key, {items: []});
+    const stApi = createUpdateApi(st);
 
     function normalize() {
         const seen = new Set<string>();
@@ -32,7 +33,7 @@ export function createSearchHistory(opts: {key: string, max?: number}) {
 
     function emit() {
         normalize();
-        renderBy(st);
+        stApi.render();
         memoryMarkDirty(opts.key);
     }
 
@@ -41,7 +42,7 @@ export function createSearchHistory(opts: {key: string, max?: number}) {
             return normalize().slice();
         },
         use() {
-            updateBy(st);
+            stApi.use();
             return normalize().slice();
         },
         add(value: string) {

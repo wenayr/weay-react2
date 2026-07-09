@@ -1,10 +1,11 @@
 import {useEffect, useRef} from "react";
-import {renderBy} from "../../updateBy";
+import {createUpdateApi} from "../../updateBy";
 import {listen as createListen} from "wenay-common2";
 
 export const keyboardState = {
     key: "" as string
 }
+const keyboardStateApi = createUpdateApi(keyboardState)
 
 export type KeyboardApi = {
     readonly key: string;
@@ -24,7 +25,7 @@ export const keyboard: KeyboardApi = {
     get() { return keyboardState.key; },
     clear() {
         keyboardState.key = "";
-        renderBy(keyboardState);
+        keyboardStateApi.render();
         emitKeyDown("", undefined);
     },
     reset() {
@@ -54,7 +55,7 @@ export function useKeyboard(options: {
         const func: EventListener = (event) => {
             if (!(event instanceof KeyboardEvent)) return;
             keyboardState.key = event.key;
-            renderBy(keyboardState);
+            keyboardStateApi.render();
             emitKeyDown(event.key, event);
             onKeyDownRef.current?.(event.key, event);
         };

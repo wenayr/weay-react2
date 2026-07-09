@@ -76,6 +76,7 @@ type SettingsSection = {key: string, name: string, render: () => ReactNode, chil
     sectionActiveClassName?           // apps pass their own .chipActive; default .wenayDlgSectionActive
 />
 
+useSettingsDialogController({sections?, defaultSection?, sectionClassName?, sectionActiveClassName?})
 registerSettingsSection(s) -> unregister
 getSettingsSections() -> readonly SettingsSection[]
 ```
@@ -85,7 +86,7 @@ replacement is a no-op. Tree shape comes from nested `children` or flat sections
 Search matches section labels, `keywords`, `searchText`, and best-effort text extracted from rendered
 React children; matching descendants stay visible and their ancestors auto-expand. The search input uses
 `createSearchHistory({key:"SettingsDialog.searchHistory"})`: Enter commits the current query, the history
-button recalls stored queries, leaving the search box closes the list, and changes are published through memoryProps -> memoryCache. Tree controls
+button recalls stored queries, leaving the search box closes the list, and changes are published through memoryProps -> memoryCache. `useSettingsDialogController` exposes the same open/search/tree/history/nav-resize actions for custom settings chrome. Tree controls
 are one compact dotted cycle button in the search row (expanded -> current branch -> collapsed), hidden when
 the tree has too little hierarchy to need it. Closes on the x, a scrim click, and Escape.
 Styling: `--dlg-scrim / bg / border / radius / shadow / nav-bg / nav-width` tokens (tokens.css,
@@ -300,8 +301,10 @@ StyleOtherColumn
 ```
 FloatingWindowBase(props)                  // lower-level react-rnd wrapper
 FloatingWindow(props)                      // canonical floating window component
+useFloatingWindowController(options)       // headless geometry/stack/drag/resize controller for custom chrome
 floatingWindowMap                           // persisted RND map (ObservableMap)
 FloatingWindowUpdate
+FloatingWindowProps / FloatingWindowController / FloatingWindowSavedGeometry
 
 DragBox(props)                       // absolute-position movement component
 DragArea(props)                     // low-level movement component
@@ -415,6 +418,7 @@ The primitive must not contain product group names, base `columnDefs`, visibilit
 ## Params / Generated Editors
 ```
 ParamsEditor({params, onChange, onExpand?, expandStatus?, expandStatusLvl?})
+useParamsEditorController({params, onChange, onExpand?})
 ParamsEdit({params, onSave})        // canonical compact editor
 ParamsArrayEdit({params, onSave})        // array params editor
 ParamRow({param, onClick, type?})
@@ -422,7 +426,7 @@ ParamLabelContent(name)
 ParamToggleLabel(type, name)
 ```
 
-`ParamsEditor` receives wenay-common2 `Params.IParamsExpandableReadonly` shape.
+`ParamsEditor` receives wenay-common2 `Params.IParamsExpandableReadonly` shape. `useParamsEditorController` owns the mutable draft clone, immediate/delayed notify, expand callback, and timer cleanup for custom renderers; `ParamsEditor` remains the compatibility visual wrapper.
 
 ## Menu Low Level
 ```
@@ -435,7 +439,7 @@ contextMenu.openAt(eventOrPoint, items, {source?, layerId?}) -> boolean
 contextMenu.openAtPoint({x, y}, items, {source?, layerId?}) -> boolean
 contextMenu.close()
 contextMenu.getState() -> {open, items, point, source?, layerId?, seq}
-contextMenu.stats.getSnapshot() -> {openAt, openAtPoint, legacyLayer, close, replace, empty, sources, layers}
+contextMenu.stats.getSnapshot() -> {openAt, openAtPoint, legacyLayer, close, replace, empty, sources, layers, actionTotals, actions}
 contextMenu.stats.reset()
 contextMenu.stats.onChange(cb) -> off
 <contextMenu.Layer zIndex? statusOn? other? className?>...</contextMenu.Layer>
@@ -444,18 +448,19 @@ createContextMenu({name?})              // custom isolated instance with its own
 createRightClickMenu()                  // lower-level legacy right-click factory
 
 DropdownMenu({elements, trigger?, classNames?, styles?, style?, position?, verticalPosition?, keyForSave?})
+useRightMenuController({elements, style?, styles?, position?, verticalPosition?, keyForSave?})
 createRightMenuController()
 mapRightMenu                         // persisted floating-menu state (ObservableMap, RightMenuStore)
 MenuRightPosition / MenuRightVerticalPosition / MenuRightSavedState / MenuRightRenderProps
-MenuRightTrigger / MenuRightClassNames / MenuRightStyles
+MenuRightTrigger / MenuRightClassNames / MenuRightStyles / RightMenuController
 StickerMenu                          // components/Menu re-export
 ```
 
-Prefer `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, and stays supported through `1.x`; it should not be the primary API in new code. `contextMenu.stats` is local in-memory diagnostics, not hidden analytics: it counts direct `openAt`, `openAtPoint`, legacy Layer queued opens, empty opens, close/replace, and source/layer usage. It deliberately does not persist, send network requests, or store arbitrary item labels. Item-click/submenu/async-error counters still need an explicit stable action-key contract before implementation.
+Prefer `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, and stays supported through `1.x`; it should not be the primary API in new code. `contextMenu.stats` is local in-memory diagnostics, not hidden analytics: it counts direct `openAt`, `openAtPoint`, legacy Layer queued opens, empty opens, close/replace, source/layer usage, aggregate action outcomes, and keyed action outcomes. It deliberately does not persist, send network requests, or store arbitrary item labels. Per-action stats require explicit `MenuItemStrict.actionKey`; unkeyed actions update `actionTotals` only.
 
 `Menu` does not mutate `item.status`. Open/hover state is an internal active index; `status` remains a seed/compatibility value, and custom item renderers receive a view item whose `status` mirrors the current open state.
 
-`DropdownMenu` is a floating action menu, not the main context-menu primitive. Its trigger glyph/content and visual classes/styles are caller-owned through `trigger`, `classNames`, and `styles`; the default still renders the old hamburger glyph and CSS classes.
+`DropdownMenu` is a floating action menu, not the main context-menu primitive. Its trigger glyph/content and visual classes/styles are caller-owned through `trigger`, `classNames`, and `styles`; the default still renders the old hamburger glyph and CSS classes. `useRightMenuController` is the hook/controller layer behind it for custom views; do not duplicate hover/fixed/submenu timers in product code.
 
 
 ## Observe / Listen React Hooks
@@ -521,24 +526,31 @@ QA cards 23/24/25/26 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10
 Frequent global logger:
 ```
 getLogsApi({limit?, limitPer, varMin?})
+createLogsController({options, state?, onFullChange?, onMiniChange?, onSettingsChange?})
+createLogsControllerState({full?, mini?, settings?})
 logsApi
 PageLogs({update?})
 MessageEventLogs({zIndex?})
 LogsPage({update?})
-MiniLogs({data, onClick?})
+useMiniLogsTable({data, onClick?, columnDefs?, defaultColDef?})
+MiniLogsView({controller})
+MiniLogsTable({data, onClick?, columnDefs?, defaultColDef?})
+MiniLogs({data, onClick?}) // compatibility wrapper
 ```
 
 React-context logger:
 ```
 LogsProvider
 useLogsContext()
+useLogsTableController()
 LogsTable()
+useLogsNotificationsController()
 LogsNotifications()
 LogsSettings()
 MainPage()
 ```
 
-The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point. Shared logger chrome lives in `src/common/src/logs/logStyles.ts` and is themed through `--logs-*` tokens; this is a small visual contract, not a full logger architecture rewrite.
+The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point. `createLogsController` is the headless layer for append/limit/settings state; `PageLogs`, `MessageEventLogs`, and `LogsPage` remain compatibility UI wrappers. `useLogsTableController` and `useLogsNotificationsController` expose the provider-local table/notification state while `LogsTable` and `LogsNotifications` keep the visual wrappers. Shared logger chrome lives in `src/common/src/logs/logStyles.ts` and is themed through `--logs-*` tokens.
 
 ## Cache / Memory / Browser Utilities
 ```
