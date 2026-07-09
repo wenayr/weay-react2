@@ -148,6 +148,9 @@
   --cols-dots-selected-bg: #0969da;
   --cols-dots-selected-border: #b6d4fe;
   --cols-dots-fixed-border: #afb8c1;
+  --cols-dots-drag-label-bg: #24292f;
+  --cols-dots-drag-label-color: #fff;
+  --cols-dots-drag-label-font-size: 10px;
   --cols-card-gap: 8px;
   --cols-card-border: 1px solid #d0d7de;
   --cols-card-radius: 8px;

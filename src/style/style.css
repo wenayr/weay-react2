@@ -993,6 +993,20 @@ body {
 .wenayColDotsDotWrap_removing {
   opacity: 0.4;
 }
+.wenayColDotsDragLabel {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 2px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--cols-dots-drag-label-bg, #24292f);
+  color: var(--cols-dots-drag-label-color, #fff);
+  font-size: var(--cols-dots-drag-label-font-size, 10px);
+  white-space: nowrap;
+  pointer-events: none;
+}
 .wenayColDotsDot {
   width: var(--cols-dots-dot-size, 18px);
   height: var(--cols-dots-dot-size, 18px);

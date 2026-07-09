@@ -341,7 +341,9 @@ keep `ColumnsMenu` for compact button strips or custom presentation-only menus.
 Mobile (no ag-grid): dots selector + card rows over the same config:
 ```
 <ColumnDots state={cs} max?=8 />                 // track of marks; dots = shown columns; tap empty=add,
-                                                 //   drag=replace, swipe up=remove, tap dot=select, sort button cycles
+                                                 //   drag=LIVE replace (every empty mark crossed swaps the shown
+                                                 //   column immediately + small label names it - column search
+                                                 //   by finger), swipe up=remove, tap dot=select, sort cycles
 <CardList<Row> state={cs} data={rows} getId? renderValue? />   // visible cols -> card fields; cardRole:'title'/'accent'
 ```
 

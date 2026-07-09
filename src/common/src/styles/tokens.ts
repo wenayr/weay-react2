@@ -138,6 +138,9 @@ export const tokens = {
         selectedBg: '#0969da',
         selectedBorder: '#b6d4fe',
         fixedBorder: '#afb8c1',
+        dragLabelBg: '#24292f',
+        dragLabelColor: '#fff',
+        dragLabelFontSize: '10px',
     },
     /** CardList chrome (--cols-card-*). Defaults preserve restored card-29 look. */
     colsCard: {
