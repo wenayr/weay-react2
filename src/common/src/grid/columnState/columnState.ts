@@ -14,6 +14,7 @@ import {listen as createListen} from 'wenay-common2'
 import {createUpdateApi} from '../../../updateBy'
 import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
 import {pinFixedOrder} from '../../utils/fixedOrder'
+import {structEqual} from '../../utils/structEqual'
 
 export type ColumnMeta = {
     /** stable id (persist key; must equal the grid colId) */
@@ -308,12 +309,14 @@ export function createColumnState(opts: {
             if (order.indexOf(k) == -1) order.push(k)
         const filter = (gridApi.getFilterModel() ?? {}) as {[k: string]: unknown}
         const next: ColumnsConfig = {...cfg, order, visible, width, sort, filter}
-        if (JSON.stringify(next) == JSON.stringify(cfg)) return
+        // structural compare: the grid returns filter models with its own key order,
+        // which must not count as a change (stringify used to false-positive here)
+        if (structEqual(next, cfg)) return
         commit(next, true)
         // normalize() may have corrected the grid's move (a fixed column dragged
         // away from its pinned index): push the corrected order back so the grid
         // and the config never disagree
-        if (JSON.stringify(normalize().order) != JSON.stringify(next.order)) applyToGrid()
+        if (!structEqual(normalize().order, next.order)) applyToGrid()
     }
 
     function onGridEvent(e: {source?: string, finished?: boolean}) {

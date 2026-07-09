@@ -8,3 +8,4 @@ export * from './memoryStore';
 export * from './observableMap';
 export * from './pageVisibilityContext';
 export * from './searchHistory';
+export * from './structEqual';
