@@ -225,6 +225,7 @@ toolbars, and mobile card views.
 
 Main APIs:
 
+- `createColumnGrid`, `useColumnGrid`
 - `createColumnState`
 - `ColumnsMenu`, `MenuStrip`
 - `ColumnDots`
@@ -232,7 +233,9 @@ Main APIs:
 - `columnState.grid.attach(api)` and `detach()`
 - `columnState.api.listSource`
 
-Use this when the user can change column order, visibility, width, sort,
+Use `createColumnGrid` by default when a normal ag-grid table should get the standard dots overlay, menu, toolbar settings, cards, and table/card `View` without custom wiring. It accepts default `data`/`getId`, and can optionally fit columns when the visible column count changes. Use raw `createColumnState` when the product needs custom grouped modes, runtime presence gates, or a bespoke toolbar skin.
+
+Use this area when the user can change column order, visibility, width, sort,
 filter, or mobile field selection.
 
 Key idea: column config is independent from ag-grid. ag-grid is one adapter
@@ -365,6 +368,7 @@ Important current cards:
 - 29: mobile `ColumnDots` + `CardList`.
 - 30: grouped sub-column mode above toolbar/columnState.
 - 31: `createToolbar` over `columnState.api.listSource`.
+- 32: `createColumnGrid` wrapper with built-in dots overlay driving table/cards.
 
 Known audit note: archive card 5 and `src/common/testUseReact/useGrid.tsx`
 still demonstrate direct `applyGridRows`. That is useful as a regression

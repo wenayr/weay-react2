@@ -1,6 +1,7 @@
 export * from './gridRows';
 export * from './arrayPromise';
 export * from './cache';
+export * from './fixedOrder';
 export * from './callbackHub';
 export * from './inputAutoStep';
 export * from './memoryStore';

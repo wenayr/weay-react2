@@ -244,6 +244,29 @@ Semantics that are easy to get wrong:
   stand: hot-reload recreates a module-level controller while the live grid stays attached to the
   OLD instance, so store->grid needs an F5; in a real app the module runs once.
 
+High-level kit (`createColumnGrid`, `grid/columnState/columnGrid.tsx`):
+```
+createColumnGrid({key, columnDefs?, columns?, data?, getId?, def?, saveMs?, toolbar?, autoSizeOnColumnCountChange?})
+    -> {state, toolbar, api, grid, tableProps, Table, Menu, Dots, Cards, Toolbar, Settings, View}
+useColumnGrid(opts) -> same controller, captured once for component-local setups
+```
+- This is the default convenience layer for ordinary app grids that all need the same column menu.
+  It infers `ColumnMeta` from leaf `ColDef`s (`colId` -> `field`, title from `headerName` -> key)
+  and merges optional `columns` overrides for `fixed`, `short`, `icon`, `defaultVisible`, `cardRole`,
+  and group semantics. Unknown explicit overrides are appended, so grid-less/card-only fields still work.
+- `Table` and `tableProps()` wrap `AgGridTable` and wire `state.grid.attach/detach` automatically.
+  Their default `autoSizeColumns=false` is deliberate: the wrapper is for persisted column layout, so
+  auto-fit must be opt-in. `autoSizeOnColumnCountChange` is a narrower opt-in: it calls
+  `sizeColumnsToFit()` only when `visibleKeys().length` changes after a columnState edit.
+- `View` is a small representation switch (`mode:'table'|'cards'`) with controls
+  (`'menu'|'dots'|'toolbar'|false|'auto'`). `auto` resolves to the built-in dots overlay for both
+  table and card mode; the wrapper sets dot max to the full column count unless overridden. `Dots` is
+  not card-specific; on table mode it edits the same config and the attached grid applies visibility,
+  order, and sort through columnState. `data`/`getId` can live on the controller defaults or be
+  passed per `View` render.
+- Use raw `createColumnState` plus `createToolbar` when the app needs a custom skin like QA card 30,
+  a runtime `presentGate`, special group mode buttons, or nonstandard persistence timing.
+
 Icon menu (ColumnsMenu / MenuStrip, `grid/columnState/ColumnsMenu.tsx`):
 ```
 <MenuStrip items={MenuStripItem[]} onItem? onMove? move? tail? holdMs?=150 compact? />
@@ -284,7 +307,7 @@ Mobile (no ag-grid, no storage - the config alone):
   as dots move), `cardRole:'title'` = the header (else the first visible key), `cardRole:'accent'`
   = a badge, the rest are label+value. It sorts by the sticky `config.sort` itself
   (numeric/locale comparator) even when the sorted column is hidden.
-Styling uses shared classes `.wenayColDots*` / `.wenayCardList*`; runtime geometry remains inline because dot positions and drag transforms are state-derived. QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (toolbar icon menu + grouped sub-column mode button), 31 (Toolbar over columnState.listSource + pseudo-icons).
+Styling uses shared classes `.wenayColDots*` / `.wenayCardList*`; runtime geometry remains inline because dot positions and drag transforms are state-derived. QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (toolbar icon menu + grouped sub-column mode button), 31 (Toolbar over columnState.listSource + pseudo-icons), 32 (createColumnGrid wrapper + dots driving table/cards).
 
 ## Outside / Buttons Compatibility
 ```
@@ -519,6 +542,10 @@ Semantics that are easy to get wrong:
 - `useReplayHistory.seek` kills the live subscription imperatively (guarded off, double-call safe), folds `history.at(where)` through `apply` (keyframe + tail; a keyframe fully redefines consumer state, so `reset` is rarely needed), and freezes. `play()` resubscribes `{since: pos}` -> archive tail -> live handover.
 - `useStoreReplayEach` composes existing pieces instead of calling `Observe.syncStoreReplayEach` (which builds a FRESH store per call): the mirror lives in a ref (like `useStoreReplayMirror`), `store.each()` is subscribed in an effect declared BEFORE the sync effect (hook-call order guarantees the per-key subscriber exists when the keyframe applies — the expansion is never missed), then `useStoreReplaySync` drives the wire. Consequences: within one mount every resubscribe (StrictMode, `restart()`, `enabled` toggle, `staleMs`/`policy` change) reconnects by tail ON TOP of kept state and the consumer sees only the diff — no snapshot/`initial` dance (the library one-call needs `{since, initial: snapshot}` for that). After a FULL unmount pass `{since: prev.seq(), initial: prev.store.snapshot()}` like the library contract. `drain` is creation-time (it goes to `createStore`); changing it later does nothing. The fold target must live outside React state (ref/Map/grid api) — the hook renders nothing; `controller.store` is a normal store for `useStoreNode`/`useStoreKeys` extras.
 - Server primitives (`conflateReplay` per connection, `archiveReplay`) intentionally have no hooks: they live where the RPC server is built.
+- Route coordinator (common2 1.0.67 `Replay.createRouteCoordinator`): the coordinator owns promotion/fallback/shadow via policy hooks; consumers subscribe on a pair `link`, whose handle matches our route hooks (`ready, seq(), label(), active()`) minus `switchRoute` — the transport switch is invisible by the seq contract. Our route hooks (`useReplayRouteSubscribe` etc.) remain the manual-`switchRoute` wrapper over `replayRouteSubscribe`; they do NOT sit on top of a coordinator. React surface for coordinator links (subscribe hook + route-state/`promoteDirect` controls for ops UI) is a target-backlog item — do not bend the existing route hooks to accept links implicitly.
+- WebRTC direct path (common2 1.0.68): `createWebRtcConnector({port, rtc, ...})` is the coordinator's direct `RouteConnector`; `rtc` is an injected factory and in the browser that injection (`() => new RTCPeerConnection(cfg)`) belongs to the app/React side — common2 stays lib.dom-free. Signaling rides the EXISTING rpc socket (`createSignalHub` port exposed by `createRpcServerAuto`), so no new connection management appears in React; channel death / revoke surfaces as loud `onError` on the line (never silence), which the existing hooks already map to `error`. Nothing here needs a hook by itself — it matters as the direct transport under a future adapter (target backlog).
+- Peer SDK (common2 1.0.69 `Peer` / `wenay-common2/peer`): the one-call layer over rpc + store + replay + route coordinator — `createPeerClient({remote, account, initial, rtc?})` publishes the own store as a patch line and `peer(account)` returns a live mirrored store + route control; relay and direct share the OWNER's seq space (`createPatchRelayJournal`), so hand-offs are plain seq resumes, no keyframe reset. This is the intended React adoption surface (a `usePeer` adapter is the target-backlog item, superseding the raw coordinator-link hook idea): the mirrored store already plugs into `useStoreNode`/`useStoreKeys` as-is. 1.0.70 ships the oracle suites + `demo/` stand in the package — living examples per subsystem (`replay/peer-sdk.test.ts` is the Peer contract).
+- Media capture (common2 1.0.66 `Media` namespace / `wenay-common2/media`): CONSUMPTION needs no new hooks — `Media.createAudioSource` / `Media.createVideoSource` return `[emit, listen] & control`, with `replay:true` the `listen` is a normal replay line, so `useReplaySubscribe` / `useReplayFrame` cover it; frames are one `Uint8Array` (40-byte fixed header + raw payload, `Media.decodeMediaFrame`) and follow the existing fold-outside-React rule (canvas/AudioContext via ref). The capture `control` side (`start()` resolving to `'idle'|'requesting'|'live'|'denied'|'no-device'|'error'`, `stop()`, `setDevice`, `listDevices`, stats) is a permission/device/lifecycle state machine — exactly hook-shaped; a `useMediaSource` capture hook + QA card is a recorded target goal (supersedes the earlier "wrap it app-locally" stance). Backpressure defaults live in common2 (audio = lossless queue, video `replay:true` = keep-latest frame recovery); the client-side knobs are the same `policy`/`hint` as any replay line.
 
 QA cards 23/24/25/26 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `Replay.replayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror); client E = pull path (`useReplayFrame` over the direct remote with a wrapped counting `frame()`, pace switch 250ms/1s/3s keeps seq). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Card 25 = per-key feed (`useStoreReplayEach` over `exposeStoreReplay`): a dict-of-rows store, producer touches ONE random row per tick, the fold target is a plain Map with per-row cb counters — only the mutated row's counter grows, keyframe/`replace` are the only whole-table expansions, delete arrives as `(key, undefined)`. Card 26 = route hand-off (`useReplayRouteSubscribe` over the same video line): one canvas starts on relay, switches direct/relay by `switchRoute`, and failed replacement keeps the previous route alive. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
 
@@ -555,6 +582,18 @@ MainPage()
 
 The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point. `createLogsController` is the headless layer for append/limit/settings state; `useMessageEventLogsController` owns the global notification queue/timers/settings, while `MessageEventLogsView` and `MessageEventLogCard` own rendering. `PageLogs`, `MessageEventLogs`, and `LogsPage` remain compatibility UI wrappers. `useLogsTableController` and `useLogsNotificationsController` expose the provider-local table/notification state while `LogsTable` and `LogsNotifications` keep the visual wrappers. Shared logger chrome lives in `src/common/src/logs/logStyles.ts` and is themed through `--logs-*` tokens.
 
+Full-page table controller (`useLogsPageTable` -> `LogsPageTableController`): the last logs table
+moved to the controller pattern. Semantics that matter: the grid receives a MOUNT-TIME snapshot of
+the accumulated log map once (`useState` initializer) and afterwards lives on
+`applyTransactionAsync` appends from the mini feed - re-renders do not re-feed `rowData`, so row
+identity is per-append copy exactly as before. The importance filter is ONE method
+(`applyImportanceFilter(min?)`: set -> `setFilterModel` greaterThanOrEqual on `var`, unset ->
+`destroyFilter`), used by both the settings subscription and `onGridReady` (which skips the
+destroy branch - a fresh grid has no filter). Both data subscriptions are `updateBy(obj, cb)`
+WITH a callback: they run imperatively on `renderBy` and never re-render the component.
+`gridProps` is one stable memo - spread it into `AgGridTable`; `fit()` is exposed for the legacy
+`update` prop, which `PageLogs` still honors. QA card 9.
+
 ## Cache / Memory / Browser Utilities
 ```
 browserCacheStorage
@@ -584,9 +623,27 @@ ArrayPromise({arr, catchF?, thenF?})
 PageVisibilityProvider
 PageVisibilityContext
 setAutoStepForElement(input, {minStep?, maxStep?})
+
+useCacheMapPersistence(cache: CacheMap, delay?=300) -> {isDirty(), flush(), save(), reload()}
 ```
 
-Cache helpers are process/browser storage utilities, not React state management.
+Layering (2026-07 architecture pass): the persisted maps (`floatingWindowMap`, `mapResiReact`,
+`mapRightMenu`) are DECLARED in the utils leaf `utils/persistedMaps.ts` and re-exported by their
+owning components (FloatingWindow/Resizable/RightMenuStore) - importing `memoryStore`/`memoryCache`
+no longer pulls react-rnd or the Menu tree; only `import type` lines point upward (erased at build).
+Shared order helper `utils/fixedOrder.ts` (`pinFixedOrder`, `movedOrderWithFixed`) is the single
+implementation of the "fixed entries pin to descriptor index" invariant used by columnState,
+ColumnsMenu, and Toolbar (it used to be four inline copies that had to stay byte-identical).
+
+Cache helpers are process/browser storage utilities, not React state management. The one React
+entry here is `useCacheMapPersistence` - the documented app contract (`load()` on mount +
+`onDirty -> saveDebounced(delay)`) as a hook. Scope is deliberately exactly that: the
+pagehide/visibilitychange flush backstops stay app-side (they are page-level policy, not
+per-component). Effect identity is `[cache, delay]`; the returned methods are pass-throughs and
+`reload()` is an alias of `load()` - a repeated load MERGES storage on top of the current maps
+(addDataToMap semantics), it is not a reset. QA cards 20/21/25 share one `memoryCache`, so
+several mounted hooks coexist: load() is idempotent-enough (merge) and extra onDirty
+subscribers just debounce the same save.
 
 Dirty/save contract: the dirty signal originates in the data layer. The persisted maps are
 `ObservableMap`s, so `set/delete/clear` announce themselves; in-place mutations of stored
@@ -612,9 +669,20 @@ CResizeObserver
 setResizeableElement(el)
 removeResizeableElement(el)
 ObserveID
+
+useResizeObserver<T>(onResize) -> {ref, element()}
+useElementSize<T>() -> {ref, element(), width, height, getSize()}
 ```
 
-Use these only when a component must participate in the shared resize observer map.
+Use the class/imperative pair only when a component must participate in the shared resize
+observer map. The hooks are the React-shaped entry over the SAME module singleton (one native
+`ResizeObserver` per app): `useResizeObserver` returns a callback ref (attach/detach re-observes;
+React null-call on unmount unsubscribes) and takes `onResize` through a ref - new identity
+neither resubscribes nor is missed. The native observer fires once right after `observe`, so the
+first measurement arrives without an explicit initial read. `useElementSize` folds that into
+rounded, equality-guarded `{width, height}` state (a no-op resize does not re-render) plus a live
+`getSize()` getter (exact floats, no render wait). `setResizeableElement`'s auto-shrink path is
+untouched and still class-driven (ParamsEditor inputs). QA card 19 drives both hooks.
 
 ## Styles
 ```
@@ -650,11 +718,11 @@ Normalization rule: new shared CSS should first try an existing token. Add a new
 
 Open normalization candidates:
 - `src/style/style.css`: `.msTradeAlt`, `.msTradeActive`, `.newButtonSimple`, `.toIndicatorMenuButton:hover`, submit-button green, and several toolbar row hover/drag literals still use raw colors.
-- `src/common/src/grid/columnState/*`: compact menu/dots/card visuals now use `.wenayColsMenu*`, `.wenayColDots*`, `.wenayCardList*` plus `--cols-menu-*`, `--cols-dots-*`, and `--cols-card-*`; further changes here should be visual QA only, not a new default palette.
+- `src/common/src/grid/columnState/*`: compact menu/dots/card visuals now use `.wenayColumnGrid*`, `.wenayColsMenu*`, `.wenayColDots*`, `.wenayCardList*` plus `--cols-grid-*`, `--cols-menu-*`, `--cols-dots-*`, and `--cols-card-*`; further changes here should be visual QA only, not a new default palette.
 - `src/common/src/components/ParamsEditor.tsx` and `src/common/src/components/Input.tsx`: if these stay public primitives, define default class/token contracts instead of component-owned visual styling.
 - `src/common/src/styles/commentaryStyles.css`: standalone `.commentary` CSS is not imported by the root style bundle; either import/tokenize it if still used, or mark it as a local component concern.
 
-Recently normalized: mouse context-menu item colors through `--menu-*`, `--menu-outline-color` for `OutlineDragDemo`, `--logs-*` for logger chrome, `--dlg-scrim` in `ModalProvider`, compact `ColumnsMenu/MenuStrip` visuals through `.wenayColsMenu*` / `--cols-menu-*`, and card-29 mobile primitives through `--cols-dots-*` / `--cols-card-*`.
+Recently normalized: mouse context-menu item colors through `--menu-*`, `--menu-outline-color` for `OutlineDragDemo`, `--logs-*` for logger chrome, `--dlg-scrim` in `ModalProvider`, compact `ColumnsMenu/MenuStrip` visuals through `.wenayColsMenu*` / `--cols-menu-*`, card-29 mobile primitives through `--cols-dots-*` / `--cols-card-*`, and createColumnGrid overlay through `.wenayColumnGrid*` / `--cols-grid-*`.
 
 ## Cleanup Inventory
 
@@ -667,6 +735,14 @@ Suspicious but still public:
 - Chart engine primitives (`DataSet`, `Panel`, `Renderer`, `Interaction`, `ChartEngine`, etc.) are very low-level. They are public through `chartEngineReact.tsx`; product apps should wrap them before use.
 - `src/common/src/myChart/chartEngine/chartEngine.ts` is a reference copy next to the public React engine. It is not exported from root; treat it as suspicious maintenance debt, not as public API.
 - `StyleCSSHeadGridEdit` and `StyleCSSHeadGrid` mutate `<head>` directly. They are exported and can have consumers, but new grid styling should prefer ag-grid theme params and tokens.
+
+Added by the 2026-07-09 architecture audit (evidence in the audit report / `doc/target/my.md`):
+- `menuR.tsx` (`createRightClickMenu` / `MenuR`) - CONFIRMED dead: no runtime consumer anywhere (the test that supposedly covers it imports `RightMenu.tsx`); re-exported twice from `api.tsx` (`export *` + `kit.menu.rightClick`). Candidate for removal in a deliberate breaking version; its gesture code duplicates `menuMouse.tsx:342-380`.
+- `logsContext.tsx` - a full PARALLEL logs stack (own `LogEntry` shape divergent from `logsController`, raw unguarded `localStorage`, own settings/notifications/table) exported from the barrel next to `logs.tsx`. Decide: deprecate or converge; new code should use `logsApi`/`createLogsController`.
+- `MyChartEngine` - a hardcoded DEMO (random data + setInterval inside `useEffect`, no props but `style`) exported as public API from `chartEngineReact.tsx`; `generateIncrementalData` (Math.random demo util) is public too. Should move to demo namespace or gain a real props contract.
+- `getLogsApi<T>()` - the `<T>` is cosmetic: EVERY call shares module-level `datumConst`/`datumMiniConst` and the constant `"settingLogs"` key, so a "custom" logger and the global `logsApi` write into one shared full/mini/settings state with colliding `num` counters and competing `limitPer` trims. Treat as singleton-only until state is built per call.
+- `FloatingWindow` public prop `onCLickClose` (typo, capital L) is baked into the API; add `onClickClose` and deprecate the alias in a breaking pass.
+- `contextMenu` raw `map`/legacy-queue path is test-only-live (populated only by `contextMenuStats.test.tsx`); the `bb`/`map.clear()` reopening invariant itself is intentional and stays.
 
 ## Charts
 Canvas chart:

@@ -1,8 +1,6 @@
 import { deepClone } from "wenay-common2";
 import { renderBy } from "../../updateBy";
-import { floatingWindowMap } from "../components/Dnd/FloatingWindow";
-import { mapResiReact } from "../components/Dnd/Resizable";
-import { mapRightMenu } from "../components/Menu/RightMenuStore";
+import { floatingWindowMap, mapResiReact, mapRightMenu } from "./persistedMaps";
 import {createCacheMap} from "./cache";
 import { ObservableMap } from "./observableMap";
 

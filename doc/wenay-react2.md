@@ -21,9 +21,11 @@ Put app-specific layout/build rules in an app wrapper above the primitive.
 ## Render Memory
 ```
 updateBy(obj) / useUpdateBy(obj)                 // subscribe current component to renderBy(obj)
+updateBy(obj, cb)                                // imperative callback instead of a re-render;
+                                                 //   cb goes through a ref - inline identity is fine
 renderBy(obj, ms?)                               // emit render for subscribers
-renderByRevers(obj, ms?, reverse?=true)
-renderByLast(obj, ms?)
+renderByRevers(obj, ms?, reverse?=true)          // reverse/last affect ONLY React subscribers;
+renderByLast(obj, ms?)                           //   updateBy(obj, cb) callbacks always all run first
 
 const state = { count: 0 }
 const api = createUpdateApi(state)
@@ -63,6 +65,13 @@ document.addEventListener("visibilitychange",
 window.addEventListener("pagehide", () => { void memoryCache.flush() })  // backstop: flush is async
 ```
 
+The load + dirty->saveDebounced part of that contract as one hook (React components):
+```
+const persistence = useCacheMapPersistence(memoryCache, delayMs?=300)
+persistence.isDirty(); persistence.flush(); persistence.save(); persistence.reload()  // reload = load() alias
+```
+The pagehide/visibility flush backstops stay app-side (see above) - the hook deliberately does not own them.
+
 ## Outside Click / Buttons
 ```
 const outside = useOutside({onOutside, enabled?})
@@ -78,6 +87,20 @@ outside.contains(event.target)
 <HoverButton button={...}>{...}</HoverButton>
 <AbsoluteButton button={...}>{...}</AbsoluteButton>
 ```
+
+## Element Size / Resize Observer
+```
+const box = useResizeObserver<HTMLDivElement>(() => onResize())   // shared singleton observer
+<div ref={box.ref} />; box.element()
+
+const size = useElementSize<HTMLDivElement>()    // "want the size -> get the value/method"
+<div ref={size.ref} />
+size.width; size.height                          // state, rounded, no-op resize does not re-render
+size.getSize()                                   // live getter (exact, no render wait)
+
+setResizeableElement(el) / removeResizeableElement(el)   // legacy imperative auto-shrink path, unchanged
+```
+Both hooks ride the same module-level `CResizeObserver` singleton (one native `ResizeObserver` for the whole app). QA card 19.
 
 ## Drag / Floating Windows
 ```
@@ -156,6 +179,7 @@ tb.api.useConfig() / getConfig() / setConfig(next) / setOrder(order) / show(key,
 tb.api.showSettings(on) / showReset(on)             // pseudo-controls visibility
 tb.api.useItems()            // headless bar: ordered visible [{item, density, content}] - custom markup
 tb.api.onChange.on(cfg => ...) -> off        // fires on every edit
+tb.api.dispose()             // release the external-source subscription (HMR/remounts); persisted config stays
 
 registerToolbarDensity({key, name, renderItem?}) -> unregister   // built-ins: 'icon', 'label'
 toolbarItemIcon(item)        // the item's icon, or its first letters as a text pseudo-icon
@@ -317,7 +341,34 @@ Mobile (no ag-grid): dots selector + card rows over the same config:
                                                  //   drag=replace, swipe up=remove, tap dot=select, sort button cycles
 <CardList<Row> state={cs} data={rows} getId? renderValue? />   // visible cols -> card fields; cardRole:'title'/'accent'
 ```
-QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (toolbar icon menu + grouped sub-column mode button), 31 (Toolbar over the same config).
+
+Default wrapper for repeated grid/menu/mobile use:
+```
+const cg = createColumnGrid<Row>({
+    key: "orders.columns",
+    columnDefs: cols,                              // ColumnMeta inferred from colId/field/headerName
+    data: rows,                                    // optional default; View props can override
+    getId: r => r.id,
+    autoSizeOnColumnCountChange: true,             // optional fit when visible column count changes
+    columns: [{key: "name", fixed: true, cardRole: "title"}], // optional overrides
+})
+
+<cg.View mode="table" />                           // default controls="auto" -> dots overlay
+<cg.View mode="cards" data={otherRows} />
+<cg.Table rowData={rows} getRowId={p => p.data.id} />
+<cg.Menu compact />
+<cg.Dots />                                        // no wrapper max; defaults to all columns
+<cg.Toolbar settings />
+<cg.Settings />
+```
+`createColumnGrid` returns `{state, toolbar, api, grid, tableProps, Table, Menu, Dots, Cards, Toolbar, Settings, View, dispose}`; `dispose()` releases factory-lifetime subscriptions (config onChange, toolbar source, pending fit) without touching the persisted config. The columnState BARREL stays ag-grid-free; `createColumnGrid` ships from its own module (both are exported from the package root).
+Its `Table`/`tableProps()` attach/detach the columnState grid adapter automatically and default
+`autoSizeColumns=false` so restored widths are not overwritten. `autoSizeOnColumnCountChange` is
+separate and only calls `sizeColumnsToFit()` when the visible column count changes. `useColumnGrid(opts)`
+is the same controller captured once for component-local setups; keep module-level `createColumnGrid`
+when the controller must survive route/component remounts.
+
+QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (toolbar icon menu + grouped sub-column mode button), 31 (Toolbar over the same config), 32 (createColumnGrid wrapper + dots driving table/cards).
 
 
 ## Observe React Adapter
@@ -416,6 +467,10 @@ const tt = useReplayHistory(history, (frame) => draw(frame), {head: () => replay
 tt.live; tt.seq; tt.head; tt.pause(); tt.play(); tt.seek({seq})
 ```
 
+Route hand-off here is the MANUAL surface (`switchRoute`). common2 1.0.67 `Replay.createRouteCoordinator` moves route decisions (policy, promote/fallback/shadow) out of the consumer; a coordinator `link.subscribe(cb)` handle has the same shape (`ready, seq(), label(), active()`) and survives every route change, so components consuming a coordinator link do not need `switchRoute` at all. common2 1.0.68 supplies the direct transport for it: `createWebRtcConnector` with an app-injected `rtc: () => new RTCPeerConnection(cfg)` factory (the browser — i.e. the React app — owns that injection) and signaling over the existing RPC socket (`createSignalHub`). common2 1.0.69 wraps the whole stack into the `Peer` SDK (`wenay-common2/peer`): `createPeerClient(...).peer(account)` returns a live mirrored store (works with `useStoreNode`/`useStoreKeys` as-is) + route control, surviving relay<->direct hand-offs in one seq space. A dedicated `usePeer` adapter is a target-backlog item, not yet a library surface.
+
+Media lines (common2 1.0.66 `Media.createAudioSource` / `Media.createVideoSource`) are ordinary binary Listen sources; with `replay:true` their `listen` is a replay line, so `useReplaySubscribe` / `useReplayFrame` consume mic/camera frames with no media-specific hook. Each frame is one `Uint8Array` (`Media.decodeMediaFrame`); draw/play it via ref (canvas, AudioContext), never useState — the same rule as any high-frequency line. Without `replay`, the plain `listen` works with the listen hooks above.
+
 Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. Freshness: detection lives in wenay-common2 (`staleMs` watchdog); the non-route hooks mirror its edge-triggered `onStale` into `stale`, so a fresh 100 ev/s line causes zero extra renders. Route hand-off is explicit through `switchRoute(nextRemote, {label?, since?, reset?, policy?, hint?})`: old route stays live while the replacement catches up by `seq`, then closes. `useReplayHistory` is archive playback — staleness does not apply. QA cards 23 (video line + conflation + time travel + freshness), 24 (store sync), 25 (per-key feed), and 26 (route hand-off) are the live examples.
 
 ## Logs
@@ -425,7 +480,9 @@ logsApi.addLogs({id: "api", time: new Date(), txt: "done", var: 1})
 <logsApi.React.PageLogs />
 <logsApi.React.Setting />
 
-const customLogs = getLogsApi<MyFields>({limitPer: 500, limit?: 50, varMin?: 0})
+const customLogs = getLogsApi<MyFields>({limitPer: 500, limit?: 50, varMin?: 0, settingsKey?: "myLogs"})
+// each getLogsApi call now owns ISOLATED full/mini/settings state (settingsKey persists the
+// instance settings; omitted = fresh non-persisted). The global logsApi keeps the legacy shared state.
 const headless = createLogsController<MyFields>({options: {limitPer: 500, limit: 50}})
 
 const messageNotifications = useMessageEventLogsController({maxVisible: 4})
@@ -437,9 +494,13 @@ const contextNotifications = useLogsNotificationsController()
 const mini = useMiniLogsTable({data: rows, onClick: e => console.log(e.data)})
 <AgGridTable {...mini.props} />
 <MiniLogsTable data={rows} />
+
+const table = useLogsPageTable()                 // full-page logs grid controller
+<AgGridTable {...table.gridProps} />
+table.fit(); table.applyImportanceFilter(min?); table.appendRow(row); table.getApi()
 ```
 
-Logger notification/tabs chrome uses `--logs-*` CSS variables; apps can theme it without forking logger components. `createLogsController` owns the headless append/limit/settings state for custom integrations. `useMessageEventLogsController` owns the global notification queue/timers/settings, `MessageEventLogsView` draws it, and `MessageEventLogs` / `logsApi.React.Message` remain compatibility wrappers. `MiniLogs` remains the compatibility wrapper; new compact-table code can use `useMiniLogsTable` or `MiniLogsTable`.
+Logger notification/tabs chrome uses `--logs-*` CSS variables; apps can theme it without forking logger components. `createLogsController` owns the headless append/limit/settings state for custom integrations. `useMessageEventLogsController` owns the global notification queue/timers/settings, `MessageEventLogsView` draws it, and `MessageEventLogs` / `logsApi.React.Message` remain compatibility wrappers. `MiniLogs` remains the compatibility wrapper; new compact-table code can use `useMiniLogsTable` or `MiniLogsTable`. `useLogsPageTable` owns the full-page table (mount-time row snapshot, transaction appends from the mini feed, one importance-filter method); `PageLogs` / `logsApi.React.PageLogs` remain the thin compatibility wrappers over it.
 
 ## Styles / Theme
 ```
@@ -455,7 +516,7 @@ useAgGridTheme("dark" | "light")
 colDefCentered / colDefWrap / numericComparator
 ```
 
-Shared CSS variables include `--menu-outline-color`, `--logs-*`, `--dlg-*`, `--wnd-*`, `--tb-*`, `--cols-menu-*`, `--cols-dots-*`, and `--cols-card-*`.
+Shared CSS variables include `--menu-outline-color`, `--logs-*`, `--dlg-*`, `--wnd-*`, `--tb-*`, `--cols-grid-*`, `--cols-menu-*`, `--cols-dots-*`, and `--cols-card-*`.
 
 ## Charts
 ```

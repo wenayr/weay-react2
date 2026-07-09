@@ -18,21 +18,25 @@ export * from "./src/styles/tokens";
 // 1. BASE LAYER - no internal project dependencies
 export * from "./updateBy";
 
-// 2. HOOKS - depend only on updateBy
+// 2. HOOKS - depend on updateBy and wenay-common2
 export * from "./src/hooks";
 
-// 4. DND components - depend on updateBy
+// 4. DND components - depend on updateBy and utils (persistedMaps)
 export * from "./src/components/Dnd";
 
-// 5. UTILS - now depend on Dnd (memoryStore imports floatingWindowMap, mapResiReact)
+// 5. UTILS - self-contained (persisted maps live in utils/persistedMaps; components import
+// their map from there, so utils no longer reaches into the component layer)
 export * from "./src/utils";
 
 // 5b. GRID (agGrid4): core buffer + headless hook + AgGridTable.
 export * from "./src/grid/agGrid4";
 
 // 5c. GRID column state (createColumnState): persisted order/visibility/width/sort/filter,
-// standalone config store + optional two-way ag-grid adapter (attach via onGridReady)
+// standalone config store + optional two-way ag-grid adapter (attach via onGridReady).
+// The columnState barrel is deliberately ag-grid-free; createColumnGrid (ag-grid runtime +
+// Toolbar) ships from its own module so grid-less consumers can import the barrel directly.
 export * from "./src/grid/columnState";
+export * from "./src/grid/columnState/columnGrid";
 
 // 6. BASE COMPONENTS - depend on hooks
 export * from "./src/components/Buttons";

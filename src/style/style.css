@@ -751,6 +751,63 @@ body {
   overflow: auto;
 }
 
+/* Column grid kit layout (createColumnGrid.View). */
+.wenayColumnGrid {
+  position: relative;
+  display: grid;
+  gap: var(--cols-grid-gap, 8px);
+  min-width: 0;
+}
+.wenayColumnGridControls,
+.wenayColumnGridBody {
+  min-width: 0;
+}
+.wenayColumnGridControls_dots {
+  position: absolute;
+  left: var(--cols-grid-dots-x, 10px);
+  right: var(--cols-grid-dots-x, 10px);
+  bottom: var(--cols-grid-dots-bottom, 10px);
+  z-index: 3;
+}
+.wenayColumnGrid_cards.wenayColumnGrid_controls_dots .wenayCardListItem:last-child {
+  padding-bottom: var(--cols-grid-dots-card-bottom-padding, 92px);
+}
+.wenayColumnGridDots {
+  padding: var(--cols-grid-dots-padding, 6px 8px 8px);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.wenayColumnGridDots .wenayColDotsHead {
+  justify-content: flex-end;
+  gap: 0;
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+.wenayColumnGridDots .wenayColDotsTrack {
+  height: 48px;
+  margin: 0 16px;
+}
+.wenayColumnGridDots .wenayColDotsMeta,
+.wenayColumnGridDots .wenayColDotsSpacer {
+  display: none;
+}
+.wenayColumnGridDots .wenayColDotsSort {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  font-size: 0;
+  opacity: 0.82;
+  background: transparent;
+}
+.wenayColumnGridDots .wenayColDotsSort::before {
+  content: "⇅";
+  font-size: 16px;
+  line-height: 1;
+}
+
 /* Column state compact menu (ColumnsMenu/MenuStrip). Visual defaults moved from
    component inline styles; runtime drag transforms remain inline. */
 .wenayColsMenu,

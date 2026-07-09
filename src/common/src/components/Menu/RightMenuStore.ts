@@ -10,7 +10,9 @@ export type MenuRightSavedState = {
     };
 };
 
-import { ObservableMap } from "../../utils/observableMap";
+import { mapRightMenu } from "../../utils/persistedMaps";
 
-// observable - memoryCache marks itself dirty on its mutations (drag end re-set()s the state)
-export const mapRightMenu = new ObservableMap<string, MenuRightSavedState>();
+// observable - memoryCache marks itself dirty on its mutations (drag end re-set()s the state);
+// declared in utils/persistedMaps (memoryCache registry must not import the component layer)
+// and re-exported here so the public surface is unchanged
+export { mapRightMenu };

@@ -226,18 +226,22 @@ export function useRightMenuController({
             display: 'flex'
         };
 
+        // runs during render: guard for DOM-less environments (SSR/tests) - Infinity makes
+        // the clamp a no-op there; on the client the behavior is unchanged
+        const vw = typeof window != 'undefined' ? window.innerWidth : Infinity;
+        const vh = typeof window != 'undefined' ? window.innerHeight : Infinity;
         if (position === 'left') {
-            computedStyle.left = Math.max(0, Math.min(computedX, window.innerWidth - 50));
+            computedStyle.left = Math.max(0, Math.min(computedX, vw - 50));
             computedStyle.right = 'auto';
         } else {
-            computedStyle.right = Math.max(0, Math.min(computedX, window.innerWidth - 50));
+            computedStyle.right = Math.max(0, Math.min(computedX, vw - 50));
             computedStyle.left = 'auto';
         }
         if (isTop) {
-            computedStyle.top = Math.max(0, Math.min(computedY, window.innerHeight - 50));
+            computedStyle.top = Math.max(0, Math.min(computedY, vh - 50));
             computedStyle.bottom = 'auto';
         } else {
-            computedStyle.bottom = Math.max(0, Math.min(computedY, window.innerHeight - 50));
+            computedStyle.bottom = Math.max(0, Math.min(computedY, vh - 50));
             computedStyle.top = 'auto';
         }
         return computedStyle;

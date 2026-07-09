@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
-import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
+import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, createColumnGrid, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, useCacheMapPersistence, useResizeObserver, useElementSize, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { listen as createListen, Observe, Params } from "wenay-common2";
 import { Button, HoverButton, OutsideClickArea } from "../src/hooks";
@@ -825,6 +825,36 @@ const ToolbarColumnsDemo = () => (
     </div>
 );
 
+/* ---------- 32. createColumnGrid: auto kit over table/cards/menu/dots ---------- */
+const qaAutoColumnGrid = createColumnGrid<tTbColRow>({
+    key: "qa32.columnGrid",
+    columnDefs: tbColDefs,
+    data: tbColRows,
+    getId: r => r.id,
+    autoSizeOnColumnCountChange: true,
+    columns: [
+        { key: "name", fixed: true, cardRole: "title" },
+        { key: "price", icon: <span>PX</span>, cardRole: "accent" },
+        { key: "qty", short: "qty" },
+        { key: "note", short: "note", defaultVisible: false },
+    ],
+});
+
+const ColumnGridKitDemo = () => {
+    const [mode, setMode] = useState<"table" | "cards">("table");
+    return <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <button style={btn(mode == "table", "#0969da")} onClick={() => setMode("table")}>table</button>
+            <button style={btn(mode == "cards", "#0969da")} onClick={() => setMode("cards")}>cards</button>
+        </div>
+        <qaAutoColumnGrid.View
+            mode={mode}
+            tableHeight={180}
+            table={{ getRowId: pp => pp.data.id }}
+        />
+    </div>;
+};
+
 
 /* ---------- 18. Observe local store/listen hooks ---------- */
 type tObserveLocalState = {
@@ -1079,52 +1109,50 @@ const ResizeBugRepro = () => {
     const [fixedWidth, setFixedWidth] = useState(150);
     const [autoWidth, setAutoWidth] = useState(0);
     const [fixedSelectWidth, setFixedSelectWidth] = useState(0);
-    const autoRef = React.useRef<HTMLDivElement>(null);
-    const fixedRef = React.useRef<HTMLDivElement>(null);
 
     const onChange = (params: ReturnType<typeof makeResizeParams>) => {
         setAsset(params.asset.value);
         setN(v => v + 1);
     };
 
+    // Resize detection now rides the library singleton: useResizeObserver on the auto box,
+    // useElementSize on the user-resizable fixed box (its width/height come from the hook).
+    const readWidths = () => {
+        const autoSelect = autoBox.element()?.querySelector("select");
+        const fixedSelect = fixedBox.element()?.querySelector("select");
+        setAutoWidth(Math.round(autoSelect?.getBoundingClientRect().width ?? 0));
+        setFixedSelectWidth(Math.round(fixedSelect?.getBoundingClientRect().width ?? 0));
+    };
+    const autoBox = useResizeObserver<HTMLDivElement>(readWidths);
+    const fixedBox = useElementSize<HTMLDivElement>();
+
     React.useLayoutEffect(() => {
-        const readWidths = () => {
-            const autoSelect = autoRef.current?.querySelector("select");
-            const fixedSelect = fixedRef.current?.querySelector("select");
-            setAutoWidth(Math.round(autoSelect?.getBoundingClientRect().width ?? 0));
-            setFixedSelectWidth(Math.round(fixedSelect?.getBoundingClientRect().width ?? 0));
-        };
         readWidths();
+        // setResizeableElement's probing settles after paint - re-read one frame later
         const id = requestAnimationFrame(readWidths);
-        const observer = typeof ResizeObserver != "undefined" ? new ResizeObserver(readWidths) : null;
-        if (autoRef.current) observer?.observe(autoRef.current);
-        if (fixedRef.current) observer?.observe(fixedRef.current);
-        return () => {
-            cancelAnimationFrame(id);
-            observer?.disconnect();
-        };
-    }, [n, asset, fixedWidth]);
+        return () => cancelAnimationFrame(id);
+    }, [n, asset, fixedWidth, fixedBox.width]);
 
     const selectInfo: React.CSSProperties = { fontSize: 12, color: "#57606a", marginTop: 6 };
 
     return <div style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div>
-                <div ref={autoRef} style={{ display: "inline-flex", flexDirection: "column", alignItems: "stretch", border: "1px solid #cf222e", padding: 6 }}>
+                <div ref={autoBox.ref} style={{ display: "inline-flex", flexDirection: "column", alignItems: "stretch", border: "1px solid #cf222e", padding: 6 }}>
                     <ParamsEditor params={makeResizeParams(asset)} onChange={onChange}/>
                     <button onClick={() => setN(v => v + 1)}>rerender {n}</button>
                 </div>
                 <div style={selectInfo}>auto-width select: <b>{autoWidth}px</b></div>
             </div>
             <div>
-                <div ref={fixedRef} style={{ width: fixedWidth, minWidth: 90, maxWidth: 300, resize: "horizontal", overflow: "auto", border: "1px solid #0969da", padding: 6 }}>
+                <div ref={fixedBox.ref} style={{ width: fixedWidth, minWidth: 90, maxWidth: 300, resize: "horizontal", overflow: "auto", border: "1px solid #0969da", padding: 6 }}>
                     <ParamsEditor params={makeResizeParams(asset)} onChange={onChange}/>
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
                     <button onClick={() => setFixedWidth(w => w == 150 ? 240 : 150)}>parent {fixedWidth}px</button>
                     <button onClick={() => setN(v => v + 1)}>rerender</button>
                 </div>
-                <div style={selectInfo}>fixed-parent select: <b>{fixedSelectWidth}px</b></div>
+                <div style={selectInfo}>fixed-parent select: <b>{fixedSelectWidth}px</b> · container (useElementSize): <b>{fixedBox.width}×{fixedBox.height}px</b></div>
             </div>
         </div>
         <div style={{ fontSize: 13 }}>selected asset: <b>{asset}</b></div>
@@ -1218,10 +1246,7 @@ const ExternalSectionModule = () => {
 };
 const SettingsDialogDemo = () => {
     const [mounted, setMounted] = useState(true);
-    useEffect(() => {
-        void memoryCache.load();
-        return memoryCache.onDirty(() => memoryCache.saveDebounced(300));
-    }, []);
+    useCacheMapPersistence(memoryCache);
     return <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <SettingsDialog
             sections={dlgStaticSections}
@@ -1241,14 +1266,10 @@ const qaSlot = createUiSlot({
 const slotContent = <span style={{ padding: "4px 10px", background: "#0969da", color: "#fff", borderRadius: 6, fontSize: 12 }}>the block</span>;
 
 const UiSlotDemo = () => {
-    // App-side persistence contract: memoryCache.load() on start, then subscribe to the dirty
-    // channel - the persisted maps are observable and mark their memoryCache dirty themselves,
-    // the app owns the write policy.
-    useEffect(() => {
-        void memoryCache.load();
-        const off = memoryCache.onDirty(() => memoryCache.saveDebounced(300));
-        return off;
-    }, []);
+    // App-side persistence contract in one hook: memoryCache.load() on start, then the dirty
+    // channel -> saveDebounced(300) - the persisted maps are observable and mark their
+    // memoryCache dirty themselves, the app owns the write policy.
+    useCacheMapPersistence(memoryCache);
     return <div style={{ display: "grid", gap: 10 }}>
         <style>{`.qaChip{border:1px solid #6e7781;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;display:inline-block}.qaChipActive{background:#0969da;border-color:#0969da;color:#fff}`}</style>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -1326,10 +1347,7 @@ const ToolbarDemo = () => {
     const tb = extra ? getQaToolbarExtra() : qaToolbar;
 
     // App-side persistence contract - same wiring as the UiSlot card.
-    useEffect(() => {
-        void memoryCache.load();
-        return memoryCache.onDirty(() => memoryCache.saveDebounced(300));
-    }, []);
+    useCacheMapPersistence(memoryCache);
     // Same pure Settings element registered as a global settings section (see card 20's dialog).
     useEffect(() => registerSettingsSection({
         key: "qa-toolbar",
@@ -1607,6 +1625,14 @@ function ActiveChecks() {
                    note="createToolbar({source}) - the toolbar's order/visibility now can live OUTSIDE it: UiListSource is the extracted control contract, and columnState.api.listSource implements it over the same config the grid adapter syncs. No bridge, no double storage - Toolbar became a VIEW. Backward compatible: without source the toolbar keeps its own store exactly as in card 25."
                    tall>
                 <ToolbarColumnsDemo />
+            </Check>
+
+            <Check n={32} title="createColumnGrid - default grid menu + mobile dots for table/cards"
+                   do="Switch table/cards. Use the dots overlay: hide/show/replace fields. In table mode the grid columns change and optionally fit on column-count changes; in cards mode the card fields change."
+                   expect="createColumnGrid inferred column metadata from columnDefs, applied small overrides, took default data/getId at the controller level, and rendered dots as the built-in overlay with no manual max. Dots are not card-only: the same selector drives the table through columnState.grid.attach. Width restore stays protected because Table defaults autoSizeColumns=false; this card explicitly enables fit on visible column-count changes."
+                   note="This is the reusable wrapper for the card-29/30/31 pattern: one keyed controller, auto ColumnMeta from ag-grid defs, optional overrides/default data, built-in dots overlay, and ready-made representations. Use View for quick table/card switching, or use the returned pieces manually."
+                   tall>
+                <ColumnGridKitDemo />
             </Check>
 
             <Check n={30} title="columnState toolbar menu - grouped sub-columns"

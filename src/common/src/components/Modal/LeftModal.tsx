@@ -4,7 +4,8 @@ import {createUpdateApi} from "../../../updateBy";
 import {createModalElementStore} from "./Modal";
 import { DragBox } from "../Dnd/FloatingWindow";
 function useViewport() {
-    const [width, setWidth] = useState(window.innerWidth);
+    // lazy initializer + guard: window is absent in DOM-less environments (SSR/tests)
+    const [width, setWidth] = useState(() => typeof window != 'undefined' ? window.innerWidth : 0);
 
     useEffect(() => {
         const handleResize = () => setWidth(window.innerWidth);
@@ -321,7 +322,8 @@ export function getApiLeftMenu() {
         children: () => React.JSX.Element,
         textB?: string
     }) => {
-        const viewportWidth = window.innerWidth;
+        // guard: ApiLeftMenu is created at import time, so this must not touch window on a server
+        const viewportWidth = typeof window != 'undefined' ? window.innerWidth : 0;
         return (
             <div
                 className={"blur"}

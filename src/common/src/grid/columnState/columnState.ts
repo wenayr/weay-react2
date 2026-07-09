@@ -11,8 +11,9 @@
 import type {ReactNode} from 'react'
 import type {ColumnState as AgColumnState, GridApi} from 'ag-grid-community'
 import {listen as createListen} from 'wenay-common2'
-import {createUpdateApi, renderBy, updateBy} from '../../../updateBy'
+import {createUpdateApi} from '../../../updateBy'
 import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
+import {pinFixedOrder} from '../../utils/fixedOrder'
 
 export type ColumnMeta = {
     /** stable id (persist key; must equal the grid colId) */
@@ -137,12 +138,10 @@ export function createColumnState(opts: {
         const known = new Set(opts.columns.map(c => c.key))
         const byKey = new Map(opts.columns.map(c => [c.key, c]))
         const rawOrder = Array.isArray(st.order) ? st.order : []
-        const order = rawOrder.filter(k => known.has(k) && !byKey.get(k)?.fixed)
+        const prelim = rawOrder.filter(k => known.has(k) && !byKey.get(k)?.fixed)
         for (const c of opts.columns)
-            if (!c.fixed && order.indexOf(c.key) == -1) order.push(c.key)
-        opts.columns.forEach(function pinFixed(c, i) {
-            if (c.fixed) order.splice(Math.min(i, order.length), 0, c.key)
-        })
+            if (!c.fixed && prelim.indexOf(c.key) == -1) prelim.push(c.key)
+        const order = pinFixedOrder(prelim, opts.columns)
         const rawVisible = st.visible && typeof st.visible == 'object' ? st.visible : {}
         const visible: {[k: string]: boolean} = {}
         for (const c of opts.columns)

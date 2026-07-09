@@ -1,6 +1,6 @@
 # Style system normalization
 
-Status: verify; default inventory and column-state scoped token fixes implemented.
+Status: done/released (v1.0.38, v1.0.39, v1.0.41); default inventory and column-state scoped token fixes implemented and shipped.
 
 ## Source
 

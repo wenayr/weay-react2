@@ -1,3 +1,5 @@
+import { useCallback, useRef, useState } from "react";
+
 export type ObserveID = { readonly [Symbol.species]: ObserveID };
 
 // Class for tracking element size changes
@@ -43,6 +45,53 @@ export class CResizeObserver {
 }
 
 const global_resizeObserver = new CResizeObserver();
+
+/** Subscribe an element to the shared resize observer via the returned callback ref.
+ *  `onResize` goes through a ref - a new function identity neither resubscribes nor is missed.
+ *  The native observer fires once right after observe, so the first measurement is not skipped.
+ *  `setResizeableElement` / `removeResizeableElement` below stay untouched - this is the
+ *  hook-shaped entry over the same singleton. */
+export function useResizeObserver<T extends Element = HTMLElement>(onResize: () => void) {
+    const cbRef = useRef(onResize);
+    cbRef.current = onResize;
+    const elRef = useRef<T | null>(null);
+    const idRef = useRef<ObserveID | null>(null);
+    const ref = useCallback((el: T | null) => {
+        if (idRef.current) {
+            global_resizeObserver.delete(idRef.current);
+            idRef.current = null;
+        }
+        elRef.current = el;
+        if (el) idRef.current = global_resizeObserver.add(el, function emitResize() { cbRef.current(); });
+    }, []);
+    return {
+        /** Callback ref - attach to the element to observe. */
+        ref,
+        /** The currently observed element (null while detached). */
+        element: () => elRef.current,
+    };
+}
+
+/** "I want the size -> I get the value/method": observed element's width/height as state
+ *  (rounded, equality-guarded - a no-op resize does not re-render) plus a live `getSize()`
+ *  getter for measurements that must not wait for a render. */
+export function useElementSize<T extends Element = HTMLElement>() {
+    const [size, setSize] = useState({ width: 0, height: 0 });
+    const obs = useResizeObserver<T>(function readSize() {
+        const el = obs.element();
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const next = { width: Math.round(r.width), height: Math.round(r.height) };
+        setSize(prev => prev.width == next.width && prev.height == next.height ? prev : next);
+    });
+    const getSize = () => {
+        const el = obs.element();
+        if (!el) return { width: 0, height: 0 };
+        const r = el.getBoundingClientRect();
+        return { width: r.width, height: r.height };
+    };
+    return { ref: obs.ref, element: obs.element, width: size.width, height: size.height, getSize };
+}
 
 type ResizeableElementState = { observerId: ObserveID, defaultWidth: number, styleWidth: string, resizing: boolean };
 const resizeableElementMap = new WeakMap<HTMLElement, ResizeableElementState>();

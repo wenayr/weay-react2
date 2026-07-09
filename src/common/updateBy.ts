@@ -4,8 +4,11 @@ import { listen as createListen, waitRun } from "wenay-common2";
 type Listener = (a?: any) => void;
 
 interface ObserverState {
-    listeners: Set<Listener>;
+    listeners: Set<Listener>; // React-нотификаторы (useSyncExternalStore)
+    callbacks: Set<Listener>; // императивные f-колбэки (useUpdateBy(a, f))
     version: number;
+    running: boolean; // идёт итерация triggerUpdate по этому объекту
+    pending: boolean; // вложенный renderBy запросил повторный проход
 }
 
 export const map3 = new WeakMap<object, ObserverState>();
@@ -32,37 +35,63 @@ function getUpdateListen(obj: object) {
 function getObserverState(obj: object): ObserverState {
     let state = map3.get(obj);
     if (!state) {
-        state = { listeners: new Set(), version: 0 };
+        state = { listeners: new Set(), callbacks: new Set(), version: 0, running: false, pending: false };
         map3.set(obj, state);
     }
     return state;
 }
 
-// reverse/lastOnly действуют только на React-подписчиков (useUpdateBy);
-// императивные on-подписчики вызываются всегда все, в порядке подписки
-function triggerUpdate(obj: object, reverse = false, lastOnly = false) {
+// reverse/lastOnly действуют только на React-подписчиков (useSyncExternalStore);
+// императивные f-колбэки вызываются всегда все, в порядке подписки, ДО React-нотификаторов
+function runTriggerPass(obj: object, state: ObserverState, reverse: boolean, lastOnly: boolean) {
     const listen = updateListens.get(obj);
-    let state = map3.get(obj);
-    if ((!state || state.listeners.size === 0) && !listen?.[1].count()) return;
-    state ??= getObserverState(obj);
 
     state.version += 1;
 
-    let listenersArray = Array.from(state.listeners);
+    // императивные f-колбэки: всегда все, в порядке подписки
+    Array.from(state.callbacks).forEach(callback => callback(obj));
+
+    const listenersArray = Array.from(state.listeners);
 
     if (lastOnly) {
         const last = listenersArray.at(-1);
         if (last) last(obj);
-        listen?.[0](obj);
+    } else {
+        if (reverse) {
+            listenersArray.reverse();
+        }
+        listenersArray.forEach(listener => listener(obj));
+    }
+
+    listen?.[0](obj);
+}
+
+const MAX_TRIGGER_PASSES = 100;
+
+function triggerUpdate(obj: object, reverse = false, lastOnly = false) {
+    const listen = updateListens.get(obj);
+    let state = map3.get(obj);
+    if ((!state || (state.listeners.size === 0 && state.callbacks.size === 0)) && !listen?.[1].count()) return;
+    state ??= getObserverState(obj);
+
+    // реентерабельность: синхронный renderBy по тому же объекту изнутри слушателя
+    // коалесцируется — помечаем pending и выходим, текущая итерация сделает ещё проход
+    if (state.running) {
+        state.pending = true;
         return;
     }
 
-    if (reverse) {
-        listenersArray.reverse();
+    state.running = true;
+    try {
+        for (let pass = 0; pass < MAX_TRIGGER_PASSES; pass++) {
+            state.pending = false;
+            runTriggerPass(obj, state, reverse, lastOnly);
+            if (!state.pending) break;
+        }
+    } finally {
+        state.running = false;
+        state.pending = false;
     }
-
-    listenersArray.forEach(listener => listener(obj));
-    listen?.[0](obj);
 }
 
 function schedule(a: object, ms: number | undefined, reverse = false, lastOnly = false) {
@@ -88,10 +117,16 @@ export function renderByLast(a: object, ms?: number) {
 }
 
 export function useUpdateBy<T extends object>(a: T, f?: UpdateCallback<T>) {
+    // f прокидывается через ref: inline-колбэк (новая identity на каждый рендер)
+    // не должен вызывать переподписку — регистрируется одна стабильная обёртка на (a)
+    const fRef = React.useRef(f);
+    fRef.current = f;
+    const hasF = !!f;
+
     // стабильный subscribe: без useCallback React переподписывается на каждый рендер,
     // а удаление state из map3 при этом сбрасывало бы version → лишний форс-ререндер
     const subscribe = useCallback((listener: Listener) => {
-        if (f) return () => {};
+        if (hasF) return () => {};
 
         const state = getObserverState(a);
         state.listeners.add(listener);
@@ -99,24 +134,29 @@ export function useUpdateBy<T extends object>(a: T, f?: UpdateCallback<T>) {
         return () => {
             state.listeners.delete(listener);
         };
-    }, [a, f]);
+    }, [a, hasF]);
 
     useSyncExternalStore(
         subscribe,
         // getSnapshot must be pure: only read the version, subscribe creates the state
-        () => (f ? 0 : (map3.get(a)?.version ?? 0))
+        () => (hasF ? 0 : (map3.get(a)?.version ?? 0))
     );
 
     useLayoutEffect(() => {
-        if (!f) return;
+        if (!hasF) return;
 
         const state = getObserverState(a);
-        state.listeners.add(f);
+        // обёртка передаёт тот же мутированный объект — для ветки Dispatch<SetStateAction<T>>
+        // setState(тот же ref) React бэйлаутит без ререндера (см. UpdateCallback)
+        const wrapper: Listener = (obj) => {
+            fRef.current?.(obj);
+        };
+        state.callbacks.add(wrapper);
 
         return () => {
-            state.listeners.delete(f);
+            state.callbacks.delete(wrapper);
         };
-    }, [a, f]);
+    }, [a, hasF]);
 }
 
 export function updateBy<T extends object>(a: T, f?: UpdateCallback<T>) {

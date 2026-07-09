@@ -16,9 +16,11 @@ export function createSearchHistory(opts: {key: string, max?: number}) {
     const st = memoryGetOrCreate<SearchHistoryState>(opts.key, {items: []});
     const stApi = createUpdateApi(st);
 
-    function normalize() {
+    /** Pure derivation - reads must not rewrite the persisted object (a getter that
+     *  mutates state silently marks nothing dirty and surprises memoryCache diffing). */
+    function normalized(): string[] {
         const seen = new Set<string>();
-        st.items = st.items
+        return st.items
             .map(normalizeSearchHistoryItem)
             .filter(Boolean)
             .filter(item => {
@@ -28,22 +30,21 @@ export function createSearchHistory(opts: {key: string, max?: number}) {
                 return true;
             })
             .slice(0, max);
-        return st.items;
     }
 
     function emit() {
-        normalize();
+        st.items = normalized(); // normalization happens on WRITE, announced below
         stApi.render();
         memoryMarkDirty(opts.key);
     }
 
     return {
         get items() {
-            return normalize().slice();
+            return normalized();
         },
         use() {
             stApi.use();
-            return normalize().slice();
+            return normalized();
         },
         add(value: string) {
             const item = normalizeSearchHistoryItem(value);

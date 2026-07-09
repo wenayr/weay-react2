@@ -5,7 +5,10 @@ export type LogEntry<T extends object = {}> = LogInput<T> & {num: number};
 export type LogsApiOptions = {
     limit?: number,
     limitPer: number,
-    varMin?: number
+    varMin?: number,
+    /** memoryGetOrCreate key for this instance's settings; without it a fresh
+     *  (non-persisted) settings object is used. The global logsApi keeps "settingLogs". */
+    settingsKey?: string
 };
 
 export const getSettingLogs = () => ({

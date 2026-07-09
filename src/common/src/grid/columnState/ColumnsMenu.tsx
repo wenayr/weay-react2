@@ -21,6 +21,7 @@
 // comes back to life when the column returns. No ag-grid, no storage here.
 import React, {useRef} from 'react'
 import {useReorder} from '../../hooks/useReorder'
+import {movedOrderWithFixed} from '../../utils/fixedOrder'
 import type {ColumnStateController, ColumnsConfig} from './columnState'
 
 export type MenuStripItem = {
@@ -183,18 +184,10 @@ export function ColumnsMenu(p: {
     }
 
     /** Simulated drop with the same fixed pinning as the config's normalize():
-     *  the drag preview never disagrees with where the button actually lands. */
+     *  the drag preview never disagrees with where the button actually lands -
+     *  both sides now share utils/fixedOrder. */
     function movedOrder(order: string[], key: string, to: number): string[] {
-        const next = order.slice()
-        const from = next.indexOf(key)
-        if (from == -1) return next
-        next.splice(from, 1)
-        next.splice(Math.max(0, Math.min(next.length, to)), 0, key)
-        const res = next.filter(k => !byKey.get(k)?.fixed)
-        p.state.columns.forEach(function pinFixed(c, i) {
-            if (c.fixed) res.splice(Math.min(i, res.length), 0, c.key)
-        })
-        return res
+        return movedOrderWithFixed(order, key, to, p.state.columns)
     }
 
     return <MenuStrip items={items} tail={p.tail} onItem={onItem}

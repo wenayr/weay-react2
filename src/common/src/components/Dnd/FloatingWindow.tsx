@@ -6,7 +6,7 @@ import React, {
 } from "react";
 import { Rnd, type RndResizeCallback } from "react-rnd";
 import {createUpdateApi} from "../../../updateBy";
-import {ObservableMap} from "../../utils/observableMap";
+import {floatingWindowMap} from "../../utils/persistedMaps";
 
 export type FloatingWindowPosition = { x: number; y: number };
 export type FloatingWindowSize = { height: number | string; width: number | string };
@@ -61,8 +61,9 @@ export type FloatingWindowController = {
     onResizeStop: RndResizeCallback;
 };
 
-// Map of all popup window sizes; observable - memoryCache marks itself dirty on its mutations
-export const floatingWindowMap = new ObservableMap<string, tRND>();
+// Map of all popup window sizes; declared in utils/persistedMaps (memoryCache registry must not
+// import the component layer) and re-exported here so the public surface is unchanged
+export { floatingWindowMap };
 
 // limit={{x:{min:0}, y:{min:0}}}
 let k = 0;

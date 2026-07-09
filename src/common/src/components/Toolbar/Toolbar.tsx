@@ -2,6 +2,7 @@ import React, {useLayoutEffect, useRef, useState} from 'react'
 import {listen as createListen} from 'wenay-common2'
 import {createUpdateApi} from '../../../updateBy'
 import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
+import {pinFixedOrder, movedOrderWithFixed} from '../../utils/fixedOrder'
 import {OutsideClickArea} from '../../hooks/useOutside'
 import {useReorder} from '../../hooks/useReorder'
 
@@ -215,8 +216,9 @@ export function createToolbar(opts: {
     const ext = opts.source
     const sourceMode: ToolbarSourceMode = ext ? (opts.sourceMode ?? 'orderVisible') : 'orderVisible'
     // outside edits of the external config (grid drags...) must reach the
-    // toolbar's own subscribers too; module-lifetime subscription by design
-    ext?.onChange?.(() => emitChange(normalize()))
+    // toolbar's own subscribers too; lives until dispose() (repeated factories over
+    // one key used to leak a permanent listener per call - HMR, remounts)
+    const offSource = ext?.onChange?.(() => emitChange(normalize()))
 
     function sameOrder(a: string[], b: string[]) {
         return a.length == b.length && a.every((k, i) => k == b[i])
@@ -246,12 +248,10 @@ export function createToolbar(opts: {
         const rawOrder = ext && sourceMode == 'order'
             ? mergeSourceOrder(Array.isArray(st.order) ? st.order : [], Array.isArray(extRaw?.order) ? extRaw.order : [], sourceKeys)
             : Array.isArray(raw.order) ? raw.order : []
-        const order = rawOrder.filter(k => known.has(k) && !opts.items.find(i => i.key == k)?.fixed)
+        const prelim = rawOrder.filter(k => known.has(k) && !opts.items.find(i => i.key == k)?.fixed)
         for (const it of opts.items)
-            if (!it.fixed && order.indexOf(it.key) == -1) order.push(it.key)
-        opts.items.forEach(function pinFixed(it, i) {
-            if (it.fixed) order.splice(Math.min(i, order.length), 0, it.key)
-        })
+            if (!it.fixed && prelim.indexOf(it.key) == -1) prelim.push(it.key)
+        const order = pinFixedOrder(prelim, opts.items)
         const rawVisible = raw.visible && typeof raw.visible == 'object' ? raw.visible : {}
         const visible: {[k: string]: boolean} = {}
         for (const it of opts.items)
@@ -444,18 +444,9 @@ export function createToolbar(opts: {
         const activeCls = p.activeClassName ?? 'wenaySegBtnActive'
         const byKey = new Map(opts.items.map(i => [i.key, i]))
 
-        /** Simulated commit: splice + the same fixed pinning as normalize(). */
+        /** Simulated commit: splice + the same fixed pinning as normalize() (shared utils/fixedOrder). */
         function movedOrder(order: string[], key: string, to: number): string[] {
-            const next = order.slice()
-            const from = next.indexOf(key)
-            if (from == -1) return next
-            next.splice(from, 1)
-            next.splice(Math.max(0, Math.min(next.length, to)), 0, key)
-            const res = next.filter(k => !byKey.get(k)?.fixed)
-            opts.items.forEach(function pinFixed(it, i) {
-                if (it.fixed) res.splice(Math.min(i, res.length), 0, it.key)
-            })
-            return res
+            return movedOrderWithFixed(order, key, to, opts.items)
         }
 
         const reorder = useReorder({
@@ -525,9 +516,15 @@ export function createToolbar(opts: {
         </div>
     }
 
+    /** Release the external-source subscription. The persisted config itself stays -
+     *  dispose() is about listener lifetime (HMR, remounts), not about state. */
+    function dispose() {
+        offSource?.()
+    }
+
     return {
         Bar,
         Settings,
-        api: {useConfig, useItems, getConfig, setConfig, setOrder, show, setDensity, showSettings, showReset, reset, onChange},
+        api: {useConfig, useItems, getConfig, setConfig, setOrder, show, setDensity, showSettings, showReset, reset, onChange, dispose},
     }
 }

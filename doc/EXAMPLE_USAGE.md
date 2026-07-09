@@ -411,6 +411,62 @@ Standard:
 - Use `sourceMode: "order"` when toolbar membership and extra toolbar-only
   buttons must stay local while column order comes from `columnState`.
 
+## Default Column Grid Wrapper
+
+Use when a normal grid should get the standard column menu, toolbar settings,
+and mobile card/table representation without hand-wiring every surface.
+
+```tsx
+import { createColumnGrid } from "wenay-react2"
+import type { ColDef } from "ag-grid-community"
+
+type Row = { id: string; name: string; price: number; qty: number; note: string }
+
+const columnDefs: ColDef<Row>[] = [
+    { colId: "name", field: "name" },
+    { colId: "price", field: "price" },
+    { colId: "qty", field: "qty", headerName: "Qty" },
+    { colId: "note", field: "note" },
+]
+
+const ordersGrid = createColumnGrid<Row>({
+    key: "orders.columns",
+    columnDefs,
+    getId: row => row.id,
+    autoSizeOnColumnCountChange: true,
+    columns: [
+        { key: "name", fixed: true, cardRole: "title" },
+        { key: "note", defaultVisible: false },
+    ],
+})
+
+export function OrdersView({ rows, mobile }: { rows: Row[]; mobile?: boolean }) {
+    return (
+        <ordersGrid.View
+            mode={mobile ? "cards" : "table"}
+            data={rows}
+            table={{ getRowId: p => p.data.id }}
+        />
+    )
+}
+```
+
+Standard:
+
+- `createColumnGrid` infers column metadata from `colId`, `field`, and
+  `headerName`; pass `columns` only for overrides like `fixed`, `icon`,
+  `defaultVisible`, and `cardRole`.
+- The returned `Table` and `View` attach/detach `columnState` automatically and
+  default `autoSizeColumns` to `false` so restored widths survive remounts.
+- `View` defaults to the dots overlay (`controls="auto"`) for both table and cards;
+  pass `controls="menu"`, `controls="toolbar"`, or `controls={false}` only when needed.
+- `Dots` can drive a table too; it is a column selector over the shared config,
+  not a card-only control, and the wrapper defaults its max to all columns.
+- `autoSizeOnColumnCountChange` is optional and separate from `autoSizeColumns`;
+  it fits once when the number of visible columns changes.
+- Drop to raw `createColumnState` when a product needs custom grouping, runtime
+  presence gates, or a fully custom toolbar skin.
+
 ## Toolbar With Local Commands
 
 Use when a command strip has its own commands and user-configurable layout.
@@ -866,7 +922,7 @@ Current strong examples:
 - `qa.tsx` card 20 for `SettingsDialog` search/tree registry behavior.
 - `qa.tsx` card 21 for `createUiSlot` persisted placement behavior.
 - `qa.tsx` card 25 for local `createToolbar` config/settings behavior.
-- `qa.tsx` cards 28-31 for `columnState`, `ColumnsMenu`, `ColumnDots`,
+- `qa.tsx` cards 28-32 for `columnState`, `createColumnGrid`, `ColumnsMenu`, `ColumnDots`,
   `CardList`, and `createToolbar({source})`.
 - `qa.tsx` cards 23-26 for Replay hooks.
 - `src/common/src/grid/agGrid4/example.tsx` for `useAgGrid` / `AgGridTable` controller examples.
