@@ -136,11 +136,11 @@ input:invalid {
 
 /* Menu */
 .MenuR {
-  box-shadow: var(--menu-shadow);
+  box-shadow: var(--menu-shadow, 0 0 20px 14px rgba(34, 60, 80, 0.2));
   margin-top: 4px;
   min-width: 80px;
   width: max-content;
-  background: var(--menu-bg-color);
+  background: var(--menu-bg-color, #0c0c0c);
 }
 
 .maxSize {
@@ -197,18 +197,24 @@ input:invalid {
    menu-specific colors through the shared --menu-* token contract. */
 .MenuR.toButton,
 .MenuR.toButtonA {
-  color: var(--menu-item-color);
-  border-bottom: var(--menu-border);
+  color: var(--menu-item-color, #fff);
+  border-bottom: var(--menu-border, 1px solid rgba(255, 255, 255, 0.41));
 }
 .MenuR.toButtonA {
-  background: var(--menu-active-background);
+  background: var(--menu-active-background, var(--menu-item-active-bg-color, #262626));
+  color: var(--menu-item-active-color, var(--menu-item-color, #fff));
 }
 .MenuR.toButton:hover,
-.MenuR.toButton:active,
 .MenuR.toButtonA:hover {
-  background: var(--menu-item-hover-bg-color);
-  color: var(--menu-item-hover-color);
-  border-bottom: var(--menu-border);
+  background: var(--menu-item-hover-bg-color, #fff);
+  color: var(--menu-item-hover-color, #101010);
+  border-bottom: var(--menu-border, 1px solid rgba(255, 255, 255, 0.41));
+}
+.MenuR.toButton:active,
+.MenuR.toButtonA:active {
+  background: var(--menu-item-pressed-bg-color, #f2c94c);
+  color: var(--menu-item-pressed-color, #101010);
+  border-bottom: var(--menu-border, 1px solid rgba(255, 255, 255, 0.41));
 }
 
 /* Menu indicator elements */

@@ -42,6 +42,9 @@ fs.copyFileSync("./package.json", path.join(tempDir,"package.json"));
 if (fs.existsSync("./README.md")) {
     fs.copyFileSync("./README.md", path.join(tempDir,"README.md"));
 }
+if (fs.existsSync("./doc")) {
+    fs.cpSync("./doc", path.join(tempDir, "doc"), { recursive: true, force: true });
+}
 //fs.symlinkSync("../"+srcDir,  path.join(tempDir, srcDir), "junction");
 fs.cpSync(srcDir, path.join(tempDir, srcDir), { recursive: true, force: true })
 }

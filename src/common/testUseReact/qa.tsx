@@ -81,13 +81,15 @@ const OutsideDemo = () => {
 // Logs: add a record with time:Date and check the time column, which used to be always empty.
 const LogsDemo = () => {
     const PageLogs = logsApi.React.PageLogs;
+    const MessageLogs = logsApi.React.Message;
     const [miniClick, setMiniClick] = useState("none");
     const miniRows = useMemo(() => [
         { time: new Date("2026-01-01T10:00:00"), id: "mini", var: 1, txt: "mini one", address: "qa" },
         { time: new Date("2026-01-01T10:00:01"), id: "mini", var: 2, txt: "mini two", address: "qa" },
     ], []);
     return (
-        <div>
+        <div style={{ position: "relative" }}>
+            <MessageLogs zIndex={80} />
             <button style={{ marginBottom: 8 }} onClick={() => logsApi.addLogs({ id: "demo", var: 1, time: new Date(), txt: "log " + new Date().toLocaleTimeString() })}>add log</button>
             <div style={{ height: 260 }}><PageLogs /></div>
             <div style={{ marginTop: 12, fontSize: 12 }}>MiniLogs click: {miniClick}</div>
@@ -1759,9 +1761,9 @@ function ArchiveChecks() {
             </Check>
 
             <Check n={9} title="Logs - time format + MiniLogs layers"
-                   do="Click add log several times, then click a row in the compact MiniLogs table."
-                   expect="PageLogs and MiniLogs show time in hh:mm:ss format; MiniLogs row click updates the small click label."
-                   note="MiniLogs is now hook/controller-first: useMiniLogsTable -> MiniLogsView/MiniLogsTable -> compatibility MiniLogs. Row identity stays rowData-based."
+                   do="Click add log several times, watch the corner notification layer, then click a row in the compact MiniLogs table."
+                   expect="PageLogs and MiniLogs show time in hh:mm:ss format; a temporary notification appears in the card corner; MiniLogs row click updates the small click label."
+                   note="This card mounts logsApi.React.Message; that compatibility wrapper now uses useMessageEventLogsController -> MessageEventLogsView. The newer context LogsNotifications remains a separate LogsProvider-based surface. MiniLogs is hook/controller-first: useMiniLogsTable -> MiniLogsView/MiniLogsTable -> compatibility MiniLogs."
                    tall>
                 <LogsDemo />
             </Check>

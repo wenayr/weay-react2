@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {copyToClipboard, Params, timeLocalToStr_hhmmss, ArrayElementType} from "wenay-common2";
 import {renderBy, updateBy} from "../../updateBy";
 import {ColDef, ColGroupDef, GridReadyEvent} from "ag-grid-community";
@@ -193,11 +193,34 @@ export function PageLogs({update}: {update?: number}) {
     return <Main/>
 }
 
-function Message({logs}: {logs: LogEntry}) {
+export type MessageEventLogsItem = {
+    key: string
+    logs: LogEntry
+}
+
+export type UseMessageEventLogsControllerOptions = {
+    maxVisible?: number
+}
+
+export type MessageEventLogsController = {
+    show: boolean
+    setShow(value: boolean): void
+    toggleShow(): void
+    notifications: MessageEventLogsItem[]
+    visibleNotifications: MessageEventLogsItem[]
+    maxVisible: number
+}
+
+export type MessageEventLogsViewProps = {
+    controller: MessageEventLogsController
+    zIndex?: number
+    className?: string
+    style?: React.CSSProperties
+}
+
+export function MessageEventLogCard({logs}: {logs: LogEntry}) {
     return <div className={"testAnime"}
-                style={{ width:"200px", color: logStyleTokens.text, height:"auto", marginTop:"10px", borderRight:`5px solid ${logStyleTokens.accent}`, background: logSeverityBackground(logs.var)}}
-        //key={id}
-    >
+                style={{ width:"200px", color: logStyleTokens.text, height:"auto", marginTop:"10px", borderRight:`5px solid ${logStyleTokens.accent}`, background: logSeverityBackground(logs.var)}}>
         <p style = {{textAlign:"center", fontSize: "10px", marginBottom:"1px"}}>{"notification"}</p>
         <hr style = {{
             backgroundImage: logDividerGradient(),
@@ -208,48 +231,113 @@ function Message({logs}: {logs: LogEntry}) {
             display: "block"
         }}/>
         <div style={{textAlign:"right", marginRight:"10px", height:"auto", overflowWrap: "break-word", textOverflow: "ellipsis"}}>{typeof logs.txt == "object" ? JSON.stringify(logs.txt) : logs.txt}</div>
-        <p style={{float:"inline-end", textAlign:"right",  marginRight:"10px"}}>{(new Date()).toLocaleDateString()}</p>
+        <p style={{float:"inline-end", textAlign:"right",  marginRight:"10px"}}>{(new Date(logs.time)).toLocaleDateString()}</p>
     </div>
 }
 
-const tt: {[key: string]: React.ReactElement} = {}
-let r = 0
-export function MessageEventLogs({zIndex} :{zIndex?: number}) {
+export function useMessageEventLogsController(options: UseMessageEventLogsControllerOptions = {}): MessageEventLogsController {
     const setting = memoryGetOrCreate("settingLogs",settingLogs)
-    updateBy(tt)
-    updateBy(datumMiniConst, ()=>{
+    const maxVisible = Math.max(1, options.maxVisible ?? 10)
+    const [notifications, setNotifications] = useState<MessageEventLogsItem[]>([])
+    const counterRef = useRef(0)
+    const lastLogRef = useRef<LogEntry | null>(null)
+    const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+
+    updateBy(setting)
+
+    const addNotification = useCallback((last: LogEntry) => {
+        if ((last.var ?? 0) < (setting.params.minVarMessage ?? 0)) return
+
+        const key = String(counterRef.current++)
+        const item = {key, logs: last}
+        const displayMs = (setting.params.timeShow ? setting.params.timeShow : 2) * 1000
+
+        setNotifications(prev => [item, ...prev])
+        const timer = setTimeout(()=>{
+            timersRef.current.delete(key)
+            setNotifications(prev => prev.filter(e => e.key !== key))
+        }, displayMs)
+        timersRef.current.set(key, timer)
+    }, [setting])
+
+    const onMiniChange = useCallback(() => {
         const last = datumMiniConst.last[0]
-        if (!last) return;
-        if (setting.params.minVarMessage && (!last.var || last.var < setting.params.minVarMessage)) return;
+        if (!last || last === lastLogRef.current) return
+        lastLogRef.current = last
+        addNotification(last)
+    }, [addNotification])
 
-        let key = String(r++)
-        tt[key] = <div className={"example-exit"} key = {key}>
-            <Message logs = {last} />
-        </div>
-        setTimeout(()=>{
-            if (tt[key]) {
-                delete tt[key];
-                renderBy(tt, 100)
-            }
-        }, setting.params.timeShow ? setting.params.timeShow * 1000 : 2000)
-        renderBy(tt)
-    })
-    const tr = [...Object.values(tt)].reverse().slice(0,10)
+    updateBy(datumMiniConst, onMiniChange)
 
-    return <div style={{maxHeight: "50vh", position: "absolute", right: "1px", zIndex}}>
-        <div
-            onClick={()=>{setting.params.show = !setting.params.show; renderBy(tt)}}
-            style={{margin: 3, padding: 3, right: 0, position: "absolute", zIndex: 120,
-                ...setting.params.show ?
-                    {background: logStyleTokens.toggleBg, fontSize: "25px"} :
-                    {background: logStyleTokens.toggleOffBg}
-        }}>{setting.params.show ? "X" : "log"}</div>
+    useEffect(() => () => {
+        timersRef.current.forEach(clearTimeout)
+        timersRef.current.clear()
+    }, [])
 
-        <div>{setting.params.show ? tr : null}</div>
+    const setShow = useCallback((value: boolean) => {
+        setting.params.show = value
+        renderBy(setting)
+    }, [setting])
 
-         </div>
+    const toggleShow = useCallback(() => {
+        setShow(!setting.params.show)
+    }, [setShow, setting])
+
+    return useMemo(() => ({
+        show: Boolean(setting.params.show),
+        setShow,
+        toggleShow,
+        notifications,
+        visibleNotifications: notifications.slice(0, maxVisible),
+        maxVisible,
+    }), [maxVisible, notifications, setShow, setting.params.show, toggleShow])
 }
 
+export function MessageEventLogsView({controller, zIndex, className, style}: MessageEventLogsViewProps) {
+    const toggleTitle = controller.show ? "Hide log notifications" : "Show log notifications"
+    const toggleStyle: React.CSSProperties = {
+        position: "absolute",
+        right: 0,
+        top: 0,
+        zIndex: 120,
+        minWidth: controller.show ? 24 : 42,
+        height: 24,
+        padding: controller.show ? 0 : "0 8px",
+        border: `1px solid ${logStyleTokens.accent}`,
+        borderRadius: 999,
+        background: controller.show ? logStyleTokens.toggleBg : logStyleTokens.toggleOffBg,
+        color: logStyleTokens.text,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: controller.show ? 18 : 12,
+        lineHeight: 1,
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.35)",
+    }
+
+    return <div className={className} style={{maxHeight: "50vh", position: "absolute", right: "1px", zIndex, ...style}}>
+        <button
+            type="button"
+            aria-label={toggleTitle}
+            title={toggleTitle}
+            onClick={controller.toggleShow}
+            style={toggleStyle}
+        >{controller.show ? "\u00d7" : "log"}</button>
+
+        <div>{controller.show ? controller.visibleNotifications.map(e => (
+            <div className={"example-exit"} key={e.key}>
+                <MessageEventLogCard logs={e.logs} />
+            </div>
+        )) : null}</div>
+
+    </div>
+}
+
+export function MessageEventLogs({zIndex} :{zIndex?: number}) {
+    const controller = useMessageEventLogsController()
+    return <MessageEventLogsView controller={controller} zIndex={zIndex} />
+}
 type ty = {name: string, key: string, page: (a?: any) => React.JSX.Element | null}
 
 const defPageBase = {

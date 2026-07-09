@@ -32,14 +32,32 @@
   - Сделано: context logger UI hooks — добавлены `useLogsTableController` и `useLogsNotificationsController`; `LogsTable`/`LogsNotifications` оставлены compatibility wrappers.
   - Сделано: `FloatingWindow` first controller layer — добавлен `useFloatingWindowController` для saved geometry / update counter / z-index stack / drag state / resize callbacks / viewport clamp; `FloatingWindowBase` оставлен compatibility wrapper над тем же `Rnd` и DOM/classes.
   - Пропущено: `FResizableReact` hook — в `src`/`__test` нет render-consumers, только export/docs и `mapResiReact` persistence wiring; без consumer это low-effectiveness speculative refactor.
-  - Hook/controller-first backlog после audit-pass выполнен; дальше не делать `memoryStore`, `PageVisibilityProvider`, `StickerMenu`, `DragBox` broad rewrite или `FResizableReact` hook без отдельного consumer/test сценария.
+  - Hook/controller-first backlog обновлён: low-effectiveness пункты не делать без отдельного consumer/test, а новые осмысленные split passes вынесены в `Ready`.
   - Сделано: final primitive-reuse inventory — raw `AgGridReact` / `useGrid.tsx`, `logsContext.localStorage`, PageVisibility/replay/chart timers, Settings/Toolbar registries and ModalProvider paths проверены; оставшиеся места помечены как low-effectiveness/high-risk без отдельного consumer/test.
   - Сделано: QA card 25 toolbar `tb.api.onChange` переведён с ручного `useEffect(() => listen.on(...))` на `useListenEffect(tb.api.onChange, ...)` как canonical listen-hook usage.
   - Сделано: `Toolbar.Bar` получил FLIP-анимацию перемещения элементов; cards 25 и 31 теперь ведут себя как card 30-эталон, card 30 не переписывался.
+  - Сделано: `MessageEventLogs` / `logsApi.React.Message` разбит на `useMessageEventLogsController` + `MessageEventLogsView` + `MessageEventLogCard`; card 9 теперь реально показывает corner notification layer.
+  - Записано: дополнительные hook/controller split candidates с оценкой эффективности/простоты/риска в [../progress/hook-controller-opportunities.md](../progress/hook-controller-opportunities.md); low-effectiveness пункты оставлены parked.
+  - Сделано: default правой/контекстной менюшки снова непрозрачный тёмный (`--menu-bg-color: #0c0c0c`), hover белый/чёрный, active/pressed вынесены в отдельные `--menu-item-*` tokens; card 9 close toggle сделан компактной кнопкой.
 
 ## Ready
 
-_Пусто._
+- **Context menu / Menu: controller-first split**.
+  - Прогресс/оценка: [../progress/hook-controller-opportunities.md](../progress/hook-controller-opportunities.md)
+  - Смысл: выделить `createContextMenuController` / `useMenuLayer` + `MenuView` и action-layer для async/progress/submenu flow, не ломая `contextMenu.openAt`, `contextMenu.Layer` и `contextMenu.stats`.
+  - Оценка: эффективность high; простота medium/hard; риск medium. Брать только отдельным focused pass с tests по click/async/submenu/stats.
+- **Chart canvas wrapper: `useChartEngineCanvas` + view split**.
+  - Прогресс/оценка: [../progress/hook-controller-opportunities.md](../progress/hook-controller-opportunities.md)
+  - Смысл: вынести canvas lifecycle, `ResizeObserver`, event attach/destroy and RAF bridge из `MyChartEngine` wrapper.
+  - Оценка: эффективность medium; простота medium; риск medium. Брать, если будет stand/test на chart lifecycle.
+
+- **Hook extraction audit: API-возвращающие хуки (проход по всей библиотеке)** — multi-agent аудит выполнен; отобраны 3 осмысленных do-now кандидата (каждый устраняет реальный императив/дублирование и имеет живой consumer). Хук отдаёт метод/значение («хочу X,Y / размер / dirty → получаю метод»).
+  - Прогресс/детали (survivors + parked + отклонённое с причинами): [../progress/hook-extraction-audit.md](../progress/hook-extraction-audit.md)
+  - Общее правило: старое имя — compatibility wrapper, публичный API не менять; проверка `tsc -p tsconfig.qa-check.json --noEmit` + `jest` + `build` + стенд; card 25 не трогать; версию не бампать.
+  - **1. `useCacheMapPersistence` (`utils/cache.ts`)** — simple / low-risk. Убрать тройное точное дублирование `load()+onDirty(()=>saveDebounced(300))` в `qa.tsx` (SettingsDialogDemo 1221-1224, UiSlotDemo 1247-1251, ToolbarDemo 1329-1332). Хук отдаёт `{isDirty(), flush(), save(), reload()}`; `reload` = явный alias над существующим `load()` (не выдумывать метод). Аддитивная обёртка, НЕ `memoryStore` rewrite; scope только `load`+`onDirty`→`saveDebounced` (без pagehide/visibility flush).
+  - **2. `useResizeObserver`/`useElementSize` (`components/MyResizeObserver.tsx`)** — simple / low-risk. `CResizeObserver` сейчас класс+синглтон без хука; `qa.tsx` `ResizeBugRepro` (~1076, рендер ~1723) вручную городит `ResizeObserver`+`rAF`+`getBoundingClientRect`+`disconnect` в `useState`. Хук отдаёт `{width, height, getSize(), ref}`, оборачивая существующий синглтон (не ломая `setResizeableElement`/`ParamsEditor`). Явно запрошен в `REFACTOR_PLAN.md` 187/209/221/309.
+  - **3. `useLogsPageTable`/`useLogsFullTableController` (`logs/logs.tsx`)** — medium / medium-risk. Последняя logs-таблица вне controller-паттерна: `PageLogs` гоняет ag-grid через `apiGrid` ref, importance-filter `setFilterModel` дублируется дважды (эффект 92-103 и `onGridReady` 160-167). Хук: `getApi(), fit(), applyImportanceFilter(min), appendRow(row), onGridReady, columnDefs, gridProps`; `PageLogs` — тонкий wrapper, row identity сохранить. Consumer: card 9. Делать аккуратно (filter-timing, `applyTransactionAsync` append).
+  - Parked/отклонённое: `useChartCanvas` (consumer только example, не в карточке), `useContextMenuGesture` (menuR — мёртвый код), `columnState.api.reorderPreview` (дедуп 1 из 3 копий), `useResizeableFit` (не хук, а shared bind callback-ref) и ещё 13 кандидатов с причинами — в progress-файле.
 
 ## Inbox
 
@@ -58,18 +76,11 @@ _Actionable задач по текущему repo-pass нет; пункты ни
   - Статус текущего repo-pass: выполнено в рамках [../progress/public-surface-normalization.md](../progress/public-surface-normalization.md); новые пункты добавлять сюда только при появлении реального consumer/test сценария.
 - **Hook/controller-first backlog после audit-pass**.
   - Прогресс/детали: [../progress/hook-controller-opportunities.md](../progress/hook-controller-opportunities.md)
-  - Очередь по смыслу выполнена: `FloatingWindow` first controller layer сделан; `FResizableReact` hook пропущен до появления реального consumer.
-  - Не делать сейчас без отдельного consumer/test: `memoryStore` core rewrite, `PageVisibilityProvider` в обычный UI, `StickerMenu` как shared primitive, broad rewrite `DragBox`.
-  - Оценка: после `FloatingWindow` first layer осмысленных hook/controller задач без новых consumers не осталось; дальнейшие пункты из audit-pass имеют низкую эффективность или высокий риск.
+  - Новое: `MessageEventLogs` split выполнен; две следующие осмысленные задачи вынесены в `Ready` (`Menu/contextMenu`, `Chart canvas wrapper`).
+  - Не делать сейчас без отдельного consumer/test: `memoryStore` core rewrite, `PageVisibilityProvider` в обычный UI, `StickerMenu` как shared primitive, broad rewrite `DragBox`, `FResizableReact` hook.
+  - Оценка: дальнейшие hard/high-risk пункты (`ParamsEditor` full renderer split, `logsContext` migration, `SettingsDialog` full view split, `LeftModal`) брать только отдельным focused pass с ручной/тестовой приёмкой.
 
 ## Verify
-- **Hook-first архитектура для функционала библиотеки** — первый inventory pass и safe input hook extraction готовы, ждут ручной/релизной проверки.
-  - Прогресс: [../progress/hook-first-architecture.md](../progress/hook-first-architecture.md)
-  - Сделано: зафиксирован inventory по `SettingsDialog`, `ParamsEditor`, `FloatingWindow`, `Input` helpers, `LeftModal` / app-shell helpers.
-  - Сделано: добавлены `useTextInputPanel` и `useFileInputPanel`; старые `TextInputPanel`, `FileInputPanel`, `TextInputModal`, `FileInputModal` остались совместимыми визуальными wrappers.
-  - Документация: обновлены `doc/wenay-react2.md`, `doc/PROJECT_FUNCTIONALITY.md`, `doc/changes/v1.0.39.md`.
-  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand __test/inputPanelHooks.test.tsx`; `npm run testjest -- --runInBand`; `npm run build`; `git diff --check`.
-  - Не сделано: `SettingsDialog`, `ParamsEditor`, `FloatingWindow`, `LeftModal` broad extractions — оставлены для отдельных passes, потому что без отдельного API/test плана это риск поведения.
 - **Система стилей и CSS variables для shared primitives** — default contract inventory и низкорисковые token fixes готовы, ждут ручной/релизной проверки.
   - Прогресс: [../progress/style-system-normalization.md](../progress/style-system-normalization.md)
   - Сделано: зафиксирована карта style source-of-truth (`src/style/tokens.css`, `src/common/src/styles/tokens.ts`, `src/style/style.css`, `src/style/menuRight.css`) и default visual contracts по публичным primitive groups.
@@ -77,50 +88,6 @@ _Actionable задач по текущему repo-pass нет; пункты ни
   - Сделано: `ColumnDots/CardList` восстановленный card-29 baseline переведён на `--cols-dots-*` / `--cols-card-*` с теми же fallback-значениями; component runtime geometry не менялась.
   - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand`; `npm run build`; `git diff --check`.
   - Не сделано: `ParamsEditor` / `Input` broad visual migration отложен до hook-first/API решения; там нельзя безопасно менять только CSS без риска зацепить поведение.
-- **Аудит свежих QA cards и внутренних primitives на переиспользование своих технологий** — findings-pass и два safe scoped fixes готовы, ждут ручной/релизной проверки.
-  - Прогресс: [../progress/qa-primitives-reuse-audit.md](../progress/qa-primitives-reuse-audit.md)
-  - Сделано: зафиксированы findings по `useReorderBoard`, `ColumnDots/CardList`, card 30 toolbar menu, card 31 toolbar/columnState integration, `ColumnsMenu/MenuStrip` inline styles.
-  - Сделано: уточнена документация по canonical surface для `columnState`: `createToolbar({source: cs.api.listSource})` для settings-integrated flow, `ColumnsMenu` для compact/presentation menu.
-  - Сделано: card 27 `BoardDemo` получил локальные style helpers для stand-only board styles без изменения `useReorderBoard` поведения.
-  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand`; `git diff --check`.
-  - Не сделано: спорные UX-решения card 27 add/delete semantics, shared `Qa30AnimatedMenuBar` API и перенос `ColumnsMenu` inline styles — оставлены для отдельных target/style-system решений.
-
-- **Совместимость старых API и статистика меню** — open-level stats и action-level stats готовы, ждут ручной/релизной проверки.
-  - Прогресс: [../progress/menu-compat-stats.md](../progress/menu-compat-stats.md)
-  - Сделано: добавлен `contextMenu.stats.getSnapshot/reset/onChange` с локальными in-memory counters для `openAt`, `openAtPoint`, legacy Layer queued opens, empty opens, close/replace и `source`/`layerId` usage.
-  - Сделано: добавлен явный `MenuItemStrict.actionKey` contract; `contextMenu.stats` считает `actionTotals` и `actions[actionKey]` для click/ok/error/task/submenu/func/focus outcomes, не сохраняя labels/errors.
-  - Сделано: старый `contextMenu.map` путь сохранён; legacy Layer open теперь учитывается в статистике и после consume очищает map как раньше.
-  - Документация: обновлены `doc/wenay-react2.md`, `doc/wenay-react2-rare.md`, `doc/EXAMPLE_USAGE.md`, `doc/changes/v1.0.39.md`.
-  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand contextMenuStats.test.tsx`; финальный full test/build pass будет выполнен после текущей очереди.
-  - Не сделано в этом проходе: полный `useMenuActionController` split и RightMenu/DropdownMenu diagnostics — вынесено в следующие осмысленные задачи.
-- **Global Settings: история поиска и компактное управление деревом** — реализация готова, ждёт ручной проверки стенда.
-  - Прогресс: [../progress/settings-dialog-search-history.md](../progress/settings-dialog-search-history.md)
-  - Сделано: добавлен reusable `createSearchHistory({key,max?})`, экспортирован из utils; `SettingsDialog` search пишет историю через memory store / `memoryCache` dirty channel.
-  - Сделано: три отдельные кнопки управления деревом заменены одним dotted cycle control в строке поиска; control скрывается, когда в дереве мало веток.
-  - Сделано: card 29 primitives `ColumnDots` / `CardList` переведены с inline/raw visual styles на `.wenayColDots*` / `.wenayCardList*` CSS classes; follow-up: `ColumnDots` max поднят до 8, stand card 29 показывает 8 полей и нижний overlay-control поверх карточек.
-  - Документация: обновлены `doc/wenay-react2.md`, `doc/wenay-react2-rare.md`, `doc/EXAMPLE_USAGE.md`, `doc/changes/v1.0.38.md`.
-  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand __test/settingsDialog.test.tsx`; `npm run testjest -- --runInBand`; `npm run build`; `git diff --check`.
-  - Ручная приемка: card 20 — в Settings search ввести запрос, Enter добавляет в history, history button показывает список, выбор восстанавливает запрос; клик/фокус вне search box закрывает history; dotted tree control циклит expanded/current/collapsed. card 29 — нижний overlay с dots лежит на последней карточке, позволяет показать до 8 полей и не ломает CardList.
-- **React-хуки для Replay route hand-off из `wenay-common2@1.0.65`** — реализация готова, ждёт ручной проверки стенда.
-  - Прогресс: [../progress/replay-route-handoff.md](../progress/replay-route-handoff.md)
-  - Сделано: добавлены `useReplayRouteSubscribe`, `useStoreReplayRouteSync`, `useStoreReplayRouteMirror`; существующие `useReplaySubscribe` / `useStoreReplaySync` не меняли поведение; route hand-off выполняется явно через `switchRoute(...)`.
-  - Сделано: добавлены unit-тесты route switch / failed replacement fallback / unmount cleanup / store mirror convergence; добавлена QA card 26 с canvas video demo direct/relay/fail.
-  - Документация: обновлены `doc/wenay-react2.md`, `doc/wenay-react2-rare.md`, `doc/changes/v1.0.38.md`.
-  - Проверено: `npm run testjest -- --runInBand`; `tsc -p tsconfig.qa-check.json --noEmit`; `npm run build`; QA stand `http://127.0.0.1:3004/` вернул HTTP 200.
-  - Ручная приемка: card 26 — canvas продолжает рисовать при `switch direct` / `switch relay`; `fail route` показывает ошибку, label остаётся предыдущим, кадры продолжают идти.
-
-
-- **Групповой столбец с режимами показа подстолбцов в card 30** — реализация готова, ждёт ручной проверки стенда.
-  - Прогресс: [../progress/group-subcolumns-display-mode.md](../progress/group-subcolumns-display-mode.md)
-  - Сделано: в card 30 добавлен grouped `Mode block` из трёх leaf-колонок (`Values`, `Zeros`, `Empty`) и отдельный mode action в верхнем toolbar; режим работает через стабильные `columnDefs` + runtime `presentGate`, нижний старый `ColumnsMenu` из card 30 убран.
-  - Проверено: `tsc -p tsconfig.qa-check.json --noEmit`; `npm run build`; `npm run testjest -- --runInBand`; QA stand `http://127.0.0.1:3002/` вернул HTTP 200.
-  - Ручная приемка: верхняя 3-буквенная mode-кнопка с вертикальными точками циклит 1/2/3/4 состояния; grouped block показывает 3/1/2/0 подстолбцов; видимых `all/empty/skip` подписей и нижнего меню нет; исчезнувшие leaf-кнопки остаются dashed/inert и оживают при возврате режима.
-
-- **Меню столбцов в функционале «Макета 25» (createToolbar) на макетах 30/31** — реализация готова, ждёт ручной проверки стенда.
-  - Прогресс: [../progress/columns-menu-into-toolbar.md](../progress/columns-menu-into-toolbar.md)
-  - Сделано: focused API тулбара (`setOrder`, `show`, `setDensity`, `showSettings`, `showReset`), `sourceMode:"order"`, reset-псевдокнопка (`__reset` / `<Bar reset>`, скрыта по умолчанию), card 30 переведён на order-only source поверх `columnState.api.listSource`.
-  - Проверено: `tsc -p tsconfig.qa-check.json --noEmit`; `npm run build`; `npm run testjest -- --runInBand`; QA stand `http://127.0.0.1:3002/` вернул HTTP 200.
-  - Ручная приемка: card 25 — reset action внутри Settings row, reset icon скрыт по умолчанию и show/hide работает; card 30 — grid drag меняет порядок верхнего меню, Settings window не дёргается.
 
 ## Blocked — уровень приложения (не эта React-библиотека)
 

@@ -530,7 +530,10 @@ createLogsController({options, state?, onFullChange?, onMiniChange?, onSettingsC
 createLogsControllerState({full?, mini?, settings?})
 logsApi
 PageLogs({update?})
-MessageEventLogs({zIndex?})
+useMessageEventLogsController({maxVisible?})
+MessageEventLogsView({controller, zIndex?, className?, style?})
+MessageEventLogCard({logs})
+MessageEventLogs({zIndex?}) // compatibility wrapper
 LogsPage({update?})
 useMiniLogsTable({data, onClick?, columnDefs?, defaultColDef?})
 MiniLogsView({controller})
@@ -550,7 +553,7 @@ LogsSettings()
 MainPage()
 ```
 
-The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point. `createLogsController` is the headless layer for append/limit/settings state; `PageLogs`, `MessageEventLogs`, and `LogsPage` remain compatibility UI wrappers. `useLogsTableController` and `useLogsNotificationsController` expose the provider-local table/notification state while `LogsTable` and `LogsNotifications` keep the visual wrappers. Shared logger chrome lives in `src/common/src/logs/logStyles.ts` and is themed through `--logs-*` tokens.
+The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point. `createLogsController` is the headless layer for append/limit/settings state; `useMessageEventLogsController` owns the global notification queue/timers/settings, while `MessageEventLogsView` and `MessageEventLogCard` own rendering. `PageLogs`, `MessageEventLogs`, and `LogsPage` remain compatibility UI wrappers. `useLogsTableController` and `useLogsNotificationsController` expose the provider-local table/notification state while `LogsTable` and `LogsNotifications` keep the visual wrappers. Shared logger chrome lives in `src/common/src/logs/logStyles.ts` and is themed through `--logs-*` tokens.
 
 ## Cache / Memory / Browser Utilities
 ```

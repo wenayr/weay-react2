@@ -428,6 +428,9 @@ logsApi.addLogs({id: "api", time: new Date(), txt: "done", var: 1})
 const customLogs = getLogsApi<MyFields>({limitPer: 500, limit?: 50, varMin?: 0})
 const headless = createLogsController<MyFields>({options: {limitPer: 500, limit: 50}})
 
+const messageNotifications = useMessageEventLogsController({maxVisible: 4})
+<MessageEventLogsView controller={messageNotifications} zIndex={80} />
+
 const contextTable = useLogsTableController()
 const contextNotifications = useLogsNotificationsController()
 
@@ -436,7 +439,7 @@ const mini = useMiniLogsTable({data: rows, onClick: e => console.log(e.data)})
 <MiniLogsTable data={rows} />
 ```
 
-Logger notification/tabs chrome uses `--logs-*` CSS variables; apps can theme it without forking logger components. `createLogsController` owns the headless append/limit/settings state for custom integrations. `MiniLogs` remains the compatibility wrapper; new compact-table code can use `useMiniLogsTable` or `MiniLogsTable`.
+Logger notification/tabs chrome uses `--logs-*` CSS variables; apps can theme it without forking logger components. `createLogsController` owns the headless append/limit/settings state for custom integrations. `useMessageEventLogsController` owns the global notification queue/timers/settings, `MessageEventLogsView` draws it, and `MessageEventLogs` / `logsApi.React.Message` remain compatibility wrappers. `MiniLogs` remains the compatibility wrapper; new compact-table code can use `useMiniLogsTable` or `MiniLogsTable`.
 
 ## Styles / Theme
 ```

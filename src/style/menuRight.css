@@ -7,12 +7,12 @@
   right: 0;
 }
 .menu-container.activeM {
-  background: var(--menu-active-background);
+  background: var(--menu-active-background, var(--menu-item-active-bg-color, #262626));
 }
 
 .menu-button {
   padding: 4px 10px;
-  color: var(--menu-item-color);
+  color: var(--menu-item-color, #fff);
   font-size: 28px;
   border: none;
   background: transparent;
@@ -33,10 +33,10 @@
 
 
 .dropdown-content {
-  background: var(--menu-bg-color);
-  border-top: var(--menu-border);
-  border-left: var(--menu-border);
-  border-right: var(--menu-border);
+  background: var(--menu-bg-color, #0c0c0c);
+  border-top: var(--menu-border, 1px solid rgba(255, 255, 255, 0.41));
+  border-left: var(--menu-border, 1px solid rgba(255, 255, 255, 0.41));
+  border-right: var(--menu-border, 1px solid rgba(255, 255, 255, 0.41));
   user-select: none;
   min-width: 50px;
   height: min-content;
@@ -48,23 +48,29 @@
   padding: 10px;
   position: relative;
   cursor: pointer;
-  border-bottom: var(--menu-border);
-  transition: background 0.3s;
+  color: var(--menu-item-color, #fff);
+  border-bottom: var(--menu-border, 1px solid rgba(255, 255, 255, 0.41));
+  transition: background 0.3s, color 0.3s;
 }
 
 .menu-item:hover,
 .menu-item.force-hover {
-  background: var(--menu-item-hover-bg-color);
-  color: var(--menu-item-hover-color);
+  background: var(--menu-item-hover-bg-color, #fff);
+  color: var(--menu-item-hover-color, #101010);
+}
+
+.menu-item:active {
+  background: var(--menu-item-pressed-bg-color, #f2c94c);
+  color: var(--menu-item-pressed-color, #101010);
 }
 
 .submenu {
-  background: var(--menu-bg-color);
+  background: var(--menu-bg-color, #0c0c0c);
 
-  backdrop-filter: blur(var(--menu-blur)); /* Blur */
-  -webkit-backdrop-filter: blur(var(--menu-blur)); /* For Safari */
+  backdrop-filter: blur(var(--menu-blur, 0px)); /* Blur */
+  -webkit-backdrop-filter: blur(var(--menu-blur, 0px)); /* For Safari */
 
-  border: var(--menu-border);
+  border: var(--menu-border, 1px solid rgba(255, 255, 255, 0.41));
   min-width: 200px;
 }
 .draggable-div {

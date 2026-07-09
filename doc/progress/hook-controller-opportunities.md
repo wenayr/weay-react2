@@ -313,3 +313,55 @@
 4. Resizable hook — skipped until real consumers appear.
 
 Дальше не выполнять задачи ради задачи: `memoryStore`, обычный UI + `PageVisibilityProvider`, `StickerMenu`, `DragBox` broad rewrite and `FResizableReact` hook требуют отдельного consumer/test сценария.
+
+## Дополнительный проход: notification layer и новые кандидаты
+
+Дата: 2026-07-09.
+
+### MessageEventLogs notification split — done
+
+Что сделано:
+- старый `MessageEventLogs` разбит на `useMessageEventLogsController`, `MessageEventLogsView` и `MessageEventLogCard`;
+- `MessageEventLogs` и `logsApi.React.Message` оставлены compatibility wrappers;
+- controller владеет queue/timers/filter by `minVarMessage`, `show`, `setShow`, `toggleShow`, `visibleNotifications`, `maxVisible`;
+- QA card 9 теперь реально монтирует notification layer поверх log card, а не только описывает его в тексте;
+- добавлен focused test `messageEventLogs.test.tsx` и usage docs.
+
+Оценка:
+- эффективность: high — убран старый module-level JSX store `tt`, таймеры и подписка вынесены из visual wrapper;
+- простота: medium — глобальный `logsApi`/`datumMiniConst` сохранён ради совместимости;
+- риск: low/medium — старый компонент остался, но уведомления теперь локальны для mounted layer вместо общего module-level React-element map.
+
+### Кандидаты на следующие split passes
+
+1. `menuMouse.tsx` + `menu.tsx`: context menu/action controller split.
+   - Идея: выделить `createContextMenuController` / `useMenuLayer` + `MenuView` и отдельный `useMenuAction` для async action/progress/submenu flow.
+   - Эффективность: high; простота: medium/hard; риск: medium.
+   - Почему не делать мелким quick fix: меню уже имеет compatibility/statistics контракты, нужен focused pass с tests по click/async/submenu/stats.
+
+2. `LeftModal.tsx`: sidebar/modal controller split.
+   - Идея: вынести viewport listener, drag API, open/close animation state and imperative store из visual layer.
+   - Эффективность: medium/high; простота: medium/hard; риск: medium.
+   - Делать, когда появится задача по left/sidebar UX или QA card для ручной приёмки.
+
+3. `logsContext.tsx`: migration/deprecation decision.
+   - Идея: не просто дробить файл, а решить направление: общий `logsController`/memoryStore или documented compat surface.
+   - Эффективность: medium/high; простота: hard; риск: medium/high.
+   - Без решения о будущем context logger переписывание будет косметическим.
+
+4. `chartEngineReact.tsx`: `useChartEngineCanvas` + `ChartCanvasView`.
+   - Идея: вынести canvas lifecycle, `ResizeObserver`, event attach/destroy and RAF bridge из React wrapper.
+   - Эффективность: medium; простота: medium; риск: medium.
+   - Имеет смысл, если будет stand/test на chart canvas lifecycle.
+
+5. `ParamsEditor.tsx`: full row-model/View split.
+   - Идея: продолжить после `useParamsEditorController`, но только через отдельную модель строк/inputs.
+   - Эффективность: medium/high; простота: hard; риск: high.
+   - Сейчас не брать как простую задачу: renderer рекурсивный и чувствителен к array mutation/resize/autostep UX.
+
+6. `SettingsDialog.tsx`: full View split.
+   - Идея: controller уже есть; следующий шаг — вынести visual tree/portal/FloatingWindow composition.
+   - Эффективность: medium; простота: medium/hard; риск: medium.
+   - Делать только вместе с реальным изменением UI, иначе польза ниже риска.
+
+Не включать как активные задачи без нового consumer/test: `memoryStore` core rewrite, `StickerMenu`, broad `DragBox`, `FResizableReact` hook.

@@ -808,6 +808,17 @@ logs.addLogs({id: "orders", time: new Date(), txt: "queued", var: 1})
 logs.getLatest()
 ```
 
+For corner notifications, the compatibility wrapper is still the shortest path. Use the hook/controller layer when the app needs to place or restyle the notification chrome itself:
+
+```tsx
+import { MessageEventLogsView, useMessageEventLogsController } from "wenay-react2"
+
+export function CornerLogs() {
+    const notifications = useMessageEventLogsController({maxVisible: 4})
+    return <MessageEventLogsView controller={notifications} zIndex={80} />
+}
+```
+
 For compact embedded log tables, use the MiniLogs hook/controller first when the parent needs grid control:
 
 ```tsx
@@ -833,6 +844,7 @@ Why:
 
 - The shared logger already has notification/table chrome.
 - `createLogsController` keeps append/limit/settings state testable without rewriting logger UI.
+- `useMessageEventLogsController` owns notification queue/timers/settings; `MessageEventLogsView` is the visual layer and `MessageEventLogs` remains the wrapper.
 - `useMiniLogsTable` keeps the compact table defaults, click contract, and grid control API in one reusable layer.
 - `MiniLogsTable` is the visual layer; `MiniLogs` remains the old compatibility wrapper.
 - Styling is tokenized through `--logs-*`.

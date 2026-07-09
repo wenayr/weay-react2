@@ -110,3 +110,12 @@ Implemented the mobile/card column-state style contract:
 - Kept component code unchanged; `ColumnDots` runtime geometry (`left`, drag transform) remains inline in the component where it belongs.
 
 Verification: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand`; `npm run build`; `git diff --check`.
+## 2026-07-09 — Menu default contrast restore
+
+Сделано:
+- `--menu-bg-color` возвращён к непрозрачному dark fallback `#0c0c0c`, `--menu-blur` по умолчанию `0px`;
+- добавлены `--menu-item-active-*` и `--menu-item-pressed-*` tokens, старый `--menu-active-background` оставлен alias/fallback;
+- `MenuR` / mouse context menu and `RightMenu` CSS получили hard fallbacks: default dark background, white text, hover white with dark text, pressed yellow-ish contrast state;
+- причина: рабочие проекты могут ещё не переопределять новые CSS variables, поэтому дефолт не должен становиться glass/transparent.
+
+Проверка: CSS-only visual contract; прогнать `tsc`/`build`, card 4 вручную открыть правой кнопкой.

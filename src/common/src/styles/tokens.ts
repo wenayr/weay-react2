@@ -13,17 +13,20 @@ export const tokens = {
         borderCommon: 'rgb(50, 62, 71)',
     },
     menu: {
-        bgColor: 'rgba(12, 12, 12, 0.91)',
-        blur: '10px',
+        bgColor: '#0c0c0c',
+        blur: '0px',
         border: '1px solid rgba(255, 255, 255, 0.41)',
-        activeBackground: 'rgba(255, 255, 255, 0.23)',
+        activeBackground: '#262626',
         itemColor: '#fff',
+        itemActiveBgColor: '#262626',
+        itemActiveColor: '#fff',
         itemHoverColor: '#101010',
         itemHoverBgColor: '#fff',
+        itemPressedColor: '#101010',
+        itemPressedBgColor: '#f2c94c',
         outlineColor: '#007bff',
         shadow: '0 0 20px 14px rgba(34, 60, 80, 0.2)',
-    },
-    /** FloatingWindow window chrome (--wnd-*). Defaults = legacy look; apps re-skin via :root[data-theme].
+    },    /** FloatingWindow window chrome (--wnd-*). Defaults = legacy look; apps re-skin via :root[data-theme].
      *  --wnd-header-height/color/font-size/letter-spacing/transform are intentionally undeclared
      *  (inherit/auto) until a theme sets them. */
     wnd: {
