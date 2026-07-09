@@ -676,7 +676,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
                         zIndex={10000}
                         moveOnlyHeader={true}
                         overflow={false}
-                        onCLickClose={() => setOpen(false)}
+                        onClickClose={() => setOpen(false)}
                         header={<div className="wenayDlgHeader">Settings</div>}
                     >
                         <div className={classNames(["wenayDlg", navResizing && "wenayDlg_resizing"])}>

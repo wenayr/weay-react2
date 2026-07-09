@@ -1554,14 +1554,14 @@ function ActiveChecks() {
                    note="exposeStoreReplay/syncStoreReplay in-proc: the remote is the exposed {line, since, keyframe} facade, exactly what createRpcServerAuto would expose over a socket. staleMs rides the same ReplaySubscribeOpts as the video card.">
                 <ReplayStoreDemo />
             </Check>
-            <Check n={25} title="Replay hooks - per-key feed (useStoreReplayEach)"
+            <Check n={33} title="Replay hooks - per-key feed (useStoreReplayEach)"
                    do="Watch the table for a few producer ticks. Click server add row, server delete row, server replace ALL, then remount client (fresh keyframe)."
                    expect="On mount every row appears with cb calls=1 (keyframe expanded per key). Between clicks only the mutated row's cb calls counter grows - the whole dict is never re-delivered per tick. Delete removes the row via (key, undefined). replace ALL swaps the table: removed rows leave, new rows enter with cb calls=1. Remount folds a fresh keyframe (all counters reset to 1); StrictMode double-effect does not double-count."
                    note="React counterpart of Observe.syncStoreReplayEach (wenay-common2 1.0.62): internal mirror store + syncStoreReplay + store.each(). The mirror lives in a ref, so in-mount resubscribes reconnect by journal tail on top of kept state; the fold target is a plain Map (grid-api style), not React state. drain:100 coalesces multiple writes to one key into one call per window."
                    tall>
                 <ReplayStoreEachDemo />
             </Check>
-            <Check n={26} title="Replay hooks - route hand-off (useReplayRouteSubscribe)"
+            <Check n={34} title="Replay hooks - route hand-off (useReplayRouteSubscribe)"
                    do="Watch one canvas draw the synthetic video. Click switch direct, then switch relay, then fail route. Repeat while the producer is moving."
                    expect="The canvas keeps advancing as one logical fold: route switches catch up by seq before the old route closes, so frames do not reset or duplicate. The label changes to direct/relay only after ready. fail route reports an error but keeps the previous active route alive and the canvas continues."
                    note="React wrapper over wenay-common2 1.0.65 Replay.replayRouteSubscribe. Route hand-off is explicit through switchRoute(); changing the remote prop remains a fresh subscription boundary. This route helper does not expose stale/lastTs, so freshness stays on the non-route hooks until common2 grows that surface."

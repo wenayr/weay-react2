@@ -29,6 +29,9 @@ export type FloatingWindowProps = {
     position?: FloatingWindowPosition;
     size?: FloatingWindowSize;
     moveOnlyHeader?: boolean;
+    /** Show the close button and handle its click. */
+    onClickClose?: () => void;
+    /** @deprecated typo alias of {@link onClickClose}; kept for compatibility, `onClickClose` wins when both are set. */
     onCLickClose?: () => void;
     header?: React.ReactElement | boolean;
     overflow?: boolean;
@@ -42,7 +45,7 @@ export type FloatingWindowProps = {
 };
 export type FloatingWindowControllerOptions = Omit<
     FloatingWindowProps,
-    "children" | "className" | "header" | "moveOnlyHeader" | "overflow" | "onCLickClose"
+    "children" | "className" | "header" | "moveOnlyHeader" | "overflow" | "onCLickClose" | "onClickClose"
 >;
 
 export type FloatingWindowController = {
@@ -334,9 +337,11 @@ export function FloatingWindowBase({
                                 moveOnlyHeader,
                                 limit,
                                 onCLickClose,
+                                onClickClose,
                                 sizeByWindow = true
                             }: FloatingWindowProps) {
-    // NOTE: no implicit limit for onCLickClose windows. `limit` is parent-relative,
+    const clickClose = onClickClose ?? onCLickClose;
+    // NOTE: no implicit limit for onClickClose windows. `limit` is parent-relative,
     // so {y:{min:0}} pinned windows to their DOM parent's top: a window opened from a
     // centered wrapper (ModalProvider / ModalWrapper at top:50%) could not be dragged
     // above mid-screen. Keeping the window on screen is already handled by the
@@ -405,7 +410,7 @@ export function FloatingWindowBase({
                     )}
                     {typeof children === "function" ? children(controller.update) : children}
                 </div>
-                {onCLickClose && (
+                {clickClose && (
                     <div
                         key="323"
                         className="wenayCloseBtn wenayWndClose"
@@ -413,7 +418,7 @@ export function FloatingWindowBase({
                         style={{
                             zIndex: controller.overlayZIndex
                         }}
-                        onClick={onCLickClose}
+                        onClick={clickClose}
                     >
                         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
                             <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>

@@ -89,7 +89,11 @@ type ButtonBaseProps = {
     className?: string
 }
 type ButtonProps = ButtonBaseProps & {
-    statusDef?: boolean, keySave?: string,
+    statusDef?: boolean,
+    /** Persist the open/closed status under this key (module-lifetime). Same naming as FloatingWindow/Resizable/RightMenu. */
+    keyForSave?: string,
+    /** @deprecated alias of {@link keyForSave}; kept for compatibility, `keyForSave` wins when both are set. */
+    keySave?: string,
     outClick?: boolean | (() => void), zIndex?: number,
 }
 
@@ -127,7 +131,8 @@ function ButtonBase({children, button, style = {}, className = "", state: [a, se
 }
 
 const saveStatus: {[key: string]: boolean} = {}
-export function Button({keySave, statusDef, outClick, ...data}: ButtonProps) {
+export function Button({keyForSave, keySave, statusDef, outClick, ...data}: ButtonProps) {
+    keySave = keyForSave ?? keySave
     if (keySave && saveStatus[keySave] != null) statusDef = saveStatus[keySave]
     const [status, setStatusRaw] = useState(statusDef ?? false)
     const setStatus: typeof setStatusRaw = (v) => {
