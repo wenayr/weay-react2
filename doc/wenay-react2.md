@@ -82,7 +82,7 @@ outside.contains(event.target)
 
 <OutsideClickArea outsideClick={close} status={open}>...</OutsideClickArea>
 
-<Button button={<button>Open</button>} outClick>{...}</Button>
+<Button button={<button>Open</button>} outClick keyForSave?>{...}</Button>   // keySave = deprecated alias
 <OutsideButton button={...}>{...}</OutsideButton>
 <HoverButton button={...}>{...}</HoverButton>
 <AbsoluteButton button={...}>{...}</AbsoluteButton>
@@ -104,11 +104,13 @@ Both hooks ride the same module-level `CResizeObserver` singleton (one native `R
 
 ## Drag / Floating Windows
 ```
-const drag = useDraggableApi({initialPosition, holdMs?, onDragStart?, onDragEnd?})
+const drag = useDraggableApi({initialPosition, holdMs?, onDragStart?, onDragEnd?, onMove?, trackState?})
 <div {...drag.bind} style={{transform: `translate(${drag.position.x}px, ${drag.position.y}px)`}} />
 drag.setPosition({x, y})
 drag.resetPosition()
 drag.cancelDrag()
+// imperative path: onMove(p) fires per move tick (through a ref); trackState:false stops
+// per-tick re-renders - position lives only in drag.positionRef/onMove (DragBox is this shape)
 
 const r = useReorder({order, commit, move?, canDrag?, preview?, holdMs?})   // mini reorder-by-drag
 <div ref={r.listRef}>{order.map(k => {                                      // children 1:1 with order
@@ -122,7 +124,8 @@ const b = useReorderBoard({columns: [{key, items}], commit,                 // d
 b.over                                                                      // {col, index} | null - live target
 // column gravity is YOUR CSS: justify-content flex-start packs up, flex-end packs down
 
-<FloatingWindow keyForSave="tool" size={{width: 320, height: 240}} header={<div>Tool</div>}>
+<FloatingWindow keyForSave="tool" size={{width: 320, height: 240}} header={<div>Tool</div>}
+                onClickClose={() => setOpen(false)}>   {/* onCLickClose (typo) = deprecated alias */}
     <Panel />
 </FloatingWindow>
 

@@ -53,6 +53,14 @@ confirmModal({modal, func, password?})
 
 `inputModal` and `confirmModal` accept either a setter function or the `useModal()` controller.
 
+Internal Overlay (A9, 2026-07-10): `components/Overlay.tsx` is the ONE portal+scrim+outside-click+
+Escape composition; `ModalProvider` and `SettingsDialog` are adapters over it (behavior 1:1,
+SettingsDialog keeps its own two-stage Escape by NOT passing `onEscape`). It is deliberately not
+exported: apps use ModalProvider/useModal/SettingsDialog. The render-slot stores above, the
+LeftModal drawer (gesture-driven, scrim-less), and `ModalWrapper`/Input helpers (backdrop-less,
+hosted inside another modal slot) are NOT overlays and stay separate. This leaf is also where all
+scrim/portal DOM lives - the seam for a future react-native view layer.
+
 Left-side modal/menu helpers:
 ```
 LeftModal({arr, zIndex})
@@ -320,6 +328,10 @@ StyleOtherColumn
 
 `Button`, `OutsideButton`, `HoverButton`, and `AbsoluteButton` are still direct components rather than hook controllers.
 
+`Button` persists its open/closed status under `keyForSave` (module-lifetime; same naming as
+FloatingWindow/Resizable/RightMenu); the old `keySave` prop is a deprecated alias (`keyForSave`
+wins when both are set).
+
 ## Drag / Resize Low Level
 ```
 FloatingWindowBase(props)                  // lower-level react-rnd wrapper
@@ -329,8 +341,8 @@ floatingWindowMap                           // persisted RND map (ObservableMap)
 FloatingWindowUpdate
 FloatingWindowProps / FloatingWindowController / FloatingWindowSavedGeometry
 
-DragBox(props)                       // absolute-position movement component
-DragArea(props)                     // low-level movement component
+DragBox(props)                       // delta-drag component; thin adapter over useDraggableApi (A7)
+DragArea(props)                     // @deprecated: unique semantics kept as-is; prefer useDraggableApi/DragBox
 FResizableReact(props)
 mapResiReact                        // persisted resize map (ObservableMap)
 OutlineDragDemo()
@@ -343,6 +355,18 @@ const drag = useDraggableApi(...)
 ```
 
 `useDraggable(...)` is kept as the simple hook wrapper; `useDraggableApi(...)` is the controller-style shape.
+
+Drag primitives after the A7 pass (2026-07-10): `DragBox` is a thin adapter over
+`useDraggableApi({holdMs: 0, trackState: false, onMove})` - same observable contract as its old
+bespoke loop (immediate start, per-tick imperative `onX`/`onY` with the delta from the press
+point, no re-render per move tick, `onStop` only after a real gesture, `last` ref shares the live
+position object; pinned by `__test/dragBox.test.tsx`, QA card 35). `DragArea` stays untouched and
+`@deprecated`: no consumers, and its semantics are unique (document.body listeners,
+`stopPropagation` per move tick, ABSOLUTE coords, no preventDefault) - re-basing it would change
+observable behavior; removal only in a breaking version. `useFloatingWindowController`'s header
+loop and `StickerMenu` deliberately keep their own loops: viewport clamp + `e.buttons===1` release
+recovery + persistence/z-stack, and mount-lifetime listeners + click-vs-drag suppression
+respectively, are load-bearing behavior `useDraggableApi` does not model.
 
 Reorder-by-drag (useReorder, `hooks/useReorder.tsx` - extracted from the Toolbar editor, which is
 its first consumer):
@@ -616,6 +640,9 @@ memoryUpdate(key, mutate)
 memoryMarkDirty(key)
 createSearchHistory({key, max?})
 deepMergeWithMap(target, source)
+structEqual(a, b)                   // deep equality for plain data trees; JSON.stringify-idiom
+                                    //   tolerances (undefined props absent, NaN==NaN) WITHOUT
+                                    //   its key-order sensitivity; not for Maps/Sets/cycles
 memoryCache
 memoryMaps
 
@@ -740,8 +767,10 @@ Added by the 2026-07-09 architecture audit (evidence in the audit report / `doc/
 - `menuR.tsx` (`createRightClickMenu` / `MenuR`) - CONFIRMED dead: no runtime consumer anywhere (the test that supposedly covers it imports `RightMenu.tsx`); re-exported twice from `api.tsx` (`export *` + `kit.menu.rightClick`). Candidate for removal in a deliberate breaking version; its gesture code duplicates `menuMouse.tsx:342-380`.
 - `logsContext.tsx` - a full PARALLEL logs stack (own `LogEntry` shape divergent from `logsController`, raw unguarded `localStorage`, own settings/notifications/table) exported from the barrel next to `logs.tsx`. Decide: deprecate or converge; new code should use `logsApi`/`createLogsController`.
 - `MyChartEngine` - a hardcoded DEMO (random data + setInterval inside `useEffect`, no props but `style`) exported as public API from `chartEngineReact.tsx`; `generateIncrementalData` (Math.random demo util) is public too. Should move to demo namespace or gain a real props contract.
-- `getLogsApi<T>()` - the `<T>` is cosmetic: EVERY call shares module-level `datumConst`/`datumMiniConst` and the constant `"settingLogs"` key, so a "custom" logger and the global `logsApi` write into one shared full/mini/settings state with colliding `num` counters and competing `limitPer` trims. Treat as singleton-only until state is built per call.
-- `FloatingWindow` public prop `onCLickClose` (typo, capital L) is baked into the API; add `onClickClose` and deprecate the alias in a breaking pass.
+- ~~`getLogsApi<T>()` shared module state~~ FIXED (A2, v1.0.41): every call now builds its own map/mini/settings (optional `settingsKey` persists per instance); the global `logsApi` explicitly injects the legacy shared state.
+- ~~`FloatingWindow` `onCLickClose` typo~~ ALIASED (A10, v1.0.42): `onClickClose` added, typo prop is a deprecated alias; REMOVAL of the alias still needs a breaking pass.
+- `DragArea` - `@deprecated` (A7, v1.0.42): no consumers; unique semantics kept as-is (see Drag / Resize Low Level). Removal in a deliberate breaking version.
+- `Button` `keySave` prop - deprecated alias of `keyForSave` (A10, v1.0.42); removal in a breaking pass.
 - `contextMenu` raw `map`/legacy-queue path is test-only-live (populated only by `contextMenuStats.test.tsx`); the `bb`/`map.clear()` reopening invariant itself is intentional and stays.
 
 ## Charts
