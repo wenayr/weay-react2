@@ -1,8 +1,7 @@
 import React, {useEffect, useRef, useState} from "react";
-import {createPortal} from "react-dom";
 import {createUpdateApi, renderBy} from "../../../updateBy";
-import {OutsideClickArea} from "../../hooks/useOutside";
 import {FloatingWindowBase} from "../Dnd/FloatingWindow";
+import {Overlay} from "../Overlay";
 import {createSearchHistory} from "../../utils/searchHistory";
 import {memoryGetOrCreate, memoryMarkDirty} from "../../utils/memoryStore";
 
@@ -666,9 +665,14 @@ export function SettingsDialog(props: SettingsDialogProps) {
         >
             {props.trigger ?? <DefaultSettingsTrigger />}
         </span>
-        {open && createPortal(
-            <div className="wenayDlgScrim">
-                <OutsideClickArea outsideClick={() => setOpen(false)} status={open} className="wenayDlgOutside">
+        {open && (
+            <Overlay
+                scrimClassName="wenayDlgScrim"
+                outsideClassName="wenayDlgOutside"
+                outsideStatus={open}
+                onOutsideClick={() => setOpen(false)}
+                /* no onEscape: the controller owns the two-stage Escape (clear search, then close) */
+            >
                     <FloatingWindowBase
                         className="wenayDlgWindow"
                         size={settingsDialogSize}
@@ -786,9 +790,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
                     </div>
                         </div>
                     </FloatingWindowBase>
-                </OutsideClickArea>
-            </div>,
-            document.body
+            </Overlay>
         )}
     </>
 }

@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
-import { createPortal } from 'react-dom';
-import {OutsideClickArea} from "../../hooks/useOutside";
+import React, { createContext, useContext, useMemo, useState, ReactNode } from 'react';
 import {tokens} from "../../styles/tokens";
+import {Overlay} from "../Overlay";
 
 export type ModalApi = {
     show(node: ReactNode): void;
@@ -34,29 +33,21 @@ export const ModalProvider = ({ children, closeOnOutsideClick = true, closeOnEsc
         return api;
     }, []);
 
-    useEffect(() => {
-        if (!modal || !closeOnEscape) return;
-        const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key == 'Escape') setModal(null);
-        };
-        document.addEventListener('keydown', onKeyDown);
-        return () => document.removeEventListener('keydown', onKeyDown);
-    }, [modal, closeOnEscape]);
-
     return (
         <ModalContext.Provider value={modalApi}>
             {children}
-            {modal && createPortal(
-                <div style={{
-                    position: 'fixed', inset: 0, zIndex: tokens.zIndex.modal,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: 'var(--dlg-scrim, rgba(0, 0, 0, 0.5))'
-                }}>
-                    <OutsideClickArea outsideClick={() => { if (closeOnOutsideClick) setModal(null); }} status={true}>
-                        {modal}
-                    </OutsideClickArea>
-                </div>,
-                document.body
+            {modal && (
+                <Overlay
+                    scrimStyle={{
+                        position: 'fixed', inset: 0, zIndex: tokens.zIndex.modal,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: 'var(--dlg-scrim, rgba(0, 0, 0, 0.5))'
+                    }}
+                    onEscape={closeOnEscape ? () => setModal(null) : undefined}
+                    onOutsideClick={() => { if (closeOnOutsideClick) setModal(null); }}
+                >
+                    {modal}
+                </Overlay>
             )}
         </ModalContext.Provider>
     );
