@@ -8,39 +8,49 @@ _Пусто._
 
 ## Ready
 
-- **Система стилей и CSS variables для shared primitives** — нормализовать дефолтные стили, чтобы aggressive migration не ломал внешний вид библиотеки.
-  - Прогресс: [../progress/style-system-normalization.md](../progress/style-system-normalization.md)
-  - Источник: уточнение, что совместимость можно решать жёстким переездом через changelog, но удаление дефолтных стилей особенно опасно; стили должны быть хорошо вынесены и построены на переменных.
-  - Policy: дефолтный стиль публичного primitive — часть usability contract; удалять старый class/style можно только при наличии replacement class/token path, changelog и migration note.
-  - Acceptance: карта default style contracts по публичным primitive groups; решение по token prefixes (`--cols-*`, возможные `--input-*`, `--param-*`); перенос reusable visual styles из inline в classes/variables; scoped QA visual check.
-- **Совместимость старых API и статистика меню** — оставить старые публичные пути рабочими при вводе новых hook/controller API; добавить план локальной статистики, особенно для right-click/context menu.
-  - Прогресс: [../progress/menu-compat-stats.md](../progress/menu-compat-stats.md)
-  - Источник: вопрос про поддержку старого кода после новых изменений и идея статистики по менюшке правой кнопки.
-  - Policy: старые публичные API обычно сохраняем при внутренних refactor; наглый переезд допустим только как явный migration cut с changelog/migration notes и списком изменённого поведения.
-  - Acceptance: documented compatibility policy; design for `contextMenu.stats` / menu diagnostics; no hidden analytics/network writes; legacy `contextMenu.map` path remains supported while new docs teach `openAt` first.
-- **Hook-first архитектура для функционала библиотеки** — провести аудит и переводить reusable behavior в headless `use*` hooks / `create*` controllers, оставляя компоненты и stand cards тонким визуальным слоем поверх API.
-  - Прогресс: [../progress/hook-first-architecture.md](../progress/hook-first-architecture.md)
-  - Источник: уточнение, что “фук” может возвращать не только X/Y данные, но методы, getters, `props/bind` helpers или свое API; визуальная среда/норматив слоя строится поверх hook/controller.
-  - Первые кандидаты: `SettingsDialog` tree/search controller, `ParamsEditor`, `FloatingWindow` window-level controller, старые input/modal helpers, `LeftModal`/app-shell menu helpers.
-  - Acceptance: inventory публичных компонентов, где reusable behavior живет внутри JSX; безопасные конверсии в `use*`/`create*`; спорные публичные API остаются совместимыми и сначала фиксируются в docs/target.
-- **Аудит свежих QA cards и внутренних primitives на переиспользование своих технологий** — начать с последних элементов, особенно cards 27-31 и card 29.
-  - Источник: новая надиктовка про то, что библиотека сама местами не использует свои стандарты/примитивы; много inline-стилей и ad hoc UI, нужно пройтись по коду и вносить хорошие точечные коррективы.
-  - Первые наблюдения: card 29 уже частично исправлен (`ColumnDots`/`CardList` переведены на CSS classes); card 27 insert-column/delete UX требует отдельного решения, без молчаливого изменения семантики.
-  - Acceptance: список findings по свежим карточкам и core primitives; для безопасных пунктов — small scoped fixes; для спорных UX — вопросы/варианты, без самовольного изменения поведения.
+_Пусто._
 
 ## Inbox
 _Пусто._
 
 ## Verify
+- **Hook-first архитектура для функционала библиотеки** — первый inventory pass и safe input hook extraction готовы, ждут ручной/релизной проверки.
+  - Прогресс: [../progress/hook-first-architecture.md](../progress/hook-first-architecture.md)
+  - Сделано: зафиксирован inventory по `SettingsDialog`, `ParamsEditor`, `FloatingWindow`, `Input` helpers, `LeftModal` / app-shell helpers.
+  - Сделано: добавлены `useTextInputPanel` и `useFileInputPanel`; старые `TextInputPanel`, `FileInputPanel`, `TextInputModal`, `FileInputModal` остались совместимыми визуальными wrappers.
+  - Документация: обновлены `doc/wenay-react2.md`, `doc/PROJECT_FUNCTIONALITY.md`, `doc/changes/v1.0.39.md`.
+  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand __test/inputPanelHooks.test.tsx`; `npm run testjest -- --runInBand`; `npm run build`; `git diff --check`.
+  - Не сделано: `SettingsDialog`, `ParamsEditor`, `FloatingWindow`, `LeftModal` broad extractions — оставлены для отдельных passes, потому что без отдельного API/test плана это риск поведения.
+- **Система стилей и CSS variables для shared primitives** — default contract inventory и низкорисковые token fixes готовы, ждут ручной/релизной проверки.
+  - Прогресс: [../progress/style-system-normalization.md](../progress/style-system-normalization.md)
+  - Сделано: зафиксирована карта style source-of-truth (`src/style/tokens.css`, `src/common/src/styles/tokens.ts`, `src/style/style.css`, `src/style/menuRight.css`) и default visual contracts по публичным primitive groups.
+  - Сделано: `ColumnsMenu/MenuStrip` переведён на `.wenayColsMenu*` + `--cols-menu-*`; runtime reorder transform/drag geometry оставлен inline.
+  - Сделано: `ColumnDots/CardList` восстановленный card-29 baseline переведён на `--cols-dots-*` / `--cols-card-*` с теми же fallback-значениями; component runtime geometry не менялась.
+  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand`; `npm run build`; `git diff --check`.
+  - Не сделано: `ParamsEditor` / `Input` broad visual migration отложен до hook-first/API решения; там нельзя безопасно менять только CSS без риска зацепить поведение.
+- **Аудит свежих QA cards и внутренних primitives на переиспользование своих технологий** — findings-pass и два safe scoped fixes готовы, ждут ручной/релизной проверки.
+  - Прогресс: [../progress/qa-primitives-reuse-audit.md](../progress/qa-primitives-reuse-audit.md)
+  - Сделано: зафиксированы findings по `useReorderBoard`, `ColumnDots/CardList`, card 30 toolbar menu, card 31 toolbar/columnState integration, `ColumnsMenu/MenuStrip` inline styles.
+  - Сделано: уточнена документация по canonical surface для `columnState`: `createToolbar({source: cs.api.listSource})` для settings-integrated flow, `ColumnsMenu` для compact/presentation menu.
+  - Сделано: card 27 `BoardDemo` получил локальные style helpers для stand-only board styles без изменения `useReorderBoard` поведения.
+  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand`; `git diff --check`.
+  - Не сделано: спорные UX-решения card 27 add/delete semantics, shared `Qa30AnimatedMenuBar` API и перенос `ColumnsMenu` inline styles — оставлены для отдельных target/style-system решений.
 
+- **Совместимость старых API и статистика меню** — первый слой `contextMenu.stats` готов, ждёт ручной/релизной проверки.
+  - Прогресс: [../progress/menu-compat-stats.md](../progress/menu-compat-stats.md)
+  - Сделано: добавлен `contextMenu.stats.getSnapshot/reset/onChange` с локальными in-memory counters для `openAt`, `openAtPoint`, legacy Layer queued opens, empty opens, close/replace и `source`/`layerId` usage.
+  - Сделано: старый `contextMenu.map` путь сохранён; legacy Layer open теперь учитывается в статистике и после consume очищает map как раньше.
+  - Документация: обновлены `doc/wenay-react2.md`, `doc/wenay-react2-rare.md`, `doc/changes/v1.0.39.md`.
+  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand __test/contextMenuStats.test.tsx`; scoped `git diff --check`.
+  - Не сделано в этом проходе: item click/submenu/async-error counters — нужен отдельный стабильный action-key contract.
 - **Global Settings: история поиска и компактное управление деревом** — реализация готова, ждёт ручной проверки стенда.
   - Прогресс: [../progress/settings-dialog-search-history.md](../progress/settings-dialog-search-history.md)
   - Сделано: добавлен reusable `createSearchHistory({key,max?})`, экспортирован из utils; `SettingsDialog` search пишет историю через memory store / `memoryCache` dirty channel.
   - Сделано: три отдельные кнопки управления деревом заменены одним dotted cycle control в строке поиска; control скрывается, когда в дереве мало веток.
-  - Сделано: card 29 primitives `ColumnDots` / `CardList` переведены с inline/raw visual styles на `.wenayColDots*` / `.wenayCardList*` CSS classes.
+  - Сделано: card 29 primitives `ColumnDots` / `CardList` переведены с inline/raw visual styles на `.wenayColDots*` / `.wenayCardList*` CSS classes; follow-up: `ColumnDots` max поднят до 8, stand card 29 показывает 8 полей и нижний overlay-control поверх карточек.
   - Документация: обновлены `doc/wenay-react2.md`, `doc/wenay-react2-rare.md`, `doc/EXAMPLE_USAGE.md`, `doc/changes/v1.0.38.md`.
-  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; scoped `git diff --check` по изменённым файлам.
-  - Ручная приемка: card 20 — в Settings search ввести запрос, Enter добавляет в history, history button показывает список, выбор восстанавливает запрос; dotted tree control циклит expanded/current/collapsed. card 29 — ColumnDots/CardList визуально не регресснули.
+  - Проверено: `npx tsc -p tsconfig.qa-check.json --noEmit`; `npm run testjest -- --runInBand __test/settingsDialog.test.tsx`; `npm run testjest -- --runInBand`; `npm run build`; `git diff --check`.
+  - Ручная приемка: card 20 — в Settings search ввести запрос, Enter добавляет в history, history button показывает список, выбор восстанавливает запрос; клик/фокус вне search box закрывает history; dotted tree control циклит expanded/current/collapsed. card 29 — нижний overlay с dots лежит на последней карточке, позволяет показать до 8 полей и не ломает CardList.
 - **React-хуки для Replay route hand-off из `wenay-common2@1.0.65`** — реализация готова, ждёт ручной проверки стенда.
   - Прогресс: [../progress/replay-route-handoff.md](../progress/replay-route-handoff.md)
   - Сделано: добавлены `useReplayRouteSubscribe`, `useStoreReplayRouteSync`, `useStoreReplayRouteMirror`; существующие `useReplaySubscribe` / `useStoreReplaySync` не меняли поведение; route hand-off выполняется явно через `switchRoute(...)`.

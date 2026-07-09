@@ -27,6 +27,21 @@ export type ContextMenuLayerProps = {
     onConsume?: () => void;
     className?: (active?: boolean) => string;
 };
+export type ContextMenuStatsSnapshot = {
+    openAt: number;
+    openAtPoint: number;
+    legacyLayer: number;
+    close: number;
+    replace: number;
+    empty: number;
+    sources: Record<string, number>;
+    layers: Record<string, number>;
+};
+export type ContextMenuStats = {
+    getSnapshot(): ContextMenuStatsSnapshot;
+    reset(): void;
+    onChange(cb: (snapshot: ContextMenuStatsSnapshot) => void): () => void;
+};
 
 function normalizeItems(items: readonly MenuItem[] | null | undefined): MenuItemStrict[] {
     return (items ?? []).filter(Boolean) as MenuItemStrict[];
@@ -62,6 +77,17 @@ export function createContextMenu(data?: {name?: string}) {
     const map = new Map<string, MenuItem[]>();
     const state: ContextMenuState = {open: false, items: [], point: {x: 0, y: 0}, seq: 0};
     const listeners = new Set<() => void>();
+    const statsListeners = new Set<(snapshot: ContextMenuStatsSnapshot) => void>();
+    const statsState: ContextMenuStatsSnapshot = {
+        openAt: 0,
+        openAtPoint: 0,
+        legacyLayer: 0,
+        close: 0,
+        replace: 0,
+        empty: 0,
+        sources: {},
+        layers: {},
+    };
     const layers = new Set<string>();
     let layerSeq = 0;
 
@@ -74,6 +100,53 @@ export function createContextMenu(data?: {name?: string}) {
         listeners.add(cb);
         return () => { listeners.delete(cb); };
     }
+
+    function statsSnapshot(): ContextMenuStatsSnapshot {
+        return {
+            openAt: statsState.openAt,
+            openAtPoint: statsState.openAtPoint,
+            legacyLayer: statsState.legacyLayer,
+            close: statsState.close,
+            replace: statsState.replace,
+            empty: statsState.empty,
+            sources: {...statsState.sources},
+            layers: {...statsState.layers},
+        };
+    }
+
+    function emitStats() {
+        const snapshot = statsSnapshot();
+        for (const cb of [...statsListeners]) cb(snapshot);
+    }
+
+    function bumpStat(key: keyof Omit<ContextMenuStatsSnapshot, "sources" | "layers">) {
+        statsState[key] += 1;
+        emitStats();
+    }
+
+    function bumpMapStat(map: Record<string, number>, key: string | undefined) {
+        if (!key) return;
+        map[key] = (map[key] ?? 0) + 1;
+    }
+
+    const stats: ContextMenuStats = {
+        getSnapshot: statsSnapshot,
+        reset() {
+            statsState.openAt = 0;
+            statsState.openAtPoint = 0;
+            statsState.legacyLayer = 0;
+            statsState.close = 0;
+            statsState.replace = 0;
+            statsState.empty = 0;
+            statsState.sources = {};
+            statsState.layers = {};
+            emitStats();
+        },
+        onChange(cb) {
+            statsListeners.add(cb);
+            return () => { statsListeners.delete(cb); };
+        },
+    };
 
     function legacyItems() {
         if (map.has("only")) return normalizeItems(map.get("only"));
@@ -88,30 +161,41 @@ export function createContextMenu(data?: {name?: string}) {
 
     function close() {
         if (!state.open && state.items.length == 0) return;
+        bumpStat("close");
         state.open = false;
         state.items = [];
         state.layerId = undefined;
         emit();
     }
 
-    function openAt(anchor: ContextMenuAnchor, items: readonly MenuItem[] | null | undefined, opts: {source?: string, layerId?: string} = {}) {
+    function openMenu(anchor: ContextMenuAnchor, items: readonly MenuItem[] | null | undefined, opts: {source?: string, layerId?: string} = {}, kind: "openAt" | "openAtPoint" | "legacyLayer") {
         preventNative(anchor);
         const nextItems = normalizeItems(items);
         if (nextItems.length == 0) {
+            bumpStat("empty");
             close();
             return false;
         }
+        if (state.open) bumpStat("replace");
+        bumpStat(kind);
         state.open = true;
         state.items = nextItems;
         state.point = anchorPoint(anchor);
         state.source = opts.source;
         state.layerId = opts.layerId ?? anchorLayerId(anchor) ?? [...layers][0];
+        bumpMapStat(statsState.sources, state.source);
+        bumpMapStat(statsState.layers, state.layerId);
+        emitStats();
         emit();
         return true;
     }
 
+    function openAt(anchor: ContextMenuAnchor, items: readonly MenuItem[] | null | undefined, opts: {source?: string, layerId?: string} = {}) {
+        return openMenu(anchor, items, opts, "openAt");
+    }
+
     function openAtPoint(point: ContextMenuPoint, items: readonly MenuItem[] | null | undefined, opts: {source?: string, layerId?: string} = {}) {
-        return openAt(point, items, opts);
+        return openMenu(point, items, opts, "openAtPoint");
     }
 
     function getState(): ContextMenuState {
@@ -162,7 +246,7 @@ export function createContextMenu(data?: {name?: string}) {
         }
 
         function openQueued(anchor: ContextMenuAnchor) {
-            const opened = openAt(anchor, queuedItems(), {source: "layer", layerId});
+            const opened = openMenu(anchor, queuedItems(), {source: "layer", layerId}, "legacyLayer");
             if (opened) {
                 map.clear();
                 onConsume?.();
@@ -246,6 +330,7 @@ export function createContextMenu(data?: {name?: string}) {
         openAt,
         openAtPoint,
         close,
+        stats,
         Layer,
         MenuView: Menu,
     };

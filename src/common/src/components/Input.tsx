@@ -34,20 +34,30 @@ function ModalWrapper({
     </OutsideClickArea>
 }
 
-export function TextInputPanel({callback, name = "", txt =""}: {callback: (txt: string)=>void, name?: string, txt?: string}) {
+export type TextInputPanelProps = {callback: (txt: string)=>void, name?: string, txt?: string}
+
+export function useTextInputPanel({callback, txt = ""}: Pick<TextInputPanelProps, "callback" | "txt">) {
     const txtName = useRef(txt)
-    return <div className={"maxSize"} style={{padding: 20,}}>
-        <label>{name}</label>
-        <input type={"text"} style={{width:"100%"}}
-               defaultValue={txtName.current}
-               onChange={(e) => {
-                   txtName.current = e.target.value
-               }}/>
-        <div style={{marginTop: 20}} className={"msTradeAlt msTradeActive"} onClick={()=>{callback(txtName.current)}}>send</div>
-    </div>
+    return {
+        getValue: () => txtName.current,
+        setValue: (next: string) => { txtName.current = next },
+        submit: () => callback(txtName.current),
+        inputProps: {
+            defaultValue: txtName.current,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => { txtName.current = e.target.value },
+        },
+    }
 }
 
-export function TextInputModal({callback, name, outClick, keyForSave = "TextInputModal", txt}: Parameters<typeof TextInputPanel>[0] & {outClick: ()=>any, keyForSave?: string}) {
+export function TextInputPanel({callback, name = "", txt = ""}: TextInputPanelProps) {
+    const input = useTextInputPanel({callback, txt})
+    return <div className={"maxSize"} style={{padding: 20,}}>
+        <label>{name}</label>
+        <input type={"text"} style={{width:"100%"}} {...input.inputProps}/>
+        <div style={{marginTop: 20}} className={"msTradeAlt msTradeActive"} onClick={input.submit}>send</div>
+    </div>
+}
+export function TextInputModal({callback, name, outClick, keyForSave = "TextInputModal", txt}: TextInputPanelProps & {outClick: ()=>any, keyForSave?: string}) {
     return <ModalWrapper
         outClick={outClick}
         keyForSave={keyForSave}
@@ -57,7 +67,7 @@ export function TextInputModal({callback, name, outClick, keyForSave = "TextInpu
         <TextInputPanel callback={callback} name={name} txt={txt} />
     </ModalWrapper>
 }
-export function FileInputModal({callback, name, outClick, keyForSave = "FileInputModal"}: Parameters<typeof FileInputPanel>[0] & {outClick: ()=>any, keyForSave?: string}) {
+export function FileInputModal({callback, name, outClick, keyForSave = "FileInputModal"}: FileInputPanelProps & {outClick: ()=>any, keyForSave?: string}) {
     return <ModalWrapper
         outClick={outClick}
         keyForSave={keyForSave}
@@ -67,14 +77,26 @@ export function FileInputModal({callback, name, outClick, keyForSave = "FileInpu
         <FileInputPanel callback={callback} name={name} />
     </ModalWrapper>
 }
-export function FileInputPanel({callback, name = ""}: {callback: (file: File | null)=>void, name?: string}) {
+export type FileInputPanelProps = {callback: (file: File | null)=>void, name?: string}
+
+export function useFileInputPanel({callback}: Pick<FileInputPanelProps, "callback">) {
     const file = useRef<File | null>(null)
+    return {
+        getFile: () => file.current,
+        setFile: (next: File | null) => { file.current = next },
+        submit: () => callback(file.current),
+        inputProps: {
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => { file.current = e.target.files?.[0] ?? null },
+        },
+    }
+}
+
+export function FileInputPanel({callback, name = ""}: FileInputPanelProps) {
+    const input = useFileInputPanel({callback})
     return <div className={"maxSize"} style={{padding: 20,}}>
         <label>{name}</label>
-        <input type={"file"} style={{width:"100%"}} onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-            file.current = e.target.files?.[0] ?? null
-        }}/>
-        <div style={{marginTop: 20}} className={"msTradeAlt msTradeActive"} onClick={()=>{callback(file.current)}}>send</div>
+        <input type={"file"} style={{width:"100%"}} {...input.inputProps}/>
+        <div style={{marginTop: 20}} className={"msTradeAlt msTradeActive"} onClick={input.submit}>send</div>
     </div>
 }
 export function FreeModal({outClick, children, zIndex, size = {height: 150, width: 300}, keyForSave = "FreeModal"}: {zIndex?: number, outClick: ()=>any, children: React.JSX.Element, size?: {height: number, width: number}, keyForSave?: string}) {

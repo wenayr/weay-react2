@@ -40,10 +40,15 @@ export type MenuStripItem = {
     fixed?: boolean
 }
 
+function colsMenuClass(parts: Array<string | false | null | undefined>) {
+    return parts.filter(Boolean).join(' ')
+}
+
 function MenuButton(p: {
     item: MenuStripItem
     onItem?: (key: string, e: React.MouseEvent) => void
     drag?: {onMouseDown: React.MouseEventHandler, onTouchStart: React.TouchEventHandler}
+    className?: string
     style?: React.CSSProperties
     /** icon-only face: the icon, or the first letters of short/title as a
      *  text pseudo-icon; the full title stays in the tooltip */
@@ -52,28 +57,21 @@ function MenuButton(p: {
     const it = p.item
     const disabled = it.state == 'disabled'
     const on = it.state == 'on'
+    const stateClass = disabled ? 'wenayColsMenuBtn_disabled' : on ? 'wenayColsMenuBtn_on' : 'wenayColsMenuBtn_off'
     const abbr = p.compact && it.icon == null
-        ? <span style={{fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase'}}>
+        ? <span className='wenayColsMenuAbbr'>
             {(it.short ?? it.title).slice(0, 3)}
         </span> : null
     return <div title={it.title}
                 onClick={disabled ? undefined : e => p.onItem?.(it.key, e)}
                 onMouseDown={p.drag?.onMouseDown}
                 onTouchStart={p.drag?.onTouchStart}
-                style={{
-                    position: 'relative', display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '3px 9px', borderRadius: 6, fontSize: 12, lineHeight: '16px',
-                    whiteSpace: 'nowrap', cursor: disabled ? 'default' : 'pointer',
-                    ...(disabled ? {border: '1px dashed #d0d7de', background: '#f6f8fa', color: '#c4ccd4'}
-                        : on ? {border: '1px solid #24292f', background: '#24292f', color: '#fff'}
-                            : {border: '1px solid #d0d7de', background: '#fff', color: '#8c959f', textDecoration: 'line-through'}),
-                    ...(it.fixed ? {boxShadow: '0 0 0 2px #eaeef2'} : null),
-                    ...p.style,
-                }}>
-        {it.icon != null && <span style={{display: 'inline-flex', alignItems: 'center'}}>{it.icon}</span>}
+                className={colsMenuClass(['wenayColsMenuBtn', stateClass, it.fixed && 'wenayColsMenuBtn_fixed', p.className])}
+                style={p.style}>
+        {it.icon != null && <span className='wenayColsMenuIcon'>{it.icon}</span>}
         {abbr}
-        {!p.compact && <span>{it.short ?? it.title}</span>}
-        {it.marks != null && <span style={{fontSize: 9, opacity: 0.9}}>{it.marks}</span>}
+        {!p.compact && <span className='wenayColsMenuLabel'>{it.short ?? it.title}</span>}
+        {it.marks != null && <span className='wenayColsMenuMarks'>{it.marks}</span>}
     </div>
 }
 
@@ -116,10 +114,9 @@ export function MenuStrip(p: {
         if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return
         p.onItem?.(key, e)
     }
-    return <div className={p.className}
-                style={{display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', userSelect: 'none', ...p.style}}>
+    return <div className={colsMenuClass(['wenayColsMenu', p.className])} style={p.style}>
         {/* the reorder container holds ONLY the reorderable items (1:1 with order) */}
-        <div ref={reorder.listRef} style={{display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap'}}>
+        <div ref={reorder.listRef} className='wenayColsMenuList'>
             {p.items.map(it => {
                 const r = reorder.item(it.key)
                 const drag = {
@@ -129,16 +126,13 @@ export function MenuStrip(p: {
                     },
                     onTouchStart: r.props.onTouchStart,
                 }
+                const dragClass = r.dragging ? 'wenayColsMenuBtn_dragging' : r.active ? 'wenayColsMenuBtn_shift' : undefined
                 return <MenuButton key={it.key} item={it} onItem={onItem} drag={drag} compact={p.compact}
-                                   style={{
-                                       ...r.style,
-                                       ...(r.dragging ? {zIndex: 3, boxShadow: '0 3px 10px rgba(0,0,0,0.35)'}
-                                           : r.active ? {transition: 'transform 0.15s ease'} : null),
-                                   }}/>
+                                   className={dragClass} style={r.style}/>
             })}
         </div>
         {!!p.tail?.length && <>
-            <div style={{width: 1, alignSelf: 'stretch', margin: '1px 2px', background: '#d0d7de'}}/>
+            <div className='wenayColsMenuDivider'/>
             {p.tail.map(it => <MenuButton key={it.key} item={it} onItem={p.onItem} compact={p.compact}/>)}
         </>}
     </div>

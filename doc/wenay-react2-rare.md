@@ -85,7 +85,7 @@ replacement is a no-op. Tree shape comes from nested `children` or flat sections
 Search matches section labels, `keywords`, `searchText`, and best-effort text extracted from rendered
 React children; matching descendants stay visible and their ancestors auto-expand. The search input uses
 `createSearchHistory({key:"SettingsDialog.searchHistory"})`: Enter commits the current query, the history
-button recalls stored queries, and changes are published through memoryProps -> memoryCache. Tree controls
+button recalls stored queries, leaving the search box closes the list, and changes are published through memoryProps -> memoryCache. Tree controls
 are one compact dotted cycle button in the search row (expanded -> current branch -> collapsed), hidden when
 the tree has too little hierarchy to need it. Closes on the x, a scrim click, and Escape.
 Styling: `--dlg-scrim / bg / border / radius / shadow / nav-bg / nav-width` tokens (tokens.css,
@@ -259,6 +259,9 @@ Two DECOUPLED layers, because "what a click means" is deliberately not the strip
 - `ColumnsMenu` binds it to a columnState: buttons follow config.order (the grid mirror is free -
   both read the same config), state = disabled (absent from the live grid) / on / off, default
   click = toggle visibility (overridable via `onItem` for multi-state columns), drag = api.move.
+  It is the compact/presentation surface. For settings-integrated bars that need density,
+  pseudo-controls, reset, and global Settings reuse, use `createToolbar({source: cs.api.listSource})`
+  as the canonical richer surface and optionally render a compact `ColumnsMenu` beside it.
 - Click-vs-drag guard: a drag that ends on its origin button still fires a browser click; a click
   that travelled >4px from mousedown is dropped, so a snapped-back drag never also toggles.
 - `compact` = icon-only buttons: the icon, or the first letters of short/title as a text
@@ -266,7 +269,7 @@ Two DECOUPLED layers, because "what a click means" is deliberately not the strip
 
 Mobile (no ag-grid, no storage - the config alone):
 ```
-<ColumnDots state max?=4 className? style? />        // grid/columnState/ColumnDots.tsx
+<ColumnDots state max?=8 className? style? />        // grid/columnState/ColumnDots.tsx
 <CardList<Row> state data getId? renderValue? />     // grid/columnState/CardList.tsx
 ```
 - `ColumnDots` is a discrete multi-thumb slider on pointer events (react-range cannot change thumb
@@ -432,9 +435,12 @@ contextMenu.openAt(eventOrPoint, items, {source?, layerId?}) -> boolean
 contextMenu.openAtPoint({x, y}, items, {source?, layerId?}) -> boolean
 contextMenu.close()
 contextMenu.getState() -> {open, items, point, source?, layerId?, seq}
+contextMenu.stats.getSnapshot() -> {openAt, openAtPoint, legacyLayer, close, replace, empty, sources, layers}
+contextMenu.stats.reset()
+contextMenu.stats.onChange(cb) -> off
 <contextMenu.Layer zIndex? statusOn? other? className?>...</contextMenu.Layer>
 contextMenu.map                         // legacy queue consumed by Layer; prefer openAt
-createContextMenu({name?})              // custom isolated instance
+createContextMenu({name?})              // custom isolated instance with its own state and stats
 createRightClickMenu()                  // lower-level legacy right-click factory
 
 DropdownMenu({elements, trigger?, classNames?, styles?, style?, position?, verticalPosition?, keyForSave?})
@@ -445,7 +451,7 @@ MenuRightTrigger / MenuRightClassNames / MenuRightStyles
 StickerMenu                          // components/Menu re-export
 ```
 
-Prefer `contextMenu.openAt(e, items)` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, and stays supported through `1.x`; it should not be the primary API in new code. Planned diagnostics should count openAt/openAtPoint vs legacy queued opens, source/layer usage, item clicks by explicit stable keys, submenu opens, async errors, and close reasons where known. Counters must be local and opt-in, not hidden analytics.
+Prefer `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, and stays supported through `1.x`; it should not be the primary API in new code. `contextMenu.stats` is local in-memory diagnostics, not hidden analytics: it counts direct `openAt`, `openAtPoint`, legacy Layer queued opens, empty opens, close/replace, and source/layer usage. It deliberately does not persist, send network requests, or store arbitrary item labels. Item-click/submenu/async-error counters still need an explicit stable action-key contract before implementation.
 
 `Menu` does not mutate `item.status`. Open/hover state is an internal active index; `status` remains a seed/compatibility value, and custom item renderers receive a view item whose `status` mirrors the current open state.
 
@@ -620,17 +626,20 @@ Current tokenized prefixes:
 - `--dlg-*` for `SettingsDialog` chrome.
 - `--tb-*` for toolbar chrome.
 - `--logs-*` for global/context logger chrome.
+- `--cols-menu-*` for compact `ColumnsMenu/MenuStrip` chrome.
+- `--cols-dots-*` for `ColumnDots` chrome.
+- `--cols-card-*` for `CardList` chrome.
 - `--wenay-z-modal` for modal/overlay stacking.
 
 Normalization rule: new shared CSS should first try an existing token. Add a new token only when a value is reused by a shared primitive or is expected to be theme-overridden by apps. One-off app/demo styles should stay in the demo/app wrapper, not in library tokens. Do not delete a default style/class without a replacement class/token path and changelog entry; visually broken defaults are treated as a compatibility break.
 
 Open normalization candidates:
 - `src/style/style.css`: `.msTradeAlt`, `.msTradeActive`, `.newButtonSimple`, `.toIndicatorMenuButton:hover`, submit-button green, and several toolbar row hover/drag literals still use raw colors.
-- `src/common/src/grid/columnState/*`: card/list/menu visuals use GitHub-like inline colors. If these are generic product primitives, introduce `--cols-*` tokens; if they are demo-ish, keep them isolated.
+- `src/common/src/grid/columnState/*`: compact menu/dots/card visuals now use `.wenayColsMenu*`, `.wenayColDots*`, `.wenayCardList*` plus `--cols-menu-*`, `--cols-dots-*`, and `--cols-card-*`; further changes here should be visual QA only, not a new default palette.
 - `src/common/src/components/ParamsEditor.tsx` and `src/common/src/components/Input.tsx`: if these stay public primitives, define default class/token contracts instead of component-owned visual styling.
 - `src/common/src/styles/commentaryStyles.css`: standalone `.commentary` CSS is not imported by the root style bundle; either import/tokenize it if still used, or mark it as a local component concern.
 
-Recently normalized: mouse context-menu item colors through `--menu-*`, `--menu-outline-color` for `OutlineDragDemo`, `--logs-*` for logger chrome, and `--dlg-scrim` in `ModalProvider`.
+Recently normalized: mouse context-menu item colors through `--menu-*`, `--menu-outline-color` for `OutlineDragDemo`, `--logs-*` for logger chrome, `--dlg-scrim` in `ModalProvider`, compact `ColumnsMenu/MenuStrip` visuals through `.wenayColsMenu*` / `--cols-menu-*`, and card-29 mobile primitives through `--cols-dots-*` / `--cols-card-*`.
 
 ## Cleanup Inventory
 

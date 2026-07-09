@@ -1,5 +1,5 @@
 import React from "react";
-import {fireEvent, render, screen} from "@testing-library/react";
+import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {SettingsDialog, type SettingsSection} from "../src/common/src/components/Settings/SettingsDialog";
 
 const sections: SettingsSection[] = [
@@ -40,4 +40,21 @@ test("SettingsDialog updates floating window content when search state changes",
 
     expect(screen.getByText("Suffix content")).toBeTruthy();
     expect(screen.queryByText("Display")).toBeNull();
+});
+test("SettingsDialog closes search history when search focus leaves", async () => {
+    render(React.createElement(SettingsDialog, {sections, defaultSection: "general"}));
+
+    fireEvent.click(screen.getByRole("button", {name: "Open settings"}));
+    const search = screen.getByRole("textbox", {name: "Search settings"});
+
+    fireEvent.change(search, {target: {value: "suffix"}});
+    fireEvent.keyDown(search, {key: "Enter"});
+    expect(screen.queryByRole("listbox")).toBeNull();
+
+    fireEvent.blur(search);
+    fireEvent.focus(search);
+    expect(screen.getByRole("listbox")).toBeTruthy();
+
+    fireEvent.blur(search);
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
 });

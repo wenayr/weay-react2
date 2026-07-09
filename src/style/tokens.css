@@ -87,7 +87,81 @@
   --tb-pop-radius: 8px;
   --tb-pop-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
 
+  /* Column-state compact menu (ColumnsMenu/MenuStrip). Defaults preserve the
+     previous GitHub-like inline look; apps can override via --cols-menu-*. */
+  --cols-menu-gap: 6px;
+  --cols-menu-btn-gap: 4px;
+  --cols-menu-btn-padding: 3px 9px;
+  --cols-menu-btn-radius: 6px;
+  --cols-menu-btn-font-size: 12px;
+  --cols-menu-btn-line-height: 16px;
+  --cols-menu-on-border: 1px solid #24292f;
+  --cols-menu-on-bg: #24292f;
+  --cols-menu-on-color: #fff;
+  --cols-menu-off-border: 1px solid #d0d7de;
+  --cols-menu-off-bg: #fff;
+  --cols-menu-off-color: #8c959f;
+  --cols-menu-disabled-border: 1px dashed #d0d7de;
+  --cols-menu-disabled-bg: #f6f8fa;
+  --cols-menu-disabled-color: #c4ccd4;
+  --cols-menu-fixed-shadow: 0 0 0 2px #eaeef2;
+  --cols-menu-drag-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  --cols-menu-divider: #d0d7de;
+  --cols-menu-abbr-font-size: 10px;
+  --cols-menu-abbr-font-weight: 700;
+  --cols-menu-abbr-letter-spacing: 0.5px;
+  --cols-menu-marks-font-size: 9px;
+  --cols-menu-marks-opacity: 0.9;
 
+  /* Column-state mobile/card primitives (ColumnDots/CardList). Defaults preserve
+     the restored card-29 look; apps can override via --cols-dots-* / --cols-card-*. */
+  --cols-dots-text: #24292f;
+  --cols-dots-head-gap: 10px;
+  --cols-dots-head-margin-bottom: 6px;
+  --cols-dots-head-font-size: 12px;
+  --cols-dots-meta-color: #57606a;
+  --cols-dots-sort-border: 1px solid #6e7781;
+  --cols-dots-sort-radius: 6px;
+  --cols-dots-sort-padding: 2px 8px;
+  --cols-dots-sort-font-size: 12px;
+  --cols-dots-sort-bg: #fff;
+  --cols-dots-track-height: 56px;
+  --cols-dots-track-margin: 0 14px;
+  --cols-dots-rail: #d0d7de;
+  --cols-dots-mark-width: 44px;
+  --cols-dots-mark-height: 56px;
+  --cols-dots-mark-margin-left: -22px;
+  --cols-dots-sort-mark-color: #0969da;
+  --cols-dots-sort-mark-font-size: 11px;
+  --cols-dots-pin: #afb8c1;
+  --cols-dots-label-color: #8c959f;
+  --cols-dots-label-active-color: #24292f;
+  --cols-dots-label-font-size: 10px;
+  --cols-dots-dot-size: 18px;
+  --cols-dots-dot-radius: 9px;
+  --cols-dots-dot-bg: #24292f;
+  --cols-dots-dot-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  --cols-dots-selected-bg: #0969da;
+  --cols-dots-selected-border: #b6d4fe;
+  --cols-dots-fixed-border: #afb8c1;
+  --cols-card-gap: 8px;
+  --cols-card-border: 1px solid #d0d7de;
+  --cols-card-radius: 8px;
+  --cols-card-padding: 8px 10px;
+  --cols-card-bg: #fff;
+  --cols-card-header-gap: 8px;
+  --cols-card-header-margin-bottom: 6px;
+  --cols-card-title-font-size: 14px;
+  --cols-card-accent-font-size: 11px;
+  --cols-card-accent-padding: 1px 8px;
+  --cols-card-accent-radius: 10px;
+  --cols-card-accent-bg: #ddf4ff;
+  --cols-card-accent-color: #0969da;
+  --cols-card-field-gap: 10px;
+  --cols-card-field-font-size: 12px;
+  --cols-card-field-line-height: 1.7;
+  --cols-card-label-color: #57606a;
+  --cols-card-label-min-width: 72px;
   /* Logs. Defaults preserve the old logger look; apps can override in their theme. */
   --logs-notification-text: #fff;
   --logs-notification-accent: #5D9FFA;

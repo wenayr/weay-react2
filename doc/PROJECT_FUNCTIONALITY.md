@@ -301,6 +301,7 @@ Main APIs:
 - `ParamsEditor`
 - `ParamsEdit`
 - `ParamRow`
+- `useTextInputPanel`, `useFileInputPanel`
 - `TextInputPanel`, `FileInputPanel`
 
 Use these for generic param editing. Product-specific validation and save

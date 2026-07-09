@@ -304,6 +304,7 @@ export function SettingsDialog(props: {
     const [navWidth, setNavWidth] = useState(() => clampSettingsNavWidth(settingsDialogLayout.navWidth))
     const [navResizing, setNavResizing] = useState(false)
     const searchInputRef = useRef<HTMLInputElement>(null)
+    const searchBoxRef = useRef<HTMLDivElement>(null)
     const navResizeRef = useRef<{startX: number, startWidth: number} | null>(null)
     const navWidthRef = useRef(navWidth)
     updateBy(registry)
@@ -455,6 +456,14 @@ export function SettingsDialog(props: {
         searchInputRef.current?.focus()
     }
 
+    function closeHistoryWhenSearchFocusLeaves(e: React.FocusEvent<HTMLDivElement>) {
+        const next = e.relatedTarget as Node | null
+        if (next && e.currentTarget.contains(next)) return
+        window.setTimeout(() => {
+            const box = searchBoxRef.current
+            if (box == null || !box.contains(document.activeElement)) setHistoryOpen(false)
+        }, 0)
+    }
     function cycleTreeTool() {
         if (treeToolState == "expanded") collapseOutsideCurrent()
         else if (treeToolState == "branch") collapseAll()
@@ -539,7 +548,7 @@ export function SettingsDialog(props: {
                         <div className={classNames(["wenayDlg", navResizing && "wenayDlg_resizing"])}>
                     <div className="wenayDlgNav" style={{width: navWidth}}>
                         <div className="wenayDlgNavTop">
-                            <div className="wenayDlgSearchBox">
+                            <div ref={searchBoxRef} className="wenayDlgSearchBox" onBlur={closeHistoryWhenSearchFocusLeaves}>
                                 <input
                                     ref={searchInputRef}
                                     className="wenayDlgSearch"

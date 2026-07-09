@@ -323,14 +323,14 @@ const ColumnStateDemo = () => {
 
 
 /* ---------- 29. columnState mobile: ColumnDots + CardList ---------- */
-type tMobRow = { id: string; name: string; price: number; qty: number; ver: string; note: string };
+type tMobRow = { id: string; name: string; price: number; qty: number; ver: string; note: string; base: string; change: string; risk: string };
 const mobRows: tMobRow[] = [
-    { id: "btc", name: "BTCUSDT", price: 64230.5, qty: 3, ver: "v2", note: "spot" },
-    { id: "eth", name: "ETHUSDT", price: 3120.2, qty: 12, ver: "v3", note: "spot" },
-    { id: "sol", name: "SOLUSDT", price: 148.9, qty: 40, ver: "v1", note: "futures" },
-    { id: "ada", name: "ADAUSDT", price: 0.44, qty: 900, ver: "v2", note: "spot" },
-    { id: "dot", name: "DOTUSDT", price: 6.8, qty: 150, ver: "v4", note: "futures" },
-    { id: "xrp", name: "XRPUSDT", price: 0.52, qty: 700, ver: "v1", note: "spot" },
+    { id: "btc", name: "BTCUSDT", price: 64230.5, qty: 3, ver: "v2", note: "spot", base: "USDT", change: "+1.8%", risk: "low" },
+    { id: "eth", name: "ETHUSDT", price: 3120.2, qty: 12, ver: "v3", note: "spot", base: "USDT", change: "+0.7%", risk: "mid" },
+    { id: "sol", name: "SOLUSDT", price: 148.9, qty: 40, ver: "v1", note: "futures", base: "USDT", change: "-2.1%", risk: "high" },
+    { id: "ada", name: "ADAUSDT", price: 0.44, qty: 900, ver: "v2", note: "spot", base: "USDT", change: "+0.2%", risk: "low" },
+    { id: "dot", name: "DOTUSDT", price: 6.8, qty: 150, ver: "v4", note: "futures", base: "USDT", change: "-0.9%", risk: "mid" },
+    { id: "xrp", name: "XRPUSDT", price: 0.52, qty: 700, ver: "v1", note: "spot", base: "USDT", change: "+3.0%", risk: "mid" },
 ];
 const qaMobColumns = createColumnState({
     key: "qa29.mobileColumns",
@@ -340,13 +340,58 @@ const qaMobColumns = createColumnState({
         { key: "qty", title: "Quantity", short: "qty", defaultVisible: false },
         { key: "ver", title: "Version", short: "ver", cardRole: "accent", defaultVisible: false },
         { key: "note", title: "Note", short: "note", defaultVisible: false },
+        { key: "base", title: "Base", short: "base", defaultVisible: false },
+        { key: "change", title: "Change", short: "chg", defaultVisible: false },
+        { key: "risk", title: "Risk", short: "risk", defaultVisible: false },
     ],
 });
 
+const qa29MobileCss = `
+.qa29MobileShell {
+  position: relative;
+  max-width: 420px;
+}
+.qa29MobileCards .wenayCardListItem:last-child {
+  padding-bottom: 92px;
+}
+.qa29MobileDots {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  padding: 6px 8px 8px;
+  border: 1px solid rgba(208, 215, 222, 0.92);
+  border-radius: 8px;
+  background: rgba(246, 248, 250, 0.94);
+  box-shadow: 0 8px 22px rgba(36, 41, 47, 0.18);
+  backdrop-filter: blur(6px);
+}
+.qa29MobileDots .wenayColDotsHead {
+  gap: 6px;
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+.qa29MobileDots .wenayColDotsTrack {
+  height: 48px;
+  margin: 0 16px;
+}
+.qa29MobileDots .wenayColDotsSort {
+  padding: 1px 6px;
+  font-size: 11px;
+  opacity: 0.72;
+  background: transparent;
+}
+.qa29MobileDots .wenayColDotsMeta {
+  font-size: 11px;
+}
+`;
+
 const MobileColumnsDemo = () => (
-    <div style={{ maxWidth: 420 }}>
-        <ColumnDots state={qaMobColumns} max={4} />
-        <CardList<tMobRow> state={qaMobColumns} data={mobRows} getId={r => r.id} style={{ marginTop: 10 }} />
+    <div className="qa29MobileShell">
+        <style>{qa29MobileCss}</style>
+        <CardList<tMobRow> state={qaMobColumns} data={mobRows} getId={r => r.id} className="qa29MobileCards" />
+        <ColumnDots state={qaMobColumns} max={8} className="qa29MobileDots" />
     </div>
 );
 
@@ -1359,6 +1404,43 @@ const boardState = {
     commits: 0, events: 0, last: "-", nextCol: 6,
 };
 
+const qaBoardStyles: Record<string, React.CSSProperties> = {
+    root: { display: "grid", gap: 8, fontSize: 13 },
+    columns: { display: "flex", gap: 6, alignItems: "flex-start", flexWrap: "wrap" },
+    insertStrip: {
+        width: 14, height: 240, borderRadius: 6, cursor: "pointer", userSelect: "none",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#57606a", background: "#151b26", fontSize: 12,
+    },
+    column: { display: "flex", flexDirection: "column", gap: 6, width: 78, height: 240, padding: 6, borderRadius: 8 },
+    item: {
+        height: 32, lineHeight: "32px", textAlign: "center", borderRadius: 6,
+        color: "#dfe6ef", cursor: "grab", userSelect: "none", touchAction: "none",
+    },
+    status: { color: "#57606a", fontFamily: "monospace", fontSize: 12 },
+};
+
+function qaBoardColumnStyle(over: boolean, bottom: boolean): React.CSSProperties {
+    return {
+        ...qaBoardStyles.column,
+        justifyContent: bottom ? "flex-end" : "flex-start",
+        background: over ? "#1d2b40" : "#17202e",
+        outline: over ? "1px solid #2f5a8f" : undefined,
+    };
+}
+
+function qaBoardItemStyle(it: {dragging: boolean; active: boolean; style?: React.CSSProperties}): React.CSSProperties {
+    return {
+        ...qaBoardStyles.item,
+        background: it.dragging ? "#2f5a8f" : "#2b3648",
+        transition: it.active && !it.dragging ? "transform 0.12s ease" : undefined,
+        position: it.dragging ? "relative" : undefined,
+        zIndex: it.dragging ? 1 : undefined,
+        boxShadow: it.dragging ? "0 4px 14px rgba(0,0,0,0.4)" : undefined,
+        ...it.style,
+    };
+}
+
 const BoardDemo = () => {
     updateBy(boardState);
     const log = (s: string) => { boardState.last = s; boardState.events++; renderBy(boardState); };
@@ -1379,44 +1461,25 @@ const BoardDemo = () => {
         renderBy(boardState);
     };
     const InsertStrip = ({ at }: { at: number }) => (
-        <div title="insert column here" onClick={() => addColumnAt(at)}
-             style={{
-                 width: 14, height: 240, borderRadius: 6, cursor: "pointer", userSelect: "none",
-                 display: "flex", alignItems: "center", justifyContent: "center",
-                 color: "#57606a", background: "#151b26", fontSize: 12,
-             }}>+</div>
+        <div title="insert column here" onClick={() => addColumnAt(at)} style={qaBoardStyles.insertStrip}>+</div>
     );
-    return <div style={{ display: "grid", gap: 8, fontSize: 13 }}>
-        <div style={{ display: "flex", gap: 6, alignItems: "flex-start", flexWrap: "wrap" }}>
+    return <div style={qaBoardStyles.root}>
+        <div style={qaBoardStyles.columns}>
             <InsertStrip at={0} />
             {boardState.cols.map((c, ci) => (
                 <React.Fragment key={c.key}>
                     <div ref={r.columnRef(c.key)}
-                         style={{
-                             display: "flex", flexDirection: "column", gap: 6, width: 78, height: 240,
-                             justifyContent: boardState.gravity[c.key] == "bottom" ? "flex-end" : "flex-start",
-                             background: r.over?.col == c.key ? "#1d2b40" : "#17202e", padding: 6, borderRadius: 8,
-                             outline: r.over?.col == c.key ? "1px solid #2f5a8f" : undefined,
-                         }}>
+                         style={qaBoardColumnStyle(r.over?.col == c.key, boardState.gravity[c.key] == "bottom")}>
                         {c.items.map(k => {
                             const it = r.item(k);
-                            return <div key={k} {...it.props}
-                                        style={{
-                                            height: 32, lineHeight: "32px", textAlign: "center", borderRadius: 6,
-                                            background: it.dragging ? "#2f5a8f" : "#2b3648", color: "#dfe6ef",
-                                            cursor: "grab", userSelect: "none", touchAction: "none",
-                                            transition: it.active && !it.dragging ? "transform 0.12s ease" : undefined,
-                                            position: it.dragging ? "relative" : undefined, zIndex: it.dragging ? 1 : undefined,
-                                            boxShadow: it.dragging ? "0 4px 14px rgba(0,0,0,0.4)" : undefined,
-                                            ...it.style,
-                                        }}>{k}</div>;
+                            return <div key={k} {...it.props} style={qaBoardItemStyle(it)}>{k}</div>;
                         })}
                     </div>
                     <InsertStrip at={ci + 1} />
                 </React.Fragment>
             ))}
         </div>
-        <div style={{ color: "#57606a", fontFamily: "monospace", fontSize: 12 }}>
+        <div style={qaBoardStyles.status}>
             {boardState.cols.map(c => c.key + (boardState.gravity[c.key] == "bottom" ? "↓" : "↑") + ":[" + c.items.join(",") + "]").join(" ")} | commits: {boardState.commits} | events: {boardState.events} | last: {boardState.last}
         </div>
     </div>;
@@ -1476,7 +1539,7 @@ function ActiveChecks() {
 
             <Check n={20} title="SettingsDialog - searchable settings tree + registry"
                    do="Click the three-dot toolbar-style settings button: drag the window by its header, drag the divider between tree and content, double-click it to reset width, use the tree icons and the dotted tree-cycle button, search for suffix/leaf/palette/accent/font/external and wrong-layout examples like ыгаашч for suffix. Press Enter to save a query into search history, reopen history from the clock button, pick a saved query, then clear history. Clear search via the x and via Escape, then close via window x/outside click/Escape with empty search. Unmount external module and open again."
-                   expect="The default trigger is the same compact toolbar-button style as createToolbar, using a three-dot icon. Dialog opens as the standard draggable FloatingWindow with a header, larger size, shared close x, and outside-click close. The tree/content divider changes the tree width, persists it through memoryCache, supports keyboard arrows, and double-click/Enter resets to default. Search uses original input plus RU/EN keyboard-layout variants, selects the first real match, auto-expands parents, and highlights only the matched word once. Enter stores non-empty queries in a small persisted search history; choosing a history item restores the query; clearing history removes the dropdown. The dotted tree-cycle button switches expanded/current branch/collapsed and stays in the search row. The clear x and Escape both cancel search text; Escape with empty search closes the dialog. The external child under Display appears only while mounted."
+                   expect="The default trigger is the same compact toolbar-button style as createToolbar, using a three-dot icon. Dialog opens as the standard draggable FloatingWindow with a header, larger size, shared close x, and outside-click close. The tree/content divider changes the tree width, persists it through memoryCache, supports keyboard arrows, and double-click/Enter resets to default. Search uses original input plus RU/EN keyboard-layout variants, selects the first real match, auto-expands parents, and highlights only the matched word once. Enter stores non-empty queries in a small persisted search history; choosing a history item restores the query; clearing history removes the dropdown; leaving the search box closes the dropdown. The dotted tree-cycle button switches expanded/current branch/collapsed and stays in the search row. The clear x and Escape both cancel search text; Escape with empty search closes the dialog. The external child under Display appears only while mounted."
                    note="Registry is a module singleton (registerSettingsSection -> unregister), no React context. Tree shape comes from children or parentKey. Search history uses createSearchHistory -> memoryGetOrCreate/memoryCache dirty channel; this demo loads memoryCache and saves dirty changes with saveDebounced(300). Look via --dlg-* tokens; apps pass their own section classes via sectionClassName/sectionActiveClassName.">
                 <SettingsDialogDemo />
             </Check>

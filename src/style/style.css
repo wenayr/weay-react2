@@ -745,32 +745,103 @@ body {
   overflow: auto;
 }
 
+/* Column state compact menu (ColumnsMenu/MenuStrip). Visual defaults moved from
+   component inline styles; runtime drag transforms remain inline. */
+.wenayColsMenu,
+.wenayColsMenuList {
+  display: flex;
+  align-items: center;
+  gap: var(--cols-menu-gap, 6px);
+  flex-wrap: wrap;
+}
+.wenayColsMenu {
+  user-select: none;
+}
+.wenayColsMenuBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--cols-menu-btn-gap, 4px);
+  padding: var(--cols-menu-btn-padding, 3px 9px);
+  border-radius: var(--cols-menu-btn-radius, 6px);
+  font-size: var(--cols-menu-btn-font-size, 12px);
+  line-height: var(--cols-menu-btn-line-height, 16px);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.wenayColsMenuBtn_on {
+  border: var(--cols-menu-on-border, 1px solid #24292f);
+  background: var(--cols-menu-on-bg, #24292f);
+  color: var(--cols-menu-on-color, #fff);
+}
+.wenayColsMenuBtn_off {
+  border: var(--cols-menu-off-border, 1px solid #d0d7de);
+  background: var(--cols-menu-off-bg, #fff);
+  color: var(--cols-menu-off-color, #8c959f);
+  text-decoration: line-through;
+}
+.wenayColsMenuBtn_disabled {
+  border: var(--cols-menu-disabled-border, 1px dashed #d0d7de);
+  background: var(--cols-menu-disabled-bg, #f6f8fa);
+  color: var(--cols-menu-disabled-color, #c4ccd4);
+  cursor: default;
+}
+.wenayColsMenuBtn_fixed {
+  box-shadow: var(--cols-menu-fixed-shadow, 0 0 0 2px #eaeef2);
+}
+.wenayColsMenuBtn_dragging {
+  z-index: 3;
+  box-shadow: var(--cols-menu-drag-shadow, 0 3px 10px rgba(0, 0, 0, 0.35));
+}
+.wenayColsMenuBtn_shift {
+  transition: transform 0.15s ease;
+}
+.wenayColsMenuIcon {
+  display: inline-flex;
+  align-items: center;
+}
+.wenayColsMenuAbbr {
+  font-size: var(--cols-menu-abbr-font-size, 10px);
+  font-weight: var(--cols-menu-abbr-font-weight, 700);
+  letter-spacing: var(--cols-menu-abbr-letter-spacing, 0.5px);
+  text-transform: uppercase;
+}
+.wenayColsMenuMarks {
+  font-size: var(--cols-menu-marks-font-size, 9px);
+  opacity: var(--cols-menu-marks-opacity, 0.9);
+}
+.wenayColsMenuDivider {
+  width: 1px;
+  align-self: stretch;
+  margin: 1px 2px;
+  background: var(--cols-menu-divider, #d0d7de);
+}
 /* Column state mobile primitives (ColumnDots/CardList). Visual defaults mirror the
-   original stand-29 inline look; apps can still override with className/style. */
+   restored stand-29 look and are tokenized through --cols-dots-* / --cols-card-*. */
 .wenayColDots {
   user-select: none;
-  color: #24292f;
+  color: var(--cols-dots-text, #24292f);
 }
 .wenayColDotsHead {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
-  font-size: 12px;
+  gap: var(--cols-dots-head-gap, 10px);
+  margin-bottom: var(--cols-dots-head-margin-bottom, 6px);
+  font-size: var(--cols-dots-head-font-size, 12px);
 }
 .wenayColDotsMeta {
-  color: #57606a;
+  color: var(--cols-dots-meta-color, #57606a);
 }
 .wenayColDotsSpacer {
   flex: 1;
 }
 .wenayColDotsSort {
-  border: 1px solid #6e7781;
-  border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 12px;
+  border: var(--cols-dots-sort-border, 1px solid #6e7781);
+  border-radius: var(--cols-dots-sort-radius, 6px);
+  padding: var(--cols-dots-sort-padding, 2px 8px);
+  font-size: var(--cols-dots-sort-font-size, 12px);
   cursor: pointer;
-  background: #fff;
+  background: var(--cols-dots-sort-bg, #fff);
 }
 .wenayColDotsSort:disabled {
   cursor: default;
@@ -778,8 +849,8 @@ body {
 }
 .wenayColDotsTrack {
   position: relative;
-  height: 56px;
-  margin: 0 14px;
+  height: var(--cols-dots-track-height, 56px);
+  margin: var(--cols-dots-track-margin, 0 14px);
   touch-action: none;
 }
 .wenayColDotsRail {
@@ -789,14 +860,14 @@ body {
   top: 27px;
   height: 2px;
   border-radius: 1px;
-  background: #d0d7de;
+  background: var(--cols-dots-rail, #d0d7de);
 }
 .wenayColDotsMark {
   position: absolute;
   top: 0;
-  width: 44px;
-  height: 56px;
-  margin-left: -22px;
+  width: var(--cols-dots-mark-width, 44px);
+  height: var(--cols-dots-mark-height, 56px);
+  margin-left: var(--cols-dots-mark-margin-left, -22px);
 }
 .wenayColDotsSortMark {
   position: absolute;
@@ -804,8 +875,8 @@ body {
   right: 0;
   top: 0;
   text-align: center;
-  font-size: 11px;
-  color: #0969da;
+  font-size: var(--cols-dots-sort-mark-font-size, 11px);
+  color: var(--cols-dots-sort-mark-color, #0969da);
   font-weight: 700;
 }
 .wenayColDotsMarkPin {
@@ -816,7 +887,7 @@ body {
   height: 8px;
   margin-left: -4px;
   border-radius: 4px;
-  background: #afb8c1;
+  background: var(--cols-dots-pin, #afb8c1);
 }
 .wenayColDotsMark_on .wenayColDotsMarkPin {
   background: transparent;
@@ -827,14 +898,14 @@ body {
   right: 0;
   top: 40px;
   text-align: center;
-  font-size: 10px;
-  color: #8c959f;
+  font-size: var(--cols-dots-label-font-size, 10px);
+  color: var(--cols-dots-label-color, #8c959f);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .wenayColDotsMark_on .wenayColDotsMarkLabel {
-  color: #24292f;
+  color: var(--cols-dots-label-active-color, #24292f);
 }
 .wenayColDotsDotWrap {
   position: absolute;
@@ -860,37 +931,37 @@ body {
   opacity: 0.4;
 }
 .wenayColDotsDot {
-  width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  background: #24292f;
+  width: var(--cols-dots-dot-size, 18px);
+  height: var(--cols-dots-dot-size, 18px);
+  border-radius: var(--cols-dots-dot-radius, 9px);
+  background: var(--cols-dots-dot-bg, #24292f);
   border: 2px solid transparent;
 }
 .wenayColDotsDotWrap_dragging .wenayColDotsDot {
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--cols-dots-dot-shadow, 0 3px 10px rgba(0, 0, 0, 0.35));
 }
 .wenayColDotsDot_selected {
-  background: #0969da;
-  border-color: #b6d4fe;
+  background: var(--cols-dots-selected-bg, #0969da);
+  border-color: var(--cols-dots-selected-border, #b6d4fe);
 }
 .wenayColDotsDot_fixed {
-  border-color: #afb8c1;
+  border-color: var(--cols-dots-fixed-border, #afb8c1);
 }
 .wenayCardList {
   display: grid;
-  gap: 8px;
+  gap: var(--cols-card-gap, 8px);
 }
 .wenayCardListItem {
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: #fff;
+  border: var(--cols-card-border, 1px solid #d0d7de);
+  border-radius: var(--cols-card-radius, 8px);
+  padding: var(--cols-card-padding, 8px 10px);
+  background: var(--cols-card-bg, #fff);
 }
 .wenayCardListHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: var(--cols-card-header-gap, 8px);
+  margin-bottom: var(--cols-card-header-margin-bottom, 6px);
 }
 .wenayCardListHeader_compact {
   margin-bottom: 0;
@@ -900,25 +971,25 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: var(--cols-card-title-font-size, 14px);
 }
 .wenayCardListAccent {
-  font-size: 11px;
-  padding: 1px 8px;
-  border-radius: 10px;
-  background: #ddf4ff;
-  color: #0969da;
+  font-size: var(--cols-card-accent-font-size, 11px);
+  padding: var(--cols-card-accent-padding, 1px 8px);
+  border-radius: var(--cols-card-accent-radius, 10px);
+  background: var(--cols-card-accent-bg, #ddf4ff);
+  color: var(--cols-card-accent-color, #0969da);
   white-space: nowrap;
 }
 .wenayCardListField {
   display: flex;
-  gap: 10px;
-  font-size: 12px;
-  line-height: 1.7;
+  gap: var(--cols-card-field-gap, 10px);
+  font-size: var(--cols-card-field-font-size, 12px);
+  line-height: var(--cols-card-field-line-height, 1.7);
 }
 .wenayCardListLabel {
-  color: #57606a;
-  min-width: 72px;
+  color: var(--cols-card-label-color, #57606a);
+  min-width: var(--cols-card-label-min-width, 72px);
 }
 .wenayCardListValue {
   flex: 1;
@@ -926,6 +997,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 /* Toolbar (createToolbar). Themed via --tb-* (tokens.css), dark defaults. */
 .wenayTb {
   display: inline-flex;

@@ -28,7 +28,7 @@ function cx(parts: Array<string | false | null | undefined>) {
 
 export function ColumnDots(p: {
     state: ColumnStateController
-    /** max simultaneous dots (default 4) */
+    /** max simultaneous dots (default 8) */
     max?: number
     className?: string
     style?: React.CSSProperties
@@ -36,7 +36,7 @@ export function ColumnDots(p: {
     const cfg = p.state.api.useConfig()
     const cols = p.state.columns
     const byKey = new Map(cols.map(c => [c.key, c]))
-    const max = p.max ?? 4
+    const max = p.max ?? 8
     const order = cfg.order
     const n = order.length
     const visibleKeys = order.filter(k => cfg.visible[k] != false)

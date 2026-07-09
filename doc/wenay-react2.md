@@ -119,8 +119,10 @@ modal(null)                                      // callable shortcut for cleari
 
 Input helpers:
 ```
-<TextInputPanel callback={txt => {}} name="Name" txt="" />
-<FileInputPanel callback={file => {}} name="File" />
+const text = useTextInputPanel({callback: txt => {}, txt: ""})  // headless value + submit API
+const file = useFileInputPanel({callback: file => {}})          // headless file + submit API
+<TextInputPanel callback={txt => {}} name="Name" txt="" />     // thin visual wrapper over hook
+<FileInputPanel callback={file => {}} name="File" />            // thin visual wrapper over hook
 <TextInputModal callback={...} outClick={modal.close} />
 <FileInputModal callback={...} outClick={modal.close} />
 <FreeModal outClick={modal.close} size={{width: 400, height: 260}}>...</FreeModal>
@@ -128,7 +130,7 @@ Input helpers:
 
 ## Settings Dialog
 ```
-<SettingsDialog trigger={<span>settings</span>} sections={[{key, name, render, children?, parentKey?, searchText?, keywords?}]} defaultSection? /> // searchable tree + persisted search history
+<SettingsDialog trigger={<span>settings</span>} sections={[{key, name, render, children?, parentKey?, searchText?, keywords?}]} defaultSection? /> // searchable tree + persisted search history; history closes when search focus leaves
 registerSettingsSection({key, name, render, parentKey?, searchText?, keywords?}) -> unregister
 ```
 
@@ -194,11 +196,12 @@ type MenuItem = { name, onClick?, next?, func?, status? } | false | null | undef
 <Menu data={items} coordinate={{x: 0, y: 0}} />
 
 <contextMenu.Layer>{children}</contextMenu.Layer>
-contextMenu.openAt(event, [{name: "Copy", onClick: copy}])
+contextMenu.openAt(event, [{name: "Copy", onClick: copy}], {source: "grid"})
+contextMenu.stats.getSnapshot()   // local counters only: opens, legacy Layer opens, close/replace/empty, source/layer usage
 contextMenu.close()
 ```
 
-Use `contextMenu.openAt(e, items)` for new right-click integrations. `contextMenu.map` still exists as a legacy Layer queue, but it is not the recommended path for new code.
+Use `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` still exists as a legacy Layer queue, but it is not the recommended path for new code. `contextMenu.stats` is an in-memory diagnostics API; it never persists data and never reports over the network.
 
 `Menu` keeps the hovered/open item in internal React state. `status` is only an initial open hint and a compatibility field passed to custom renderers; menu objects are not mutated.
 
@@ -297,11 +300,13 @@ Icon menu - a 1:1 grid mirror (reorder in the grid <-> reorder the buttons):
 ```
 `ColumnsMenu` binds `MenuStrip` - a presentation-only layer that reports clicks/drags but never
 interprets them - to the config. `compact` = icon-only buttons; an item with no icon shows its
-first letters. `tail` = trailing non-column buttons (a table-standards cycler etc.).
+first letters. `tail` = trailing non-column buttons (a table-standards cycler etc.). For new
+settings-integrated toolbar/grid surfaces prefer `createToolbar({source: cs.api.listSource})`;
+keep `ColumnsMenu` for compact button strips or custom presentation-only menus.
 
 Mobile (no ag-grid): dots selector + card rows over the same config:
 ```
-<ColumnDots state={cs} max?=4 />                 // track of marks; dots = shown columns; tap empty=add,
+<ColumnDots state={cs} max?=8 />                 // track of marks; dots = shown columns; tap empty=add,
                                                  //   drag=replace, swipe up=remove, tap dot=select, sort button cycles
 <CardList<Row> state={cs} data={rows} getId? renderValue? />   // visible cols -> card fields; cardRole:'title'/'accent'
 ```
@@ -432,7 +437,7 @@ useAgGridTheme("dark" | "light")
 colDefCentered / colDefWrap / numericComparator
 ```
 
-Shared CSS variables include `--menu-outline-color`, `--logs-*`, `--dlg-*`, `--wnd-*`, and `--tb-*`.
+Shared CSS variables include `--menu-outline-color`, `--logs-*`, `--dlg-*`, `--wnd-*`, `--tb-*`, `--cols-menu-*`, `--cols-dots-*`, and `--cols-card-*`.
 
 ## Charts
 ```
