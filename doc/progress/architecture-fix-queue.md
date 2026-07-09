@@ -34,9 +34,9 @@ Commits this session (chronological):
    jump-back (renders 1+2/gesture), card 26 reorder commits once, zero console
    errors on fresh load.
 
-## A9 — in progress (uncommitted at the time of this note)
+## A9 — DONE (committed 2026-07-10, 5th commit of the session; build OK)
 
-Done in the working tree:
+Done:
 
 - `components/Overlay.tsx` — INTERNAL (not exported) portal+scrim+outside+Escape
   composition; outside-click delegates to `OutsideClickArea`; Escape listener only
@@ -59,8 +59,8 @@ Deliberately NOT overlaid (recorded in changelog): `createModalElementStore`
 no scrim), `ModalWrapper`/Input helpers (backdrop-less by design, hosted inside
 another modal slot).
 
-Remaining for A9 pass close-out: final fresh-page card-20 spot check, changelog
-entry, my.md update, commit.
+Close-out complete: fresh-page card-13/20 spot checks passed, changelog +
+my.md updated, `npm run build` OK, committed.
 
 ## Queue after this session
 
