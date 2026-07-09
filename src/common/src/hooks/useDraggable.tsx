@@ -10,6 +10,14 @@ export type UseDraggableOptions = {
     holdMs?: number;
     onDragEnd?: DragEndCallback;
     onDragStart?: DragStartCallback;
+    /** Imperative per-move-tick callback: fires with the current delta on every
+     *  mousemove/touchmove of an active drag - NOT on setPosition/resetPosition/cancelDrag
+     *  and not on release. Goes through a ref, an inline closure does not resubscribe. */
+    onMove?: (position: Position) => void;
+    /** When false, position lives only in positionRef/onMove and the hook does NOT
+     *  re-render per move tick (imperative consumers, e.g. the DragBox adapter).
+     *  isDragging start/end re-renders remain. Default true. */
+    trackState?: boolean;
 };
 
 export interface UseDraggableReturn {
@@ -35,7 +43,7 @@ type DragEndCallback = (finalPosition: Position) => void;
 type DragStartCallback = () => void;
 
 export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggableApi {
-    const { initialPosition = { x: 0, y: 0 }, holdMs = 500, onDragEnd, onDragStart } = options;
+    const { initialPosition = { x: 0, y: 0 }, holdMs = 500, onDragEnd, onDragStart, onMove, trackState = true } = options;
     const [position, setPositionState] = useState<Position>(initialPosition);
     const positionRef = useRef(position);
     const holdMsRef = useRef(holdMs);
@@ -47,20 +55,24 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
 
     const onDragEndRef = useRef(onDragEnd);
     const onDragStartRef = useRef(onDragStart);
+    const onMoveRef = useRef(onMove);
+    const trackStateRef = useRef(trackState);
     const holdTimerMouse = useRef<number | null>(null);
     const holdTimerTouch = useRef<number | null>(null);
 
     const setPos = (p: Position) => {
         positionRef.current = p;
-        setPositionState(p);
+        if (trackStateRef.current) setPositionState(p);
     };
 
     holdMsRef.current = holdMs;
+    trackStateRef.current = trackState;
     draggingRef.current = draggingMouse || draggingTouch;
 
     useEffect(() => {
         onDragEndRef.current = onDragEnd;
         onDragStartRef.current = onDragStart;
+        onMoveRef.current = onMove;
     });
 
     const cancelMouseHold = useMemo(() => function cancelMouseHold() {
@@ -117,7 +129,9 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
         if (!draggingMouse) return;
 
         const handleMouseMove = (e: MouseEvent) => {
-            setPos({ x: e.clientX - offsetMouse.current.x, y: e.clientY - offsetMouse.current.y });
+            const p = { x: e.clientX - offsetMouse.current.x, y: e.clientY - offsetMouse.current.y };
+            setPos(p);
+            onMoveRef.current?.(p);
         };
 
         const handleMouseUp = () => {
@@ -146,7 +160,9 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
             if (!offsetTouch.current) return;
             const theTouch = Array.from(e.changedTouches).find((t) => t.identifier === offsetTouch.current?.id);
             if (!theTouch) return;
-            setPos({ x: theTouch.clientX - offsetTouch.current.x, y: theTouch.clientY - offsetTouch.current.y });
+            const p = { x: theTouch.clientX - offsetTouch.current.x, y: theTouch.clientY - offsetTouch.current.y };
+            setPos(p);
+            onMoveRef.current?.(p);
         };
 
         const handleTouchEnd = (e: TouchEvent) => {

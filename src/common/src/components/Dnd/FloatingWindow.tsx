@@ -7,6 +7,7 @@ import React, {
 import { Rnd, type RndResizeCallback } from "react-rnd";
 import {createUpdateApi} from "../../../updateBy";
 import {floatingWindowMap} from "../../utils/persistedMaps";
+import {useDraggableApi} from "../../hooks/useDraggable";
 
 export type FloatingWindowPosition = { x: number; y: number };
 export type FloatingWindowSize = { height: number | string; width: number | string };
@@ -484,125 +485,51 @@ export function DragBox({
                            y = 0,
                            right = false,
                            last,
-                           dragging,
+                           dragging: _dragging, // accepted for compatibility, was never read
                            onStart,
                            onStop
                        }: DragBoxProps) {
-    const offsetMouse = useRef({ x: 0, y: 0 });
-    const offsetTouch = useRef<{ x: number; y: number; id: number } | null>(null);
-    const [draggingMouse, setDraggingMouse] = useState(false);
-    const [draggingTouch, setDraggingTouch] = useState(false);
+    // Thin adapter over useDraggableApi (A7): same observable contract as the old
+    // bespoke loop - immediate start, per-tick imperative onX/onY with the delta from
+    // the press point, NO re-render per move tick, posRef keeps the last delta after
+    // release (reset happens on the next gesture start inside the hook).
     const posRef = useRef<{ x: number; y: number }>(last?.current ?? { x, y });
-    const wasDragging = useRef(false);
     const callbacksRef = useRef({ onX, onY, onStart, onStop });
     callbacksRef.current = { onX, onY, onStart, onStop };
+
+    const api = useDraggableApi({
+        holdMs: 0,
+        trackState: false,
+        onDragStart() {
+            // per-gesture reset - without it repeated drags accumulated offset
+            posRef.current.x = 0;
+            posRef.current.y = 0;
+            callbacksRef.current.onStart?.();
+        },
+        onMove(p) {
+            // mutate in place: `last` shares this object (see layout effect below)
+            posRef.current.x = p.x;
+            posRef.current.y = p.y;
+            callbacksRef.current.onX?.(p.x);
+            callbacksRef.current.onY?.(p.y);
+        },
+        onDragEnd(final) {
+            posRef.current.x = final.x;
+            posRef.current.y = final.y;
+            callbacksRef.current.onStop?.();
+        },
+    });
 
     useLayoutEffect(() => {
         posRef.current.x = x;
         posRef.current.y = y;
     }, [x, y]);
 
-    useEffect(() => {
-        if (!draggingMouse && !draggingTouch) {
-            // onStop only after a real drag - previously it also fired on initial mount
-            if (wasDragging.current) {
-                wasDragging.current = false;
-                callbacksRef.current.onStop?.();
-            }
-            return;
-        }
-        wasDragging.current = true;
-
-        if (draggingMouse) {
-            const handleMouseMove = (e: MouseEvent) => {
-                const newX = e.clientX + offsetMouse.current.x;
-                const newY = e.clientY + offsetMouse.current.y;
-                posRef.current = { x: newX, y: newY };
-                callbacksRef.current.onX?.(newX);
-                callbacksRef.current.onY?.(newY);
-            };
-
-            const handleMouseUp = () => {
-                offsetMouse.current.x = 0;
-                offsetMouse.current.y = 0;
-                document.removeEventListener("mousemove", handleMouseMove);
-                document.removeEventListener("mouseup", handleMouseUp);
-                setDraggingMouse(false);
-            };
-
-            document.addEventListener("mousemove", handleMouseMove);
-            document.addEventListener("mouseup", handleMouseUp);
-            callbacksRef.current.onStart?.();
-
-            return () => {
-                document.removeEventListener("mousemove", handleMouseMove);
-                document.removeEventListener("mouseup", handleMouseUp);
-            };
-        }
-
-        if (draggingTouch) {
-            const handleTouchMove = (e: TouchEvent) => {
-                if (!offsetTouch.current) return;
-                const theTouch = Array.from(e.changedTouches).find(
-                    (t) => t.identifier === offsetTouch.current?.id
-                );
-                if (!theTouch) return;
-
-                const newX = theTouch.clientX + offsetTouch.current.x;
-                const newY = theTouch.clientY + offsetTouch.current.y;
-                posRef.current = { x: newX, y: newY };
-                callbacksRef.current.onX?.(newX);
-                callbacksRef.current.onY?.(newY);
-            };
-
-            const handleTouchEnd = (e: TouchEvent) => {
-                if (!offsetTouch.current) return;
-                const ended = Array.from(e.changedTouches).find(
-                    (t) => t.identifier === offsetTouch.current?.id
-                );
-                if (ended) {
-                    offsetTouch.current = null;
-                    document.removeEventListener("touchmove", handleTouchMove);
-                    document.removeEventListener("touchend", handleTouchEnd);
-                    setDraggingTouch(false);
-                }
-            };
-
-            document.addEventListener("touchmove", handleTouchMove);
-            document.addEventListener("touchend", handleTouchEnd);
-            callbacksRef.current.onStart?.();
-
-            return () => {
-                document.removeEventListener("touchmove", handleTouchMove);
-                document.removeEventListener("touchend", handleTouchEnd);
-            };
-        }
-    }, [draggingMouse, draggingTouch]);
-
     useLayoutEffect(() => {
         if (last) {
             last.current = posRef.current;
         }
     });
-
-    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        posRef.current.x = 0;
-        posRef.current.y = 0;
-        offsetMouse.current = { x: -e.clientX, y: -e.clientY };
-        setDraggingMouse(true);
-    };
-
-    const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-        const t = e.changedTouches[0];
-        if (!t) return;
-
-        // same per-gesture reset as mouse - without it repeated touch drags accumulated offset
-        posRef.current.x = 0;
-        posRef.current.y = 0;
-        offsetTouch.current = { x: -t.clientX, y: -t.clientY, id: t.identifier };
-        setDraggingTouch(true);
-    };
 
     return (
         <div
@@ -612,8 +539,7 @@ export function DragBox({
                 right: right ? 0 : undefined,
                 top: 0
             }}
-            onMouseDown={handleMouseDown}
-            onTouchStart={handleTouchStart}
+            {...api.dragProps}
         >
             {children}
         </div>

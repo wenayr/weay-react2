@@ -1,6 +1,10 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 
-//
+/** @deprecated No consumers in the library; prefer `useDraggableApi` (delta-based, mouse+touch)
+ *  or `DragBox` for the imperative onX/onY shape. Kept as-is because its semantics are unique
+ *  (document.body listeners, stopPropagation on every move tick, ABSOLUTE x/y coordinates,
+ *  no preventDefault) - re-basing it on useDraggableApi would change observable behavior.
+ *  Candidate for removal in a deliberate breaking version (A7/A3 cleanup inventory). */
 export function DragArea({
                           children,
                           onY,

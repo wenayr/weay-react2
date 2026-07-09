@@ -11,6 +11,7 @@ import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { listen as createListen, Observe, Params } from "wenay-common2";
 import { Button, HoverButton, OutsideClickArea } from "../src/hooks";
 import { FloatingWindow } from "../src/components";
+import { DragBox } from "../src/components/Dnd/FloatingWindow";
 import { MyChartEngine } from "../src/myChart/chartEngine/chartEngineReact";
 import { GridExample, tt } from "./useGrid";
 import { TestParams } from "./testParams";
@@ -1312,6 +1313,40 @@ const HubDemo = () => {
     </div>;
 };
 
+/* ---------- 35. DragBox - imperative delta drag (adapter over useDraggableApi) ---------- */
+const DragBoxDemo = () => {
+    const base = useRef({ x: 20, y: 20 });
+    const delta = useRef({ x: 0, y: 0 });
+    const chipRef = useRef<HTMLDivElement | null>(null);
+    const renders = useRef(0);
+    const [starts, setStarts] = useState(0);
+    const [stops, setStops] = useState(0);
+    renders.current++;
+    const apply = () => {
+        const el = chipRef.current;
+        if (el) el.style.transform = `translate(${base.current.x + delta.current.x}px, ${base.current.y + delta.current.y}px)`;
+    };
+    useEffect(apply, []);
+    return <div style={{ position: "relative", height: 220, border: "1px dashed #d0d7de", borderRadius: 8, overflow: "hidden" }}>
+        <DragBox
+            onStart={() => { delta.current = { x: 0, y: 0 }; setStarts(v => v + 1); }}
+            onX={x => { delta.current.x = x; apply(); }}
+            onY={y => { delta.current.y = y; apply(); }}
+            onStop={() => {
+                base.current = { x: base.current.x + delta.current.x, y: base.current.y + delta.current.y };
+                delta.current = { x: 0, y: 0 };
+                apply();
+                setStops(v => v + 1);
+            }}
+        >
+            <div ref={chipRef} style={{ width: 90, padding: "10px 0", textAlign: "center", background: "#0969da", color: "#fff", borderRadius: 8, cursor: "grab", userSelect: "none", touchAction: "none" }}>drag me</div>
+        </DragBox>
+        <div style={{ position: "absolute", right: 10, bottom: 8, fontSize: 12, color: "#57606a" }}>
+            starts: <b>{starts}</b> · stops: <b>{stops}</b> · renders: <b>{renders.current}</b>
+        </div>
+    </div>;
+};
+
 /* ---------- 25. createToolbar - customizable toolbar ---------- */
 // Item actions land in a module store (the demo component reads it via updateBy).
 const tbActions = { last: "-", count: 0 };
@@ -1617,6 +1652,12 @@ function ActiveChecks() {
                    note="useReorderBoard - the columns extension of useReorder: column gravity is pure consumer CSS (justify-content), the hook never knows it - it measures the real layout (offset-based FLIP with display:none for the dragged and a real margin gap at the landing slot, so CSS decides who moves aside). Columns register via live callback refs - adding one is just consumer state. Same non-goals: no nesting, no collision packing, no autoscroll."
                    tall>
                 <BoardDemo />
+            </Check>
+            <Check n={35} title="DragBox - imperative delta drag (adapter over useDraggableApi)"
+                   do="Drag the blue chip around (mouse or touch), several gestures in a row. Watch the counters while moving."
+                   expect="The chip follows the pointer 1:1; releasing commits the position - the next drag continues from where it stopped (no jump-back, no accumulation drift). starts/stops grow by 1 per gesture; renders grows only with starts/stops, NOT per move pixel (the per-tick path is imperative onX/onY over refs)."
+                   note="DragBox is now a thin adapter over useDraggableApi (holdMs 0, trackState:false, onMove) - the old bespoke document-listener loop is gone; contract pinned by __test/dragBox.test.tsx. Production consumer: LeftModal sidebar. DragArea deliberately stays as-is (@deprecated: unique semantics - body listeners, stopPropagation per tick, absolute coords).">
+                <DragBoxDemo />
             </Check>
 
             <Check n={31} title="Toolbar over columnState - one config drives toolbar + menu + grid"
