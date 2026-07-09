@@ -77,11 +77,13 @@ function MenuElement({
                          toLeft,
                          className,
                          update,
+                         open,
                      }: {
     data: Pick<MenuItemStrict, "onClick" | "active" | "name" | "getStatus">;
     toLeft: boolean;
     className?: (active?: boolean) => string;
     update: () => void;
+    open?: boolean;
 }): ReactElement {
     const unsubOk = useRef<null | (() => any)>(null);
     const unsubErr = useRef<null | (() => any)>(null);
@@ -97,12 +99,13 @@ function MenuElement({
     }, []);
 
     const [progress, setProgress] = useState<MenuProgressCounters | null>(null);
+    const active = open || item.active?.();
 
     return (
         <div
             className={
-                className?.(item.active?.()) ||
-                "MenuR " + (item.active?.() ? "toButtonA" : "toButton")
+                className?.(active) ||
+                "MenuR " + (active ? "toButtonA" : "toButton")
             }
             style={{ float: toLeft ? "left" : "right" }}
             onClick={() => {
@@ -197,7 +200,8 @@ type MenuItemWrapperProps = {
     isLeftAligned: boolean;
     leftPos: number;
     menuElement?: (item: MenuItem) => ReactElement;
-    fullArray: MenuItemStrict[];
+    open: boolean;
+    setOpenIndex: (index: number) => void;
 };
 
 const MenuItemWrapper = ({
@@ -208,14 +212,15 @@ const MenuItemWrapper = ({
                              isLeftAligned,
                              leftPos,
                              menuElement,
-                             fullArray,
+                             open,
+                             setOpenIndex,
                          }: MenuItemWrapperProps): ReactElement => {
     const [childMenu, setChildMenu] = useState<MenuItemStrict[]>([]);
     const [asyncFuncElement, setAsyncFuncElement] = useState<React.ReactElement | null>(null);
     const [onFocusMenu, setOnFocusMenu] = useState<MenuItemStrict[]>([]);
 
     useEffect(() => {
-        if (item.status && item.next) {
+        if (open && item.next) {
             let alive = true; // guard: do not set state after unmount or item change
             const result = item.next();
             if (result instanceof Promise) {
@@ -229,10 +234,10 @@ const MenuItemWrapper = ({
         } else {
             setChildMenu([]);
         }
-    }, [item.status, item.next]);
+    }, [open, item.next]);
 
     useEffect(() => {
-        if (item.status && item.func) {
+        if (open && item.func) {
             let alive = true;
             const result = item.func();
             if (result instanceof Promise) {
@@ -246,10 +251,10 @@ const MenuItemWrapper = ({
         } else {
             setAsyncFuncElement(null);
         }
-    }, [item.status, item.func]);
+    }, [open, item.func]);
 
     useEffect(() => {
-        if (item.status && item.onFocus) {
+        if (open && item.onFocus) {
             let alive = true;
             const result = item.onFocus();
             if (result instanceof Promise) {
@@ -263,35 +268,34 @@ const MenuItemWrapper = ({
         } else {
             setOnFocusMenu([]);
         }
-    }, [item.status, item.onFocus]);
+    }, [open, item.onFocus]);
 
     const onMouseEnter = () => {
-        if (item.status) return;
-        fullArray.forEach((it, j) => {
-            it.status = j === index;
-        });
-        update();
+        if (open) return;
+        setOpenIndex(index);
     };
+    const viewItem = open == !!item.status ? item : {...item, status: open};
 
     return (
         <div className="toLine" onMouseEnter={onMouseEnter}>
             {menuElement
-                ? menuElement(item)
+                ? menuElement(viewItem)
                 : item.menuElement?.({
                 toLeft: isLeftAligned,
-                data: item,
+                data: viewItem,
                 className,
                 update,
             }) ?? (
                 <MenuElement
                     toLeft={isLeftAligned}
-                    data={item}
+                    data={viewItem}
                     className={className}
                     update={update}
+                    open={open}
                 />
             )}
             <div>
-                {item.status && childMenu.length > 0 && (
+                {open && childMenu.length > 0 && (
                     <div style={{ position: "relative" }}>
                         <Menu
                             data={childMenu}
@@ -304,7 +308,7 @@ const MenuItemWrapper = ({
                         />
                     </div>
                 )}
-                {item.status && asyncFuncElement && (
+                {open && asyncFuncElement && (
                     <div style={{ position: "relative" }}>
                         <Menu
                             menu={() => asyncFuncElement}
@@ -318,7 +322,7 @@ const MenuItemWrapper = ({
                         />
                     </div>
                 )}
-                {item.status && onFocusMenu.length > 0 && (
+                {open && onFocusMenu.length > 0 && (
                     <div style={{ position: "relative" }}>
                         <Menu
                             data={onFocusMenu}
@@ -384,6 +388,15 @@ export function Menu({
         () => data.filter(Boolean) as MenuItemStrict[],
         [data, data.length]
     );
+    const initialActiveIndex = () => {
+        const i = dataMemo.findIndex(item => item.status);
+        return i == -1 ? null : i;
+    };
+    const [activeIndex, setActiveIndex] = useState<number | null>(initialActiveIndex);
+
+    useEffect(() => {
+        setActiveIndex(prev => prev != null && dataMemo[prev] ? prev : initialActiveIndex());
+    }, [dataMemo]);
 
     const [top, setTop] = useState(coordinate.y);
     const [leftPos, setLeftPos] = useState(coordinate.x);
@@ -447,7 +460,8 @@ export function Menu({
                         isLeftAligned={isLeftAligned}
                         leftPos={leftPos}
                         menuElement={menuElement}
-                        fullArray={dataMemo}
+                        open={activeIndex === i}
+                        setOpenIndex={setActiveIndex}
                     />
                 ))}
         </div>

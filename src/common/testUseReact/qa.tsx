@@ -5,7 +5,7 @@
  * Use the ✓/✗ buttons to mark results as you go. These are also the acceptance criteria for changes from REFACTOR_PLAN.md.
  */
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
 import { Menu, contextMenu, renderBy, updateBy, logsApi, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { listen as createListen, Observe, Params } from "wenay-common2";
@@ -14,7 +14,7 @@ import { FloatingWindow } from "../src/components";
 import { MyChartEngine } from "../src/myChart/chartEngine/chartEngineReact";
 import { GridExample, tt } from "./useGrid";
 import { TestParams } from "./testParams";
-import { ReplayVideoDemo, ReplayStoreDemo, ReplayStoreEachDemo } from "./replayVideo";
+import { ReplayVideoDemo, ReplayRouteDemo, ReplayStoreDemo, ReplayStoreEachDemo } from "./replayVideo";
 
 /* ---------- card wrapper ---------- */
 const card: React.CSSProperties = { border: "1px solid #d0d7de", borderRadius: 10, margin: "14px 0", background: "#fff", overflow: "hidden", fontFamily: "system-ui, sans-serif" };
@@ -352,18 +352,24 @@ const MobileColumnsDemo = () => (
 
 
 /* ---------- 30. columnState icon menu: ColumnsMenu (1:1 grid mirror, button states, standards) ---------- */
-type tMenuRow = { id: string; name: string; price: number; qty: number; fee: number; note: string };
+type tMenuRow = { id: string; name: string; price: number; qty: number; fee: number; note: string; blockText: string; blockZero: number; blockEmpty: string };
 const menuRows: tMenuRow[] = [
-    { id: "a", name: "Alpha", price: 10.5, qty: 3, fee: 0, note: "" },
-    { id: "b", name: "Beta", price: 22.1, qty: 0, fee: 0, note: "" },
-    { id: "c", name: "Gamma", price: 5.8, qty: 1, fee: 0, note: "" },
+    { id: "a", name: "Alpha", price: 10.5, qty: 3, fee: 0, note: "", blockText: "red", blockZero: 0, blockEmpty: "" },
+    { id: "b", name: "Beta", price: 22.1, qty: 0, fee: 0, note: "", blockText: "green", blockZero: 0, blockEmpty: "" },
+    { id: "c", name: "Gamma", price: 5.8, qty: 1, fee: 0, note: "", blockText: "blue", blockZero: 0, blockEmpty: "" },
 ];
-const menuColDefs = [
+const menuBaseColDefs = [
     { colId: "name", field: "name" },
     { colId: "price", field: "price" },
     { colId: "qty", field: "qty", headerName: "Qty" },
     { colId: "fee", field: "fee" },
     { colId: "note", field: "note" },
+] satisfies ColDef<tMenuRow>[];
+const qa30BlockGroup = "modeBlock";
+const qa30BlockColumns = [
+    { colId: "blockText", field: "blockText", headerName: "Values" },
+    { colId: "blockZero", field: "blockZero", headerName: "Zeros" },
+    { colId: "blockEmpty", field: "blockEmpty", headerName: "Empty" },
 ] satisfies ColDef<tMenuRow>[];
 const qaMenuState = createColumnState({
     key: "qa30.columnsMenu",
@@ -373,37 +379,326 @@ const qaMenuState = createColumnState({
         { key: "qty", title: "Quantity", short: "qty" },
         { key: "fee", title: "Fee", short: "fee" },
         { key: "note", title: "Note", short: "note" },
+        { key: "blockText", title: "Block / Values", short: "val", group: qa30BlockGroup },
+        { key: "blockZero", title: "Block / Zeros", short: "zero", group: qa30BlockGroup },
+        { key: "blockEmpty", title: "Block / Empty", short: "empty", group: qa30BlockGroup },
     ],
 });
-// the three table "standards": which columns the TABLE itself keeps. Cycling the
-// standard rebuilds columnDefs - columns get REMOVED from the live grid, the
-// config and the buttons stay (buttons go disabled via presence).
-const menuStandards = [
-    { label: "all", hint: "standard 1/3: show every column", empty: (_: unknown[]) => false },
-    { label: "∅+0", hint: "standard 2/3: drop empty columns, 0 counts as empty", empty: (vals: unknown[]) => vals.every(v => v == null || v === "" || v === 0) },
-    { label: "∅", hint: "standard 3/3: drop empty columns, 0 is a value", empty: (vals: unknown[]) => vals.every(v => v == null || v === "") },
+// The grouped block's mode is an app-level layer above columnState: columnDefs
+// stay stable, and a runtime presentGate hides/disables unavailable leaf columns.
+const qa30BlockModeState = { i: 0 };
+const menuValues = (key: string) => menuRows.map(r => r[key as keyof tMenuRow]);
+const menuColumnEmpty = (key: string, zeroIsEmpty: boolean) =>
+    menuValues(key).every(v => v == null || v === "" || (zeroIsEmpty && v === 0));
+const qa30BlockModes = [
+    { hint: "mode 1/4: show all 3 sub-columns", show: (_: string) => true },
+    { hint: "mode 2/4: hide empty sub-columns, 0 counts as empty", show: (key: string) => !menuColumnEmpty(key, true) },
+    { hint: "mode 3/4: hide empty sub-columns, 0 is a value", show: (key: string) => !menuColumnEmpty(key, false) },
+    { hint: "mode 4/4: skip the whole group block", show: (_: string) => false },
 ];
+function qa30BlockMode() {
+    return qa30BlockModes[qa30BlockModeState.i];
+}
+function qa30BlockVisible(mode = qa30BlockMode()) {
+    return qa30BlockColumns.some(d => mode.show(String(d.colId)));
+}
+
+const qa30MenuColumnDefs = [
+    ...menuBaseColDefs,
+    { headerName: "Mode block", groupId: qa30BlockGroup, children: qa30BlockColumns } satisfies ColGroupDef<tMenuRow>,
+];
+const qa30BaseColumnKeys = menuBaseColDefs.map(d => String(d.colId));
+function qa30PresentKeys(mode = qa30BlockMode()) {
+    return [
+        ...qa30BaseColumnKeys,
+        ...qa30BlockColumns.filter(d => mode.show(String(d.colId))).map(d => String(d.colId)),
+    ];
+}
+function applyQa30BlockMode(mode = qa30BlockMode()) {
+    qaMenuState.api.setPresentGate(qa30PresentKeys(mode));
+}
+
+function nextQa30BlockMode() {
+    qa30BlockModeState.i = (qa30BlockModeState.i + 1) % qa30BlockModes.length;
+    applyQa30BlockMode();
+    renderBy(qa30BlockModeState);
+}
+
+const qa30BlockModeItem = { title: "Block display mode" };
+const qa30SquareButtonBase: React.CSSProperties = {
+    boxSizing: "border-box",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    padding: "7px 11px",
+    borderRadius: 0,
+    margin: 0,
+    fontSize: 13,
+    lineHeight: "16px",
+    fontWeight: 400,
+    userSelect: "none",
+    whiteSpace: "nowrap",
+    transition: "background-color 120ms ease, border-color 120ms ease, color 120ms ease",
+};
+const qa30SquareGlyphStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 0,
+    fontWeight: 400,
+    letterSpacing: 0,
+};
+function qa30SquareGlyph(item: {icon?: React.ReactNode, short?: string, title: string}, density: string) {
+    if (density == "icon") {
+        if (item.icon != null) return <span style={qa30SquareGlyphStyle}>{item.icon}</span>;
+        return <span style={qa30SquareGlyphStyle}>{(item.short ?? item.title).slice(0, 3).toUpperCase()}</span>;
+    }
+    const text = density == "label" ? (item.short ?? item.title) : item.title;
+    return <span style={qa30SquareGlyphStyle}>{text}</span>;
+}
+const Qa30SquareButton = (p: {
+    title: string;
+    pressed?: boolean;
+    disabled?: boolean;
+    fixed?: boolean;
+    children: React.ReactNode;
+    clickable?: boolean;
+    onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
+}) => {
+    const [hover, setHover] = useState(false);
+    const interactive = (!!p.onClick || p.clickable) && !p.disabled;
+    const state: React.CSSProperties = p.disabled
+        ? { background: "#0b1020", border: "1px dashed #526179", color: "#738096", opacity: 0.72 }
+        : p.pressed
+            ? { background: "#f8fafc", border: "1px solid #f8fafc", color: "#0f172a" }
+            : hover
+                ? { background: "#172238", border: "1px solid #f8fafc", color: "#f8fafc" }
+                : { background: "#111a2c", border: "1px solid #34445f", color: "#d8e7ff" };
+    return <div title={p.title}
+                role={p.onClick && !p.disabled ? "button" : undefined}
+                tabIndex={p.onClick && !p.disabled ? 0 : undefined}
+                aria-pressed={p.pressed}
+                onMouseEnter={() => setHover(true)}
+                onMouseLeave={() => setHover(false)}
+                onClick={p.onClick && !p.disabled ? p.onClick : undefined}
+                onKeyDown={p.onClick && !p.disabled ? e => {
+                    if (e.key != "Enter" && e.key != " ") return;
+                    e.preventDefault();
+                    p.onClick?.(e as unknown as React.MouseEvent<HTMLDivElement>);
+                } : undefined}
+                style={{
+                    ...qa30SquareButtonBase,
+                    ...state,
+                    cursor: interactive ? "pointer" : "default",
+                    ...(p.fixed ? { borderColor: "#9db3d1" } : null),
+                }}>
+        {p.children}
+    </div>;
+};
+
+const Qa30ModeDots = () => {
+    const count = qa30BlockModeState.i + 1;
+    return <span aria-hidden style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, marginLeft: 1 }}>
+        {Array.from({ length: count }, (_, i) => <span key={i} style={{ width: 3, height: 3, borderRadius: 0, background: "currentColor", opacity: 0.95 }} />)}
+    </span>;
+};
+const BlockModeButton = (p: {density: string}) => {
+    updateBy(qa30BlockModeState);
+    const mode = qa30BlockMode();
+    const visible = qa30BlockVisible(mode);
+    return <Qa30SquareButton title={visible ? mode.hint : `${mode.hint}; block is not displayed`}
+                             pressed={visible}
+                             clickable>
+        {qa30SquareGlyph(qa30BlockModeItem, p.density)}
+        <Qa30ModeDots />
+    </Qa30SquareButton>;
+};
+
+// Client skin over the toolbar config: createToolbar owns order/membership/density,
+// while this stand draws the face as square-edged content tiles. State: pressed = column
+// visible in the grid, unpressed = hidden, dashed = removed by the block mode
+// (present=false). Click toggles the column's grid visibility.
+const MenuStateButton = (p: { state: typeof qaMenuState; colKey: string; density: string }) => {
+    const cfg = p.state.api.useConfig();
+    const present = p.state.api.usePresent();
+    const col = p.state.columns.find(c => c.key === p.colKey);
+    if (!col) return null;
+    const disabled = !!present && !present[p.colKey];
+    const on = cfg.visible[p.colKey] != false;
+    return <Qa30SquareButton title={col.title}
+                             pressed={on}
+                             disabled={disabled}
+                             fixed={col.fixed}
+                             clickable={!disabled && !col.fixed}>
+        {qa30SquareGlyph(col, p.density)}
+    </Qa30SquareButton>;
+};
+
+// A "card 25" toolbar (createToolbar) whose ITEMS are those on/off buttons.
+// sourceMode:'order' lets columnState own only the real-column order while the
+// toolbar keeps MENU MEMBERSHIP local. The button's pressed/unpressed state is
+// still the grid visibility from qaMenuState, and blockMode is a local extra item
+// that is not pushed into the grid order.
+const qa30MenuToolbar = createToolbar({
+    key: "qa30.menuToolbar",
+    items: [
+        ...qaMenuState.columns.map(c => ({
+            key: c.key, title: c.title, short: c.short, icon: c.icon, fixed: c.fixed,
+            onClick: () => {
+                const present = qaMenuState.api.getPresent();
+                if (c.fixed || (!!present && !present[c.key])) return;
+                const cfg = qaMenuState.api.getConfig();
+                qaMenuState.api.show(c.key, cfg.visible[c.key] == false);
+            },
+            render: (density: string) => <MenuStateButton state={qaMenuState} colKey={c.key} density={density} />,
+        })),
+        { key: "blockMode", title: "Block display mode", onClick: () => nextQa30BlockMode(), render: (density: string) => <BlockModeButton density={density} /> },
+    ],
+    source: qaMenuState.api.listSource,
+    sourceMode: "order",
+});
+
+const Qa30ResetIcon = () => <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+    <path d="M3.2 5.5 A5.2 5.2 0 1 1 4.1 11.7 M3.2 5.5 H6.4 M3.2 5.5 V2.3"
+          fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+</svg>;
+const qa30ToolbarSkinCss = `
+.qa30MenuSkin {
+  display: inline-flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 1px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+}
+.qa30MenuSkin .wenayTbItem {
+  padding: 0;
+  border-radius: 0;
+  gap: 0;
+  align-items: stretch;
+  cursor: default;
+}
+.qa30MenuSkin .wenayTbItem:hover {
+  background: transparent;
+}
+.qa30MenuSkin .qa30MenuTile {
+  will-change: transform;
+}
+`;
+
+const Qa30AnimatedMenuBar = () => {
+    const items = qa30MenuToolbar.api.useItems();
+    const tileRefs = useRef(new Map<string, HTMLDivElement>());
+    const prevRects = useRef(new Map<string, {left: number, top: number}>());
+    const layoutKey = items.map(x => `${x.item.key}:${x.density}`).join("|");
+
+    useLayoutEffect(() => {
+        const prev = prevRects.current;
+        const next = new Map<string, {left: number, top: number}>();
+        tileRefs.current.forEach((node, key) => {
+            const rect = node.getBoundingClientRect();
+            next.set(key, {left: rect.left, top: rect.top});
+            const old = prev.get(key);
+            if (old == null) return;
+            const dx = old.left - rect.left;
+            const dy = old.top - rect.top;
+            if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+            node.style.transition = "none";
+            node.style.transform = `translate(${dx}px, ${dy}px)`;
+            node.getBoundingClientRect();
+            requestAnimationFrame(() => {
+                node.style.transition = "transform 180ms ease";
+                node.style.transform = "";
+            });
+        });
+        prevRects.current = next;
+    }, [layoutKey]);
+
+    return <div className="wenayTb qa30MenuSkin">
+        {items.map(x => <div key={x.item.key}
+                            ref={node => {
+                                if (node) tileRefs.current.set(x.item.key, node);
+                                else tileRefs.current.delete(x.item.key);
+                            }}
+                            className="wenayTbItem qa30MenuTile"
+                            title={x.density == "icon" ? x.item.title : undefined}
+                            onClick={x.item.onClick}>
+            {x.content}
+        </div>)}
+    </div>;
+};
 
 const ColumnsMenuDemo = () => {
-    const [std, setStd] = useState(0);
-    const s = menuStandards[std];
-    const defs = menuColDefs.filter(d => !s.empty(menuRows.map(r => r[d.colId as keyof tMenuRow])));
+    const [win, setWin] = useState(false); // Settings window open? (client-owned container, see below)
+    const cfg = qa30MenuToolbar.api.useConfig();
+    const resetOn = cfg.visible["__reset"] != false;
     return (
-        <div>
-            <ColumnsMenu
-                state={qaMenuState}
-                style={{ marginBottom: 8 }}
-                marks={k => (k === "price" ? "••" : null)} // "on with extras": e.g. enabled sub-fields
-                tail={[{ key: "std", title: s.hint, short: s.label, state: "on", marks: "•".repeat(std + 1) }]}
-                onTail={() => setStd(v => (v + 1) % menuStandards.length)}
-            />
+        // position: relative -> the Settings window (its own layer, position: absolute) is
+        // anchored to THIS card, so it scrolls with the card instead of running off-screen.
+        // FloatingWindow's --wnd-* theme tokens are UNDECLARED by default (the window renders
+        // transparent) - declare them HERE for a dark modal look. Scoped to this card ON
+        // PURPOSE: stand-only styling, not a global tokens change (a client brings its own).
+        <div style={{
+            position: "relative",
+            "--wnd-bg": "var(--color-bg-dark)",
+            "--wnd-border": "1px solid var(--color-border-common)",
+            "--wnd-radius": "8px",
+            "--wnd-shadow": "0 10px 30px rgba(0,0,0,0.55)",
+            "--wnd-header-bg": "rgba(255,255,255,0.06)",
+            "--wnd-header-border": "1px solid var(--color-border-common)",
+            "--wnd-header-color": "var(--color-text-base)",
+        } as React.CSSProperties}>
+            {/* Square client skin over the same "card 25" toolbar functionality
+                (createToolbar). Membership (gear -> Settings) stays separate
+                from each button's pressed = grid visibility.
+                NOTE: this uses the standard Toolbar.Bar; only the item face is client-styled.
+                The gear here opens Settings in a DRAGGABLE WINDOW (see below), not
+                the core inline popover - a client-side choice; the toolbar core is untouched. */}
+            <div style={{ background: "#26354f", border: "1px solid #40516d", borderRadius: 0, padding: 1, width: "fit-content", maxWidth: "100%", marginBottom: 10, display: "inline-flex", alignItems: "stretch", gap: 1, flexWrap: "wrap" }}>
+                <style>{qa30ToolbarSkinCss}</style>
+                <Qa30AnimatedMenuBar />
+                {resetOn && <Qa30SquareButton title="Reset toolbar" onClick={() => qa30MenuToolbar.api.reset()}><Qa30ResetIcon /></Qa30SquareButton>}
+                {/* Client-owned Settings container: <Settings/> in a FloatingWindow -
+                    draggable by its header, close X, and closes on an outside click. Rendered
+                    in its own layer, so toggling members reflows the bar WITHOUT moving this
+                    window (no popover twitch). The library core does NOT ship this - clients
+                    wire their own modal; see doc/wenay-react2-rare.md recommendation. */}
+                <OutsideClickArea status={win} outsideClick={() => setWin(false)} style={{ display: "inline-flex" }}>
+                    <Qa30SquareButton title="Настройки меню" pressed={win} onClick={() => setWin(v => !v)}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H2a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H8a1.65 1.65 0 0 0 1-1.51V2a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V8a1.65 1.65 0 0 0 1.51 1H22a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        </svg>
+                    </Qa30SquareButton>
+                    {win && (
+                        <FloatingWindow
+                            keyForSave="qa30.menuSettingsWin"
+                            position={{ x: 0, y: 44 }}
+                            size={{ width: 300, height: 320 }}
+                            zIndex={40}
+                            header={<span style={{ padding: "0 10px", fontSize: 12, lineHeight: "26px", color: "#cdd6e4" }}>Настройки меню</span>}
+                            onCLickClose={() => setWin(false)}
+                        >
+                            <div style={{ padding: 12, color: "var(--color-text-base)", height: "100%", boxSizing: "border-box", overflow: "auto" }}>
+                                <qa30MenuToolbar.Settings />
+                            </div>
+                        </FloatingWindow>
+                    )}
+                </OutsideClickArea>
+            </div>
             <div style={{ height: 190 }}>
                 <AgGridTable<tMenuRow>
                     rowData={menuRows}
                     getRowId={pp => pp.data.id}
-                    columnDefs={defs}
+                    columnDefs={qa30MenuColumnDefs}
                     autoSizeColumns={false}
-                    onGridReady={e => qaMenuState.grid.attach(e.api)}
+                    onGridReady={e => {
+                        qaMenuState.grid.attach(e.api);
+                        applyQa30BlockMode();
+                    }}
                     onGridPreDestroyed={() => qaMenuState.grid.detach()}
                 />
             </div>
@@ -773,25 +1068,97 @@ const ResizeBugRepro = () => {
 /* ---------- 20. SettingsDialog + section registry ---------- */
 const dlgBody: React.CSSProperties = { fontSize: 13, lineHeight: 1.6 };
 const dlgStaticSections = [
-    { key: "general", name: "General", render: () => <div style={dlgBody}><b>General</b><div>Static section passed via the sections prop.</div></div> },
-    { key: "display", name: "Display", render: () => <div style={dlgBody}><b>Display</b><div>Second static section. Long content to test scrolling:</div>{Array.from({ length: 30 }, (_, i) => <div key={i}>line {i + 1}</div>)}</div> },
+    {
+        key: "general",
+        name: "General",
+        keywords: ["workspace", "startup"],
+        searchText: "autosave project defaults",
+        render: () => <div style={dlgBody}><b>General</b><div>Static root section passed via the sections prop.</div></div>,
+        children: [
+            {
+                key: "general-project",
+                name: "Project",
+                searchText: "workspace autosave startup folder",
+                render: () => <div style={dlgBody}><b>Project</b><div>Workspace folder, startup page, and autosave defaults.</div></div>,
+                children: [
+                    {
+                        key: "general-project-indexing",
+                        name: "Indexing",
+                        searchText: "file watcher cache suffix tree",
+                        render: () => <div style={dlgBody}><b>Indexing</b><div>File watcher cache and recursive search index settings.</div></div>,
+                        children: [
+                            {
+                                key: "general-project-indexing-suffix",
+                                name: "Suffix tree",
+                                searchText: "suffix tree trie token depth recursive auto expand",
+                                render: () => <div style={dlgBody}><b>Suffix tree</b><div>Deep branch used to verify auto-expansion for any tree depth.</div></div>,
+                                children: [
+                                    {
+                                        key: "general-project-indexing-suffix-leaves",
+                                        name: "Leaf buckets",
+                                        searchText: "suffix tree leaves buckets compact path",
+                                        render: () => <div style={dlgBody}><b>Leaf buckets</b><div>Nested leaf configuration under the suffix tree branch.</div></div>,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        key: "display",
+        name: "Display",
+        keywords: ["appearance", "theme"],
+        render: () => <div style={dlgBody}><b>Display</b><div>Display root. Long content to test scrolling:</div>{Array.from({ length: 30 }, (_, i) => <div key={i}>line {i + 1}</div>)}</div>,
+        children: [
+            {
+                key: "display-theme",
+                name: "Theme",
+                searchText: "dark light contrast palette",
+                render: () => <div style={dlgBody}><b>Theme</b><div>Dark, light, contrast, and palette options.</div></div>,
+                children: [
+                    {
+                        key: "display-theme-palette",
+                        name: "Palette",
+                        searchText: "semantic colors accent warning success",
+                        render: () => <div style={dlgBody}><b>Palette</b><div>Semantic colors shared by settings, windows, and toolbars.</div></div>,
+                        children: [
+                            {
+                                key: "display-theme-palette-accent",
+                                name: "Accent color",
+                                searchText: "accent primary focus selected highlight",
+                                render: () => <div style={dlgBody}><b>Accent color</b><div>Primary focus and selected-state color tokens.</div></div>,
+                            },
+                        ],
+                    },
+                ],
+            },
+            { key: "display-font", name: "Font", searchText: () => "font size editor line height", render: () => <div style={dlgBody}><b>Font</b><div>Editor font size and line height settings.</div></div> },
+        ],
+    },
 ];
 
 // Any module: register on mount, the returned unregister runs on unmount.
 const ExternalSectionModule = () => {
     useEffect(() => registerSettingsSection({
         key: "external",
-        name: "External",
+        parentKey: "display",
+        name: "External module",
+        searchText: "registered plugin mount unmount external",
         render: () => <div style={dlgBody}><b>External</b><div>Registered by a module on mount and removed on unmount.</div></div>,
     }), []);
     return <span style={{ padding: "2px 8px", background: "#dafbe1", borderRadius: 6, fontSize: 12 }}>external module mounted</span>;
 };
-
 const SettingsDialogDemo = () => {
     const [mounted, setMounted] = useState(true);
+    useEffect(() => {
+        void memoryCache.load();
+        return memoryCache.onDirty(() => memoryCache.saveDebounced(300));
+    }, []);
     return <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <SettingsDialog
-            trigger={<span style={{ display: "inline-block", padding: "6px 12px", border: "1px solid #0969da", borderRadius: 6, color: "#0969da" }}>open settings</span>}
             sections={dlgStaticSections}
             defaultSection="general"
         />
@@ -925,7 +1292,7 @@ const ToolbarDemo = () => {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
             <SettingsDialog trigger={<span style={{ display: "inline-block", padding: "4px 10px", border: "1px solid #0969da", borderRadius: 6, color: "#0969da" }}>global settings</span>} />
-            <button onClick={() => tb.api.reset()}>reset config</button>
+
             <button onClick={() => setExtra(v => !v)}>{extra ? "app update: extra item ON" : "simulate app update (+1 item)"}</button>
             <label><input type="checkbox" checked={thirdDensity} onChange={e => setThirdDensity(e.target.checked)} /> register 3rd density (Full text)</label>
         </div>
@@ -1087,11 +1454,18 @@ function ActiveChecks() {
                 <ReplayStoreDemo />
             </Check>
             <Check n={25} title="Replay hooks - per-key feed (useStoreReplayEach)"
-                   do="Watch px of one random row change every 700ms. Click server add row / delete row, replace ALL (root replace), remount client."
+                   do="Watch the table for a few producer ticks. Click server add row, server delete row, server replace ALL, then remount client (fresh keyframe)."
                    expect="On mount every row appears with cb calls=1 (keyframe expanded per key). Between clicks only the mutated row's cb calls counter grows - the whole dict is never re-delivered per tick. Delete removes the row via (key, undefined). replace ALL swaps the table: removed rows leave, new rows enter with cb calls=1. Remount folds a fresh keyframe (all counters reset to 1); StrictMode double-effect does not double-count."
                    note="React counterpart of Observe.syncStoreReplayEach (wenay-common2 1.0.62): internal mirror store + syncStoreReplay + store.each(). The mirror lives in a ref, so in-mount resubscribes reconnect by journal tail on top of kept state; the fold target is a plain Map (grid-api style), not React state. drain:100 coalesces multiple writes to one key into one call per window."
                    tall>
                 <ReplayStoreEachDemo />
+            </Check>
+            <Check n={26} title="Replay hooks - route hand-off (useReplayRouteSubscribe)"
+                   do="Watch one canvas draw the synthetic video. Click switch direct, then switch relay, then fail route. Repeat while the producer is moving."
+                   expect="The canvas keeps advancing as one logical fold: route switches catch up by seq before the old route closes, so frames do not reset or duplicate. The label changes to direct/relay only after ready. fail route reports an error but keeps the previous active route alive and the canvas continues."
+                   note="React wrapper over wenay-common2 1.0.65 Replay.replayRouteSubscribe. Route hand-off is explicit through switchRoute(); changing the remote prop remains a fresh subscription boundary. This route helper does not expose stale/lastTs, so freshness stays on the non-route hooks until common2 grows that surface."
+                   tall>
+                <ReplayRouteDemo />
             </Check>
             <Check n={13} title="ModalProvider / useModal - Escape and outside click"
                    do="Click open modal. Close it with Escape. Open it again and close with an outside click. Open it again and close with the close button."
@@ -1100,10 +1474,10 @@ function ActiveChecks() {
                 <ModalDemo />
             </Check>
 
-            <Check n={20} title="SettingsDialog - centered dialog + section registry"
-                   do="Click open settings: switch sections on the left, scroll Display, close via the x, the scrim, and Escape. Then unmount external module and open the dialog again."
-                   expect="The dialog is centered with a scrim; the active section is highlighted; content switches. The External section is present while the module is mounted and disappears after unmount (falls back to the first section if it was active)."
-                   note="Registry is a module singleton (registerSettingsSection -> unregister), no React context. Look via --dlg-* tokens; apps pass their own section classes via sectionClassName/sectionActiveClassName.">
+            <Check n={20} title="SettingsDialog - searchable settings tree + registry"
+                   do="Click the three-dot toolbar-style settings button: drag the window by its header, drag the divider between tree and content, double-click it to reset width, use the tree icons and the dotted tree-cycle button, search for suffix/leaf/palette/accent/font/external and wrong-layout examples like ыгаашч for suffix. Press Enter to save a query into search history, reopen history from the clock button, pick a saved query, then clear history. Clear search via the x and via Escape, then close via window x/outside click/Escape with empty search. Unmount external module and open again."
+                   expect="The default trigger is the same compact toolbar-button style as createToolbar, using a three-dot icon. Dialog opens as the standard draggable FloatingWindow with a header, larger size, shared close x, and outside-click close. The tree/content divider changes the tree width, persists it through memoryCache, supports keyboard arrows, and double-click/Enter resets to default. Search uses original input plus RU/EN keyboard-layout variants, selects the first real match, auto-expands parents, and highlights only the matched word once. Enter stores non-empty queries in a small persisted search history; choosing a history item restores the query; clearing history removes the dropdown. The dotted tree-cycle button switches expanded/current branch/collapsed and stays in the search row. The clear x and Escape both cancel search text; Escape with empty search closes the dialog. The external child under Display appears only while mounted."
+                   note="Registry is a module singleton (registerSettingsSection -> unregister), no React context. Tree shape comes from children or parentKey. Search history uses createSearchHistory -> memoryGetOrCreate/memoryCache dirty channel; this demo loads memoryCache and saves dirty changes with saveDebounced(300). Look via --dlg-* tokens; apps pass their own section classes via sectionClassName/sectionActiveClassName.">
                 <SettingsDialogDemo />
             </Check>
 
@@ -1122,8 +1496,8 @@ function ActiveChecks() {
             </Check>
 
             <Check n={25} title="createToolbar - customizable toolbar (config / Bar / Settings)"
-                   do="Click toolbar items (last action updates). Open the gear popover: toggle Clear workspace on, drag rows to reorder - grab ANYWHERE on the row, mouse or touch, try dragging above the fixed Home too (or focus the handle and press arrow keys), switch density Icons / Icons + labels. Open global settings -> Toolbar section and repeat an edit there. Register the 3rd density and switch to Full text. Uncheck the separated Toolbar settings row at the bottom - the gear (and this popover) disappears from the bar; re-enable it via global settings -> Toolbar. Click simulate app update. Reload the page (F5). Click reset config."
-                   expect="The bar renders visible items in config order; density switches icon-only <-> icon+label (tooltips show titles in icon mode). Home is fixed: checkbox disabled, no drag handle, pinned first - it never moves during a drag preview and a row dragged above it lands right below it, exactly as previewed (no snap-back on drop). The gear popover and the global settings section are THE SAME editor - an edit in one is instantly visible in the other and on the bar. The 3rd density appears in the editor as one more segment and renders icon + full title. The app update appends Help as visible WITHOUT wiping your order/visibility. After F5 everything is restored (memoryGetOrCreate -> memoryCache). onChange fires on every edit with the new config (JSON below); reset restores defaults (Clear workspace hidden again)."
+                   do="Click toolbar items (last action updates). Open the gear popover: toggle Clear workspace on, drag rows to reorder - grab ANYWHERE on the row, mouse or touch, try dragging above the fixed Home too (or focus the handle and press arrow keys), switch density Icons / Icons + labels. Open global settings -> Toolbar section and repeat an edit there. Register the 3rd density and switch to Full text. Uncheck the separated Toolbar settings row at the bottom - the gear (and this popover) disappears from the bar; re-enable it via global settings -> Toolbar. Click simulate app update. Reload the page (F5). In Settings, click the Reset toolbar action button inside its row. Then check the Reset toolbar row, confirm the reset icon appears in the bar, click it, and uncheck the row again."
+                   expect="The bar renders visible items in config order; density switches icon-only <-> icon+label (tooltips show titles in icon mode). Home is fixed: checkbox disabled, no drag handle, pinned first - it never moves during a drag preview and a row dragged above it lands right below it, exactly as previewed (no snap-back on drop). The gear popover and the global settings section are THE SAME editor - an edit in one is instantly visible in the other and on the bar. The 3rd density appears in the editor as one more segment and renders icon + full title. The app update appends Help as visible WITHOUT wiping your order/visibility. After F5 everything is restored (memoryGetOrCreate -> memoryCache). onChange fires on every edit with the new config (JSON below); Settings is visible by default, the reset icon is hidden by default, the Reset toolbar row action restores defaults, and that row can hide/show the bar icon."
                    note="Three decoupled layers: serializable config (single source of truth, persisted like createUiSlot), Bar, and a PURE Settings editor over config. Density levels live in an extensible module registry (registerToolbarDensity); reorder is a built-in nearest-slot pointer sort (no dnd deps, layout-agnostic: list / bar / grid) + keyboard arrows; the preview simulates the commit incl. fixed pinning, so what you see is what you drop. v1 has no overflow menu - visibility is the space tool."
                    tall>
                 <ToolbarDemo />
@@ -1152,10 +1526,10 @@ function ActiveChecks() {
                 <ToolbarColumnsDemo />
             </Check>
 
-            <Check n={30} title="columnState icon menu - ColumnsMenu (1:1 grid mirror, button states, standards)"
-                   do="Click price/qty buttons - the columns hide/show in the grid (off = struck through). Drag the qty COLUMN in the grid before price - the buttons swap too; then drag a BUTTON - the grid follows (try dropping one before Name). Click the standards button after the divider: all -> ∅+0 (fee AND note leave the grid) -> ∅ (only note leaves, 0 is a value) -> all. While a column is out, click its dashed button."
-                   expect="Order is a 1:1 two-way mirror: grid drag reorders the buttons, button drag reorders the grid; a drop before Name snaps back (fixed). A column removed by a standard keeps its BUTTON - dashed and inert (clicks do nothing) - and the button revives with its column when the standard returns it; the returning column lands at its configured order/width. price shows the marks adornment ('on with extras', e.g. sub-fields); the standards button shows 1-3 dots for its own state."
-                   note="Two decoupled layers by design: MenuStrip is pure presentation (states on/off/disabled + marks + drag + click reporting) and does NOT know what a click means; ColumnsMenu binds it to columnState (default click = toggle visibility, overridable via onItem). The standards cycler is just a tail button whose meaning lives in the demo - the strip renders its state dots and reports clicks. Presence comes from the grid adapter (gridColumnsChanged); with no grid attached every button counts as present."
+            <Check n={30} title="columnState toolbar menu - grouped sub-columns"
+                   do="TOP is our menu drawn with a square-edged client skin over the card-25 toolbar config; the old lower ColumnsMenu is intentionally gone. Change menu order in Settings and watch the horizontal tiles glide into place, then click column tiles to toggle grid visibility; switch density in Settings and check that labels expand by content. Click the BLO tile with vertical square dots several times. The grid has a Mode block group with 3 sub-columns: Values has text, Zeros has only 0, Empty has blanks. Enable Reset toolbar in Settings and click its tile."
+                   expect="The grouped block changes by dot count without rebuilding grid columnDefs: 1 dot shows Values+Zeros+Empty; 2 dots shows only Values; 3 dots shows Values+Zeros; 4 dots hides the whole group. The top menu has large square-edged content tiles: 1px separators between tiles, comfortable internal padding, dark by default, white border on hover, white fill when pressed/open. When order/density changes elsewhere, existing tiles animate to their new places; the menu itself remains click-only, without drag handles or drag reorder. Label/full densities grow by text content. BLO uses square vertical dots and remains clickable when the whole group is off. Hidden-by-mode sub-columns keep dashed/inert tiles and revive when the mode brings them back. Reset appears as a small-icon tile only when enabled."
+                   note="This demonstrates the multi-state layer and replaceable face: the menu uses the standard Toolbar.Bar for structure/order/membership/density while the client fully draws the square-edged item face. The mode tile is not a column; it changes a runtime columnState presentGate over a stable grouped schema. columnState presence marks gated leaf columns disabled; createToolbar({source, sourceMode:'order'}) lets the source own only real-column order, while blockMode position/membership stay local and are never pushed into the grid config."
                    tall>
                 <ColumnsMenuDemo />
             </Check>

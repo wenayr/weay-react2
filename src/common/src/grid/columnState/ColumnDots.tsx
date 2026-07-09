@@ -22,6 +22,10 @@ const MOVE_SLOP = 4
 
 type tDrag = {key: string, dx: number, dy: number, to: number, off: boolean}
 
+function cx(parts: Array<string | false | null | undefined>) {
+    return parts.filter(Boolean).join(' ')
+}
+
 export function ColumnDots(p: {
     state: ColumnStateController
     /** max simultaneous dots (default 4) */
@@ -73,13 +77,13 @@ export function ColumnDots(p: {
         const st = drag
         setDrag(null)
         if (!g) return
-        if (!g.moved) { // tap = select the field
+        if (!g.moved) {
             setSelected(g.key)
             return
         }
         if (!st) return
         const meta = byKey.get(g.key)
-        if (st.off) { // swipe up = tear the dot off (fixed and the last dot stay)
+        if (st.off) {
             if (!meta?.fixed && visibleKeys.length > 1) {
                 p.state.api.show(g.key, false)
                 if (selected == g.key) setSelected(null)
@@ -88,7 +92,6 @@ export function ColumnDots(p: {
         }
         const target = order[st.to]
         if (target && target != g.key && cfg.visible[target] == false && !meta?.fixed) {
-            // the dot slides to another mark: that column takes this slot
             p.state.api.setConfig({...cfg, visible: {...cfg.visible, [g.key]: false, [target]: true}})
             if (selected == g.key) setSelected(target)
         }
@@ -103,32 +106,30 @@ export function ColumnDots(p: {
 
     const sortLabel = cfg.sort ? `${short(cfg.sort.key)} ${cfg.sort.dir == 'asc' ? '↑' : '↓'}` : 'off'
 
-    return <div className={p.className} style={{userSelect: 'none', ...p.style}}>
-        <div style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, fontSize: 12}}>
-            <span style={{color: '#57606a'}}>{visibleKeys.length}/{max} fields</span>
-            <span style={{flex: 1}}/>
-            <span style={{color: '#57606a'}}>field: <b>{selected ? short(selected) : '—'}</b></span>
-            <button disabled={!selected}
+    return <div className={cx(['wenayColDots', p.className])} style={p.style}>
+        <div className='wenayColDotsHead'>
+            <span className='wenayColDotsMeta'>{visibleKeys.length}/{max} fields</span>
+            <span className='wenayColDotsSpacer'/>
+            <span className='wenayColDotsMeta'>field: <b>{selected ? short(selected) : '—'}</b></span>
+            <button className='wenayColDotsSort' disabled={!selected}
                     title='Sort by the selected field: asc -> desc -> off'
-                    onClick={() => selected && p.state.api.toggleSort(selected)}
-                    style={{border: '1px solid #6e7781', borderRadius: 6, padding: '2px 8px', fontSize: 12, cursor: selected ? 'pointer' : 'default', opacity: selected ? 1 : 0.5, background: '#fff'}}>
+                    onClick={() => selected && p.state.api.toggleSort(selected)}>
                 ⇅ sort: {sortLabel}
             </button>
         </div>
-        {/* the track: one mark per column; touchAction none so the drag owns the pointer */}
-        <div ref={trackRef} style={{position: 'relative', height: 56, margin: '0 14px', touchAction: 'none'}}>
-            <div style={{position: 'absolute', left: -8, right: -8, top: 27, height: 2, background: '#d0d7de', borderRadius: 1}}/>
+        <div ref={trackRef} className='wenayColDotsTrack'>
+            <div className='wenayColDotsRail'/>
             {order.map((k, i) => {
                 const vis = cfg.visible[k] != false
                 const isSorted = cfg.sort?.key == k
                 return <div key={'m' + k} onPointerUp={() => tapMark(k)}
-                            style={{position: 'absolute', left: `${pct(i)}%`, top: 0, width: 44, height: 56, marginLeft: -22, cursor: !vis && visibleKeys.length < max ? 'pointer' : 'default'}}>
-                    {isSorted && <div style={{position: 'absolute', left: 0, right: 0, top: 0, textAlign: 'center', fontSize: 11, color: '#0969da', fontWeight: 700}}>{cfg.sort!.dir == 'asc' ? '↑' : '↓'}</div>}
-                    <div style={{position: 'absolute', left: '50%', top: 24, width: 8, height: 8, marginLeft: -4, borderRadius: 4, background: vis ? 'transparent' : '#afb8c1'}}/>
-                    <div style={{position: 'absolute', left: 0, right: 0, top: 40, textAlign: 'center', fontSize: 10, color: vis ? '#24292f' : '#8c959f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{short(k)}</div>
+                            className={cx(['wenayColDotsMark', vis ? 'wenayColDotsMark_on' : 'wenayColDotsMark_off'])}
+                            style={{left: `${pct(i)}%`, cursor: !vis && visibleKeys.length < max ? 'pointer' : 'default'}}>
+                    {isSorted && <div className='wenayColDotsSortMark'>{cfg.sort!.dir == 'asc' ? '↑' : '↓'}</div>}
+                    <div className='wenayColDotsMarkPin'/>
+                    <div className='wenayColDotsMarkLabel'>{short(k)}</div>
                 </div>
             })}
-            {/* dots above the marks; the dragged one follows the pointer */}
             {order.map((k, i) => {
                 if (cfg.visible[k] == false) return null
                 const meta = byKey.get(k)
@@ -136,20 +137,9 @@ export function ColumnDots(p: {
                 const removing = !!d?.off && !meta?.fixed && visibleKeys.length > 1
                 return <div key={'d' + k}
                             onPointerDown={e => downDot(k, e)} onPointerMove={moveDot} onPointerUp={upDot} onPointerCancel={upDot}
-                            style={{
-                                position: 'absolute', left: `${pct(i)}%`, top: 28, width: 44, height: 44,
-                                margin: '-22px 0 0 -22px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: 'grab', zIndex: d ? 3 : 2,
-                                transform: d ? `translate(${d.dx}px, ${removing ? d.dy : 0}px)` : undefined,
-                                transition: d ? undefined : 'transform 0.15s ease',
-                                opacity: removing ? 0.4 : 1,
-                            }}>
-                    <div style={{
-                        width: 18, height: 18, borderRadius: 9,
-                        background: selected == k ? '#0969da' : '#24292f',
-                        border: meta?.fixed ? '2px solid #afb8c1' : selected == k ? '2px solid #b6d4fe' : '2px solid transparent',
-                        boxShadow: d ? '0 3px 10px rgba(0,0,0,0.35)' : undefined,
-                    }}/>
+                            className={cx(['wenayColDotsDotWrap', d && 'wenayColDotsDotWrap_dragging', removing && 'wenayColDotsDotWrap_removing'])}
+                            style={{left: `${pct(i)}%`, transform: d ? `translate(${d.dx}px, ${removing ? d.dy : 0}px)` : undefined}}>
+                    <div className={cx(['wenayColDotsDot', selected == k && 'wenayColDotsDot_selected', meta?.fixed && 'wenayColDotsDot_fixed'])}/>
                 </div>
             })}
         </div>

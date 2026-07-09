@@ -6,3 +6,4 @@ export * from './inputAutoStep';
 export * from './memoryStore';
 export * from './observableMap';
 export * from './pageVisibilityContext';
+export * from './searchHistory';

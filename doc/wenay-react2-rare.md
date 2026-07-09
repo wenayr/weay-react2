@@ -10,9 +10,10 @@ New code teaches and imports the short canonical surface:
   useModal(), useOutside(), useDraggableApi(), useReorder(), useReorderBoard(),
   useAgGrid(), createGridBuffer(), createColumnBuffer(), createUiSlot(), createToolbar()
 
-Old names are recorded only in `WENAY_REACT2_RENAMES.md`; do not export compatibility aliases.
+Old names are recorded only in `WENAY_REACT2_RENAMES.md`; do not export new compatibility aliases casually. Existing public APIs should usually remain supported during internal refactors; removals require an explicit migration cut with a separate task, migration notes, changelog, and usage signal. Default style contracts are stricter: do not remove old default classes/styles until the replacement class/token path is shipped and documented.
 Do not add new examples with Get*, FuncJSX, *2/*3, or business-specific helper names.
 If a primitive needs app policy, build a small app wrapper above it.
+If behavior is reusable, expose it first as a headless use*/create* API. The hook/controller may return methods, getters, props/bind helpers, or a small API object; visual components and QA cards should consume that surface instead of becoming the only implementation.
 ```
 
 Canonical method vocabulary:
@@ -63,13 +64,13 @@ TestLeft333()
 These are app-shell style utilities. Prefer local app wrappers for new layouts.
 
 ## Settings Dialog / UI Slot / Callback Hub Details
-Settings dialog (centered panel ~640x420, max 92vw/82vh; sections column left, content right):
+Settings dialog (centered panel ~720x480, max 92vw/82vh; searchable settings tree left, content right):
 ```
-type SettingsSection = {key: string, name: string, render: () => ReactNode}
+type SettingsSection = {key: string, name: string, render: () => ReactNode, children?, parentKey?, searchText?, keywords?}
 
 <SettingsDialog
     trigger={...}                     // wrapper span is clickable
-    sections?                         // static sections, listed first
+    sections?                         // static sections, listed first; children form tree nodes
     defaultSection?                   // falls back to the first section when missing/unmounted
     sectionClassName?                 // apps pass their own .chip; default .wenayDlgSection
     sectionActiveClassName?           // apps pass their own .chipActive; default .wenayDlgSectionActive
@@ -80,11 +81,17 @@ getSettingsSections() -> readonly SettingsSection[]
 ```
 The registry is a module singleton on updateBy/renderBy (no React context). Registering the same
 `key` replaces the previous section; unregister removes by identity, so a stale unregister after a
-replacement is a no-op. Closes on the x, a scrim click, and Escape.
+replacement is a no-op. Tree shape comes from nested `children` or flat sections with `parentKey`.
+Search matches section labels, `keywords`, `searchText`, and best-effort text extracted from rendered
+React children; matching descendants stay visible and their ancestors auto-expand. The search input uses
+`createSearchHistory({key:"SettingsDialog.searchHistory"})`: Enter commits the current query, the history
+button recalls stored queries, and changes are published through memoryProps -> memoryCache. Tree controls
+are one compact dotted cycle button in the search row (expanded -> current branch -> collapsed), hidden when
+the tree has too little hierarchy to need it. Closes on the x, a scrim click, and Escape.
 Styling: `--dlg-scrim / bg / border / radius / shadow / nav-bg / nav-width` tokens (tokens.css,
-mirror `tokens.dlg`), classes `.wenayDlgScrim / .wenayDlg / .wenayDlgNav / .wenayDlgContent /
-.wenayDlgClose` in style.css; dark defaults, apps re-skin via `:root[data-theme]` like `--wnd-*`.
-
+mirror `tokens.dlg`), classes `.wenayDlgScrim / .wenayDlg / .wenayDlgNav / .wenayDlgSearch /
+.wenayDlgTree / .wenayDlgContent / .wenayDlgSearchHistory` in style.css; dark defaults, apps re-skin
+via `:root[data-theme]` like `--wnd-*`.
 UI slot:
 ```
 createUiSlot({key, places, def}) -> {Slot, PlacementSetting, getPlace, setPlace}
@@ -98,8 +105,8 @@ Slot/PlacementSetting subscribe internally via updateBy.
 
 Toolbar (createToolbar, `components/Toolbar/Toolbar.tsx`):
 ```
-createToolbar({key, items, def?, settingsItem?, source?}) -> {Bar, Settings, api: {useConfig, useItems, getConfig, setConfig, reset, onChange}}
-<tb.Bar className? settings? popAlign? />             // default classes .wenayTb / .wenayTbItem; popAlign
+createToolbar({key, items, def?, settingsItem?, resetItem?, source?, sourceMode?}) -> {Bar, Settings, api: {useConfig, useItems, getConfig, setConfig, setOrder, show, setDensity, showSettings, showReset, reset, onChange}}
+<tb.Bar className? settings? reset? popAlign? />             // default classes .wenayTb / .wenayTbItem; popAlign
                                                       //   'right' (default, top-right bars) | 'left'
 <tb.Settings className? activeClassName? />           // density segments default .wenaySegBtn(Active)
 registerToolbarDensity({key, name, renderItem?}) / getToolbarDensities()
@@ -130,26 +137,44 @@ registered settings section, no prop changes. Semantics that are easy to get wro
   used (free-floating windows, wrong tool). `touch-action: none` + `user-select: none` on
   draggable rows (`.wenayTbRowGrab`).
 - `api.onChange` is a wenay-common2 `listen` stream; emits the NORMALIZED config after every
-  setConfig. useConfig subscribes via updateBy; getConfig is a non-reactive snapshot.
-- The gear button is a pseudo-item: reserved visible key `__settings` (always normalized in,
-  default true), NO order slot (it always sits at the bar edge), toggled from a separated row at
-  the bottom of the editor (`.wenayTbRowMeta`, outside the drag-slot container on purpose).
-  Hiding it in the gear's own popover closes the popover - the global settings section is the way
-  back. Face via `createToolbar({settingsItem: {title?, icon?}})`.
+  config edit. useConfig subscribes via updateBy; getConfig is a non-reactive snapshot.
+  `setOrder(order)` is the focused external-control path for grid/menu reorder sync: it preserves
+  current membership, density, and pseudo-control visibility while changing only item order. `show(key,on)`,
+  `setDensity(key)`, `showSettings(on)`, and `showReset(on)` are the matching narrow writes; `setConfig` remains the low-level full write.
+- The gear and reset buttons are pseudo-items: reserved visible keys `__settings` and `__reset`,
+  NO order slots (they always sit at the bar edge), toggled from separated rows at the bottom of
+  the editor (`.wenayTbRowMeta`, outside the drag-slot container on purpose). Hiding the gear in
+  its own popover closes the popover - the global settings section is the way back. The reset
+  button calls `api.reset()` and restores defaults for order, membership, density and pseudo-control
+  visibility. Settings is default-visible; reset is default-hidden unless `resetItem.defaultVisible=true` or `api.showReset(true)` enables it. `resetItem: false` removes that feature. Faces via `settingsItem` / `resetItem`.
+- **The Settings CONTAINER is the client's choice (not the core's).** `tb.Settings` is
+  presentation-agnostic - render it anywhere. `<Bar settings>`'s gear opens it in a small inline
+  popover anchored to the gear; since the bar reflows when you toggle membership, that popover
+  shifts a little (known minor twitch). The core deliberately ships ONLY that inline popover -
+  anything richer is a client layer. For a stable, movable editor render `tb.Settings` in your own
+  container: a registered settings section (`registerSettingsSection`), or a draggable window -
+  `FloatingWindow` (drag by header, close X, viewport-clamped, position persisted via `keyForSave`)
+  wrapped in `OutsideClickArea` for close-on-outside-click. Recommended pattern for clients who
+  want the modal-with-title-bar-and-close look; QA card 30 demonstrates it (gear -> Settings in a
+  FloatingWindow, in the card's own positioned layer so it scrolls with the card). This is separate
+  from the row REORDER above, which stays on `useReorder` (a floating window would be the wrong tool
+  there).
 - `api.useItems()` is the headless bar: ordered, visibility-filtered `[{item, density, content}]`
   for fully custom markup. Refs-out was rejected deliberately: order lives in the config, so the
   consumer re-renders from this list - the library never re-parents foreign DOM nodes.
 - `icon` is OPTIONAL: `toolbarItemIcon(item)` returns the icon, else the first 3 letters of
   short/title as a text pseudo-icon (icon density only - the label density shows the caption, not
   the letters). Exported so menus (ColumnsMenu compact) share the exact rule.
-- `source?: UiListSource` inverts ownership of order/visibility. With a source the toolbar is a
-  VIEW: `rawList()` reads the source (not `st`), setConfig writes the item order/visibility THERE
-  (its own change flow re-emits `api.onChange`; the toolbar emits itself only if the source has no
-  `onChange`), while density and the gear flag stay in the toolbar's own `st` under `key`. `ext`
-  is per-instance constant, so hook-call order in useConfig/Bar/Settings never changes. Item keys
-  should match the source's keys 1:1. `columnState.api.listSource` is the reference implementer -
-  one config then drives a grid, its icon menu and the toolbar (QA card 31). Without a source the
-  behaviour is byte-identical to before (own `st`).
+- `source?: UiListSource` inverts ownership. Default `sourceMode:"orderVisible"` makes the toolbar a
+  VIEW over source order+visibility: setConfig writes item order/visibility THERE (its own change
+  flow re-emits `api.onChange`; the toolbar emits itself only if the source has no `onChange`), while
+  density and the gear/reset flags stay in the toolbar's own `st` under `key`. `sourceMode:"order"`
+  shares only the relative order of keys present in the source; item membership, density,
+  pseudo-controls, and extra non-source item positions stay local. On source reorders, source keys
+  refill their slots in the local toolbar order, so an extra item like QA card 30's `blockMode` is
+  not pushed into `columnState` and does not need a bridge hook. `ext` is per-instance constant, so
+  hook-call order in useConfig/Bar/Settings never changes. `columnState.api.listSource` is the
+  reference implementer (QA card 31 for order+visibility, QA card 30 for order-only). Without a source
 - v1 non-goals: no overflow/"more" menu (hook point: Bar, after the visible-items map), no
   grouping, no cross-bar drag.
 Styling: `--tb-*` tokens (tokens.css, mirror `tokens.tb`), classes `.wenayTb*` in style.css;
@@ -176,7 +201,7 @@ createColumnState({key, columns: ColumnMeta[], def?, saveMs?=300})
 ColumnMeta   = {key, title, short?, icon?, group?, fixed?, defaultVisible?, cardRole?: 'title'|'accent'}
 ColumnsConfig= {v, order, visible, width, sort: {key, dir} | null, filter, groups}
 api: {getConfig, setConfig, useConfig, onChange, reset, show(k,on), move(order), setSort(s|null),
-      toggleSort(k), visibleKeys(), getPresent, usePresent, isPresent(k), setPresent(keys|null), listSource}
+      toggleSort(k), visibleKeys(), getPresent, usePresent, isPresent(k), setPresent(keys|null), getPresentGate, setPresentGate(keys|null), listSource}
 ```
 Persist + migration (same DNA as createToolbar/createUiSlot): config lives in `memoryGetOrCreate(key)`,
 edits mutate it in place + renderBy + memoryMarkDirty, the APP saves via `memoryCache.onDirty`.
@@ -195,20 +220,23 @@ Semantics that are easy to get wrong:
   frame - only the final shape persists), debounced `saveMs`, and a JSON compare before commit. A
   `fixed` column dragged off its slot in the grid: readFromGrid commits, normalize() pins it back,
   and if the order changed the adapter re-applies to the grid (snap-back) so the two never disagree.
-- Presence (`usePresent/isPresent/setPresent`): runtime-only, NEVER persisted - which columns the
-  live grid actually HAS. The adapter maintains it on attach and on `gridColumnsChanged`; a column
-  removed from the grid (dynamic columnDefs, a "drop empty columns" standard) keeps its config
-  entry and its menu button (rendered disabled), and when the set changes the adapter RE-IMPOSES
-  the config so a returning column regains its stored order/width/visibility (setting columnDefs
-  resets grid order). No loop: applyColumnState never adds/removes columns. `null` = no grid = all
-  present.
+- Presence (`usePresent/isPresent/setPresent/setPresentGate`): runtime-only, NEVER persisted. It is
+  the intersection of actual live-grid columns and an optional app-level gate. The adapter maintains
+  actual presence on attach and on `gridColumnsChanged`; a column removed from the grid (dynamic
+  columnDefs) keeps its config entry and its menu button (rendered disabled), and when the set changes
+  the adapter RE-IMPOSES the config so a returning column regains its stored order/width/visibility
+  (setting columnDefs resets grid order). `setPresentGate(keys|null)` is for stable-schema app modes:
+  it marks gated-out buttons disabled and hides those grid columns through applyColumnState without
+  mutating persisted `visible`. No loop: applyColumnState never adds/removes columns. Null actual presence
+  and null gate together mean all present; if a gate is set, grid-less consumers still see that gate.
 - `listSource` = the `{order, visible}` slice exposed as a `UiListSource` (Toolbar's
   external-config contract): plug it into `createToolbar({source})` and the toolbar, the icon menu
   and the grid all mirror one config. Its setConfig MERGES visible and re-appends via normalize, so
   an editor over a SUBSET of columns never drops the rest.
 - `filter`/`width` are written by the grid adapter only; `groups` (group key -> enabled
-  sub-columns) is modelled now, group UI is a later phase; `visibleKeys()` additionally gates a
-  grouped column by its group's enabled set.
+  sub-columns) is modelled now; core group UI is still app-owned. QA card 30 demonstrates an app-level
+  mode button over stable grouped `columnDefs`; `presentGate` hides unavailable leaf columns and keeps their buttons disabled.
+  `visibleKeys()` additionally gates a grouped column by its group's enabled set.
 - Attach from the consumer's `onGridReady` (AgGridTable forwards it over its own wiring) with
   `autoSizeColumns={false}` (auto-fit at mount would rewrite stored widths); detach from
   `onGridPreDestroyed` - the config outlives the grid (columnBuffer pattern). HMR caveat on the
@@ -252,8 +280,7 @@ Mobile (no ag-grid, no storage - the config alone):
   as dots move), `cardRole:'title'` = the header (else the first visible key), `cardRole:'accent'`
   = a badge, the rest are label+value. It sorts by the sticky `config.sort` itself
   (numeric/locale comparator) even when the sorted column is hidden.
-QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (icon menu + button states +
-table standards), 31 (Toolbar over columnState.listSource + pseudo-icons).
+Styling uses shared classes `.wenayColDots*` / `.wenayCardList*`; runtime geometry remains inline because dot positions and drag transforms are state-derived. QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (toolbar icon menu + grouped sub-column mode button), 31 (Toolbar over columnState.listSource + pseudo-icons).
 
 ## Outside / Buttons Compatibility
 ```
@@ -418,7 +445,9 @@ MenuRightTrigger / MenuRightClassNames / MenuRightStyles
 StickerMenu                          // components/Menu re-export
 ```
 
-Prefer `contextMenu.openAt(e, items)` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, but it should not be the primary API in new code.
+Prefer `contextMenu.openAt(e, items)` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, and stays supported through `1.x`; it should not be the primary API in new code. Planned diagnostics should count openAt/openAtPoint vs legacy queued opens, source/layer usage, item clicks by explicit stable keys, submenu opens, async errors, and close reasons where known. Counters must be local and opt-in, not hidden analytics.
+
+`Menu` does not mutate `item.status`. Open/hover state is an internal active index; `status` remains a seed/compatibility value, and custom item renderers receive a view item whose `status` mirrors the current open state.
 
 `DropdownMenu` is a floating action menu, not the main context-menu primitive. Its trigger glyph/content and visual classes/styles are caller-owned through `trigger`, `classNames`, and `styles`; the default still renders the old hamburger glyph and CSS classes.
 
@@ -454,8 +483,12 @@ QA stand coverage:
 ```
 useReplaySubscribe(remote, cb, {since?, keepSeq?=true, enabled?=true, onSeq?, onError?, staleMs?, onStale?, policy?, hint?})
   -> {ready, error, stale, seq(), lastTs(), restart(since?)}
+useReplayRouteSubscribe(remote, cb, {since?, keepSeq?=true, enabled?=true, label?, onSeq?, onError?, onRoute?, policy?, hint?})
+  -> {ready, error, route, switching, seq(), label(), active(), switchRoute(nextRemote, opts?)}
 useStoreReplaySync(store, remote, sameOpts)  -> same controller       // Observe.syncStoreReplay wrapper
+useStoreReplayRouteSync(store, remote, routeOpts) -> route controller  // Observe.syncStoreReplayRoute wrapper
 useStoreReplayMirror(remote, initial, sameOpts) -> controller & {store}   // creates the mirror store in a ref
+useStoreReplayRouteMirror(remote, initial, routeOpts) -> route controller & {store}
 useStoreReplayEach(remote, cb, sameOpts & {initial?, drain?}) -> controller & {store}   // per-key fold: Observe.syncStoreReplayEach counterpart
 useReplayFrame(remote, cb, {intervalMs?=300, since?, keepSeq?=true, enabled?=true, hint?, onSeq?, onError?})
   -> {ready, error, seq(), pull(hint?), restart(since?)}              // pull-at-own-pace over remote.frame()
@@ -464,6 +497,7 @@ useReplayHistory(history, apply, {head?, reset?, tickMs?=300, autoPlay?=true})
 ```
 Semantics that are easy to get wrong:
 - `cb`/`apply` go through refs: new function identity does NOT resubscribe. Resubscribe identity is `[remote, enabled, epoch, staleMs, policy]` — changing `staleMs` resubscribes (it is subscribe-time config in common2; under keepSeq the reconnect is a journal tail, so it is cheap); `policy` picks the wire surface (line vs frameLine), so it resubscribes too. `onStale` goes through a ref like `cb`.
+- Route hand-off hooks (`useReplayRouteSubscribe`, `useStoreReplayRouteSync`, `useStoreReplayRouteMirror`) wrap common2 `Replay.replayRouteSubscribe` / `Observe.syncStoreReplayRoute`: `switchRoute(nextRemote, {label?, since?, reset?, policy?, hint?})` keeps the old route live, catches up the replacement from the last delivered `seq`, then closes the old route. Failed replacement leaves the old route active and surfaces `error` / `route.phase == "error"`. Changing the `remote` prop is still treated as a fresh subscription boundary; no-gap promotion/demotion is explicit through `switchRoute()`. common2 1.0.65 route handles expose `seq()`, `label()`, and `active()`, but not `isStale()` / `lastTs()`, so route hooks deliberately do not promise freshness yet.
 - Lag policy / hint (frame model, common2 rev2): `policy: 'frame'` rides the server's `frameLine` when the remote has one — on lag the server drops for THIS client and recovers via the line's `frame` lambda (mini-frame); without a frameLine (old server, in-proc `exposeReplay`) common2 silently degrades to `'queue'`, so an in-proc QA of `'frame'` proves nothing — the wire test lives in common2 (`replay/rpc-auto.test.ts`). `hint` is opaque to the transport and goes through a ref: in `useReplaySubscribe` it is captured at subscribe time (used for the catch-up `frame()` call); in `useReplayFrame` it is read on EVERY pull, so a new identity is never missed and never resubscribes.
 - `useReplayFrame` is the pull path: no live socket subscription at all; a timer calls `remote.frame(seq, hint)` and folds envelopes (seq-ascending, seen seq skipped — a keyframe recovery is just an envelope). Fresh start (no `since`) mirrors `replaySubscribe`'s catch-up for since<0: `keyframe()` is polled until the line has one (`frame(-1)` has no tail to return and THROWS on a still-empty line — a mount racing the producer's first event must not stick an error); a sacred line therefore NEEDS an explicit `since` (0 = full tail) — omitted, it waits forever. Overlapping pulls are never issued (a slow `frame()` skips ticks). Errors are LOUD and sticky: a reject (network, sacred line evicted past our seq, remote without `frame()`) stops the timer and sets `error` until `restart()` — deliberately no tail fallback here, that is `replaySubscribe`'s job. Freshness (`staleMs`) does not apply (the consumer owns the cadence).
 - Freshness (`staleMs`): detection is 100% wenay-common2's watchdog (`ReplaySubscribeOpts.staleMs/onStale`, edge-triggered); the hook only mirrors the edges into `stale` state, so a fresh high-frequency line causes zero extra renders. `lastTs()` is a plain getter like `seq()` (producer ts of the last delivered event, 0 before the first delivery / while unsubscribed). Without `staleMs`: no watchdog, no state updates, `stale` stays `false`.
@@ -475,7 +509,8 @@ Semantics that are easy to get wrong:
 - `useStoreReplayEach` composes existing pieces instead of calling `Observe.syncStoreReplayEach` (which builds a FRESH store per call): the mirror lives in a ref (like `useStoreReplayMirror`), `store.each()` is subscribed in an effect declared BEFORE the sync effect (hook-call order guarantees the per-key subscriber exists when the keyframe applies — the expansion is never missed), then `useStoreReplaySync` drives the wire. Consequences: within one mount every resubscribe (StrictMode, `restart()`, `enabled` toggle, `staleMs`/`policy` change) reconnects by tail ON TOP of kept state and the consumer sees only the diff — no snapshot/`initial` dance (the library one-call needs `{since, initial: snapshot}` for that). After a FULL unmount pass `{since: prev.seq(), initial: prev.store.snapshot()}` like the library contract. `drain` is creation-time (it goes to `createStore`); changing it later does nothing. The fold target must live outside React state (ref/Map/grid api) — the hook renders nothing; `controller.store` is a normal store for `useStoreNode`/`useStoreKeys` extras.
 - Server primitives (`conflateReplay` per connection, `archiveReplay`) intentionally have no hooks: they live where the RPC server is built.
 
-QA cards 23/24/25 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `Replay.replayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror); client E = pull path (`useReplayFrame` over the direct remote with a wrapped counting `frame()`, pace switch 250ms/1s/3s keeps seq). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Card 25 = per-key feed (`useStoreReplayEach` over `exposeStoreReplay`): a dict-of-rows store, producer touches ONE random row per tick, the fold target is a plain Map with per-row cb counters — only the mutated row's counter grows, keyframe/`replace` are the only whole-table expansions, delete arrives as `(key, undefined)`. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
+QA cards 23/24/25/26 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `Replay.replayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror); client E = pull path (`useReplayFrame` over the direct remote with a wrapped counting `frame()`, pace switch 250ms/1s/3s keeps seq). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Card 25 = per-key feed (`useStoreReplayEach` over `exposeStoreReplay`): a dict-of-rows store, producer touches ONE random row per tick, the fold target is a plain Map with per-row cb counters — only the mutated row's counter grows, keyframe/`replace` are the only whole-table expansions, delete arrives as `(key, undefined)`. Card 26 = route hand-off (`useReplayRouteSubscribe` over the same video line): one canvas starts on relay, switches direct/relay by `switchRoute`, and failed replacement keeps the previous route alive. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
+
 ## Logs
 Frequent global logger:
 ```
@@ -497,7 +532,7 @@ LogsSettings()
 MainPage()
 ```
 
-The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point.
+The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point. Shared logger chrome lives in `src/common/src/logs/logStyles.ts` and is themed through `--logs-*` tokens; this is a small visual contract, not a full logger architecture rewrite.
 
 ## Cache / Memory / Browser Utilities
 ```
@@ -519,6 +554,7 @@ memoryGetOrCreate(key, def, options?)
 memoryGetById(key, def, id)
 memoryUpdate(key, mutate)
 memoryMarkDirty(key)
+createSearchHistory({key, max?})
 deepMergeWithMap(target, source)
 memoryCache
 memoryMaps
@@ -579,21 +615,22 @@ Style entry points:
 
 Current tokenized prefixes:
 - `--color-*` for base palette.
-- `--menu-*` for popup/right-menu visuals.
+- `--menu-*` for mouse context-menu and right-menu visuals.
 - `--wnd-*` for `FloatingWindow` chrome.
 - `--dlg-*` for `SettingsDialog` chrome.
 - `--tb-*` for toolbar chrome.
+- `--logs-*` for global/context logger chrome.
 - `--wenay-z-modal` for modal/overlay stacking.
 
-Normalization rule: new shared CSS should first try an existing token. Add a new token only when a value is reused by a shared primitive or is expected to be theme-overridden by apps. One-off app/demo styles should stay in the demo/app wrapper, not in library tokens.
+Normalization rule: new shared CSS should first try an existing token. Add a new token only when a value is reused by a shared primitive or is expected to be theme-overridden by apps. One-off app/demo styles should stay in the demo/app wrapper, not in library tokens. Do not delete a default style/class without a replacement class/token path and changelog entry; visually broken defaults are treated as a compatibility break.
 
 Open normalization candidates:
 - `src/style/style.css`: `.msTradeAlt`, `.msTradeActive`, `.newButtonSimple`, `.toIndicatorMenuButton:hover`, submit-button green, and several toolbar row hover/drag literals still use raw colors.
-- `src/style/menuRight.css`: `OutlineDragDemo` uses `#007bff` directly.
-- `src/common/src/logs/*`: logger cards/tabs/notifications keep raw inline colors; if the context logger stays public, it needs `--logs-*` tokens or a small style contract.
 - `src/common/src/grid/columnState/*`: card/list/menu visuals use GitHub-like inline colors. If these are generic product primitives, introduce `--cols-*` tokens; if they are demo-ish, keep them isolated.
-- `src/common/src/components/Modal/ModalContextProvider.tsx`: scrim color duplicates `--dlg-scrim`; prefer token usage when touching modal chrome.
+- `src/common/src/components/ParamsEditor.tsx` and `src/common/src/components/Input.tsx`: if these stay public primitives, define default class/token contracts instead of component-owned visual styling.
 - `src/common/src/styles/commentaryStyles.css`: standalone `.commentary` CSS is not imported by the root style bundle; either import/tokenize it if still used, or mark it as a local component concern.
+
+Recently normalized: mouse context-menu item colors through `--menu-*`, `--menu-outline-color` for `OutlineDragDemo`, `--logs-*` for logger chrome, and `--dlg-scrim` in `ModalProvider`.
 
 ## Cleanup Inventory
 
@@ -639,6 +676,3 @@ removed old grid update names -> applyGridRows / agGrid4
 
 Do not add new generic utilities with app words in their signature. For example, a column primitive should accept
 `names` and `apply`, while a product wrapper decides group ids, column ids, and labels.
-
-
-

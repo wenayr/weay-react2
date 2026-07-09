@@ -187,11 +187,28 @@ input:invalid {
   padding: 8px 10px;
 }
 .toButtonA:hover {
-  /* border-color: #ffffff; */
-  color: #ffffff;
+  color: var(--base-color-hover);
 }
 .toButtonEasy:hover {
   color: var(--color-text-theme);
+}
+
+/* Mouse context menu items (Menu/MenuR). Keep legacy class names, but route
+   menu-specific colors through the shared --menu-* token contract. */
+.MenuR.toButton,
+.MenuR.toButtonA {
+  color: var(--menu-item-color);
+  border-bottom: var(--menu-border);
+}
+.MenuR.toButtonA {
+  background: var(--menu-active-background);
+}
+.MenuR.toButton:hover,
+.MenuR.toButton:active,
+.MenuR.toButtonA:hover {
+  background: var(--menu-item-hover-bg-color);
+  color: var(--menu-item-hover-color);
+  border-bottom: var(--menu-border);
 }
 
 /* Menu indicator elements */
@@ -392,33 +409,333 @@ body {
   inset: 0;
   z-index: var(--wenay-z-modal, 9999);
   background: var(--dlg-scrim, rgba(0, 0, 0, 0.5));
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
-.wenayDlg {
-  position: relative;
-  display: flex;
-  width: 640px;
-  height: 420px;
+.wenayDlgOutside {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+}
+.wenayDlgWindow {
+  --wnd-bg: var(--dlg-bg, var(--color-bg-dark));
+  --wnd-border: var(--dlg-border, 1px solid var(--color-border-common));
+  --wnd-radius: var(--dlg-radius, 10px);
+  --wnd-shadow: var(--dlg-shadow, 0 12px 40px rgba(0, 0, 0, 0.5));
+  --wnd-header-bg: var(--dlg-nav-bg, var(--color-bg-light));
+  --wnd-header-border: 1px solid rgba(255, 255, 255, 0.08);
+  --wnd-header-padding: 0;
+  --wnd-close-size: 24px;
+  --wnd-close-top: 6px;
+  --wnd-close-right: 8px;
+  --wnd-close-bg: transparent;
+  --wnd-close-border: 1px solid transparent;
+  --wnd-close-shadow: none;
   max-width: 92vw;
   max-height: 82vh;
+}
+.wenayDlgWindow .wenayWnd {
+  color: var(--color-text-base);
+  overflow: hidden;
+}
+.wenayDlgWindow .wenayWndHeader {
+  cursor: grab;
+}
+.wenayDlgWindow .wenayWndHeader:active {
+  cursor: grabbing;
+}
+.wenayDlgHeader {
+  height: 36px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 44px 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-base);
+}
+.wenayDlgTriggerBar {
+  --tb-bg: var(--dlg-nav-bg, var(--color-bg-light));
+  padding: 2px;
+  vertical-align: middle;
+}
+.wenayDlgTriggerItem {
+  width: 24px;
+  height: 24px;
+  justify-content: center;
+  padding: 0;
+}
+.wenayDlg {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   background: var(--dlg-bg, var(--color-bg-dark));
-  border: var(--dlg-border, 1px solid var(--color-border-common));
-  border-radius: var(--dlg-radius, 10px);
-  box-shadow: var(--dlg-shadow, 0 12px 40px rgba(0, 0, 0, 0.5));
   color: var(--color-text-base);
   overflow: hidden;
 }
 .wenayDlgNav {
-  width: var(--dlg-nav-width, 168px);
+  width: var(--dlg-nav-width, 220px);
   flex: none;
+  min-width: 0;
   background: var(--dlg-nav-bg, var(--color-bg-light));
-  padding: 10px 8px;
+  padding: 8px 6px;
   display: flex;
   flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+}
+.wenayDlgNavTop {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
   gap: 4px;
-  overflow-y: auto;
+}
+.wenayDlgSearchBox {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.wenayDlgSearch {
+  width: 100%;
+  box-sizing: border-box;
+  height: 24px;
+  padding: 3px 44px 3px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.16);
+  color: inherit;
+  outline: none;
+}
+.wenayDlgSearchHistoryBtn,
+.wenayDlgSearchClear {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.68);
+  cursor: pointer;
+}
+.wenayDlgSearchHistoryBtn {
+  right: 22px;
+}
+.wenayDlgSearchClear {
+  right: 4px;
+}
+.wenayDlgSearchHistoryBtn svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wenayDlgSearchHistoryBtn:hover,
+.wenayDlgSearchHistoryBtn:focus-visible,
+.wenayDlgSearchClear:hover,
+.wenayDlgSearchClear:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  outline: none;
+}
+.wenayDlgSearch:focus {
+  border-color: #0969da;
+  box-shadow: 0 0 0 1px rgba(9, 105, 218, 0.35);
+}
+.wenayDlgSearchHistory {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 180px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: var(--dlg-bg, var(--color-bg-dark));
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
+}
+.wenayDlgSearchHistoryItem,
+.wenayDlgSearchHistoryClear {
+  width: 100%;
+  min-height: 24px;
+  box-sizing: border-box;
+  display: block;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.wenayDlgSearchHistoryClear {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.58);
+}
+.wenayDlgSearchHistoryItem:hover,
+.wenayDlgSearchHistoryItem:focus-visible,
+.wenayDlgSearchHistoryClear:hover,
+.wenayDlgSearchHistoryClear:focus-visible {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  outline: none;
+}
+.wenayDlgTreeTool {
+  width: 22px;
+  height: 24px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+}
+.wenayDlgTreeTool:hover,
+.wenayDlgTreeTool:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  outline: none;
+}
+.wenayDlgTreeToolDots {
+  width: 12px;
+  height: 14px;
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  align-items: center;
+  justify-items: center;
+}
+.wenayDlgTreeToolDots span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.36;
+}
+.wenayDlgTreeTool_expanded .wenayDlgTreeToolDots span,
+.wenayDlgTreeTool_branch .wenayDlgTreeToolDots span:nth-child(-n+2),
+.wenayDlgTreeTool_collapsed .wenayDlgTreeToolDots span:first-child {
+  opacity: 1;
+}
+.wenayDlgTree {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: auto;
+}
+.wenayDlgTreeRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 22px;
+  box-sizing: border-box;
+  outline: none;
+}
+.wenayDlgTreeRow.wenayDlgSection {
+  padding: 2px 5px;
+}
+.wenayDlgTreeRow:focus-visible {
+  box-shadow: 0 0 0 1px rgba(9, 105, 218, 0.65) inset;
+}
+.wenayDlgTreeToggle {
+  position: relative;
+  width: 14px;
+  height: 16px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.wenayDlgTreeToggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 1;
+}
+.wenayDlgTreeToggle::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  width: 0;
+  height: 0;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 4px solid currentColor;
+  transform-origin: 2px 3px;
+  transition: transform 120ms ease;
+}
+.wenayDlgTreeToggleOpen::before {
+  transform: rotate(90deg);
+}
+.wenayDlgTreeToggleEmpty {
+  visibility: hidden;
+  pointer-events: none;
+}
+.wenayDlgTreeLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wenayDlgTreeMark {
+  border-radius: 3px;
+  padding: 0 1px;
+  background: rgba(255, 212, 0, 0.34);
+  color: inherit;
+  font-weight: 700;
+}
+.wenayDlgNoResults {
+  padding: 8px 10px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+}
+.wenayDlg_resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+.wenayDlgDivider {
+  position: relative;
+  width: 7px;
+  flex: none;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+}
+.wenayDlgDivider span {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 3px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.wenayDlgDivider:hover span,
+.wenayDlgDivider:focus-visible span {
+  background: #0969da;
+}
+.wenayDlgDivider:focus-visible {
+  outline: none;
 }
 .wenayDlgContent {
   position: relative;
@@ -427,12 +744,187 @@ body {
   padding: 14px 40px 14px 16px;
   overflow: auto;
 }
-/* Positioning of the close button in the dialog's top-right corner (over the content column).
-   A direct child of .wenayDlg, NOT of the scrollable content, so it does not scroll away. */
-.wenayDlgClose {
+
+/* Column state mobile primitives (ColumnDots/CardList). Visual defaults mirror the
+   original stand-29 inline look; apps can still override with className/style. */
+.wenayColDots {
+  user-select: none;
+  color: #24292f;
+}
+.wenayColDotsHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.wenayColDotsMeta {
+  color: #57606a;
+}
+.wenayColDotsSpacer {
+  flex: 1;
+}
+.wenayColDotsSort {
+  border: 1px solid #6e7781;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #fff;
+}
+.wenayColDotsSort:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.wenayColDotsTrack {
+  position: relative;
+  height: 56px;
+  margin: 0 14px;
+  touch-action: none;
+}
+.wenayColDotsRail {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  left: -8px;
+  right: -8px;
+  top: 27px;
+  height: 2px;
+  border-radius: 1px;
+  background: #d0d7de;
+}
+.wenayColDotsMark {
+  position: absolute;
+  top: 0;
+  width: 44px;
+  height: 56px;
+  margin-left: -22px;
+}
+.wenayColDotsSortMark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  text-align: center;
+  font-size: 11px;
+  color: #0969da;
+  font-weight: 700;
+}
+.wenayColDotsMarkPin {
+  position: absolute;
+  left: 50%;
+  top: 24px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 4px;
+  background: #afb8c1;
+}
+.wenayColDotsMark_on .wenayColDotsMarkPin {
+  background: transparent;
+}
+.wenayColDotsMarkLabel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 40px;
+  text-align: center;
+  font-size: 10px;
+  color: #8c959f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wenayColDotsMark_on .wenayColDotsMarkLabel {
+  color: #24292f;
+}
+.wenayColDotsDotWrap {
+  position: absolute;
+  left: 0;
+  top: 28px;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  cursor: grab;
+  z-index: 2;
+  transition: transform 0.15s ease;
+}
+.wenayColDotsDotWrap_dragging {
+  z-index: 3;
+  cursor: grabbing;
+  transition: none;
+}
+.wenayColDotsDotWrap_removing {
+  opacity: 0.4;
+}
+.wenayColDotsDot {
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: #24292f;
+  border: 2px solid transparent;
+}
+.wenayColDotsDotWrap_dragging .wenayColDotsDot {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+.wenayColDotsDot_selected {
+  background: #0969da;
+  border-color: #b6d4fe;
+}
+.wenayColDotsDot_fixed {
+  border-color: #afb8c1;
+}
+.wenayCardList {
+  display: grid;
+  gap: 8px;
+}
+.wenayCardListItem {
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+}
+.wenayCardListHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.wenayCardListHeader_compact {
+  margin-bottom: 0;
+}
+.wenayCardListTitle {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.wenayCardListAccent {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #ddf4ff;
+  color: #0969da;
+  white-space: nowrap;
+}
+.wenayCardListField {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.wenayCardListLabel {
+  color: #57606a;
+  min-width: 72px;
+}
+.wenayCardListValue {
+  flex: 1;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* Toolbar (createToolbar). Themed via --tb-* (tokens.css), dark defaults. */
 .wenayTb {
@@ -559,6 +1051,23 @@ body {
 .wenayTbHandle:focus {
   opacity: 1;
   outline: none;
+  color: #fff;
+}
+.wenayTbMetaAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.wenayTbMetaAction:hover {
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 

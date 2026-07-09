@@ -20,6 +20,7 @@ export const tokens = {
         itemColor: '#fff',
         itemHoverColor: '#101010',
         itemHoverBgColor: '#fff',
+        outlineColor: '#007bff',
         shadow: '0 0 20px 14px rgba(34, 60, 80, 0.2)',
     },
     /** FloatingWindow window chrome (--wnd-*). Defaults = legacy look; apps re-skin via :root[data-theme].
@@ -58,7 +59,7 @@ export const tokens = {
         shadow: '0 12px 40px rgba(0, 0, 0, 0.5)',
         /** var(--color-bg-light) in CSS */
         navBg: '#17202e',
-        navWidth: '168px',
+        navWidth: '220px',
     },
     /** Toolbar (createToolbar) chrome (--tb-*). Dark defaults; apps re-skin via :root[data-theme]. */
     tb: {
@@ -76,6 +77,18 @@ export const tokens = {
         popBorder: '1px solid rgb(50, 62, 71)',
         popRadius: '8px',
         popShadow: '0 8px 28px rgba(0, 0, 0, 0.5)',
+    },
+    /** Logs chrome (--logs-*). Defaults preserve the old logger look; apps re-skin via CSS vars. */
+    logs: {
+        notificationText: '#fff',
+        notificationAccent: '#5D9FFA',
+        toggleBg: 'rgb(58, 58, 58)',
+        toggleOffBg: 'rgb(144, 60, 60)',
+        divider: 'rgba(255, 255, 255, 1)',
+        tabNavBg: '#333',
+        tabBg: '#444',
+        tabActiveBg: '#666',
+        tabText: '#fff',
     },
     font: {
         family: 'Roboto',

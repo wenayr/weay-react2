@@ -6,6 +6,7 @@ import {ColDef, ColGroupDef, GridReadyEvent} from "ag-grid-community";
 import {contextMenu} from "../menu/menuMouse";
 import { memoryGetOrCreate } from "../utils/memoryStore";
 import { ParamsEditor } from "../components/ParamsEditor";
+import {logDividerGradient, logSeverityBackground, logStyleTokens} from "./logStyles";
 
 type LogInput<T extends object> = T & {id : string, var?: number, time: Date, txt: string}
 type LogEntry<T extends object = {}> = LogInput<T> & {num: number}
@@ -200,15 +201,13 @@ export function PageLogs({update}: {update?: number}) {
 }
 
 function Message({logs}: {logs: LogEntry}) {
-    let red = (logs.var ?? 0) * 10
-    if (red > 255) red = 255
     return <div className={"testAnime"}
-                style={{ width:"200px", color:"rgb(255,255,255)", height:"auto", marginTop:"10px", borderRight:"5px solid #5D9FFA", background: `rgb(${red},73,35)`}}
+                style={{ width:"200px", color: logStyleTokens.text, height:"auto", marginTop:"10px", borderRight:`5px solid ${logStyleTokens.accent}`, background: logSeverityBackground(logs.var)}}
         //key={id}
     >
         <p style = {{textAlign:"center", fontSize: "10px", marginBottom:"1px"}}>{"notification"}</p>
         <hr style = {{
-            backgroundImage: "linear-gradient(to right, transparent, rgba(255, 255, 255, 1), transparent)",
+            backgroundImage: logDividerGradient(),
             border: 0,
             height: "1px",
             margin: "0 0 0 0",
@@ -249,8 +248,8 @@ export function MessageEventLogs({zIndex} :{zIndex?: number}) {
             onClick={()=>{setting.params.show = !setting.params.show; renderBy(tt)}}
             style={{margin: 3, padding: 3, right: 0, position: "absolute", zIndex: 120,
                 ...setting.params.show ?
-                    {background: "rgb(58,58,58)", fontSize: "25px"} :
-                    {background: "rgb(144,60,60)"}
+                    {background: logStyleTokens.toggleBg, fontSize: "25px"} :
+                    {background: logStyleTokens.toggleOffBg}
         }}>{setting.params.show ? "X" : "log"}</div>
 
         <div>{setting.params.show ? tr : null}</div>

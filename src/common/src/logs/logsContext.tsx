@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridReadyEvent } from 'ag-grid-community';
+import {logDividerGradient, logSeverityBackground, logStyleTokens} from './logStyles';
 
 // Uncomment AG Grid styles if needed:
 // import 'ag-grid-community/styles/ag-grid.css';
@@ -289,7 +290,7 @@ export function LogsNotifications() {
             <div style={{ position: 'absolute', right: 10, top: 10, zIndex: 999 }}>
                 <div
                     style={{
-                        background: 'rgb(144,60,60)',
+                        background: logStyleTokens.toggleOffBg,
                         padding: '6px 10px',
                         cursor: 'pointer'
                     }}
@@ -306,7 +307,7 @@ export function LogsNotifications() {
         <div style={{ position: 'absolute', right: 10, top: 10, zIndex: 999 }}>
             <div
                 style={{
-                    background: 'rgb(58,58,58)',
+                    background: logStyleTokens.toggleBg,
                     fontSize: '20px',
                     padding: '6px 10px',
                     cursor: 'pointer'
@@ -316,20 +317,16 @@ export function LogsNotifications() {
                 X
             </div>
             <div>
-                {notifications.slice(0, 10).map(({ id, log }) => {
-                    let red = (log.var ?? 0) * 10;
-                    if (red > 255) red = 255;
-
-                    return (
+                {notifications.slice(0, 10).map(({ id, log }) => (
                         <div
                             key={id}
                             className="testAnime example-exit"
                             style={{
                                 width: 200,
-                                color: 'white',
+                                color: logStyleTokens.text,
                                 marginTop: 10,
-                                borderRight: '5px solid #5D9FFA',
-                                backgroundColor: `rgb(${red},73,35)`,
+                                borderRight: `5px solid ${logStyleTokens.accent}`,
+                                backgroundColor: logSeverityBackground(log.var),
                                 padding: 8,
                                 wordWrap: 'break-word'
                             }}
@@ -337,7 +334,7 @@ export function LogsNotifications() {
                             <p style={{ textAlign: 'center', fontSize: 10, marginBottom: 1 }}>notification</p>
                             <hr
                                 style={{
-                                    backgroundImage: 'linear-gradient(to right, transparent, rgba(255, 255, 255, 1), transparent)',
+                                    backgroundImage: logDividerGradient(),
                                     border: 0,
                                     height: 1,
                                     margin: 0
@@ -350,8 +347,7 @@ export function LogsNotifications() {
                                 {new Date(log.time).toLocaleDateString()}
                             </p>
                         </div>
-                    );
-                })}
+                    ))}
             </div>
         </div>
     );
@@ -428,12 +424,12 @@ export function MainPage() {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ display: 'flex', gap: 8, padding: 10, background: '#333' }}>
+            <div style={{ display: 'flex', gap: 8, padding: 10, background: logStyleTokens.tabNavBg }}>
                 <button
                     onClick={() => setCurrentTab('table')}
                     style={{
-                        backgroundColor: currentTab === 'table' ? '#666' : '#444',
-                        color: 'white',
+                        backgroundColor: currentTab === 'table' ? logStyleTokens.tabActiveBg : logStyleTokens.tabBg,
+                        color: logStyleTokens.tabText,
                         border: 'none',
                         padding: '8px',
                         cursor: 'pointer'
@@ -444,8 +440,8 @@ export function MainPage() {
                 <button
                     onClick={() => setCurrentTab('settings')}
                     style={{
-                        backgroundColor: currentTab === 'settings' ? '#666' : '#444',
-                        color: 'white',
+                        backgroundColor: currentTab === 'settings' ? logStyleTokens.tabActiveBg : logStyleTokens.tabBg,
+                        color: logStyleTokens.tabText,
                         border: 'none',
                         padding: '8px',
                         cursor: 'pointer'

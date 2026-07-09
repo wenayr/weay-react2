@@ -48,10 +48,12 @@ export type UiListConfig = {
     visible: {[key: string]: boolean}
 }
 
+export type ToolbarSourceMode = 'orderVisible' | 'order'
+
 /** An external owner of order/visibility that a Toolbar can run on instead of
  *  its own store - e.g. columnState's listSource: the SAME config the grid
  *  syncs with, so dragging a column in the grid reorders the toolbar and
- *  vice versa. Density and the gear flag stay toolbar-local (persisted under
+ *  vice versa. Density and the gear/reset flags stay toolbar-local (persisted under
  *  the toolbar's own key). useConfig must be a React hook (subscription). */
 export type UiListSource = {
     useConfig: () => UiListConfig
@@ -80,7 +82,9 @@ const densities = {list: [
 /** Icon with a text fallback: no glyph = the first letters of short/title
  *  (an "PR"-style pseudo-icon), so icon densities work for icon-less items. */
 export function toolbarItemIcon(item: {icon?: React.ReactNode, short?: string, title: string}): React.ReactNode {
-    return item.icon ?? <span style={{fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase'}}>
+    // No real icon -> a text pseudo-icon (first 3 letters). Rendered a touch lighter
+    // (lower weight + opacity) so this fallback does not read as a bold label.
+    return item.icon ?? <span style={{fontSize: 10, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', opacity: 0.65}}>
         {(item.short ?? item.title).slice(0, 3)}
     </span>
 }
@@ -123,6 +127,7 @@ function itemContent(item: ToolbarItem, densityKey: string) {
 /** Reserved visible-map key for the bar's settings (gear) button: not part of
  *  order (the gear always sits at the bar edge), but toggleable like an item. */
 const SETTINGS_KEY = '__settings'
+const RESET_KEY = '__reset'
 
 export function createToolbar(opts: {
     /** persistence key (memoryProps -> memoryCache), like createUiSlot */
@@ -135,13 +140,23 @@ export function createToolbar(opts: {
      *  renders only when Bar mounts with settings, AND visible['__settings'] is
      *  not false - the Settings editor shows a separated toggle row for it. */
     settingsItem?: {title?: string, icon?: React.ReactNode}
+    /** reset button face. The reset feature exists by default, but the bar
+     *  button is hidden until Settings/showReset enables it; pass false to
+     *  remove the feature. */
+    resetItem?: false | {title?: string, icon?: React.ReactNode, defaultVisible?: boolean}
     /** external owner of order/visibility (columnState.api.listSource etc.):
      *  the toolbar becomes a VIEW over that config - Bar/Settings edit it, and
      *  outside changes (a column dragged in the grid) reorder the toolbar.
-     *  Item keys should match the source's keys 1:1. Density and the gear flag
+     *  Item keys should match the source's keys 1:1. Density and the gear/reset flags
      *  remain in the toolbar's own store under `key`. Default: own store. */
     source?: UiListSource
+    /** Default 'orderVisible': source owns both item order and item visibility.
+     *  'order': source owns only the relative order of source keys; item membership,
+     *  density, pseudo-controls, and extra non-source item positions stay local. */
+    sourceMode?: ToolbarSourceMode
 }) {
+    const resetDefaultVisible = () => opts.resetItem !== false && opts.resetItem?.defaultVisible === true
+
     const defConfig = (): ToolbarConfig => ({
         order: opts.def?.order?.slice() ?? opts.items.map(i => i.key),
         visible: opts.def?.visible ? {...opts.def.visible} : Object.fromEntries(opts.items.map(i => [i.key, i.defaultVisible != false])),
@@ -152,21 +167,39 @@ export function createToolbar(opts: {
     // ext is fixed for the controller's lifetime, so hook call order inside
     // useConfig/Bar/Settings never changes for a given toolbar instance
     const ext = opts.source
+    const sourceMode: ToolbarSourceMode = ext ? (opts.sourceMode ?? 'orderVisible') : 'orderVisible'
     // outside edits of the external config (grid drags...) must reach the
     // toolbar's own subscribers too; module-lifetime subscription by design
     ext?.onChange?.(() => emitChange(normalize()))
 
-    /** raw order/visible as stored - own store or the external source */
-    const rawList = () => ext ? ext.getConfig() : {order: st.order, visible: st.visible}
+    function sameOrder(a: string[], b: string[]) {
+        return a.length == b.length && a.every((k, i) => k == b[i])
+    }
+
+    function sourceKeySet(raw: UiListConfig | undefined, known: Set<string>) {
+        return new Set((Array.isArray(raw?.order) ? raw.order : []).filter(k => known.has(k)))
+    }
+
+    function mergeSourceOrder(localOrder: string[], rawSourceOrder: string[], sourceKeys: Set<string>) {
+        if (!sourceKeys.size) return localOrder
+        const sourceOrder = rawSourceOrder.filter(k => sourceKeys.has(k))
+        let i = 0
+        return localOrder.map(k => sourceKeys.has(k) ? (sourceOrder[i++] ?? k) : k)
+    }
 
     /** The persisted state may be stale or partial (older app version, removed
      *  items, an unregistered density) - never crash, never drop user data that
      *  still applies: unknown keys are filtered out, missing items are appended
      *  (default-visible), fixed items are pinned back to their descriptor index. */
     function normalize(): ToolbarConfig {
-        const raw = rawList()
         const known = new Set(opts.items.map(i => i.key))
-        const rawOrder = Array.isArray(raw.order) ? raw.order : []
+        const extRaw = ext?.getConfig()
+        const localRaw = {order: st.order, visible: st.visible}
+        const raw = ext && sourceMode == 'orderVisible' ? extRaw! : localRaw
+        const sourceKeys = ext && sourceMode == 'order' ? sourceKeySet(extRaw, known) : new Set<string>()
+        const rawOrder = ext && sourceMode == 'order'
+            ? mergeSourceOrder(Array.isArray(st.order) ? st.order : [], Array.isArray(extRaw?.order) ? extRaw.order : [], sourceKeys)
+            : Array.isArray(raw.order) ? raw.order : []
         const order = rawOrder.filter(k => known.has(k) && !opts.items.find(i => i.key == k)?.fixed)
         for (const it of opts.items)
             if (!it.fixed && order.indexOf(it.key) == -1) order.push(it.key)
@@ -177,30 +210,59 @@ export function createToolbar(opts: {
         const visible: {[k: string]: boolean} = {}
         for (const it of opts.items)
             visible[it.key] = it.fixed ? true : (rawVisible[it.key] ?? it.defaultVisible != false)
-        // the gear flag is toolbar-local: an external source only owns items
+        // the gear/reset flags are toolbar-local: an external source only owns items
         const gearRaw = (ext ? st.visible : rawVisible) ?? {}
         visible[SETTINGS_KEY] = typeof gearRaw[SETTINGS_KEY] == 'boolean' ? gearRaw[SETTINGS_KEY] : true
+        if (opts.resetItem !== false)
+            visible[RESET_KEY] = typeof gearRaw[RESET_KEY] == 'boolean' ? gearRaw[RESET_KEY] : resetDefaultVisible()
         const density = typeof st.density == 'string' && densities.list.some(d => d.key == st.density)
             ? st.density : (opts.def?.density ?? densities.list[0].key)
         return {order, visible, density}
     }
 
+    function metaVisible(next: ToolbarConfig, key: string, def: boolean) {
+        return typeof next.visible[key] == 'boolean' ? next.visible[key] : def
+    }
+
     /** Every edit funnels through here: mutate the persisted object in place
      *  (identity is the updateBy/renderBy subscription key), announce, mark the
      *  cache dirty, emit outward. With an external source the items' order and
-     *  visibility go THERE (its own change flow re-emits); density + gear flag
+     *  visibility go THERE (its own change flow re-emits); density + gear/reset flags
      *  always stay in the toolbar's own store. */
     function setConfig(next: ToolbarConfig) {
-        if (ext) {
+        if (ext && sourceMode == 'orderVisible') {
             const visible = {...next.visible}
             delete visible[SETTINGS_KEY]
-            st.visible = {...st.visible, [SETTINGS_KEY]: next.visible[SETTINGS_KEY] != false}
+            delete visible[RESET_KEY]
+            st.visible = {
+                ...st.visible,
+                [SETTINGS_KEY]: metaVisible(next, SETTINGS_KEY, true),
+                [RESET_KEY]: metaVisible(next, RESET_KEY, resetDefaultVisible()),
+            }
             st.density = next.density
             renderBy(st)
             memoryMarkDirty(opts.key)
             ext.setConfig({order: next.order.slice(), visible})
             // the source's own onChange already re-emitted; emit only when it can't
             if (!ext.onChange) emitChange(normalize())
+        } else if (ext && sourceMode == 'order') {
+            const extRaw = ext.getConfig()
+            const known = new Set(opts.items.map(i => i.key))
+            const sourceKeys = sourceKeySet(extRaw, known)
+            const curSourceOrder = (Array.isArray(extRaw.order) ? extRaw.order : []).filter(k => sourceKeys.has(k))
+            const nextSourceOrder = next.order.filter(k => sourceKeys.has(k))
+            st.order = next.order.slice()
+            st.visible = {...next.visible}
+            st.density = next.density
+            renderBy(st)
+            memoryMarkDirty(opts.key)
+            const orderChanged = !sameOrder(curSourceOrder, nextSourceOrder)
+            if (orderChanged)
+                ext.setConfig({
+                    order: nextSourceOrder,
+                    visible: extRaw.visible && typeof extRaw.visible == 'object' ? {...extRaw.visible} : {},
+                })
+            if (!orderChanged || !ext.onChange) emitChange(normalize())
         } else {
             st.order = next.order.slice()
             st.visible = {...next.visible}
@@ -242,12 +304,31 @@ export function createToolbar(opts: {
     }
 
     const reset = () => setConfig(defConfig())
+    function setOrder(order: string[]) {
+        setConfig({...getConfig(), order: order.slice()})
+    }
+    function show(key: string, on: boolean) {
+        const cfg = getConfig()
+        setConfig({...cfg, visible: {...cfg.visible, [key]: on}})
+    }
+    function setDensity(density: string) {
+        setConfig({...getConfig(), density})
+    }
+    const showSettings = (on: boolean) => show(SETTINGS_KEY, on)
+    const showReset = (on: boolean) => show(RESET_KEY, on)
 
     const settingsTitle = () => opts.settingsItem?.title ?? 'Toolbar settings'
     const settingsIcon = () => opts.settingsItem?.icon ??
         <svg width='14' height='14' viewBox='0 0 16 16' aria-hidden='true'>
             <path d='M8 5.2 A2.8 2.8 0 1 0 8 10.8 A2.8 2.8 0 1 0 8 5.2 M8 1.2 L8.6 3.4 A4.8 4.8 0 0 1 10.6 4.2 L12.8 3.2 L14 5.6 L12.2 7 A4.8 4.8 0 0 1 12.2 9 L14 10.4 L12.8 12.8 L10.6 11.8 A4.8 4.8 0 0 1 8.6 12.6 L8 14.8 L7.4 12.6 A4.8 4.8 0 0 1 5.4 11.8 L3.2 12.8 L2 10.4 L3.8 9 A4.8 4.8 0 0 1 3.8 7 L2 5.6 L3.2 3.2 L5.4 4.2 A4.8 4.8 0 0 1 7.4 3.4 Z'
                   fill='none' stroke='currentColor' strokeWidth='1.2' strokeLinejoin='round'/>
+        </svg>
+    const resetOpts = () => opts.resetItem === false ? undefined : opts.resetItem
+    const resetTitle = () => resetOpts()?.title ?? 'Reset toolbar'
+    const resetIcon = () => resetOpts()?.icon ??
+        <svg width='14' height='14' viewBox='0 0 16 16' aria-hidden='true'>
+            <path d='M3.2 5.5 A5.2 5.2 0 1 1 4.1 11.7 M3.2 5.5 H6.4 M3.2 5.5 V2.3'
+                  fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round'/>
         </svg>
 
     function moveKey(cfg: ToolbarConfig, key: string, to: number) {
@@ -263,14 +344,17 @@ export function createToolbar(opts: {
 
     /** The live bar. settings=true adds a built-in gear opening Settings in a
      *  local popover - optional, some consumers mount Settings only in the
-     *  global settings menu. popAlign: which bar edge the popover sticks to -
-     *  'right' (default, for bars in a top-right corner) or 'left'. */
-    function Bar(p: {className?: string, settings?: boolean, popAlign?: 'left' | 'right'} = {}) {
+     *  global settings menu. reset permits rendering the reset button when its
+     *  pseudo-control is enabled (hidden by default). popAlign: which bar edge
+     *  the popover sticks to - 'right' (default, for bars in a top-right corner)
+     *  or 'left'. */
+    function Bar(p: {className?: string, settings?: boolean, reset?: boolean, popAlign?: 'left' | 'right'} = {}) {
         useSubscribe()
         updateBy(densities)
         const cfg = normalize()
         const [open, setOpen] = useState(false)
         const byKey = new Map(opts.items.map(i => [i.key, i]))
+        const resetOn = opts.resetItem !== false && (p.reset ?? p.settings ?? false) && cfg.visible[RESET_KEY] != false
         return <div className={p.className ?? 'wenayTb'}>
             {cfg.order.map(k => {
                 const it = byKey.get(k)
@@ -281,6 +365,10 @@ export function createToolbar(opts: {
                     {itemContent(it, cfg.density)}
                 </div>
             })}
+            {resetOn && <div className='wenayTbItem' title={resetTitle()}
+                             onClick={() => reset()}>
+                {resetIcon()}
+            </div>}
             {p.settings && cfg.visible[SETTINGS_KEY] != false && <OutsideClickArea className='wenayTbGear' status={open} outsideClick={() => setOpen(false)}>
                 <div className='wenayTbItem' title={settingsTitle()}
                      onClick={() => setOpen(v => !v)}>
@@ -378,12 +466,20 @@ export function createToolbar(opts: {
                 <span className='wenayTbIcon'>{settingsIcon()}</span>
                 <span className='wenayTbRowTitle'>{settingsTitle()}</span>
             </div>
+            {opts.resetItem !== false && <div className='wenayTbRow wenayTbRowMeta'>
+                <input type='checkbox'
+                       checked={cfg.visible[RESET_KEY] != false}
+                       onChange={() => setConfig({...cfg, visible: {...cfg.visible, [RESET_KEY]: !(cfg.visible[RESET_KEY] != false)}})}/>
+                <span className='wenayTbIcon'>{resetIcon()}</span>
+                <span className='wenayTbRowTitle'>{resetTitle()}</span>
+                <button type='button' className='wenayTbMetaAction' title={resetTitle()} onClick={() => reset()}>{resetIcon()}</button>
+            </div>}
         </div>
     }
 
     return {
         Bar,
         Settings,
-        api: {useConfig, useItems, getConfig, setConfig, reset, onChange},
+        api: {useConfig, useItems, getConfig, setConfig, setOrder, show, setDensity, showSettings, showReset, reset, onChange},
     }
 }

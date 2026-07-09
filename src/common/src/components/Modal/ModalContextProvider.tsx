@@ -50,7 +50,7 @@ export const ModalProvider = ({ children, closeOnOutsideClick = true, closeOnEsc
                 <div style={{
                     position: 'fixed', inset: 0, zIndex: tokens.zIndex.modal,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: 'rgba(0,0,0,0.5)'
+                    backgroundColor: 'var(--dlg-scrim, rgba(0, 0, 0, 0.5))'
                 }}>
                     <OutsideClickArea outsideClick={() => { if (closeOnOutsideClick) setModal(null); }} status={true}>
                         {modal}

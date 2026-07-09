@@ -42,6 +42,7 @@ memorySet(key, data)
 memoryGet(key)
 memoryUpdate(key, mutate) -> cur?               // mutate + rerender + announce in one call
 memoryMarkDirty(key)                            // announce an in-place mutation of a memoryGetOrCreate object
+createSearchHistory({key, max?})                 // reusable small persisted search history controller
 memoryMaps                                       // rnd / resize / other maps
 ```
 
@@ -127,8 +128,8 @@ Input helpers:
 
 ## Settings Dialog
 ```
-<SettingsDialog trigger={<span>settings</span>} sections={[{key, name, render}]} defaultSection? />
-registerSettingsSection({key, name, render}) -> unregister   // external section from any module
+<SettingsDialog trigger={<span>settings</span>} sections={[{key, name, render, children?, parentKey?, searchText?, keywords?}]} defaultSection? /> // searchable tree + persisted search history
+registerSettingsSection({key, name, render, parentKey?, searchText?, keywords?}) -> unregister
 ```
 
 ## UI Slot
@@ -141,11 +142,12 @@ const slot = createUiSlot({key, places: {top: "Top bar", side: "Sidebar"}, def: 
 
 ## Toolbar
 ```
-const tb = createToolbar({key, items: [{key, title, icon?, short?, render?, onClick?, defaultVisible?, fixed?}], def?, settingsItem?, source?})
+const tb = createToolbar({key, items: [{key, title, icon?, short?, render?, onClick?, defaultVisible?, fixed?}], def?, settingsItem?, resetItem?, source?, sourceMode?})
 
-<tb.Bar settings />          // the live bar; settings adds a gear opening Settings in a popover
+<tb.Bar settings reset? />   // the live bar; settings adds a gear; reset button is hidden by default
 <tb.Settings />              // the PURE config editor - same element drops into a settings section
-tb.api.useConfig() / getConfig() / setConfig(next) / reset()
+tb.api.useConfig() / getConfig() / setConfig(next) / setOrder(order) / show(key,on) / setDensity(key) / reset()
+tb.api.showSettings(on) / showReset(on)             // pseudo-controls visibility
 tb.api.useItems()            // headless bar: ordered visible [{item, density, content}] - custom markup
 tb.api.onChange.on(cfg => ...) -> off        // fires on every edit
 
@@ -156,14 +158,14 @@ Config `{order, visible, density}` is serializable and persisted like createUiSl
 (memoryGetOrCreate -> memoryCache, the app owns the write policy). Items added in an app update are merged
 into a stale persisted config (appended, default-visible), removed ones are ignored. `icon` is
 optional: in icon density an icon-less item renders the first letters of its short/title.
-The gear is a pseudo-item: `settingsItem: {title?, icon?}` re-skins it, and the editor has a
-separated toggle row for it (`visible['__settings']`, no order slot - it always sits at the bar edge).
+The gear and reset button are pseudo-items: `settingsItem: {title?, icon?}` and `resetItem` re-skin them,
+and the editor has separated toggle rows for them (`visible['__settings']` / `visible['__reset']`, no order slots - they always sit at the bar edge). Settings is visible by default; reset is hidden by default unless `resetItem.defaultVisible: true` or `api.showReset(true)` enables it. `resetItem: false` removes the reset feature.
 
-`source?` makes the toolbar a VIEW over an external owner of order/visibility (a `UiListSource`,
-e.g. `columnState.api.listSource`): Bar/Settings edit THAT config and outside changes reorder the
-toolbar, so one config can drive a grid, its icon menu AND the toolbar together. Density and the
-gear flag stay in the toolbar's own store. Without `source` the toolbar keeps its own store
-(standalone mode).
+`source?` makes the toolbar a VIEW over an external `UiListSource`. Default `sourceMode:"orderVisible"`
+means the source owns item order and item visibility, so one config can drive a grid, its icon menu
+AND the toolbar together (`columnState.api.listSource`, QA card 31). `sourceMode:"order"` shares only
+the source-key order; item membership, density, pseudo-controls, and extra non-source item positions
+stay in the toolbar store (QA card 30). Without `source` the toolbar keeps its own store (standalone mode).
 
 ## Callback Hub
 ```
@@ -197,6 +199,8 @@ contextMenu.close()
 ```
 
 Use `contextMenu.openAt(e, items)` for new right-click integrations. `contextMenu.map` still exists as a legacy Layer queue, but it is not the recommended path for new code.
+
+`Menu` keeps the hovered/open item in internal React state. `status` is only an initial open hint and a compatibility field passed to custom renderers; menu objects are not mutated.
 
 Floating right menu:
 ```
@@ -267,7 +271,8 @@ cs.api.useConfig() / getConfig() / setConfig(next) / reset()
 cs.api.show(key, on) / move(order) / setSort({key, dir} | null) / toggleSort(key)   // asc->desc->off
 cs.api.visibleKeys()                             // keys to render, in order (group-gated)
 cs.api.onChange.on(cfg => ...) -> off
-cs.api.usePresent() / isPresent(key) / setPresent(keys | null)   // which columns the live grid HAS
+cs.api.usePresent() / isPresent(key) / setPresent(keys | null)   // live-grid presence
+cs.api.getPresentGate() / setPresentGate(keys | null)           // app runtime availability gate, not persisted
 cs.api.listSource                                // {order, visible} slice as a Toolbar `source`
 ```
 Config `{v, order, visible, width, sort, filter, groups}` is serializable and persisted like
@@ -300,8 +305,7 @@ Mobile (no ag-grid): dots selector + card rows over the same config:
                                                  //   drag=replace, swipe up=remove, tap dot=select, sort button cycles
 <CardList<Row> state={cs} data={rows} getId? renderValue? />   // visible cols -> card fields; cardRole:'title'/'accent'
 ```
-QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (icon menu + button states +
-table standards), 31 (Toolbar over the same config).
+QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (toolbar icon menu + grouped sub-column mode button), 31 (Toolbar over the same config).
 
 
 ## Observe React Adapter
@@ -363,7 +367,7 @@ The hook does not choose transport. `remoteStore` needs `{ get(mask?), changed }
 Client-side hooks over the wenay-common2 Replay stack (snapshot + sequenced delta line). Server parts (`conflateReplay`, `archiveReplay`, `createRpcServerAuto` replayOpts) are per-connection and stay hook-free by design.
 
 ```ts
-import { useReplaySubscribe, useStoreReplaySync, useStoreReplayMirror, useStoreReplayEach, useReplayFrame, useReplayHistory } from "wenay-react2"
+import { useReplaySubscribe, useReplayRouteSubscribe, useStoreReplaySync, useStoreReplayMirror, useStoreReplayRouteSync, useStoreReplayRouteMirror, useStoreReplayEach, useReplayFrame, useReplayHistory } from "wenay-react2"
 
 // any replay line ({line, since, keyframe, frame?, frameLine?} remote)
 const sub = useReplaySubscribe(remote, (frame) => draw(frame), {onSeq?, onError?, since?, enabled?, staleMs?, onStale?, policy?, hint?})
@@ -372,10 +376,17 @@ sub.stale; sub.lastTs()   // freshness (needs staleMs): stale re-renders on fres
 // policy: 'queue' (default, nothing skipped) | 'frame' (rides the server frameLine when present: on lag the
 // server drops and recovers with a mini-frame; old servers/in-proc degrade to 'queue'). hint -> the line's frame condenser.
 
+// explicit route hand-off over the same logical replay line (relay <-> direct, etc.)
+const routed = useReplayRouteSubscribe(relayRemote, (frame) => draw(frame), {label: "relay", onRoute?})
+await routed.switchRoute(directRemote, {label: "direct"})
+routed.ready; routed.switching; routed.route; routed.seq(); routed.label(); routed.active()
+// route hooks do not expose stale/lastTs yet; use non-route hooks when freshness is required.
 // store patch line (Observe.exposeStoreReplay(...).api.replay)
 const mirror = useStoreReplayMirror(remote, initial, {enabled?})   // creates the mirror store; same staleMs/stale/policy surface
 mirror.store; mirror.ready; mirror.seq(); mirror.restart()
 const sync = useStoreReplaySync(existingStore, remote)              // same, store supplied by the app
+const routedSync = useStoreReplayRouteSync(existingStore, relayRemote, {label: "relay"})   // same store, switchRoute() replaces the route after catch-up
+const routedMirror = useStoreReplayRouteMirror(relayRemote, initial, {label: "relay"}) // mirror store + route hand-off controller
 
 // per-key fold over the same line (Observe.syncStoreReplayEach counterpart): cb per CHANGED top-level key,
 // first delivery = keyframe expanded per key, (key, undefined) = deleted — grid rows without special cases
@@ -393,7 +404,8 @@ const tt = useReplayHistory(history, (frame) => draw(frame), {head: () => replay
 tt.live; tt.seq; tt.head; tt.pause(); tt.play(); tt.seek({seq})
 ```
 
-Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. Freshness: detection lives in wenay-common2 (`staleMs` watchdog); the hooks mirror its edge-triggered `onStale` into `stale`, so a fresh 100 ev/s line causes zero extra renders. `useReplayHistory` is archive playback — staleness does not apply. QA cards 23 (video line + conflation + time travel + freshness), 24 (store sync) and 25 (per-key feed) are the live examples.
+Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. Freshness: detection lives in wenay-common2 (`staleMs` watchdog); the non-route hooks mirror its edge-triggered `onStale` into `stale`, so a fresh 100 ev/s line causes zero extra renders. Route hand-off is explicit through `switchRoute(nextRemote, {label?, since?, reset?, policy?, hint?})`: old route stays live while the replacement catches up by `seq`, then closes. `useReplayHistory` is archive playback — staleness does not apply. QA cards 23 (video line + conflation + time travel + freshness), 24 (store sync), 25 (per-key feed), and 26 (route hand-off) are the live examples.
+
 ## Logs
 ```
 logsApi.addLogs({id: "api", time: new Date(), txt: "done", var: 1})
@@ -404,9 +416,13 @@ logsApi.addLogs({id: "api", time: new Date(), txt: "done", var: 1})
 const customLogs = getLogsApi<MyFields>({limitPer: 500, limit?: 50, varMin?: 0})
 ```
 
+Logger notification/tabs chrome uses `--logs-*` CSS variables; apps can theme it without forking logger components.
+
 ## Styles / Theme
 ```
 tokens.color.bgDark
+tokens.menu.outlineColor
+tokens.logs.notificationAccent
 tokens.zIndex.modal
 
 GridStyleDefault()                               // inject legacy grid CSS vars/classes
@@ -415,6 +431,8 @@ buildAgTheme("dark" | "light")
 useAgGridTheme("dark" | "light")
 colDefCentered / colDefWrap / numericComparator
 ```
+
+Shared CSS variables include `--menu-outline-color`, `--logs-*`, `--dlg-*`, `--wnd-*`, and `--tb-*`.
 
 ## Charts
 ```
@@ -432,9 +450,3 @@ npm run testReact                                // http://localhost:3010/
 The stand lives in `src/common/testUseReact/qa.tsx`. Use it for visual checks; agGrid4 overlay/dynamic-column demos are dedicated QA cards.
 Two tabs: Active checks (current work) and Verified archive (`#archive`) - verified/fixed cards move
 there and stay runnable for regression re-checks.
-
-
-
-
-
-

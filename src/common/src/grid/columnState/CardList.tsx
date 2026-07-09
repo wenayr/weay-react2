@@ -14,6 +14,10 @@ function cmpValues(a: unknown, b: unknown): number {
     return String(a).localeCompare(String(b))
 }
 
+function cx(parts: Array<string | false | null | undefined>) {
+    return parts.filter(Boolean).join(' ')
+}
+
 export function CardList<T extends object>(p: {
     state: ColumnStateController
     data: readonly T[]
@@ -35,27 +39,22 @@ export function CardList<T extends object>(p: {
         p.renderValue?.(key, row) ?? String((row as Record<string, unknown>)[key] ?? '')
 
     const rows = [...p.data]
-    if (cfg.sort) { // sticky sort: applies even when its column is hidden
+    if (cfg.sort) {
         const {key, dir} = cfg.sort
         rows.sort((a, b) => cmpValues((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]) * (dir == 'asc' ? 1 : -1))
     }
 
-    return <div className={p.className} style={{display: 'grid', gap: 8, ...p.style}}>
+    return <div className={cx(['wenayCardList', p.className])} style={p.style}>
         {rows.map((row, i) => (
-            <div key={p.getId?.(row, i) ?? i}
-                 style={{border: '1px solid #d0d7de', borderRadius: 8, padding: '8px 10px', background: '#fff'}}>
-                <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: fieldKeys.length ? 6 : 0}}>
-                    <b style={{fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                        {titleKey ? value(titleKey, row) : ''}
-                    </b>
-                    {accentKey && <span style={{fontSize: 11, padding: '1px 8px', borderRadius: 10, background: '#ddf4ff', color: '#0969da', whiteSpace: 'nowrap'}}>
-                        {value(accentKey, row)}
-                    </span>}
+            <div key={p.getId?.(row, i) ?? i} className='wenayCardListItem'>
+                <div className={cx(['wenayCardListHeader', fieldKeys.length == 0 && 'wenayCardListHeader_compact'])}>
+                    <b className='wenayCardListTitle'>{titleKey ? value(titleKey, row) : ''}</b>
+                    {accentKey && <span className='wenayCardListAccent'>{value(accentKey, row)}</span>}
                 </div>
                 {fieldKeys.map(k => (
-                    <div key={k} style={{display: 'flex', gap: 10, fontSize: 12, lineHeight: 1.7}}>
-                        <span style={{color: '#57606a', minWidth: 72}}>{byKey.get(k)?.title ?? k}</span>
-                        <span style={{flex: 1, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis'}}>{value(k, row)}</span>
+                    <div key={k} className='wenayCardListField'>
+                        <span className='wenayCardListLabel'>{byKey.get(k)?.title ?? k}</span>
+                        <span className='wenayCardListValue'>{value(k, row)}</span>
                     </div>
                 ))}
             </div>

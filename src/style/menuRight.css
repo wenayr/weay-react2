@@ -96,7 +96,7 @@
 
 /* If the animation completed, the outline remains */
 .draggable-div.outline-complete::after {
-  border-color: #007bff;
+  border-color: var(--menu-outline-color);
   /* Ensure the pseudo-element shows the full outline */
   clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
 }
@@ -108,7 +108,7 @@
     clip-path: polygon(0 0, 0 0, 0 0, 0 0);
   }
   25% {
-    border-color: #007bff;
+    border-color: var(--menu-outline-color);
     /* Draw the top line */
     clip-path: polygon(0 0, 100% 0, 100% 0, 0 0);
   }

@@ -28,6 +28,7 @@
   --menu-item-color: var(--base-color-hover);
   --menu-item-hover-color: #101010;
   --menu-item-hover-bg-color: var(--base-color-hover);
+  --menu-outline-color: #007bff;
 
   /* Menu shadow (was a literal in .MenuR) */
   --menu-shadow: 0 0 20px 14px rgba(34, 60, 80, 0.2);
@@ -70,7 +71,7 @@
   --dlg-radius: 10px;
   --dlg-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   --dlg-nav-bg: var(--color-bg-light);
-  --dlg-nav-width: 168px;
+  --dlg-nav-width: 220px;
 
   /* Toolbar (createToolbar). Dark defaults; apps re-skin via :root[data-theme]
      overrides, same contract as --wnd-* / --dlg-*. */
@@ -86,6 +87,17 @@
   --tb-pop-radius: 8px;
   --tb-pop-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
 
+
+  /* Logs. Defaults preserve the old logger look; apps can override in their theme. */
+  --logs-notification-text: #fff;
+  --logs-notification-accent: #5D9FFA;
+  --logs-toggle-bg: rgb(58, 58, 58);
+  --logs-toggle-off-bg: rgb(144, 60, 60);
+  --logs-divider: rgba(255, 255, 255, 1);
+  --logs-tab-nav-bg: #333;
+  --logs-tab-bg: #444;
+  --logs-tab-active-bg: #666;
+  --logs-tab-text: #fff;
   /* Layers */
   --wenay-z-modal: 9999;
 }

@@ -27,8 +27,8 @@ importers:
         specifier: ^10.5.3
         version: 10.5.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       wenay-common2:
-        specifier: ^1.0.64
-        version: 1.0.64
+        specifier: ^1.0.65
+        version: 1.0.65
     devDependencies:
       '@babel/preset-env':
         specifier: ^7.28.3
@@ -3025,8 +3025,8 @@ packages:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
     engines: {node: '>=12'}
 
-  wenay-common2@1.0.64:
-    resolution: {integrity: sha512-cUm8yocWtfD6w5TKQAPKtBKND49eroQqSqxOrtB+qzsbP3YlB5oaYQlTjGHQAw4dMg7F4/7G9Y6HfCRRZLXenQ==}
+  wenay-common2@1.0.65:
+    resolution: {integrity: sha512-LdSItAP/8UV1L2UwE8IoYAXMPRvgQunbRbobaXLBSbDz5wA0Y3/D1cZ8dSZUpSfeGRRxW0Lhei2Qa5fHlJLyTQ==}
     engines: {node: '>=16.0.0'}
 
   whatwg-encoding@3.1.1:
@@ -6226,7 +6226,7 @@ snapshots:
 
   webidl-conversions@7.0.0: {}
 
-  wenay-common2@1.0.64:
+  wenay-common2@1.0.65:
     dependencies:
       express: 5.2.1
     optionalDependencies:

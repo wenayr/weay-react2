@@ -9,7 +9,7 @@
 
 import React, {StrictMode, useEffect, useMemo, useRef, useState} from "react";
 import {Observe, Replay} from "wenay-common2";
-import {useReplaySubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreReplayEach, useStoreNode, useStoreKeys} from "../src/hooks";
+import {useReplaySubscribe, useReplayRouteSubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreReplayEach, useStoreNode, useStoreKeys} from "../src/hooks";
 
 type tFrame = {n: number, w: number, h: number, ts: number, jpeg: string};
 type tFrameRemote = Replay.ReplayRemote<[tFrame]>;
@@ -218,6 +218,57 @@ function PullClient(p: {remote: tFrameRemote}) {
     </div>;
 }
 
+function failingFrameRemote(): tFrameRemote {
+    const fail = () => { throw new Error("route failed"); };
+    return {
+        line: {on: () => () => {}},
+        since: async () => fail(),
+        keyframe: async () => fail(),
+    };
+}
+
+function RouteHandoffClient(p: {direct: tFrameRemote, relay: tFrameRemote}) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const sink = useMemo(() => makeFrameSink(canvasRef), []);
+    const framesRef = useRef(0);
+    const eventsRef = useRef<string[]>([]);
+    const [, setEventTick] = useState(0);
+    const badRemote = useMemo(() => failingFrameRemote(), []);
+    const route = useReplayRouteSubscribe(p.relay, frame => {
+        framesRef.current++;
+        sink(frame);
+    }, {
+        label: "relay",
+        onRoute: ev => {
+            eventsRef.current = [`${ev.phase}:${ev.from ?? "-"}->${ev.to ?? "-"}@${ev.seq}`, ...eventsRef.current].slice(0, 4);
+            setEventTick(v => v + 1);
+        },
+    });
+    useTick(500);
+    const err = route.error instanceof Error ? route.error.message : String(route.error ?? "");
+
+    return <div style={{display: "grid", gap: 6, maxWidth: 360}}>
+        <canvas ref={canvasRef} style={canvasStyle}/>
+        <div style={{display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center"}}>
+            <button onClick={() => { void route.switchRoute(p.direct, {label: "direct"}).catch(() => {}); }}>switch direct</button>
+            <button onClick={() => { void route.switchRoute(p.relay, {label: "relay"}).catch(() => {}); }}>switch relay</button>
+            <button onClick={() => { void route.switchRoute(badRemote, {label: "bad"}).catch(() => {}); }}>fail route</button>
+        </div>
+        <div style={statLine}>ready {String(route.ready)} · switching {String(route.switching)} · active {String(route.active())} · label {route.label() ?? "-"}</div>
+        <div style={statLine}>seq {route.seq()} · frames {framesRef.current}{err ? ` · error ${err}` : ""}</div>
+        <div style={{...statLine, whiteSpace: "normal"}}>route events: {eventsRef.current.join(" | ") || "-"}</div>
+    </div>;
+}
+
+export const ReplayRouteDemo = () => {
+    const demo = useMemo(() => getVideoDemo(), []);
+    return <div style={{display: "grid", gap: 8}}>
+        <div style={{fontSize: 13, color: "#57606a"}}>
+            One canvas, one logical fold. The old route remains live while the replacement catches up by seq.
+        </div>
+        <RouteHandoffClient direct={demo.remoteDirect} relay={demo.wire.remote}/>
+    </div>;
+};
 /* ---------- card 23: video line - direct client, conflated slow client, time travel ---------- */
 
 export const ReplayVideoDemo = () => {

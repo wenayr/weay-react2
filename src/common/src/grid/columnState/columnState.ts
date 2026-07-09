@@ -82,25 +82,48 @@ export function createColumnState(opts: {
     const st = memoryGetOrCreate<ColumnsConfig>(opts.key, defConfig())
     const [emitChange, onChange] = createListen<[ColumnsConfig]>()
 
-    /** Runtime-only, never persisted: which column keys the attached grid
-     *  actually HAS right now. null = unknown / no grid = treat all as present.
-     *  A column removed from the live grid (dynamic defs, "drop empty columns"
-     *  standards) keeps its config entry and its menu button - the button just
-     *  goes inert. The grid adapter maintains this; grid-less consumers may
-     *  call setPresent themselves. */
-    const rt = {present: null as null | {[key: string]: true}}
+    /** Runtime-only, never persisted: actual = which keys the attached grid has;
+     *  gate = optional app-level availability over a stable grid schema (standards,
+     *  mode blocks). Consumers see actual AND gate as one presence map. */
+    const rt = {
+        present: null as null | {[key: string]: true},
+        presentGate: null as null | {[key: string]: true},
+    }
+    const keyMap = (keys: string[] | null) => keys ? Object.fromEntries(keys.map(k => [k, true as const])) : null
+    const sameMap = (a: null | {[key: string]: true}, b: null | {[key: string]: true}) => JSON.stringify(a) == JSON.stringify(b)
+    function combinedPresent() {
+        if (!rt.present && !rt.presentGate) return null
+        const res: {[key: string]: true} = {}
+        for (const c of opts.columns) {
+            if ((!rt.present || rt.present[c.key]) && (!rt.presentGate || rt.presentGate[c.key]))
+                res[c.key] = true
+        }
+        return res
+    }
 
     function setPresent(keys: string[] | null) {
-        const next = keys ? Object.fromEntries(keys.map(k => [k, true as const])) : null
-        if (JSON.stringify(next) == JSON.stringify(rt.present)) return
+        const next = keyMap(keys)
+        if (sameMap(next, rt.present)) return
         rt.present = next
         renderBy(rt)
     }
-    const getPresent = () => rt.present
-    const isPresent = (key: string) => !rt.present || rt.present[key] == true
+    function setPresentGate(keys: string[] | null) {
+        const next = keyMap(keys)
+        if (sameMap(next, rt.presentGate)) return
+        rt.presentGate = next
+        renderBy(rt)
+        applyToGrid()
+    }
+    const getPresent = combinedPresent
+    const getPresentGate = () => rt.presentGate
+    const isPresent = (key: string) => {
+        const p = combinedPresent()
+        return !p || p[key] == true
+    }
+    const passesPresentGate = (key: string) => !rt.presentGate || rt.presentGate[key] == true
     function usePresent() {
         updateBy(rt)
-        return rt.present
+        return combinedPresent()
     }
 
     /** The persisted state may be stale or partial (older app version, columns
@@ -235,7 +258,7 @@ export function createColumnState(opts: {
     function toAgState(cfg: ColumnsConfig): AgColumnState[] {
         return cfg.order.map(k => ({
             colId: k,
-            hide: cfg.visible[k] == false,
+            hide: cfg.visible[k] == false || !passesPresentGate(k),
             width: cfg.width[k], // undefined = leave the grid's current width
             sort: cfg.sort?.key == k ? cfg.sort.dir : null,
         }))
@@ -341,7 +364,7 @@ export function createColumnState(opts: {
          *  (dots, cards, icon menus) render from these + the config. */
         columns: opts.columns as readonly ColumnMeta[],
         api: {getConfig, setConfig, useConfig, onChange, reset, show, move, setSort, toggleSort, visibleKeys,
-            getPresent, usePresent, isPresent, setPresent, listSource},
+            getPresent, usePresent, isPresent, setPresent, getPresentGate, setPresentGate, listSource},
         grid: {attach, detach},
     }
 }
