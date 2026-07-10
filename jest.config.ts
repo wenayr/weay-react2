@@ -17,6 +17,7 @@ const jestConfig: JestConfigWithTsJest = {
   // testRegex: '^.+\\test\\.(t|j)sx?$', // Pattern for finding test files
   testRegex: '^.+.(t|j)sx?$', // Pattern for finding test files
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  moduleNameMapper: {'^(\\.{1,2}/.*)\\.js$': '$1'},
 }
 
 export default jestConfig

@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "1.0.46",
+  "version": "1.0.47",
   "description": "Common react",
   "strict": true,
   "main": "dist/index.js",
@@ -84,6 +84,7 @@
   },
   "exports": {
     ".": "./lib/index.js",
+    "./native": "./lib/native/index.js",
     "./package.json": "./package.json",
     "./demo/peer-media": "./lib/common/demo/peerMedia.js",
     "./demo/stand": "./lib/common/testUseReact/qa.js"

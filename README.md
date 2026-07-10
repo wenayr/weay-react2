@@ -3,6 +3,7 @@
 Documentation index only.
 
 - Brief API guide: [doc/wenay-react2.md](doc/wenay-react2.md)
+- React Native/headless entrypoint: [doc/native.md](doc/native.md)
 - Detailed / rare API guide: [doc/wenay-react2-rare.md](doc/wenay-react2-rare.md)
 - Project functionality map: [doc/PROJECT_FUNCTIONALITY.md](doc/PROJECT_FUNCTIONALITY.md)
 - Example usage standards: [doc/EXAMPLE_USAGE.md](doc/EXAMPLE_USAGE.md)
@@ -16,4 +17,5 @@ Feature-specific docs may also live next to their code, for example agGrid4 docs
 
 ## Shipped examples
 
-- [doc/examples/stand.tsx](doc/examples/stand.tsx) — весь интерактивный стенд (`wenay-react2/demo/stand`); Active = канон, Archive = regression/compat.`r`n- [doc/examples/peer-call-media.tsx](doc/examples/peer-call-media.tsx) — Peer calls, presence, camera and microphone relay with server-owned ACL.
+- [doc/examples/stand.tsx](doc/examples/stand.tsx) — весь интерактивный стенд (`wenay-react2/demo/stand`); Active = канон, Archive = regression/compat.
+- [doc/examples/peer-call-media.tsx](doc/examples/peer-call-media.tsx) — Peer calls, presence, camera and microphone relay with server-owned ACL.

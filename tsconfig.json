@@ -19,6 +19,7 @@
   },
   "files": [
     "src/index.ts",
+    "src/native/index.ts",
     "src/common/demo/peerMedia.tsx",
     "src/common/testUseReact/qa.tsx"
   ]
