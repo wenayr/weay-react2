@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "1.0.45",
+  "version": "1.0.46",
   "description": "Common react",
   "strict": true,
   "main": "dist/index.js",
@@ -39,7 +39,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-rnd": "^10.5.3",
-    "wenay-common2": "^1.0.73"
+    "wenay-common2": "^1.0.74"
   },
   "peerDependencies": {
     "react": "^19.2.0",
@@ -84,6 +84,8 @@
   },
   "exports": {
     ".": "./lib/index.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./demo/peer-media": "./lib/common/demo/peerMedia.js",
+    "./demo/stand": "./lib/common/testUseReact/qa.js"
   }
 }

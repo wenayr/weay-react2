@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react'
+import React, {useEffect, useRef, useState} from 'react'
 import {useDraggableApi} from './useDraggable'
 
 /** useReorder - a deliberately small reorder-by-drag for keyed blocks laid out
@@ -30,6 +30,8 @@ export type ReorderOptions = {
     preview?: 'slots' | 'measure'
     /** hold before the drag starts (touch-friendly fields); default 0 */
     holdMs?: number
+    /** transient simulated order while dragging; null on drop/cancel */
+    onPreviewChange?: (next: string[] | null) => void
 }
 
 export type ReorderItem = {
@@ -137,6 +139,8 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
     const from = dragKey != null ? o.order.indexOf(dragKey) : -1
     const target = from != -1 ? dragTarget(from, local(drag.position.x), local(drag.position.y)) : -1
     const preview = from != -1 && dragKey != null ? move(o.order, dragKey, target) : null
+    const previewKey = preview?.join("\u0000") ?? ""
+    useEffect(() => o.onPreviewChange?.(preview), [previewKey])
 
     function item(key: string): ReorderItem {
         const active = preview != null

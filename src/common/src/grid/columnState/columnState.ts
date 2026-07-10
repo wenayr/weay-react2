@@ -84,6 +84,8 @@ export function createColumnState(opts: {
     const st = memoryGetOrCreate<ColumnsConfig>(opts.key, defConfig())
     const stApi = createUpdateApi(st)
     const [emitChange, onChange] = createListen<[ColumnsConfig]>()
+    const previewRt = {order: null as string[] | null}
+    const previewApi = createUpdateApi(previewRt)
 
     /** Runtime-only, never persisted: actual = which keys the attached grid has;
      *  gate = optional app-level availability over a stable grid schema (standards,
@@ -189,6 +191,27 @@ export function createColumnState(opts: {
     const setConfig = (next: ColumnsConfig) => commit(next, false)
     const reset = () => commit(defConfig(), false)
 
+    function displayConfig() {
+        const cfg = normalize()
+        return previewRt.order ? {...cfg, order: previewRt.order.slice()} : cfg
+    }
+    function useDisplayConfig() {
+        stApi.use()
+        previewApi.use()
+        return displayConfig()
+    }
+    function setPreviewOrder(order: string[] | null) {
+        const cfg = normalize()
+        const known = new Set(cfg.order)
+        const next = order ? pinFixedOrder(order.filter(k => known.has(k)), opts.columns) : null
+        if (JSON.stringify(next) == JSON.stringify(previewRt.order)) return
+        previewRt.order = next
+        previewApi.render()
+        if (!gridApi || gridApi.isDestroyed?.()) return
+        applying = true
+        try { gridApi.applyColumnState({state: (next ?? cfg.order).map(colId => ({colId})), applyOrder: true}) }
+        finally { applying = false }
+    }
     function useConfig() {
         stApi.use()
         return normalize()
@@ -222,14 +245,22 @@ export function createColumnState(opts: {
      *  they edit the SAME config. */
     const listSource = {
         useConfig() {
-            const c = useConfig()
+            const c = useDisplayConfig()
             return {order: c.order, visible: c.visible}
         },
         getConfig() {
+            const c = displayConfig()
+            return {order: c.order, visible: c.visible}
+        },
+        useBaseConfig() {
+            const c = useConfig()
+            return {order: c.order, visible: c.visible}
+        },
+        getBaseConfig() {
             const c = normalize()
             return {order: c.order, visible: c.visible}
         },
-        setConfig(next: {order: string[], visible: {[k: string]: boolean}}) {
+        setPreview: setPreviewOrder,        setConfig(next: {order: string[], visible: {[k: string]: boolean}}) {
             const cfg = normalize()
             // an editor over a SUBSET of columns must not lose the rest:
             // unknown incoming keys are dropped by normalize, missing ones re-appended
@@ -322,14 +353,23 @@ export function createColumnState(opts: {
         if (!structEqual(normalize().order, next.order)) applyToGrid()
     }
 
-    function onGridEvent(e: {source?: string, finished?: boolean}) {
+    function onGridEvent(e: {source?: string, finished?: boolean, type?: string}) {
         if (applying || e?.source == 'api') return
-        // resize/move fire per animation frame during a drag; persist the final shape only
-        if (e?.finished === false) return
+        if (e?.type == 'columnMoved' && e.finished === false && gridApi) {
+            const known = new Set(opts.columns.map(c => c.key))
+            const order = gridApi.getColumnState().map(c => c.colId).filter((k): k is string => !!k && known.has(k))
+            for (const k of normalize().order) if (!order.includes(k)) order.push(k)
+            setPreviewOrder(order)
+            return
+        }
+        if (e?.type == 'columnMoved' && previewRt.order) {
+            readFromGrid()
+            setPreviewOrder(null)
+            return
+        }
         clearTimeout(saveTimer)
         saveTimer = setTimeout(readFromGrid, opts.saveMs ?? 300)
     }
-
     /** The grid's column SET changed (dynamic columnDefs, "drop empty columns"
      *  standards): refresh presence; when the set really changed, re-impose the
      *  config - a column that came BACK gets its stored order/width/visibility
@@ -371,7 +411,7 @@ export function createColumnState(opts: {
          *  (dots, cards, icon menus) render from these + the config. */
         columns: opts.columns as readonly ColumnMeta[],
         api: {getConfig, setConfig, useConfig, onChange, reset, show, move, setSort, toggleSort, visibleKeys,
-            getPresent, usePresent, isPresent, setPresent, getPresentGate, setPresentGate, listSource},
+            getPresent, usePresent, isPresent, setPresent, getPresentGate, setPresentGate, useDisplayConfig, setPreviewOrder, listSource},
         grid: {attach, detach},
     }
 }

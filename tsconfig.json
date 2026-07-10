@@ -18,6 +18,8 @@
     "jsx": "react-jsx"
   },
   "files": [
-    "src/index.ts"
+    "src/index.ts",
+    "src/common/demo/peerMedia.tsx",
+    "src/common/testUseReact/qa.tsx"
   ]
 }

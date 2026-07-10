@@ -95,3 +95,17 @@ test("an open present gate still folds an explicit grid visibility edit into con
 
     expect(cs.api.getConfig().visible.b).toBe(false);
 });
+
+test("preview order is runtime-only and exposed through the shared list source", () => {
+    const cs = createColumnState({
+        key: "test.columnState.preview",
+        columns: [{key: "a", title: "A"}, {key: "b", title: "B"}, {key: "c", title: "C"}],
+    });
+    const base = cs.api.getConfig().order;
+    cs.api.setPreviewOrder(["c", "a", "b"]);
+    expect(cs.api.getConfig().order).toEqual(base);
+    expect(cs.api.listSource.getBaseConfig().order).toEqual(base);
+    expect(cs.api.listSource.getConfig().order).toEqual(["c", "a", "b"]);
+    cs.api.setPreviewOrder(null);
+    expect(cs.api.listSource.getConfig().order).toEqual(base);
+});

@@ -13,3 +13,7 @@ Documentation index only.
 `wenay-common2` is an external dependency. Read its current docs from the installed module/package when needed; keep this README focused on `wenay-react2` documentation.
 
 Feature-specific docs may also live next to their code, for example agGrid4 docs under `src/common/src/grid/agGrid4/`.
+
+## Shipped examples
+
+- [doc/examples/stand.tsx](doc/examples/stand.tsx) — весь интерактивный стенд (`wenay-react2/demo/stand`); Active = канон, Archive = regression/compat.`r`n- [doc/examples/peer-call-media.tsx](doc/examples/peer-call-media.tsx) — Peer calls, presence, camera and microphone relay with server-owned ACL.

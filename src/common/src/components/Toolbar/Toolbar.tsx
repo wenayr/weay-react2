@@ -62,6 +62,10 @@ export type UiListSource = {
     setConfig: (next: UiListConfig) => void
     /** re-emitted as the toolbar's own onChange (grid-driven changes included) */
     onChange?: (cb: (cfg: UiListConfig) => void) => () => void
+    /** optional transient display order; never persisted */
+    useBaseConfig?: () => UiListConfig
+    getBaseConfig?: () => UiListConfig
+    setPreview?: (order: string[] | null) => void
 }
 
 export type ToolbarDensity = {
@@ -239,9 +243,9 @@ export function createToolbar(opts: {
      *  items, an unregistered density) - never crash, never drop user data that
      *  still applies: unknown keys are filtered out, missing items are appended
      *  (default-visible), fixed items are pinned back to their descriptor index. */
-    function normalize(): ToolbarConfig {
+    function normalize(base = false): ToolbarConfig {
         const known = new Set(opts.items.map(i => i.key))
-        const extRaw = ext?.getConfig()
+        const extRaw = ext ? (base ? (ext.getBaseConfig?.() ?? ext.getConfig()) : ext.getConfig()) : undefined
         const localRaw = {order: st.order, visible: st.visible}
         const raw = ext && sourceMode == 'orderVisible' ? extRaw! : localRaw
         const sourceKeys = ext && sourceMode == 'order' ? sourceKeySet(extRaw, known) : new Set<string>()
@@ -292,7 +296,7 @@ export function createToolbar(opts: {
             // the source's own onChange already re-emitted; emit only when it can't
             if (!ext.onChange) emitChange(normalize())
         } else if (ext && sourceMode == 'order') {
-            const extRaw = ext.getConfig()
+            const extRaw = ext.getBaseConfig?.() ?? ext.getConfig()
             const known = new Set(opts.items.map(i => i.key))
             const sourceKeys = sourceKeySet(extRaw, known)
             const curSourceOrder = (Array.isArray(extRaw.order) ? extRaw.order : []).filter(k => sourceKeys.has(k))
@@ -322,9 +326,10 @@ export function createToolbar(opts: {
     const getConfig = () => normalize()
 
     /** subscription to everything the toolbar renders from (hook) */
-    function useSubscribe() {
+    function useSubscribe(base = false) {
         stApi.use()
-        ext?.useConfig() // ext is per-instance constant - hook order is stable
+        if (base && ext?.useBaseConfig) ext.useBaseConfig()
+        else ext?.useConfig() // ext is per-instance constant - hook order is stable
     }
 
     function useConfig() {
@@ -437,9 +442,14 @@ export function createToolbar(opts: {
      *  never move in the preview and a drop never lands elsewhere than shown.
      *  Plus arrow keys on the focused handle; fixed rows have neither. */
     function Settings(p: {className?: string, activeClassName?: string} = {}) {
-        useSubscribe()
+        // BASE config on purpose: Settings is the preview AUTHOR (onPreviewChange ->
+        // ext.setPreview). Rendering from the display config would feed its own
+        // preview back mid-drag: the rows' DOM order changes under the pointer
+        // (useReorder requires it stable), styles jump, and the drop re-applies
+        // the move over the already-previewed order - one extra row.
+        useSubscribe(true)
         densitiesApi.use()
-        const cfg = normalize()
+        const cfg = normalize(true)
         const base = p.className ?? 'wenaySegBtn'
         const activeCls = p.activeClassName ?? 'wenaySegBtnActive'
         const byKey = new Map(opts.items.map(i => [i.key, i]))
@@ -454,6 +464,7 @@ export function createToolbar(opts: {
             commit: order => setConfig({...cfg, order}),
             move: movedOrder,
             canDrag: k => !byKey.get(k)?.fixed,
+            onPreviewChange: order => ext?.setPreview?.(order),
         })
 
         function onHandleKey(key: string, e: React.KeyboardEvent) {

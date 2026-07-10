@@ -85,6 +85,8 @@ export function MenuStrip(p: {
     onItem?: (key: string, e: React.MouseEvent) => void
     /** present = items are drag-reorderable (one commit per drop) */
     onMove?: (order: string[]) => void
+    /** transient order while pointer is held; null on drop/cancel */
+    onPreview?: (order: string[] | null) => void
     /** preview rule for the drop (fixed pinning etc.) - same contract as
      *  useReorder.move, so the preview shows exactly what onMove receives */
     move?: (order: string[], key: string, to: number) => string[]
@@ -104,6 +106,7 @@ export function MenuStrip(p: {
         move: p.move,
         canDrag: k => !!p.onMove && !p.items.find(i => i.key == k)?.fixed,
         holdMs: p.holdMs ?? 150,
+        onPreviewChange: p.onPreview,
     })
     // A drag that ends over the button it started on still produces a browser
     // click - without this guard every snapped-back drag would ALSO toggle the
@@ -164,7 +167,7 @@ export function ColumnsMenu(p: {
     className?: string
     style?: React.CSSProperties
 }) {
-    const cfg = p.state.api.useConfig()
+    const cfg = p.state.api.useDisplayConfig()
     const present = p.state.api.usePresent()
     const byKey = new Map(p.state.columns.map(c => [c.key, c]))
     const items: MenuStripItem[] = cfg.order.filter(k => byKey.has(k)).map(k => {
@@ -192,6 +195,7 @@ export function ColumnsMenu(p: {
 
     return <MenuStrip items={items} tail={p.tail} onItem={onItem}
                       onMove={p.reorder == false ? undefined : order => p.state.api.move(order)}
+                      onPreview={p.reorder == false ? undefined : order => p.state.api.setPreviewOrder(order)}
                       move={movedOrder} holdMs={p.holdMs} compact={p.compact}
                       className={p.className} style={p.style}/>
 }

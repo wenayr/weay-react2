@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
-import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, createColumnGrid, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, useCacheMapPersistence, useResizeObserver, useElementSize, useMediaSource, usePeer, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
+import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, createColumnGrid, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, useCacheMapPersistence, useResizeObserver, useElementSize, useMediaSource, usePeer, usePeerCalls, usePeerPresence, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { listen as createListen, Observe, Params, Media, Peer } from "wenay-common2";
 import { Button, HoverButton, OutsideClickArea } from "../src/hooks";
@@ -16,6 +16,8 @@ import { MyChartEngine } from "../src/myChart/chartEngine/chartEngineReact";
 import { GridExample, tt } from "./useGrid";
 import { TestParams } from "./testParams";
 import { ReplayVideoDemo, ReplayRouteDemo, ReplayStoreDemo, ReplayStoreEachDemo } from "./replayVideo";
+import {PeerCallDemo, PeerPresenceDemo, MediaRelayAclDemo, MediaRelayAudioDemo, PeerCallVideoAudioDemo} from "../demo/peerMedia";
+
 
 /* ---------- card wrapper ---------- */
 const card: React.CSSProperties = { border: "1px solid #d0d7de", borderRadius: 10, margin: "14px 0", background: "#fff", overflow: "hidden", fontFamily: "system-ui, sans-serif" };
@@ -411,7 +413,7 @@ const qa29MobileCss = `
 const MobileColumnsDemo = () => (
     <div className="qa29MobileShell">
         <style>{qa29MobileCss}</style>
-        <CardList<tMobRow> state={qaMobColumns} data={mobRows} getId={r => r.id} className="qa29MobileCards" />
+        <CardList<tMobRow> state={qaMobColumns} data={mobRows} getId={r => r.id} layout="compact" className="qa29MobileCards" />
         <ColumnDots state={qaMobColumns} max={8} className="qa29MobileDots" />
     </div>
 );
@@ -1474,20 +1476,42 @@ const boardState = {
         { key: "c5", items: [] as string[] },
     ] as BoardColumn[],
     gravity: { c1: "top", c2: "bottom", c3: "top", c4: "bottom", c5: "top" } as { [k: string]: string },
-    commits: 0, events: 0, last: "-", nextCol: 6,
+    // side tray: freshly created blocks land here, then drag into the board
+    tray: [] as string[],
+    commits: 0, events: 0, last: "-", nextCol: 6, nextItem: 1,
 };
+const qaBoardTray = "tray";
+// left-rail trash: a registered board column whose content the commit discards
+const qaBoardTrash = "trash";
 
 const qaBoardStyles: Record<string, React.CSSProperties> = {
     root: { display: "grid", gap: 8, fontSize: 13 },
-    columns: { display: "flex", gap: 6, alignItems: "flex-start", flexWrap: "wrap" },
+    columns: { display: "grid", alignItems: "start", columnGap: 6 },
+    columnControls: { display: "grid", alignItems: "center", columnGap: 6, marginTop: -6 },
     insertStrip: {
-        width: 14, height: 240, borderRadius: 6, cursor: "pointer", userSelect: "none",
+        width: 20, height: 20, borderRadius: 10, cursor: "pointer", userSelect: "none",
         display: "flex", alignItems: "center", justifyContent: "center",
-        color: "#57606a", background: "#151b26", fontSize: 12,
+        color: "#9fb3c8", background: "#202c3c", border: "1px solid #38506d", fontSize: 11, fontWeight: 700,
     },
     column: { display: "flex", flexDirection: "column", gap: 6, width: 78, height: 240, padding: 6, borderRadius: 8 },
+    columnWrap: { display: "grid", width: 90 },
+    tray: { display: "grid", gap: 6, width: 90, alignContent: "start" },
+    newItem: {
+        height: 24, borderRadius: 6, cursor: "pointer", userSelect: "none",
+        border: "1px dashed #38506d", background: "#202c3c", color: "#9fb3c8", fontSize: 12,
+    },
+    leftRail: { display: "grid", gap: 8, alignContent: "start", width: 44 },
+    addColumn: {
+        width: 44, height: 44, borderRadius: 8, cursor: "pointer", userSelect: "none",
+        border: "1px solid #38506d", background: "#202c3c", color: "#9fb3c8", fontSize: 18, lineHeight: "42px",
+    },
+    trashZone: {
+        width: 44, height: 64, borderRadius: 8, boxSizing: "border-box", userSelect: "none",
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+    },
+    removeColumn: { width: 24, height: 20, border: "1px solid #f4b1aa", borderRadius: 6, cursor: "pointer", color: "#cf222e", background: "#fff", fontSize: 15, lineHeight: "16px" },
     item: {
-        height: 32, lineHeight: "32px", textAlign: "center", borderRadius: 6,
+        height: 32, width: "100%", boxSizing: "border-box", lineHeight: "32px", textAlign: "center", borderRadius: 6,
         color: "#dfe6ef", cursor: "grab", userSelect: "none", touchAction: "none",
     },
     status: { color: "#57606a", fontFamily: "monospace", fontSize: 12 },
@@ -1511,15 +1535,28 @@ function qaBoardItemStyle(it: {dragging: boolean; active: boolean; style?: React
         zIndex: it.dragging ? 1 : undefined,
         boxShadow: it.dragging ? "0 4px 14px rgba(0,0,0,0.4)" : undefined,
         ...it.style,
+        // The hook may supply a measured drag width. It is valid only while
+        // dragging; idle board items must fill their own column.
+        width: it.dragging ? it.style?.width : "100%",
     };
 }
 
 const BoardDemo = () => {
     updateBy(boardState);
     const log = (s: string) => { boardState.last = s; boardState.events++; renderBy(boardState); };
+    // The tray and the trash are just MORE columns of the same hook (registered
+    // via columnRef like the rest) - rendered aside, excluded from the board grid.
+    // Whatever lands in the trash column is simply not stored back: it disappears.
     const r = useReorderBoard({
-        columns: boardState.cols,
-        commit: next => { boardState.cols = next; boardState.commits++; renderBy(boardState); },
+        columns: [...boardState.cols, { key: qaBoardTray, items: boardState.tray }, { key: qaBoardTrash, items: [] }],
+        commit: next => {
+            const trashed = next.find(c => c.key == qaBoardTrash)?.items ?? [];
+            boardState.tray = next.find(c => c.key == qaBoardTray)?.items ?? [];
+            boardState.cols = next.filter(c => c.key != qaBoardTray && c.key != qaBoardTrash);
+            boardState.commits++;
+            if (trashed.length) { boardState.last = `deleted ${trashed.join(",")}`; boardState.events++; }
+            renderBy(boardState);
+        },
         onOverChange: e => log(`over ${e.over.col}#${e.over.index}` + (e.prev && e.prev.col != e.over.col ? " (column crossed)" : "")),
         onDragEnd: e => log(`drop ${e.key} -> ${e.over.col}#${e.over.index} committed=${e.committed}`),
     });
@@ -1533,27 +1570,69 @@ const BoardDemo = () => {
         boardState.gravity[k] = boardState.nextCol % 2 ? "bottom" : "top";
         renderBy(boardState);
     };
+    const removeColumn = (key: string) => {
+        const removed = boardState.cols.find(column => column.key == key);
+        boardState.cols = boardState.cols.filter(column => column.key != key);
+        delete boardState.gravity[key];
+        log(`removed ${key}${removed?.items.length ? ` (${removed.items.length} items)` : ""}`);
+    };
     const InsertStrip = ({ at }: { at: number }) => (
-        <div title="insert column here" onClick={() => addColumnAt(at)} style={qaBoardStyles.insertStrip}>+</div>
+        <button title="insert column between" onClick={() => addColumnAt(at)} style={qaBoardStyles.insertStrip}>↔</button>
     );
+    const addItem = () => {
+        const k = "E" + boardState.nextItem++;
+        boardState.tray = [...boardState.tray, k];
+        log(`created ${k}`);
+    };
+    const tracks = boardState.cols.map((_, i) => i < boardState.cols.length - 1 ? "90px 20px" : "90px").join(" ");
+    const trashOver = r.over?.col == qaBoardTrash;
     return <div style={qaBoardStyles.root}>
-        <div style={qaBoardStyles.columns}>
-            <InsertStrip at={0} />
-            {boardState.cols.map((c, ci) => (
-                <React.Fragment key={c.key}>
-                    <div ref={r.columnRef(c.key)}
-                         style={qaBoardColumnStyle(r.over?.col == c.key, boardState.gravity[c.key] == "bottom")}>
-                        {c.items.map(k => {
-                            const it = r.item(k);
-                            return <div key={k} {...it.props} style={qaBoardItemStyle(it)}>{k}</div>;
-                        })}
-                    </div>
-                    <InsertStrip at={ci + 1} />
-                </React.Fragment>
-            ))}
+        <div style={{display: "flex", alignItems: "flex-start", gap: 14}}>
+            <div style={qaBoardStyles.leftRail}>
+                <button title="add a column at the start" onClick={() => addColumnAt(0)} style={qaBoardStyles.addColumn}>+</button>
+                <div ref={r.columnRef(qaBoardTrash)} title="drop a block here to delete it"
+                     style={{
+                         ...qaBoardStyles.trashZone,
+                         border: trashOver ? "1px solid #cf5b6a" : "1px dashed #6b4a55",
+                         background: trashOver ? "#3a2230" : "#1c1622",
+                         color: trashOver ? "#ff8896" : "#cf5b6a",
+                     }}>−</div>
+            </div>
+            <div style={{display: "grid", gap: 8}}>
+                <div style={{...qaBoardStyles.columns, gridTemplateColumns: tracks}}>
+                    {boardState.cols.map((c, ci) => (
+                        <div key={c.key} style={{...qaBoardStyles.columnWrap, gridColumn: ci * 2 + 1}}>
+                            <div ref={r.columnRef(c.key)}
+                                 style={qaBoardColumnStyle(r.over?.col == c.key, boardState.gravity[c.key] == "bottom")}>
+                                {c.items.map(k => {
+                                    const it = r.item(k);
+                                    return <div key={k} {...it.props} style={qaBoardItemStyle(it)}>{k}</div>;
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div style={{...qaBoardStyles.columnControls, gridTemplateColumns: tracks}}>
+                    {boardState.cols.map((c, ci) => <React.Fragment key={c.key}>
+                        <button title={`remove ${c.key}`} onClick={() => removeColumn(c.key)}
+                                style={{...qaBoardStyles.removeColumn, gridColumn: ci * 2 + 1, justifySelf: "center"}}>−</button>
+                        {ci < boardState.cols.length - 1 && <span style={{gridColumn: ci * 2 + 2, justifySelf: "center"}}><InsertStrip at={ci + 1} /></span>}
+                    </React.Fragment>)}
+                </div>
+            </div>
+            <div style={qaBoardStyles.tray}>
+                <button title="create a new block in the tray" onClick={addItem} style={qaBoardStyles.newItem}>+ item</button>
+                <div ref={r.columnRef(qaBoardTray)}
+                     style={{...qaBoardColumnStyle(r.over?.col == qaBoardTray, false), border: "1px dashed #2c3c55"}}>
+                    {boardState.tray.map(k => {
+                        const it = r.item(k);
+                        return <div key={k} {...it.props} style={qaBoardItemStyle(it)}>{k}</div>;
+                    })}
+                </div>
+            </div>
         </div>
         <div style={qaBoardStyles.status}>
-            {boardState.cols.map(c => c.key + (boardState.gravity[c.key] == "bottom" ? "↓" : "↑") + ":[" + c.items.join(",") + "]").join(" ")} | commits: {boardState.commits} | events: {boardState.events} | last: {boardState.last}
+            {boardState.cols.map(c => c.key + (boardState.gravity[c.key] == "bottom" ? "↓" : "↑") + ":[" + c.items.join(",") + "]").join(" ")} tray:[{boardState.tray.join(",")}] | commits: {boardState.commits} | events: {boardState.events} | last: {boardState.last}
         </div>
     </div>;
 };
@@ -1635,7 +1714,33 @@ function ActiveChecks() {
                    note="In-process host replaces a fake UI mock: this card proves the actual Peer.createPeerClient contract. Direct WebRTC needs the app's real signaling/rtc factory and remains a separate browser recipe.">
                 <PeerSdkDemo />
             </Check>
-            <Check n={21} title="createUiSlot - configurable block placement"
+            <Check n={41} title="Peer calls - ring, accept, hangup"
+                   do="Click call B. On B press accept; both sides become active. Then hang up from A. Repeat and decline on B."
+                   expect="The incoming ring, active state and terminal reason propagate through the existing Peer signal hub. React only renders manager state; common2 owns call IDs, busy/glare resolution and timeout/offline verdicts."
+                   note="In-process host, no fake call protocol: usePeerCalls binds Peer.createCallManager. A real app supplies its server-side authorize policy before allowing media viewers.">
+                <PeerCallDemo />
+            </Check>
+            <Check n={42} title="Peer presence - snapshot plus online/offline edges"
+                   do="Observe both accounts online. Toggle B connection off and on."
+                   expect="The list updates on connection edges without polling. The hook subscribes before it reads the snapshot, so it follows the host protocol rather than creating a second presence store."
+                   note="Presence is common2 host state. React receives only list/edge data and does not decide authentication or account validity.">
+                <PeerPresenceDemo />
+            </Check>            <Check n={43} title="Media relay - actual camera stream with live ACL revoke"
+                   do="Start camera and grant permission: the right canvas must show the relayed stream. Revoke ACL: the viewer frame counter stops while capture keeps running. Grant it again: frames resume. Stop camera."
+                   expect="The path is camera → Media source → common2 relay → policy-filtered viewer canvas. ACL revocation gates an already-open viewer without trusting React to detach it; the source stats continue because publishing and viewing are separate responsibilities."
+                   note="This is an in-process relay, so it proves the React/lifecycle seam and live policy filter. A deployed app exposes publishOf/watchOf through its RPC server and keeps canWatch plus call authorization on the server.">
+                <MediaRelayAclDemo />
+            </Check>            <Check n={44} title="Audio relay - actual microphone stream with live ACL revoke"
+                   do="Press enable + start relay mic and grant permission, then speak. Revoke ACL: playback and viewer counters stop while capture remains live. Grant it again and confirm playback resumes."
+                   expect="The path is microphone → Media source → common2 audio relay → policy-filtered AudioContext player. Audio activation is a user gesture; ACL gates the existing viewer without React deciding access."
+                   note="This uses the relay's short lossless audio queue. In production publishOf/watchOf/canWatch are exposed by the server next to the call authorization policy.">
+                <MediaRelayAudioDemo />
+            </Check>            <Check n={45} title="Peer call with live video and audio relay"
+                   do="Enable camera + mic, call B, then accept on B. The canvas starts receiving video only after accept; speak to hear the relayed audio. Hang up: the viewer detaches."
+                   expect="One real scenario: call state gates server-style relay access and viewer lifecycle. Before/after the active call, capture may run but B receives no media."
+                   note="This is the complete in-process consumer demo exported from wenay-react2/demo/peer-media; production keeps the same ACL decision on its server.">
+                <PeerCallVideoAudioDemo />
+            </Check>            <Check n={21} title="createUiSlot - configurable block placement"
                    do="Switch Top bar / Sidebar. Then reload the page (F5)."
                    expect="The block moves between the two containers WITHOUT a reload; only one mount point shows it at a time. After F5 the chosen place is restored (memoryGetOrCreate -> memoryCache)."
                    note="Mount points render <Slot place=...> themselves and stay ignorant of each other. The demo calls memoryCache.load() on mount and subscribes memoryCache.onDirty -> saveDebounced(300): the persisted maps are observable and mark memoryCache dirty themselves, the app owns the write policy.">
@@ -1665,9 +1770,9 @@ function ActiveChecks() {
             </Check>
 
             <Check n={27} title="useReorderBoard - columns, per-column gravity, cross-column drag"
-                   do="Drag blocks between columns: from a top-packed (up arrow) into a bottom-packed (down arrow) column, into the EMPTY column, back. Watch the landing gap: in a bottom-packed column the blocks ABOVE the slot slide UP to make room. Drag within one column too. Click a thin + strip BETWEEN columns (or at either edge) - a new column appears exactly there; drag something into it. Watch the events line: over changes, column crossings, drop."
-                   expect="The dragged block follows the pointer; the hovered column highlights (r.over); survivors glide to exactly where they land on drop - including the source column compacting per ITS gravity and the target column opening a real gap per ITS gravity. One commit per drop (counter); a plain click commits nothing. onOverChange fires only when the slot changes, onDragEnd reports the final slot and committed flag."
-                   note="useReorderBoard - the columns extension of useReorder: column gravity is pure consumer CSS (justify-content), the hook never knows it - it measures the real layout (offset-based FLIP with display:none for the dragged and a real margin gap at the landing slot, so CSS decides who moves aside). Columns register via live callback refs - adding one is just consumer state. Same non-goals: no nesting, no collision packing, no autoscroll."
+                   do="Drag blocks between columns: from a top-packed (up arrow) into a bottom-packed (down arrow) column, into the EMPTY column, back. Watch the landing gap: in a bottom-packed column the blocks ABOVE the slot slide UP to make room. Drag within one column too. Use ↔ strictly between two columns to insert a new one. The − directly below a column removes that column; all actions form one aligned lower rail. Click + item in the side tray a few times, drag the created blocks into any column and drag a block back into the tray. On the left rail: + adds a column at the start; drag any block onto the − trash to delete it. Watch the events line: over changes, column crossings, drop."
+                   expect="The dragged block follows the pointer; the hovered column highlights (r.over); survivors glide to exactly where they land on drop - including the source column compacting per ITS gravity and the target column opening a real gap per ITS gravity. One commit per drop (counter); a plain click commits nothing. onOverChange fires only when the slot changes, onDragEnd reports the final slot and committed flag. + item spawns E1, E2... into the dashed tray; the tray highlights on hover-over and accepts blocks like any column, and the status line tracks tray:[...]. The − trash highlights while hovered and swallows the dropped block (last: deleted ...) - it is one more registered column whose content the commit discards."
+                   note="useReorderBoard - the columns extension of useReorder: column gravity is pure consumer CSS (justify-content), the hook never knows it - it measures the real layout (offset-based FLIP with display:none for the dragged and a real margin gap at the landing slot, so CSS decides who moves aside). Columns register via live callback refs - adding one is just consumer state; the side tray IS one more such column rendered aside, so creating blocks needed no new hook API. Same non-goals: no nesting, no collision packing, no autoscroll."
                    tall>
                 <BoardDemo />
             </Check>
@@ -1679,7 +1784,7 @@ function ActiveChecks() {
             </Check>
 
             <Check n={31} title="Toolbar over columnState - one config drives toolbar + menu + grid"
-                   do="Drag the qty column in the GRID before price - watch the toolbar buttons AND the compact menu reorder. Open the toolbar gear: drag rows in Settings, toggle checkboxes - the grid and the menu follow. Toggle a button in the compact menu - the toolbar Bar drops/regains the item. Switch density in Settings (Icons / Icons + labels)."
+                   do="Drag the qty column in the GRID before price and HOLD it over the target - toolbar buttons and compact menu must preview the same order BEFORE drop. Open the toolbar gear: drag rows in Settings, toggle checkboxes - the grid and the menu follow. Toggle a button in the compact menu - the toolbar Bar drops/regains the item. Switch density in Settings (Icons / Icons + labels)."
                    expect="All four surfaces (grid, toolbar Bar, Settings editor, compact menu) mirror ONE config: any reorder or visibility change made on any of them lands on all others. In icon density, items without an icon show their first letters (NAM, QTY, NOT) as a text pseudo-icon; price keeps its emoji. Density and the gear checkbox are toolbar-local (they do not touch the column config); Name is fixed everywhere - not draggable, not hideable."
                    note="createToolbar({source}) - the toolbar's order/visibility now can live OUTSIDE it: UiListSource is the extracted control contract, and columnState.api.listSource implements it over the same config the grid adapter syncs. No bridge, no double storage - Toolbar became a VIEW. Backward compatible: without source the toolbar keeps its own store exactly as in card 25."
                    tall>
@@ -1695,7 +1800,7 @@ function ActiveChecks() {
             </Check>
 
             <Check n={30} title="columnState toolbar menu - grouped sub-columns"
-                   do="TOP is our menu drawn with a square-edged client skin over the card-25 toolbar config; the old lower ColumnsMenu is intentionally gone. Change menu order in Settings and watch the horizontal tiles glide into place, then click column tiles to toggle grid visibility; switch density in Settings and check that labels expand by content. Click the BLO tile with vertical square dots several times. The grid has a Mode block group with 3 sub-columns: Values has text, Zeros has only 0, Empty has blanks. Enable Reset toolbar in Settings and click its tile."
+                   do="TOP is our menu drawn with a square-edged client skin over the card-25 toolbar config; the old lower ColumnsMenu is intentionally gone. Drag menu order in Settings and HOLD before drop: the grid and horizontal tiles must preview the same order live, then click column tiles to toggle grid visibility; switch density in Settings and check that labels expand by content. Click the BLO tile with vertical square dots several times. The grid has a Mode block group with 3 sub-columns: Values has text, Zeros has only 0, Empty has blanks. Enable Reset toolbar in Settings and click its tile."
                    expect="The grouped block changes by dot count without rebuilding grid columnDefs: 1 dot shows Values+Zeros+Empty; 2 dots shows only Values; 3 dots shows Values+Zeros; 4 dots hides the whole group. The top menu has large square-edged content tiles: 1px separators between tiles, comfortable internal padding, dark by default, white border on hover, white fill when pressed/open. When order/density changes elsewhere, existing tiles animate to their new places; the menu itself remains click-only, without drag handles or drag reorder. Label/full densities grow by text content. BLO uses square vertical dots and remains clickable when the whole group is off. Hidden-by-mode sub-columns keep dashed/inert tiles and revive when the mode brings them back. Reset appears as a small-icon tile only when enabled."
                    note="This demonstrates the multi-state layer and replaceable face: the menu uses the standard Toolbar.Bar for structure/order/membership/density while the client fully draws the square-edged item face. The mode tile is not a column; it changes a runtime columnState presentGate over a stable grouped schema. columnState presence marks gated leaf columns disabled; createToolbar({source, sourceMode:'order'}) lets the source own only real-column order, while blockMode position/membership stay local and are never pushed into the grid config."
                    tall>
@@ -1705,7 +1810,7 @@ function ActiveChecks() {
             <Check n={29} title="columnState mobile - ColumnDots + CardList (dots create the blocks)"
                    do="Tap an EMPTY mark (qty / ver / note) - a dot appears and the field is created in every card below. Drag a dot slowly along the track - every empty mark it crosses replaces the field LIVE in the cards (a small label above the finger names the current field); release anywhere. Swipe a dot UP (quick vertical flick) - the dot tears off, the field disappears. Tap a dot without moving - the field gets selected (blue); press the sort button several times (asc -> desc -> off). Select ANOTHER dot - note the sort did not change. Enable sort by price, then swipe the price dot away - cards stay ordered by price."
                    expect="Dots ARE the visible fields: every dot change instantly rebuilds the cards (no table involved), INCLUDING mid-drag - the swap happens as the dot crosses an empty mark, the drop commits nothing extra. Symbol is fixed (ring): its dot cannot be dragged away or torn off, it is the card title. ver shows as a badge (accent role). The sort is STICKY: it survives selecting other dots AND hiding its own field; the arrow marker above the track shows the sorted column. Max 4 dots: taps on empty marks beyond that are ignored."
-                   note="ColumnDots + CardList run on the columnState config alone - no ag-grid, no storage. The same config could drive a desktop grid via grid.attach (card 28). Touch works: gestures are pointer events with a dominant-axis test, so a horizontal drag never removes and a vertical flick never reorders."
+                   note="ColumnDots + CardList run on the columnState config alone; this stand uses optional layout=compact (two-column key/value fields, one column below 320px) - no ag-grid, no storage. The same config could drive a desktop grid via grid.attach (card 28). Touch works: gestures are pointer events with a dominant-axis test, so a horizontal drag never removes and a vertical flick never reorders."
                    tall>
                 <MobileColumnsDemo />
             </Check>

@@ -1058,6 +1058,30 @@ body {
   color: var(--cols-card-accent-color, #0969da);
   white-space: nowrap;
 }
+.wenayCardListFields {
+  display: block;
+}
+.wenayCardListItem_compact .wenayCardListFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 8px;
+}
+.wenayCardListItem_compact .wenayCardListField {
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--cols-card-field-bg, #f6f8fa);
+  line-height: 1.45;
+}
+.wenayCardListItem_compact .wenayCardListLabel {
+  min-width: 0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+@media (max-width: 320px) {
+  .wenayCardListItem_compact .wenayCardListFields { grid-template-columns: 1fr; }
+}
 .wenayCardListField {
   display: flex;
   gap: var(--cols-card-field-gap, 10px);

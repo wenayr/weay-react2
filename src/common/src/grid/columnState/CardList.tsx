@@ -24,6 +24,8 @@ export function CardList<T extends object>(p: {
     getId?: (row: T, index: number) => string
     /** custom field renderer; default = String(row[key]) */
     renderValue?: (key: string, row: T) => React.ReactNode
+    /** default stacked key/value rows; compact packs fields into a responsive two-column grid */
+    layout?: 'stack' | 'compact'
     className?: string
     style?: React.CSSProperties
 }) {
@@ -46,17 +48,19 @@ export function CardList<T extends object>(p: {
 
     return <div className={cx(['wenayCardList', p.className])} style={p.style}>
         {rows.map((row, i) => (
-            <div key={p.getId?.(row, i) ?? i} className='wenayCardListItem'>
+            <div key={p.getId?.(row, i) ?? i} className={cx(['wenayCardListItem', p.layout == 'compact' && 'wenayCardListItem_compact'])}>
                 <div className={cx(['wenayCardListHeader', fieldKeys.length == 0 && 'wenayCardListHeader_compact'])}>
                     <b className='wenayCardListTitle'>{titleKey ? value(titleKey, row) : ''}</b>
                     {accentKey && <span className='wenayCardListAccent'>{value(accentKey, row)}</span>}
                 </div>
-                {fieldKeys.map(k => (
-                    <div key={k} className='wenayCardListField'>
-                        <span className='wenayCardListLabel'>{byKey.get(k)?.title ?? k}</span>
-                        <span className='wenayCardListValue'>{value(k, row)}</span>
-                    </div>
-                ))}
+                <div className='wenayCardListFields'>
+                    {fieldKeys.map(k => (
+                        <div key={k} className='wenayCardListField'>
+                            <span className='wenayCardListLabel'>{byKey.get(k)?.short ?? byKey.get(k)?.title ?? k}</span>
+                            <span className='wenayCardListValue'>{value(k, row)}</span>
+                        </div>
+                    ))}
+                </div>
             </div>
         ))}
     </div>
