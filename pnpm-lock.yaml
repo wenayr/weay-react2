@@ -27,8 +27,8 @@ importers:
         specifier: ^10.5.3
         version: 10.5.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       wenay-common2:
-        specifier: ^1.0.70
-        version: 1.0.70
+        specifier: ^1.0.73
+        version: 1.0.73
     devDependencies:
       '@babel/preset-env':
         specifier: ^7.28.3
@@ -1895,8 +1895,8 @@ packages:
     resolution: {integrity: sha512-1cDNdwJ2Jaohmb3sg4OmKaMBwuC48sYni5HUw2DvsC8LjGTLK9h+eb1X6RyuOHe4hT0ULCW68iomhjUoKUqlPQ==}
     engines: {node: '>= 0.4'}
 
-  hasown@2.0.2:
-    resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
+  hasown@2.0.4:
+    resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
   html-encoding-sniffer@4.0.0:
@@ -3025,8 +3025,8 @@ packages:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
     engines: {node: '>=12'}
 
-  wenay-common2@1.0.70:
-    resolution: {integrity: sha512-7GxCzj/kHgP6sTxmOXoUZILQ+fQVgd6kvuHcwPAzYUzgNXL9TMCl3jcx+ixrPH3Gn21W8v1K/xwIAI8RXJc7PQ==}
+  wenay-common2@1.0.73:
+    resolution: {integrity: sha512-BtieOn3RMDXOR81r8YJ1dFdE6P3YCFduT33kx58dcnzX3hzZ1fN0nU3eOmfMbK1dDfgUDUZ2mtyYnkJsCRWdvQ==}
     engines: {node: '>=16.0.0'}
 
   whatwg-encoding@3.1.1:
@@ -5002,7 +5002,7 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.2
+      hasown: 2.0.4
       math-intrinsics: 1.1.0
 
   get-package-type@0.1.0: {}
@@ -5049,7 +5049,7 @@ snapshots:
 
   has-symbols@1.1.0: {}
 
-  hasown@2.0.2:
+  hasown@2.0.4:
     dependencies:
       function-bind: 1.1.2
 
@@ -5113,7 +5113,7 @@ snapshots:
 
   is-core-module@2.16.1:
     dependencies:
-      hasown: 2.0.2
+      hasown: 2.0.4
 
   is-fullwidth-code-point@3.0.0: {}
 
@@ -6226,7 +6226,7 @@ snapshots:
 
   webidl-conversions@7.0.0: {}
 
-  wenay-common2@1.0.70:
+  wenay-common2@1.0.73:
     dependencies:
       express: 5.2.1
     optionalDependencies:

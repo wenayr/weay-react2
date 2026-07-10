@@ -6,9 +6,9 @@
  */
 
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
-import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, createColumnGrid, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, useCacheMapPersistence, useResizeObserver, useElementSize, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
+import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, createColumnGrid, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, useCacheMapPersistence, useResizeObserver, useElementSize, useMediaSource, usePeer, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
-import { listen as createListen, Observe, Params } from "wenay-common2";
+import { listen as createListen, Observe, Params, Media, Peer } from "wenay-common2";
 import { Button, HoverButton, OutsideClickArea } from "../src/hooks";
 import { FloatingWindow } from "../src/components";
 import { DragBox } from "../src/components/Dnd/FloatingWindow";
@@ -1616,7 +1616,25 @@ function ActiveChecks() {
                    note="Registry is a module singleton (registerSettingsSection -> unregister), no React context. Tree shape comes from children or parentKey. Search history uses createSearchHistory -> memoryGetOrCreate/memoryCache dirty channel; this demo loads memoryCache and saves dirty changes with saveDebounced(300). Look via --dlg-* tokens; apps pass their own section classes via sectionClassName/sectionActiveClassName.">
                 <SettingsDialogDemo />
             </Check>
+<Check n={38} title="Media video - capture lifecycle + canvas viewer"
+                   do="Press start camera and grant permission. Move the tab to background for a short time, then return. Press stop, then start again."
+                   expect="The canvas renders without React re-rendering per frame. State changes idle → requesting → live; the stats line shows drawn frames and frame age. Hidden-tab capture is owned by common2 worker/ImageCapture defaults."
+                   note="useMediaSource owns only permission/device lifecycle. Media.attachVideoCanvas owns JPEG decode and drawing; frame data never enters React state.">
+                <MediaVideoDemo />
+            </Check>
 
+            <Check n={39} title="Media audio - mic lifecycle + sequential player"
+                   do="Press enable + start mic, grant permission, speak briefly, then stop. If browser autoplay blocks audio, press the same button again."
+                   expect="Audio activation happens in a user gesture; common2 player keeps a short live backlog and reports played/dropped frames. React renders only the half-second stats snapshot."
+                   note="The PCM player is common2 imperative code. This card proves the React wrapper's start/stop cleanup and gesture boundary, not an audio implementation in React.">
+                <MediaAudioDemo />
+            </Check>
+            <Check n={40} title="Peer SDK - mirrored store + explicit resync"
+                   do="Click peer A +1 several times. Watch mirrored value on peer B. Press resync B; the mirror must stay coherent."
+                   expect="Peer SDK owns relay journal and repair. React reads the peer store normally and exposes route/ready/seq as low-frequency control state; no transport or patch protocol is reimplemented here."
+                   note="In-process host replaces a fake UI mock: this card proves the actual Peer.createPeerClient contract. Direct WebRTC needs the app's real signaling/rtc factory and remains a separate browser recipe.">
+                <PeerSdkDemo />
+            </Check>
             <Check n={21} title="createUiSlot - configurable block placement"
                    do="Switch Top bar / Sidebar. Then reload the page (F5)."
                    expect="The block moves between the two containers WITHOUT a reload; only one mount point shows it at a time. After F5 the chosen place is restored (memoryGetOrCreate -> memoryCache)."
@@ -1877,3 +1895,63 @@ export function QABoard() {
         </div>
     );
 }
+/* ---------- 38/39. Media sources: common2 capture + viewer helpers ---------- */
+const MediaVideoDemo = () => {
+    const media = useMediaSource("video", {fps: 12, replay: {history: 32, current: "last"}});
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const [stats, setStats] = useState({frames: 0, drawn: 0, perSec: 0, ageMs: 0});
+    const [error, setError] = useState<string | null>(null);
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const view = Media.attachVideoCanvas(media.listen, canvas, {onError: e => setError(String(e))});
+        const timer = window.setInterval(() => setStats(view.stats()), 500);
+        return () => { window.clearInterval(timer); view.off(); };
+    }, [media.listen]);
+    return <div style={{display: "grid", gap: 8}}>
+        <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
+            <button onClick={() => void media.start()}>start camera</button>
+            <button onClick={media.stop}>stop</button>
+            <b>state: {media.state}</b>
+            <span style={{fontSize: 12}}>drawn {stats.drawn}, {stats.perSec}/s, age {Math.round(stats.ageMs)}ms</span>
+        </div>
+        {error && <div style={{color: "#cf222e"}}>viewer error: {error}</div>}
+        <canvas ref={canvasRef} width={320} height={180} style={{width: 320, height: 180, background: "#111", borderRadius: 8}} />
+    </div>;
+};
+
+const MediaAudioDemo = () => {
+    const media = useMediaSource("audio", {mode: "pcm", bufferSize: 4096, replay: {history: 64, current: "last"}});
+    const playerRef = useRef<ReturnType<typeof Media.attachAudioPlayer> | null>(null);
+    const [stats, setStats] = useState({frames: 0, played: 0, dropped: 0, perSec: 0, ageMs: 0});
+    useEffect(() => {
+        const player = Media.attachAudioPlayer(media.listen, {maxBacklogSec: .35});
+        playerRef.current = player;
+        const timer = window.setInterval(() => setStats(player.stats()), 500);
+        return () => { window.clearInterval(timer); player.off(); playerRef.current = null; };
+    }, [media.listen]);
+    return <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
+        <button onClick={() => { playerRef.current?.enable(); void media.start(); }}>enable + start mic</button>
+        <button onClick={media.stop}>stop</button>
+        <b>state: {media.state}</b>
+        <span style={{fontSize: 12}}>played {stats.played}, dropped {stats.dropped}, {stats.perSec}/s</span>
+    </div>;
+};
+/* ---------- 40. Peer SDK: in-process mirrored store ---------- */
+const PeerSdkDemo = () => {
+    const pair = useMemo(() => {
+        const host = Peer.createPeerHost();
+        const a = Peer.createPeerClient<{value: number}>({remote: host.connection("qa-peer-a").fragment, account: "qa-peer-a", initial: {value: 0}});
+        const b = Peer.createPeerClient<{value: number}>({remote: host.connection("qa-peer-b").fragment, account: "qa-peer-b", initial: {value: 0}});
+        return {host, a, b};
+    }, []);
+    useEffect(() => () => { pair.a.close(); pair.b.close(); }, [pair]);
+    const remote = usePeer(pair.b, "qa-peer-a");
+    const value = useStoreNode(remote.store.node.value);
+    return <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
+        <button onClick={() => { pair.a.store.state.value += 1; }}>peer A +1</button>
+        <button onClick={() => void remote.resync()}>resync B</button>
+        <b>mirrored value: {value.value}</b>
+        <span style={{fontSize: 12}}>ready={String(remote.ready)} route={remote.route} state={remote.state} seq={remote.seq()}</span>
+    </div>;
+};
