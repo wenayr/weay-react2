@@ -27,3 +27,71 @@ test("createColumnState presentGate is runtime-only and intersects actual presen
     cs.api.setPresent(null);
     expect(cs.api.getPresent()).toBeNull();
 });
+
+function createFakeGrid(colIds: string[]) {
+    const state = new Map(colIds.map(colId => [colId, {colId, hide: false, width: 100, sort: null as null | "asc" | "desc"}]));
+    const listeners: Record<string, Array<(event: any) => void>> = {};
+    let filterModel: Record<string, unknown> = {};
+    return {
+        applyColumnState({state: next}: {state: Array<{colId: string, hide?: boolean, width?: number, sort?: "asc" | "desc" | null}>}) {
+            for (const patch of next) {
+                const current = state.get(patch.colId);
+                if (!current) continue;
+                if (patch.hide != undefined) current.hide = patch.hide;
+                if (typeof patch.width == "number") current.width = patch.width;
+                current.sort = patch.sort ?? null;
+            }
+        },
+        setFilterModel(next: Record<string, unknown> | null) { filterModel = next ?? {}; },
+        getFilterModel() { return filterModel; },
+        getColumnState() { return [...state.values()].map(column => ({...column})); },
+        getColumns() { return colIds.map(colId => ({getColId: () => colId})); },
+        addEventListener(type: string, callback: (event: any) => void) { (listeners[type] ??= []).push(callback); },
+        removeEventListener(type: string, callback: (event: any) => void) {
+            listeners[type] = (listeners[type] ?? []).filter(candidate => candidate != callback);
+        },
+        isDestroyed: () => false,
+        userResize(colId: string, width: number) {
+            state.get(colId)!.width = width;
+            for (const callback of listeners.columnResized ?? []) callback({source: "uiColumnResized", finished: true});
+        },
+        userHide(colId: string) {
+            state.get(colId)!.hide = true;
+            for (const callback of listeners.columnVisible ?? []) callback({source: "uiColumnVisible", finished: true});
+        },
+        hidden(colId: string) { return state.get(colId)?.hide; },
+    };
+}
+
+test("present-gated grid hiding never overwrites persisted visibility during unrelated grid edits", async () => {
+    const cs = createColumnState({
+        key: "test.columnState.presentGate.readback",
+        columns: [{key: "a", title: "A"}, {key: "b", title: "B"}, {key: "c", title: "C"}],
+        saveMs: 1,
+    });
+    const grid = createFakeGrid(["a", "b", "c"]);
+    cs.grid.attach(grid as any);
+
+    cs.api.setPresentGate(["a", "c"]);
+    grid.userResize("a", 150);
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    expect(cs.api.getConfig().visible.b).toBe(true);
+    cs.api.setPresentGate(null);
+    expect(grid.hidden("b")).toBe(false);
+});
+
+test("an open present gate still folds an explicit grid visibility edit into config", async () => {
+    const cs = createColumnState({
+        key: "test.columnState.presentGate.openReadback",
+        columns: [{key: "a", title: "A"}, {key: "b", title: "B"}],
+        saveMs: 1,
+    });
+    const grid = createFakeGrid(["a", "b"]);
+    cs.grid.attach(grid as any);
+
+    grid.userHide("b");
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    expect(cs.api.getConfig().visible.b).toBe(false);
+});

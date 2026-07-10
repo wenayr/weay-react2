@@ -4,7 +4,9 @@
 
 ## In Progress
 
-_Пусто._ «Hook extraction — do-now кандидаты (3)» выполнен 2026-07-09: `useCacheMapPersistence` (cache.ts), `useResizeObserver`/`useElementSize` (MyResizeObserver.tsx), `useLogsPageTable` (logs.tsx); старые имена — compatibility wrappers, card 25 не тронута. Проверено: tsc qa-check, jest 45/45, build, стенд 3010 (карточки 21 F5-persistence / 19 resize / 9 logs). Durable-запись: `doc/changes/v1.0.41.md`; parked/отклонённые кандидаты остаются в `doc/progress/hook-extraction-audit.md`.
+_Пусто._
+
+«Hook extraction — do-now кандидаты (3)» выполнен 2026-07-09: `useCacheMapPersistence` (cache.ts), `useResizeObserver`/`useElementSize` (MyResizeObserver.tsx), `useLogsPageTable` (logs.tsx); старые имена — compatibility wrappers, card 25 не тронута. Проверено: tsc qa-check, jest 45/45, build, стенд 3010 (карточки 21 F5-persistence / 19 resize / 9 logs). Durable-запись: `doc/changes/v1.0.41.md`; parked/отклонённые кандидаты остаются в `doc/progress/hook-extraction-audit.md`.
 
 (Предыдущий проход «Нормализация внутренних слоёв библиотеки» проверен multi-agent-верификацией и отгружен в v1.0.40/v1.0.41; durable-запись: `doc/progress/public-surface-normalization.md`, `doc/progress/hook-controller-opportunities.md`, `doc/changes/v1.0.38–v1.0.41.md`.)
 
@@ -42,6 +44,21 @@ _Пусто._ «Hook extraction — do-now кандидаты (3)» выполн
   - **A10 remaining (breaking only)**: raw `ListenApi` (emit/close) exposed from columnState/Toolbar onChange (narrowing is breaking); removal of deprecated `onCLickClose`/`keySave` — breaking pass only.
   - Rule: each fix is its own focused pass with verify (tsc+jest+build+stand); breaking removals only in a deliberate breaking version.
 
+- **Architecture follow-up: ownership and lifecycle boundaries (overlay / grid / columnState)** (code review 2026-07-10).
+  - **Overlay stack (high)**: `Overlay` instances independently subscribe to `document`. A `SettingsDialog` above a `ModalProvider` lets the lower modal handle the same Escape/outside interaction; this breaks SettingsDialog's two-stage Escape contract. Introduce an internal stack/arbiter so only the topmost dismissible layer receives Escape and outside-click; verify nested ModalProvider + SettingsDialog (search clear on first Escape, dialog close on second, parent remains open).
+  - **ag-grid row identity (high)**: `AgGridTable` currently lets a caller supply `getRowId` alongside `controller`, while the controller buffer owns another `getId`. Make the ownership unambiguous (reject/ignore override or explicitly derive the core identity); verify update/remove/reconnect with a controller and a conflicting callback.
+  - **ColumnGrid attachment ownership (high)**: one controller keeps one mutable `gridApi`, but its `Table` surface permits multiple mounts; an old table's destroy can detach the newer one. Either enforce one table per controller with a clear error or scope attachment state to a Table instance; verify two mounts plus either unmount order.
+  - **ColumnState contract consistency (medium)**: `groups` affects `visibleKeys()`/cards but is ignored when applying state to desktop ag-grid; `ColumnGrid.View` also forwards index `0` to a supplied `getId`. Align the shared config on both views and pass the actual row index. Add integration coverage.
+  - **Dispose lifecycle (medium)**: `createColumnGrid.dispose()` releases local listeners but not its attached grid listeners. Define dispose as a full release and make it detach the active grid; verify no grid events mutate state after dispose.
+  - Приоритет: отдельные focused passes; не смешивать с feature-задачами ColumnDots. Проверка каждого: tsc qa-check, jest, build и соответствующий lifecycle/integration test.
+
+- **QA-стенд: расширить интеграционное покрытие и сделать его картой публичных примитивов**.
+  - Проблема: стенд уже содержит полезные локальные карточки (modal 13, Settings 20, columnState 28–32, replay 23–26), но не покрывает опасные межслойные сценарии: вложенные overlay, ownership `GridApi`, `dispose`, повторный mount и смену entrypoint/платформенного слоя. Зелёный Jest не заменяет эти проверки.
+  - Задача: 1) составить компактную матрицу «публичный primitive → unit → QA card → ручной сценарий» и пометить пробелы; 2) добавить active QA-карточки только для interaction/lifecycle сценариев, которые нельзя надёжно доказать unit-тестом: overlay stack (Modal + Settings), ColumnGrid mount/unmount/ownership, persistence reload/reset, replay reconnect/route switch; 3) дать каждой карточке действия, ожидаемый результат, reset/изоляцию ключей и номер без дублей; 4) завести правило: новая визуальная либо lifecycle-поверхность не считается готовой без unit/integration проверки и обновлённой или намеренно неприменимой QA-карточки.
+  - Не превращать стенд в копию всех компонентов: чистые функции и детерминированные controller-ветки остаются в Jest; стенд — для пользовательского взаимодействия, DOM, аг-grid, browser lifecycle и визуальной приёмки.
+  - Acceptance: карточки запускаются на чистой странице без console errors; ключевые сценарии воспроизводимы вручную; карта покрытия хранится в `doc/`; команды tsc qa-check, jest и build проходят.
+  - Приоритет: после исправления overlay/grid ownership — новые карточки должны проверять именно исправленные контракты.
+
 - **Hook extraction — parked кандидаты** (do-now 1-3 выполнены и отгружены, см. In Progress выше / `doc/changes/v1.0.41.md`). Остались условные: `useChartCanvas` (ждёт ChartDemo в карточке/тесте), `useContextMenuGesture` (ждёт оживления menuR или live touch-consumer), `columnState.api.reorderPreview` (ждёт общего reorder-контракта), `useResizeableFit` (маленький shared bind callback-ref, отдельный микро-pass). Полные причины/условия возврата: [../progress/hook-extraction-audit.md](../progress/hook-extraction-audit.md).
 
 ## Inbox
@@ -64,7 +81,9 @@ _Пусто._ «Hook extraction — do-now кандидаты (3)» выполн
 
 ## Verify
 
-_Пусто._ «Система стилей и CSS variables» проверена: `doneInCode=fully`, `.wenayColsMenu*`/`--cols-menu-*` и `--cols-dots-*`/`--cols-card-*` в коде, changelog v1.0.38/v1.0.39/v1.0.41, отгружено в релизах. Удалено; durable-запись — `doc/progress/style-system-normalization.md`.
+_Пусто._ «ColumnState present-gate» выпущен как v1.0.44: repro сначала подтвердил утечку `visible.b=false` после чужого resize под закрытым gate; фикс читает visibility только для ключей, проходящих gate; targeted Jest 3/3, полный Jest 64/64, tsc и build прошли; пакет опубликован. Durable-запись: `doc/changes/v1.0.44.md`; рабочая история: `doc/progress/column-state-present-gate.md`.
+
+«Система стилей и CSS variables» проверена: `doneInCode=fully`, `.wenayColsMenu*`/`--cols-menu-*` и `--cols-dots-*`/`--cols-card-*` в коде, changelog v1.0.38/v1.0.39/v1.0.41, отгружено в релизах. Удалено; durable-запись — `doc/progress/style-system-normalization.md`.
 
 ## Blocked — уровень приложения (не эта React-библиотека)
 

@@ -298,7 +298,10 @@ export function createColumnState(opts: {
             gridIds.add(s.colId)
             if (!known.has(s.colId)) continue
             order.push(s.colId)
-            visible[s.colId] = !s.hide
+            // `hide` for a gated-out column was written by applyToGrid(), not by
+            // the user. Folding it back would turn runtime presence into persisted
+            // visibility and keep the column hidden when the gate opens again.
+            if (passesPresentGate(s.colId)) visible[s.colId] = !s.hide
             if (typeof s.width == 'number' && s.width > 0) width[s.colId] = s.width
             if (s.sort == 'asc' || s.sort == 'desc') sort = {key: s.colId, dir: s.sort}
         }
