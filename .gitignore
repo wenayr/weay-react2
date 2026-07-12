@@ -19,3 +19,6 @@ yarn-error.log*
 # local secrets / stand logs
 /.npmrc
 .vite-*.log
+
+# machine-specific Claude Code launch config
+/.claude

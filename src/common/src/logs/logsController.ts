@@ -12,8 +12,8 @@ export type LogsApiOptions = {
 };
 
 export const getSettingLogs = () => ({
-    minVarLogs: {name:"min. importance for notifications", range: {min: 0 , max: 25, step: 1}, value: 0},
-    minVarMessage: {name:"min. importance for log table", range: {min: 0 , max: 25, step: 1}, value: 0},
+    minVarLogs: {name:"min. importance for log table", range: {min: 0 , max: 25, step: 1}, value: 0},
+    minVarMessage: {name:"min. importance for notifications", range: {min: 0 , max: 25, step: 1}, value: 0},
     timeShow: {name:"screen display time", range: {min: 1, max: 20, step: 1}, value: 2},
     show: {name: "show", value: true as boolean}
 }) satisfies Params.IParams;

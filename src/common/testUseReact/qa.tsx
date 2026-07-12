@@ -748,7 +748,7 @@ const ColumnsMenuDemo = () => {
                             size={{ width: 300, height: 320 }}
                             zIndex={40}
                             header={<span style={{ padding: "0 10px", fontSize: 12, lineHeight: "26px", color: "#cdd6e4" }}>Настройки меню</span>}
-                            onCLickClose={() => setWin(false)}
+                            onClickClose={() => setWin(false)}
                         >
                             <div style={{ padding: 12, color: "var(--color-text-base)", height: "100%", boxSizing: "border-box", overflow: "auto" }}>
                                 <qa30MenuToolbar.Settings />
@@ -1697,7 +1697,7 @@ function ActiveChecks() {
             </Check>
 <Check n={38} title="Media video - capture lifecycle + canvas viewer"
                    do="Press start camera and grant permission. Move the tab to background for a short time, then return. Press stop, then start again."
-                   expect="The canvas renders without React re-rendering per frame. State changes idle → requesting → live; the stats line shows drawn frames and frame age. Hidden-tab capture is owned by common2 worker/ImageCapture defaults."
+                   expect="The canvas renders without React re-rendering per frame. State jumps idle → live (or idle → denied without a crash; the hook sets state only after start() settles, so no intermediate 'requesting' is shown); the stats line shows drawn frames and frame age. Hidden-tab capture is owned by common2 worker/ImageCapture defaults."
                    note="useMediaSource owns only permission/device lifecycle. Media.attachVideoCanvas owns JPEG decode and drawing; frame data never enters React state.">
                 <MediaVideoDemo />
             </Check>
@@ -1809,7 +1809,7 @@ function ActiveChecks() {
 
             <Check n={29} title="columnState mobile - ColumnDots + CardList (dots create the blocks)"
                    do="Tap an EMPTY mark (qty / ver / note) - a dot appears and the field is created in every card below. Drag a dot slowly along the track - every empty mark it crosses replaces the field LIVE in the cards (a small label above the finger names the current field); release anywhere. Swipe a dot UP (quick vertical flick) - the dot tears off, the field disappears. Tap a dot without moving - the field gets selected (blue); press the sort button several times (asc -> desc -> off). Select ANOTHER dot - note the sort did not change. Enable sort by price, then swipe the price dot away - cards stay ordered by price."
-                   expect="Dots ARE the visible fields: every dot change instantly rebuilds the cards (no table involved), INCLUDING mid-drag - the swap happens as the dot crosses an empty mark, the drop commits nothing extra. Symbol is fixed (ring): its dot cannot be dragged away or torn off, it is the card title. ver shows as a badge (accent role). The sort is STICKY: it survives selecting other dots AND hiding its own field; the arrow marker above the track shows the sorted column. Max 4 dots: taps on empty marks beyond that are ignored."
+                   expect="Dots ARE the visible fields: every dot change instantly rebuilds the cards (no table involved), INCLUDING mid-drag - the swap happens as the dot crosses an empty mark, the drop commits nothing extra. Symbol is fixed (ring): its dot cannot be dragged away or torn off, it is the card title. ver shows as a badge (accent role). The sort is STICKY: it survives selecting other dots AND hiding its own field; the arrow marker above the track shows the sorted column. max=8 here equals the column count, so the dot cap never bites in this demo."
                    note="ColumnDots + CardList run on the columnState config alone; this stand uses optional layout=compact (two-column key/value fields, one column below 320px) - no ag-grid, no storage. The same config could drive a desktop grid via grid.attach (card 28). Touch works: gestures are pointer events with a dominant-axis test, so a horizontal drag never removes and a vertical flick never reorders."
                    tall>
                 <MobileColumnsDemo />
@@ -1844,7 +1844,7 @@ function ArchiveChecks() {
             </Check>
 
             <Check n={14} title="Keyboard API - useKeyboard / keyboard"
-                   do="Press any key, then click clear."
+                   do="Press any key, then click reset via API."
                    expect="Last key updates through keyboard.on; reset clears the value and also notifies subscribers."
                    note="The new pub/sub is built with `listen`: listen.on(cb) -> off(). The old keyboardState remains compatible.">
                 <KeyDownDemo />
@@ -1852,12 +1852,12 @@ function ArchiveChecks() {
             <Check n={2} title="Drag + Resize (FloatingWindow / FloatingWindow)"
                    do="Click window, drag the window by its header, resize it from the edges, and close it with the x button. Open the console (F12)."
                    expect="The window moves and resizes smoothly; the x button closes it; position and size are restored on reopen (keyForSave)."
-                   note="Plan bug: the console must NOT contain xxx spam (FloatingWindow:532); listener resubscription on every tick is a candidate for usePointerDrag."
+                   note="Historical bug (fixed): the console used to fill with xxx spam from a FloatingWindow debug log; the log is gone, so any console spam during drag/resize is a regression."
                    tall>
                 <Button button={(e: any) => <div style={{ display: "inline-block", padding: "6px 12px", border: "1px solid #0969da", borderRadius: 6, cursor: "pointer", background: e ? "#0969da" : "#fff", color: e ? "#fff" : "#0969da" }}>window</div>}>
                     {(api: any) => (
                         <FloatingWindow keyForSave={"qa-rnd"} key={"qa-rnd"} size={{ height: 220, width: 280 }}
-                                 className={"fon border fonLight"} moveOnlyHeader={true} onCLickClose={api.onClose} limit={{ y: { min: 0 } }} onUpdate={() => {}}>
+                                 className={"fon border fonLight"} moveOnlyHeader={true} onClickClose={api.onClose} limit={{ y: { min: 0 } }} onUpdate={() => {}}>
                             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#eef2f6" }}>drag header / resize / close</div>
                         </FloatingWindow>
                     )}

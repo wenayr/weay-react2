@@ -132,6 +132,9 @@ export const PeerCallVideoAudioDemo = () => {
     useEffect(() => () => relay.close(), [relay]);
     const video = useMediaSource("video", {fps: 12}); const audio = useMediaSource("audio", {mode: "pcm", bufferSize: 4096});
     const canvasRef = useRef<HTMLCanvasElement | null>(null); const playerRef = useRef<ReturnType<typeof Media.attachAudioPlayer> | null>(null);
+    // the player exists only while the call is active; remember the enable intent so the
+    // documented order (enable -> call -> accept) produces sound without a second click
+    const audioWanted = useRef(false);
     const [drawn, setDrawn] = useState(0);
     const publishVideo = useMemo(() => { const send = relay.publishOf("qa-av-a"); return (frame: Uint8Array, sentAt?: number) => send("camera", frame, sentAt ?? Date.now()); }, [relay]);
     const publishAudio = useMemo(() => { const send = relay.publishOf("qa-av-a"); return (frame: Uint8Array, sentAt?: number) => send("microphone", frame, sentAt ?? Date.now()); }, [relay]);
@@ -141,13 +144,14 @@ export const PeerCallVideoAudioDemo = () => {
         if (!active || !canvasRef.current) return;
         const watcher: any = relay.watchOf("qa-av-b"); const view = Media.attachVideoCanvas(watcher["qa-av-a"].camera, canvasRef.current);
         const player = Media.attachAudioPlayer(watcher["qa-av-a"].microphone, {maxBacklogSec: .35}); playerRef.current = player;
+        if (audioWanted.current) player.enable();
         const timer = window.setInterval(() => setDrawn(view.stats().drawn), 500);
         return () => { window.clearInterval(timer); view.off(); player.off(); playerRef.current = null; };
     }, [active, relay]);
     const incoming = callee.rings.find(call => call.direction === "in");
     return <div style={{display: "grid", gap: 8}}>
         <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
-            <button onClick={() => { playerRef.current?.enable(); void video.start(); void audio.start(); }}>enable camera + mic</button>
+            <button onClick={() => { audioWanted.current = true; playerRef.current?.enable(); void video.start(); void audio.start(); }}>enable camera + mic</button>
             {!active && !incoming && <button onClick={() => caller.call("qa-av-b")}>call B</button>}
             {incoming && <button onClick={() => incoming.accept()}>B accept call</button>}
             {caller.active && <button onClick={() => caller.active?.hangup()}>hang up</button>}
