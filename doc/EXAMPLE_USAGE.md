@@ -783,7 +783,55 @@ Standard:
 - For per-key grid updates, prefer `useStoreEach` or `useStoreReplayEach`
   feeding a grid/controller outside React state.
 
+## Lossless Replay Across a Transport Reconnect
+
+Use when every retained event matters, such as orders, audit records, or
+state-machine transitions. Obtain one RPC replay remote outside component
+render and keep that same object through a temporary Socket.IO reconnect.
+
+```tsx
+import { useRef } from "react"
+import { useReplaySubscribe } from "wenay-react2"
+
+// Created once by the RPC/client setup, not during OrdersFeed render.
+// It remains the same object while its transport reconnects.
+const ordersRemote = rpc.orders.replay
+
+export function OrdersFeed() {
+    const applied = useRef<number[]>([])
+
+    const replay = useReplaySubscribe(ordersRemote, event => {
+        applied.current.push(event.id) // fold into a ref, store, or controller
+    }, {
+        since: 0,
+        policy: "queue",
+        onError: error => reportReplayGap(error),
+    })
+
+    return <span>{replay.ready ? `up to ${replay.seq()}` : "connecting"}</span>
+}
+```
+
+Why:
+
+- `wenay-common2@^1.0.75` restores a stable remote after a transient transport
+  reconnect: live delivery, seq catch-up, queued race drain, then dedupe.
+- `policy: "queue"` keeps every event available in the retained journal;
+  `"frame"` is intentionally lossy and belongs to visual/latest-value feeds.
+- Callback identity and ordinary parent rerenders do not recreate the
+  subscription.
+
+Standard:
+
+- Do not call `restart()`, replace `ordersRemote`, remount with a new key, or
+  listen to Socket.IO in React just because the transport reconnected.
+- Treat `replay.error` as a real recovery failure: a sacred journal gap without
+  a keyframe cannot be safely continued.
+- `client.dispose()`/`close()` and hub token rotation are deliberate hard
+  teardowns. Start a new subscription only with the intentionally new remote.
+
 ## Replay Feed Into A Grid
+
 
 Use when a replay line carries store patches and the grid should update per key.
 

@@ -117,7 +117,12 @@ export function createGridBuffer<T>(deps: CreateGridBufferOptions<T>) {
             const id = getId(row)
             if (seen.has(id)) continue
             seen.add(id)
-            const merged = buf[id] as T
+            // AG Grid replaces a transaction row. Overlay streams may send a
+            // Partial<T>, so preserve static fields from the rowData-owned row.
+            const node = mode == 'overlay' ? api.getRowNode?.(id) : undefined
+            const merged = node?.data
+                ? Object.assign({}, node.data, buf[id]) as T
+                : buf[id] as T
             if (gridHas(id)) toUpdate.push(merged)
             else toAdd.push(merged)
         }
@@ -157,7 +162,7 @@ export function createGridBuffer<T>(deps: CreateGridBufferOptions<T>) {
             api.forEachNode(function refresh(node) {
                 if (!node.data) return
                 const id = getId(node.data)
-                if (buf[id]) update.push(buf[id] as T)
+                if (buf[id]) update.push(Object.assign({}, node.data, buf[id]) as T)
             })
             if (update.length) api.applyTransaction({ update })
             return

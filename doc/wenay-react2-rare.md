@@ -445,6 +445,7 @@ Important agGrid4 contracts:
 ```
 mirror mode:  buffer owns row set; sync can add/update/remove grid rows.
 overlay mode: rowData owns row set; sync updates only existing grid rows.
+              Partial patches merge with that current row before delivery.
 clean():      clears buffer; mirror also removes grid rows, overlay does not remove declarative rows.
 flush():      React/controller method that calls ag-grid flushAsyncTransactions().
 ```
@@ -554,6 +555,9 @@ useReplayHistory(history, apply, {head?, reset?, tickMs?=300, autoPlay?=true})
   -> {live, seq, head, pause(), play(), seek({seq?|ts?})}
 ```
 Semantics that are easy to get wrong:
+- **Identity and reconnect boundary (common2 1.0.75).** `remote` identifies one logical Replay line. A temporary Socket.IO disconnect/reconnect keeps that object identity, so the React effect stays mounted while common2 rebinds the physical Listen subscription, restores live delivery first, catches up from its private `lastDelivered seq`, drains the racing queue, and deduplicates. Do not call `restart()`, remount with a new key, replace `remote`, poll, or attach transport listeners in React. The retained journal must cover the cursor; a sacred-line eviction with no keyframe is terminal `error`/`onError`, never a silent reset to `since: 0` or latest. `policy: 'queue'` is lossless and must deliver every retained event exactly once; `policy: 'frame'` is explicitly lossy/conflated and is not a journal-integrity check.
+**Identity matrix**
+- **Hard teardown is intentional.** `client.close()`/`dispose()` and hub `connect()`/`setToken()` end the old logical generation. React must clean up normally and must not resurrect that subscription automatically; after an intentional new client or credentials generation, provide its new `remote` as a normal new subscription. Ordinary RPC/pipe calls are not replayed by this contract.
 - `cb`/`apply` go through refs: new function identity does NOT resubscribe. Resubscribe identity is `[remote, enabled, epoch, staleMs, policy]` — changing `staleMs` resubscribes (it is subscribe-time config in common2; under keepSeq the reconnect is a journal tail, so it is cheap); `policy` picks the wire surface (line vs frameLine), so it resubscribes too. `onStale` goes through a ref like `cb`.
 - Route hand-off hooks (`useReplayRouteSubscribe`, `useStoreReplayRouteSync`, `useStoreReplayRouteMirror`) wrap common2 `Replay.replayRouteSubscribe` / `Observe.syncStoreReplayRoute`: `switchRoute(nextRemote, {label?, since?, reset?, policy?, hint?})` keeps the old route live, catches up the replacement from the last delivered `seq`, then closes the old route. Failed replacement leaves the old route active and surfaces `error` / `route.phase == "error"`. Changing the `remote` prop is still treated as a fresh subscription boundary; no-gap promotion/demotion is explicit through `switchRoute()`. common2 1.0.65 route handles expose `seq()`, `label()`, and `active()`, but not `isStale()` / `lastTs()`, so route hooks deliberately do not promise freshness yet.
 - Lag policy / hint (frame model, common2 rev2): `policy: 'frame'` rides the server's `frameLine` when the remote has one — on lag the server drops for THIS client and recovers via the line's `frame` lambda (mini-frame); without a frameLine (old server, in-proc `exposeReplay`) common2 silently degrades to `'queue'`, so an in-proc QA of `'frame'` proves nothing — the wire test lives in common2 (`replay/rpc-auto.test.ts`). `hint` is opaque to the transport and goes through a ref: in `useReplaySubscribe` it is captured at subscribe time (used for the catch-up `frame()` call); in `useReplayFrame` it is read on EVERY pull, so a new identity is never missed and never resubscribes.
@@ -606,11 +610,11 @@ MainPage()
 
 The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point. `createLogsController` is the headless layer for append/limit/settings state; `useMessageEventLogsController` owns the global notification queue/timers/settings, while `MessageEventLogsView` and `MessageEventLogCard` own rendering. `PageLogs`, `MessageEventLogs`, and `LogsPage` remain compatibility UI wrappers. `useLogsTableController` and `useLogsNotificationsController` expose the provider-local table/notification state while `LogsTable` and `LogsNotifications` keep the visual wrappers. Shared logger chrome lives in `src/common/src/logs/logStyles.ts` and is themed through `--logs-*` tokens.
 
-Full-page table controller (`useLogsPageTable` -> `LogsPageTableController`): the last logs table
-moved to the controller pattern. Semantics that matter: the grid receives a MOUNT-TIME snapshot of
-the accumulated log map once (`useState` initializer) and afterwards lives on
-`applyTransactionAsync` appends from the mini feed - re-renders do not re-feed `rowData`, so row
-identity is per-append copy exactly as before. The importance filter is ONE method
+Full-page table controller (`useLogsPageTable` -> `LogsPageTableController`): the grid receives a
+MOUNT-TIME snapshot of the accumulated log map once (`useState` initializer), then reconciles
+`applyTransactionAsync` adds AND removes with the controller's bounded full map; re-renders do not
+re-feed `rowData`. `num` is the stable grid row id, so a per-source retention eviction removes the
+same record from AG Grid instead of allowing the live table to grow forever. The importance filter is ONE method
 (`applyImportanceFilter(min?)`: set -> `setFilterModel` greaterThanOrEqual on `var`, unset ->
 `destroyFilter`), used by both the settings subscription and `onGridReady` (which skips the
 destroy branch - a fresh grid has no filter). Both data subscriptions are `updateBy(obj, cb)`

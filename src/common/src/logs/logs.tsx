@@ -119,10 +119,10 @@ type LogRow = LogEntry<any>
 export function useLogsPageTable(state?: LogsViewState) {
     const setting = state?.settings ?? memoryGetOrCreate("settingLogs",settingLogs)
     const full = state?.full ?? datumConst
-    const mini = state?.mini ?? datumMiniConst
     const apiGrid = useRef<GridReadyEvent<LogRow>|null>(null)
     // mount-time snapshot: the live grid is fed by transactions, not re-renders
     const [rowData] = useState(() => [...full.map.values()].flat())
+    const shownRows = useRef(new Map(rowData.map(row => [row.num, row])))
 
     const getApi = useCallback(() => apiGrid.current, [])
     const fit = useCallback(() => { apiGrid.current?.api.sizeColumnsToFit() }, [])
@@ -140,26 +140,32 @@ export function useLogsPageTable(state?: LogsViewState) {
             api.destroyFilter("var")
         }
     }, [])
-    const appendRow = useCallback((row: LogRow) => {
-        apiGrid.current?.api.applyTransactionAsync({add: [row]})
-    }, [])
+    const syncRows = useCallback(() => {
+        const api = apiGrid.current?.api
+        if (!api) return
+        const next = new Map([...full.map.values()].flat().map(row => [row.num, row]))
+        const add = [...next].filter(([num]) => !shownRows.current.has(num)).map(([, row]) => row)
+        const remove = [...shownRows.current].filter(([num]) => !next.has(num)).map(([, row]) => row)
+        shownRows.current = next
+        if (add.length || remove.length) api.applyTransactionAsync({add, remove})
+    }, [full])
 
     // settings change -> single filter method (no re-render: updateBy with a callback)
     updateBy(setting, ()=>{
         applyImportanceFilter(setting.params.minVarLogs)
     })
-    // new mini-feed entry -> async append, copy like before (row identity per event)
-    updateBy(mini, ()=>{
-        const data = mini.last[0]
-        if (data) appendRow({...data})
+    // The full state owns retention, so reconcile additions and evictions together.
+    updateBy(full, ()=>{
+        syncRows()
     })
 
     const onGridReady = useCallback((a: GridReadyEvent<LogRow>)=>{
         apiGrid.current = a
+        syncRows()
         fit()
         // fresh grid has no filter - only apply when the setting asks for one
         if (setting.params.minVarLogs) applyImportanceFilter(setting.params.minVarLogs)
-    }, [applyImportanceFilter, fit, setting])
+    }, [applyImportanceFilter, fit, setting, syncRows])
 
     const columnDefs = useMemo(() => [
         {
@@ -208,6 +214,7 @@ export function useLogsPageTable(state?: LogsViewState) {
         rowHeight: 26,
         autoSizePadding: 1,
         rowData,
+        getRowId: (p: {data: LogRow}) => String(p.data.num),
         columnDefs,
         onCellMouseDown: (e: any)=>{
             if (e.event instanceof MouseEvent && e.event.button == 2) {
@@ -220,7 +227,7 @@ export function useLogsPageTable(state?: LogsViewState) {
         },
     }), [columnDefs, onGridReady, rowData])
 
-    return {getApi, fit, applyImportanceFilter, appendRow, onGridReady, columnDefs, gridProps}
+    return {getApi, fit, applyImportanceFilter, syncRows, onGridReady, columnDefs, gridProps}
 }
 
 export type LogsPageTableController = ReturnType<typeof useLogsPageTable>

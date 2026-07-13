@@ -8,7 +8,8 @@
  */
 
 import React, {StrictMode, useEffect, useMemo, useRef, useState} from "react";
-import {Observe, Replay} from "wenay-common2";
+import {createRpcClientHub, Observe, Replay} from "wenay-common2";
+import {io} from "socket.io-client";
 import {useReplaySubscribe, useReplayRouteSubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreReplayEach, useStoreNode, useStoreKeys} from "../src/hooks";
 
 type tFrame = {n: number, w: number, h: number, ts: number, jpeg: string};
@@ -353,6 +354,142 @@ export const ReplayVideoDemo = () => {
     </div>;
 };
 
+/* ---------- real Socket.IO/RPC reconnect QA ---------- */
+type tRpcReplayServer = {
+    events: ReturnType<typeof Replay.replayListen<[number]>>[1];
+    start: () => {produced: number, head: number, listeners: number, producing: boolean};
+    stop: () => {produced: number, head: number, listeners: number, producing: boolean};
+    burst: (count: number) => number;
+    stats: () => {produced: number, head: number, listeners: number, producing: boolean};
+};
+type tRpcReplayMetrics = {
+    values: number[];
+    errors: string[];
+    renders: number;
+    latestCallbackRevision: number;
+    seq: () => number;
+    ready: boolean;
+};
+
+const RpcReplayConsumer = React.memo(function RpcReplayConsumer(p: {
+    remote: Replay.ReplayRemote<[number]>;
+    metrics: React.MutableRefObject<tRpcReplayMetrics>;
+    callbackRevision: number;
+}) {
+    p.metrics.current.renders++;
+    const sub = useReplaySubscribe(p.remote, value => {
+        // This is intentionally an append-only QA probe. It reports duplicates; it never
+        // suppresses them, so a green card is evidence from the real transport instead of
+        // a React-side dedupe mask.
+        p.metrics.current.values.push(value);
+        p.metrics.current.latestCallbackRevision = p.callbackRevision;
+    }, {
+        since: 0,
+        policy: "queue",
+        onSeq: () => {},
+        onError: error => { p.metrics.current.errors.push(String(error)); },
+        onStale: () => {},
+        hint: {callbackRevision: p.callbackRevision},
+    });
+    p.metrics.current.seq = sub.seq;
+    p.metrics.current.ready = sub.ready;
+    return null;
+});
+
+/**
+ * Real browser transport regression card. The server endpoint is the Vite-only
+ * `qaReplay` RPC facade; this component receives only its stable common2 remote.
+ */
+export const ReplayRpcReconnectDemo = () => {
+    const hub = useMemo(() => createRpcClientHub(
+        () => io({path: "/__qa/replay-rpc", transports: ["websocket"], reconnection: false}),
+        rpc => ({qaReplay: rpc<tRpcReplayServer>("qaReplay")}),
+    ), []);
+    const metrics = useRef<tRpcReplayMetrics>({values: [], errors: [], renders: 0, latestCallbackRevision: -1, seq: () => -1, ready: false});
+    const firstRemote = useRef<Replay.ReplayRemote<[number]> | null>(null);
+    const [remote, setRemote] = useState<Replay.ReplayRemote<[number]> | null>(null);
+    const [mounted, setMounted] = useState(true);
+    const [callbackRevision, setCallbackRevision] = useState(0);
+    const [connected, setConnected] = useState(false);
+    const [snapshot, setSnapshot] = useState({produced: 0, head: -1, listeners: 0, producing: false, received: 0, missing: 0, duplicates: 0, ordered: true, renders: 0, seq: -1, ready: false, errors: 0});
+
+    const refresh = async () => {
+        const api = hub.facade.qaReplay?.func;
+        let server = {produced: 0, head: -1, listeners: 0, producing: false};
+        try { if (api) server = await api.stats(); } catch { /* offline: retain local transport evidence */ }
+        const values = metrics.current.values;
+        const seen = new Set(values);
+        const missing = Array.from({length: server.produced}, (_, i) => i + 1).filter(value => !seen.has(value)).length;
+        const duplicates = values.length - seen.size;
+        setSnapshot({
+            ...server,
+            received: values.length,
+            missing,
+            duplicates,
+            ordered: values.every((value, index) => index == 0 || values[index - 1] < value),
+            renders: metrics.current.renders,
+            seq: metrics.current.seq(),
+            ready: metrics.current.ready,
+            errors: metrics.current.errors.length,
+        });
+    };
+
+    useEffect(() => {
+        let alive = true;
+        const offConnect = hub.connectListen(() => { if (alive) { setConnected(true); void refresh(); } });
+        const offDisconnect = hub.disconnectListen(() => { if (alive) { setConnected(false); void refresh(); } });
+        void hub.setToken(null).then(clients => {
+            if (!alive) return;
+            const next = clients.qaReplay.func.events as Replay.ReplayRemote<[number]>;
+            firstRemote.current ??= next;
+            setRemote(next);
+            setConnected(true);
+            void refresh();
+        }).catch(error => { metrics.current.errors.push(String(error)); void refresh(); });
+        return () => {
+            alive = false;
+            offConnect();
+            offDisconnect();
+            hub.socket?.disconnect?.();
+        };
+        // The hub is intentionally one logical transport for the life of this card.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hub]);
+
+    const api = hub.facade.qaReplay?.func;
+    const run = (work: (() => Promise<unknown>) | undefined) => {
+        if (!work) return;
+        void work().then(() => refresh()).catch(error => { metrics.current.errors.push(String(error)); void refresh(); });
+    };
+    const green = snapshot.produced > 0 && snapshot.missing == 0 && snapshot.duplicates == 0 && snapshot.ordered && snapshot.seq >= snapshot.head && snapshot.listeners == 1 && snapshot.errors == 0;
+    const statusStyle: React.CSSProperties = {padding: "3px 8px", borderRadius: 5, color: "#fff", background: green ? "#2da44e" : "#cf222e", fontWeight: 700, fontSize: 12};
+
+    return <div style={{display: "grid", gap: 8}}>
+        <div style={{fontSize: 13, color: "#57606a", maxWidth: 760}}>
+            Keep this tab visible: background-tab throttling delays browser work and is not transport lag. Start the producer, wait for delivery, disconnect while it keeps running, rerender, then reconnect the same socket. No restart, key change, remount, or remote replacement is used for recovery.
+        </div>
+        <div style={{display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center"}}>
+            <button onClick={() => run(api ? () => api.start() : undefined)}>start producer (20/s)</button>
+            <button onClick={() => run(api ? () => api.stop() : undefined)}>stop producer</button>
+            <button onClick={() => { hub.socket?.disconnect?.(); void refresh(); }}>disconnect transport</button>
+            <button onClick={() => { (hub.socket as any)?.connect?.(); }}>reconnect transport</button>
+            <button onClick={() => { for (let i = 1; i <= 8; i++) window.setTimeout(() => setCallbackRevision(value => value + 1), i * 20); }}>parent rerender burst</button>
+            <button onClick={() => run(api ? () => api.burst(5_000) : undefined)}>burst 5,000</button>
+            <button onClick={() => void refresh()}>refresh metrics</button>
+            <button onClick={() => { setMounted(value => !value); window.setTimeout(() => void refresh(), 0); }}>{mounted ? "unmount consumer" : "mount consumer"}</button>
+            <span style={statusStyle}>{green ? "PASS: exact replay" : "waiting / mismatch"}</span>
+        </div>
+        {remote && mounted && <StrictMode><RpcReplayConsumer remote={remote} metrics={metrics} callbackRevision={callbackRevision}/></StrictMode>}
+        <div style={{...statLine, whiteSpace: "normal"}}>
+            transport {connected ? "connected" : "disconnected"} · stable remote {String(remote != null && remote === firstRemote.current)} · producer {snapshot.producing ? "running" : "stopped"}<br/>
+            produced {snapshot.produced} · received {snapshot.received} · seq {snapshot.seq}/{snapshot.head} · missing {snapshot.missing} · duplicates {snapshot.duplicates} · ordered {String(snapshot.ordered)}<br/>
+            consumer renders {snapshot.renders} · latest callback revision {metrics.current.latestCallbackRevision}/{callbackRevision} · server listeners {snapshot.listeners} · ready {String(snapshot.ready)} · errors {snapshot.errors}
+        </div>
+        <div style={{fontSize: 12, color: "#57606a"}}>
+            The 5,000-event burst is lossless (`policy: queue`): use refresh after it drains. The consumer records deliveries in a ref, so delivery itself does not trigger React renders; only lifecycle/UI controls do. Unmount then refresh to confirm server listeners reaches 0.
+        </div>
+    </div>;
+};
 /* ---------- card 24: store replay sync - useStoreReplayMirror over exposeStoreReplay ---------- */
 
 type tWorld = {ticks: number, price: number, note: string, bag: Record<string, number>};

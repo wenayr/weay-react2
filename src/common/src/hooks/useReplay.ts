@@ -118,10 +118,18 @@ export function useReplaySubscribe<Z extends any[]>(
 
     useEffect(() => {
         if (!remote || !enabled) return;
+        if (!remote.line || typeof remote.line.on != 'function') {
+            const error = new Error('Replay remote is missing its line surface')
+            setReady(false)
+            setError(error)
+            hooksRef.current.onError?.(error)
+            return
+        }
         if (lastRemoteRef.current !== undefined && lastRemoteRef.current !== remote) seqRef.current = undefined; // a different line — old seq is meaningless
         lastRemoteRef.current = remote;
 
         let alive = true;
+        let failed = false;
         setReady(false);
         setError(null);
         // stale is NOT reset here: it re-syncs from common2 after the first delivery (a stale
@@ -136,7 +144,11 @@ export function useReplaySubscribe<Z extends any[]>(
                 hooksRef.current.onSeq?.(seq);
             },
             onError: e => {
-                if (alive) setError(e);
+                failed = true;
+                if (alive) {
+                    setError(e);
+                    setReady(false);
+                }
                 hooksRef.current.onError?.(e);
             },
             ...(staleMs !== undefined ? {
@@ -150,7 +162,7 @@ export function useReplaySubscribe<Z extends any[]>(
         subRef.current = off;
         off.ready.then(
             () => {
-                if (!alive) return;
+                if (!alive || failed) return;
                 setReady(true);
                 if (staleMs !== undefined) setStale(off.isStale()); // fresh line after a stale one: no edge from common2, sync by hand
             },

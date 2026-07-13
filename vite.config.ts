@@ -1,7 +1,40 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { Observe } from 'wenay-common2';
+import {Server as SocketIOServer} from 'socket.io';
+import {createRpcServerAuto, listen, Observe, Replay} from 'wenay-common2';
+
+/* Real Socket.IO/RPC source for the reconnect QA card. This deliberately lives in
+ * the Vite-only stand: React receives the normal common2 RPC remote and does not
+ * know about the socket or its reconnect lifecycle. */
+const [emitQaReplay, qaReplay] = Replay.replayListen<[number]>({history: 20_000});
+let qaReplayProduced = 0;
+let qaReplayTimer: ReturnType<typeof setInterval> | null = null;
+const qaReplayEmit = (count = 1) => {
+  for (let i = 0; i < count; i++) emitQaReplay(++qaReplayProduced);
+  return qaReplayProduced;
+};
+const qaReplayStats = () => ({
+  produced: qaReplayProduced,
+  head: qaReplay.head(),
+  // RPC Replay uses the envelope `line` surface, not the legacy payload `on` surface.
+  listeners: qaReplay.line.count(),
+  producing: qaReplayTimer != null,
+});
+const qaReplayApi = {
+  events: qaReplay,
+  start: () => {
+    if (!qaReplayTimer) qaReplayTimer = setInterval(() => qaReplayEmit(), 50);
+    return qaReplayStats();
+  },
+  stop: () => {
+    if (qaReplayTimer) clearInterval(qaReplayTimer);
+    qaReplayTimer = null;
+    return qaReplayStats();
+  },
+  burst: (count: number) => qaReplayEmit(Math.max(0, Math.min(10_000, Math.floor(count)))),
+  stats: qaReplayStats,
+};
 
 type QaObserveState = {
   value: number;
@@ -166,6 +199,18 @@ export default defineConfig({
     {
       name: 'qa-observe-store-server',
       configureServer(server) {
+        const io = new SocketIOServer(server.httpServer, {path: '/__qa/replay-rpc', cors: {origin: true}});
+        io.on('connection', socket => {
+          const [disconnect, disconnectListen] = listen();
+          socket.on('disconnect', disconnect);
+          createRpcServerAuto({
+            socket: {emit: (key, data) => socket.emit(key, data), on: (key, cb) => socket.on(key, cb)},
+            socketKey: 'qaReplay',
+            object: qaReplayApi,
+            disconnectListen,
+          });
+        });
+        server.httpServer?.once('close', () => io.close());
         server.middlewares.use((req, res, next) => {
           handleQaObserve(req, res, next).catch(error => {
             console.error(error);

@@ -208,7 +208,9 @@ Use `useAgGrid` or `createGridBuffer` when row updates arrive as patches,
 streams, or imperative transactions.
 
 Use overlay mode when React-owned `rowData` owns the row set and external
-patches should update only already-present rows.
+patches should update only already-present rows. Overlay patches are merged with
+the current grid row before delivery, so a `Partial<Row>` stream cannot erase
+static fields owned by declarative `rowData`.
 
 Use `createColumnBuffer` for generic dynamic column-name lifecycle. The shared
 buffer stores names and replays them; the app wrapper decides target group,
@@ -277,6 +279,15 @@ Main APIs:
 
 Use these for high-frequency event lines, state sync from a replay source, and
 route hand-off between relay/direct transports.
+
+Transport reconnect and replay recovery belong to `wenay-common2`, not these
+hooks. With a stable RPC `remote`, common2 1.0.75 rebinds a transiently lost
+physical Listen subscription, resumes from its own delivered seq, orders and
+deduplicates catch-up, and reports an unrecoverable journal gap as an error.
+`wenay-react2` owns only React mount/unmount, StrictMode-safe callback refs,
+and controller state; it must not add reconnect listeners, retry timers, or a
+second journal. Deliberate client disposal or token rotation is a hard
+teardown, not an automatic recovery path.
 
 Avoid storing every frame in React state. High-frequency lines should fold into
 canvas, refs, external stores, or grid controllers. The controller exposes

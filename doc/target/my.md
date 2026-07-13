@@ -4,6 +4,14 @@
 
 ## In Progress
 
+- **Reliability sweep 2026-07-14: replay keyframes and bounded grid delivery.** Source: dictated priority list.
+  - `clientBacktest/PanicPanel`: resume `OrderEvents` from the retained replay window/keyframe, never hard-code `since: 0`; opening after the 256-event retention window must recover.
+  - `serverAdmin balances`: publish a complete current-state keyframe and recover after journal gaps; a newly connected client must see balances before another event arrives.
+  - `wenay-react2 Grid overlay` — implemented: merge a `Partial<Row>` patch with the grid-owned row before sending an AG Grid update, so static fields survive.
+  - `wenay-react2 LogsPage` — implemented: remove rows displaced by the bounded controller feed from the live grid; the visible grid stays bounded.
+  - Local verification: overlay regression test, full Jest 27/92, `tsc -p tsconfig.qa-check.json --noEmit`, build, `git diff --check`; QA stand is running on `http://127.0.0.1:3010/`.
+  - Remaining: targeted recovery proof for `PanicPanel` and the coordinated serverAdmin/client balance-keyframe contract.
+
 - **Конференц-демо: групповой созвон на обеих технологиях — relay-мост + WebRTC direct.** DONE 2026-07-13 (обе надиктовки 2026-07-12, дословно в конце файла).
   - Отгружено: `wenay-react2/demo/peer-conference` — headless `createConferenceWorld` (host-star: групповой звонок КОМПОНУЕТСЯ из парных, один CallManager держит N-1 исходящих; roster активных звонков = единственный ACL-авторитет) + `ConferenceCallDemo` (QA card 46: грид на `Peer.createMediaRelay` fan-out, focus-пара на `Replay.createRouteCoordinator` — relay-hop `serveReplayChannel` и WebRTC `createWebRtcConnector`/`acceptWebRtcDirect` обслуживают ОДНУ owner-seq линию, hand-off без разрывов по seq; никогда не сервить маршрут из `relay.watchOf` — per-watcher seq). Хук `useRouteState`. Fake-RTC loopback (порт оракула common2) для jest/песочниц.
   - **Через бэк (надиктовка №2)**: `doc/examples/conference-server.mjs` (Node+Socket.IO: peer host, комнатная политика — accepted call вступает обеими сторонами в room, offer брокерится только внутри общей комнаты, media relay с `canWatch`=sameRoom) + `conference-client.html/.ts` (одно место = одна вкладка: грид через серверный relay, peer-store строки с promoteDirect в настоящий cross-tab RTCPeerConnection и reinterpose обратно).
