@@ -6,9 +6,10 @@
  */
 
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
-import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, createColumnGrid, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, useCacheMapPersistence, useResizeObserver, useElementSize, useMediaSource, usePeer, usePeerCalls, usePeerPresence, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
+import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, createColumnGrid, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, useAiRunClient, useFileJobClient, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, useCacheMapPersistence, useResizeObserver, useElementSize, useMediaSource, usePeer, usePeerCalls, usePeerPresence, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { listen as createListen, Observe, Params, Media, Peer } from "wenay-common2";
+import type {Ai, Resource} from "wenay-common2";
 import { Button, HoverButton, OutsideClickArea } from "../src/hooks";
 import { FloatingWindow } from "../src/components";
 import { DragBox } from "../src/components/Dnd/FloatingWindow";
@@ -28,10 +29,10 @@ const stageS: React.CSSProperties = { padding: 14, position: "relative" };
 const row: React.CSSProperties = { padding: "6px 14px", fontSize: 13, lineHeight: 1.5, borderTop: "1px dashed #e1e4e8" };
 const btn = (on: boolean, color: string): React.CSSProperties => ({ border: `1px solid ${color}`, background: on ? color : "#fff", color: on ? "#fff" : color, borderRadius: 6, padding: "3px 8px", fontSize: 12, cursor: "pointer" });
 
-function Check(p: { n: number; title: string; do: string; expect: string; note?: string; tall?: boolean; children: React.ReactNode }) {
+function Check(p: { id?: string; n: number; title: string; do: string; expect: string; note?: string; tall?: boolean; children: React.ReactNode }) {
     const [ok, setOk] = useState<null | boolean>(null);
     return (
-        <section style={{ ...card, outline: ok === true ? "2px solid #1a7f37" : ok === false ? "2px solid #cf222e" : "none" }}>
+        <section id={p.id} style={{ ...card, outline: ok === true ? "2px solid #1a7f37" : ok === false ? "2px solid #cf222e" : "none" }}>
             <div style={head}>
                 <span style={badge}>{p.n}</span>
                 <b style={{ flex: 1 }}>{p.title}</b>
@@ -856,6 +857,114 @@ const ColumnGridKitDemo = () => {
             tableHeight={180}
             table={{ getRowId: pp => pp.data.id }}
         />
+    </div>;
+};
+
+/* ---------- 47. Grid Chrome: one compact command surface over createColumnGrid ---------- */
+const GridChromeDemo = () => {
+    const [last, setLast] = useState("Откройте ⋮ или нажмите правой кнопкой по строке");
+    const [mounted, setMounted] = useState(true);
+    const [grid] = useState(() => createColumnGrid<tTbColRow>({
+        key: "qa47.gridChrome",
+        columnDefs: tbColDefs,
+        data: tbColRows,
+        getId: row => row.id,
+        columns: [
+            {key: "name", title: "Name", fixed: true},
+            {key: "price", title: "Price"},
+            {key: "qty", title: "Quantity", short: "qty"},
+            {key: "note", title: "Note", short: "note"},
+        ],
+        chrome: {
+            copy({rows}) {
+                setLast(rows.length ? `Скопированы строки: ${rows.map(row => row.name).join(", ")}` : "Сначала выберите строку");
+            },
+            saveColumns({columnState}) {
+                setLast(`Сохранена раскладка: ${columnState?.api.visibleKeys().join(", ") ?? "—"}`);
+            },
+            contextItems(event) {
+                return [{
+                    name: "Показать строку",
+                    actionKey: "qa47.inspect-row",
+                    onClick: () => setLast(`Строка: ${event.node?.data?.name ?? "—"}`),
+                }];
+            },
+            commands: [{
+                key: "refresh", group: "table", name: "Обновить данные", title: "Имитировать обновление таблицы",
+                run: () => setLast(`Таблица обновлена в ${new Date().toLocaleTimeString()}`),
+            }],
+        },
+    }));
+    useEffect(() => () => grid.dispose(), [grid]);
+    const Chrome = grid.Chrome;
+    const Table = grid.Table;
+
+    return <div style={{display: "grid", gap: 8}}>
+        <div className="wenayGridChromeArea" style={{justifyContent: "space-between", gap: 10, minHeight: 36, padding: "0 8px", border: "1px solid #40516d", background: "#26354f", color: "#f0f6fc"}}>
+            <div style={{minWidth: 0}}>
+                <b>Сделки</b><span style={{marginLeft: 8, opacity: .7, fontSize: 12}}>4 колонки · 3 строки</span>
+            </div>
+            <Chrome />
+        </div>
+        <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12}}>
+            <button onClick={() => setMounted(value => !value)}>{mounted ? "remount grid" : "mount grid"}</button>
+            <span aria-live="polite">{last}</span>
+        </div>
+        <contextMenu.Layer zIndex={120}>
+            <div style={{height: 210}}>
+                {mounted
+                    ? <Table rowData={tbColRows} getRowId={params => params.data.id} />
+                    : <div style={{height: "100%", display: "grid", placeItems: "center", color: "#57606a", border: "1px dashed #8c959f"}}>Grid is unmounted; Chrome keeps its column state.</div>}
+            </div>
+        </contextMenu.Layer>
+    </div>;
+};
+
+/* ---------- 48. common2 AI run client: React observes Store + semantic Replay ---------- */
+const qaAiStore = Observe.createStore<Ai.AiRunStore>({runs: {}, approvals: {}, inputs: {}});
+const [emitQaAiEvent, qaAiEvents] = createListen<[Ai.AiRunEvent]>();
+const qaAiClient = {store: qaAiStore, events: qaAiEvents, ready: Promise.resolve()} as unknown as Ai.AiRunClient;
+const qaFileStore = Observe.createStore<Resource.FileJobStore>({files: {}, jobs: {}});
+const qaFileClient = {store: qaFileStore, ready: Promise.resolve()} as unknown as Resource.FileJobClient;
+
+const AiRunClientDemo = () => {
+    const ai = useAiRunClient(qaAiClient);
+    const files = useFileJobClient(qaFileClient);
+    const run = ai.runs["qa-ai"];
+    function start() {
+        qaAiStore.state.runs["qa-ai"] = {
+            id: "qa-ai", owner: "qa", requestId: "qa-request", kind: "assistant", resourceIds: [],
+            state: "running", progress: 20, message: "Собираю ответ", artifacts: [], createdAt: Date.now(), updatedAt: Date.now(),
+        };
+        void Observe.flushReactive(qaAiStore.state);
+        emitQaAiEvent({type: "started", runId: "qa-ai"});
+    }
+    function finish() {
+        if (!run) return;
+        run.state = "completed";
+        run.progress = 100;
+        run.result = {summary: "Готово"};
+        run.updatedAt = Date.now();
+        void Observe.flushReactive(qaAiStore.state);
+        emitQaAiEvent({type: "completed", runId: "qa-ai", result: run.result});
+    }
+    function completeFileJob() {
+        qaFileStore.state.files["qa-file"] = {id: "qa-file", owner: "qa", name: "report.csv", size: 2048, mime: "text/csv", state: "uploaded", createdAt: Date.now(), updatedAt: Date.now()};
+        qaFileStore.state.jobs["qa-job"] = {id: "qa-job", fileId: "qa-file", owner: "qa", state: "ready", progress: 100, createdAt: Date.now(), updatedAt: Date.now()};
+        void Observe.flushReactive(qaFileStore.state);
+    }
+    return <div style={{display: "grid", gap: 8}}>
+        <div style={{display: "flex", gap: 8, flexWrap: "wrap"}}>
+            <button onClick={start}>start run</button>
+            <button onClick={finish} disabled={!run || run.state == "completed"}>complete run</button>
+        </div>
+        <div style={{fontSize: 13}}>ready: <b>{String(ai.ready)}</b> · state: <b>{run?.state ?? "idle"}</b> · progress: <b>{run?.progress ?? 0}%</b></div>
+        <div style={{fontSize: 13}}>last semantic event: <b>{ai.lastEvent?.type ?? "—"}</b></div>
+        <div style={{borderTop: "1px dashed #d0d7de", paddingTop: 8, display: "grid", gap: 6}}>
+            <div style={{fontSize: 12, fontWeight: 700}}>Resource file job</div>
+            <div><button onClick={completeFileJob}>complete upload/job</button></div>
+            <div style={{fontSize: 13}}>file: <b>{files.files["qa-file"]?.state ?? "idle"}</b> · job: <b>{files.jobs["qa-job"]?.state ?? "idle"}</b> · progress: <b>{files.jobs["qa-job"]?.progress ?? 0}%</b></div>
+        </div>
     </div>;
 };
 
@@ -1803,6 +1912,20 @@ function ActiveChecks() {
                    note="This is the reusable wrapper for the card-29/30/31 pattern: one keyed controller, auto ColumnMeta from ag-grid defs, optional overrides/default data, built-in dots overlay, and ready-made representations. Use View for quick table/card switching, or use the returned pieces manually."
                    tall>
                 <ColumnGridKitDemo />
+            </Check>
+
+            <Check id="grid-chrome" n={47} title="Grid Chrome — compact table commands"
+                   do="Hover the dark header, then open ⋮ with mouse or keyboard. Check grouped Columns / Size / Data / Table actions. Select a row and copy it; right-click another row and use both the app item and ‘Копировать строки’. Press Escape or click outside the popover. Use remount grid, then open the menu again. On a narrow/coarse screen the ⋮ trigger remains visible and touch-sized."
+                   expect="The header reserves a stable slot: desktop trigger fades in on header hover/focus without shifting columns; touch keeps a 44px target. The popover stays usable while pointer/focus is inside, closes on Escape/outside/one-shot commands, and ColumnsMenu edits the same persisted column state. Right-click first selects the clicked row when needed, then composes ‘Показать строку’ and ‘Копировать строки’; no permanent copy button or Ctrl/Cmd+C listener is required. After remount, exactly one current Grid API is attached."
+                   note="This is the required live integration card for createGridChrome/createColumnGrid({chrome}). The dark header is app skin only; Grid Chrome itself ships neutral .wenayGridChrome* classes and --grid-chrome-* variables.">
+                <GridChromeDemo />
+            </Check>
+
+            <Check id="ai-run-client" n={48} title="common2 AI run — React Store/Replay adapter"
+                   do="Start run, then complete run. Watch durable state/progress and the last semantic event. Then complete the file job below."
+                   expect="React renders the local account-filtered client Stores and can react to AI semantic Replay events. The hooks do not create hosts, send prompts, own RPC, retry provider calls, or store raw input: common2 and the application keep those responsibilities."
+                   note="useAiRunClient and useFileJobClient are the React-facing adoption of common2 1.0.78. Apps supply their own storage, runner, ACL and presentation.">
+                <AiRunClientDemo />
             </Check>
 
             <Check n={30} title="columnState toolbar menu - grouped sub-columns"

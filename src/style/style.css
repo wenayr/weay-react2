@@ -773,6 +773,14 @@ body {
   min-width: var(--grid-chrome-trigger-size, 28px);
   min-height: var(--grid-chrome-trigger-size, 28px);
 }
+/* Optional host wrapper for a table title/header plus <Chrome/>. It keeps the
+   reserved slot stable and lets a fine-pointer user discover the trigger by
+   entering the whole header, rather than hunting for a transparent 28px area. */
+.wenayGridChromeArea {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
 .wenayGridChromeTrigger {
   width: 100%;
   height: 100%;
@@ -848,6 +856,11 @@ body {
   .wenayGridChrome:not(:hover):not(:focus-within):not(.wenayGridChrome_open) .wenayGridChromeTrigger {
     opacity: 0;
     pointer-events: none;
+  }
+  .wenayGridChromeArea:hover .wenayGridChrome:not(.wenayGridChrome_open) .wenayGridChromeTrigger,
+  .wenayGridChromeArea:focus-within .wenayGridChrome:not(.wenayGridChrome_open) .wenayGridChromeTrigger {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 @media (hover: none), (pointer: coarse), (max-width: 640px) {

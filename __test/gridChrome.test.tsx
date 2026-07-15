@@ -108,6 +108,19 @@ test('GridChrome composes app context items, selects the clicked row, then copie
     expect(copy).toHaveBeenCalledWith(expect.objectContaining({rows: [{id: 'two'}], node: row}))
 })
 
+test('GridChrome selects the clicked row before asking the app to compose its context items', () => {
+    const api = createApi()
+    const row = {data: {id: 'two'}, isSelected: () => false}
+    const contextItems = jest.fn(() => [{name: 'Приложение'}])
+    const chrome = createGridChrome({contextItems})
+    chrome.grid.attach(api as any)
+
+    chrome.api.contextMenuItems({api: api as any, node: row})
+
+    expect(api.setNodesSelected).toHaveBeenCalledWith({nodes: [row], newValue: true, clearSelection: true})
+    expect(contextItems).toHaveBeenCalledWith(expect.objectContaining({api, node: row}))
+})
+
 test('GridChrome leaves an already selected row intact and does not mutate app menu items', () => {
     const api = createApi()
     const row = {data: {id: 'one'}, isSelected: () => true}

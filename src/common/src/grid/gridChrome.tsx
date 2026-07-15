@@ -154,10 +154,11 @@ export function createGridChrome<T extends object>(opts: GridChromeOptions<T>) {
         }
     }
 
-    function contextMenuItems(event: GridChromeCellContext<T>, existing = opts.contextItems?.(event) ?? []) {
+    function contextMenuItems(event: GridChromeCellContext<T>, existing?: readonly MenuItem[]) {
         const current = event.api ?? api
         if (current) selectGridChromeContextRow(current, event.node)
-        return appendGridChromeMenuItem(existing, copyItem({...event, api: current ?? undefined}))
+        const appItems = existing ?? opts.contextItems?.({...event, api: current ?? undefined}) ?? []
+        return appendGridChromeMenuItem(appItems, copyItem({...event, api: current ?? undefined}))
     }
 
     function openContextMenu(event: GridChromeCellContext<T>, existing?: readonly MenuItem[]) {

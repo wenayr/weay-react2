@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "1.0.57",
+  "version": "1.0.58",
   "description": "Common react",
   "strict": true,
   "main": "dist/index.js",
@@ -39,7 +39,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-rnd": "^10.5.3",
-    "wenay-common2": "^1.0.76"
+    "wenay-common2": "^1.0.78"
   },
   "peerDependencies": {
     "react": "^19.2.0",

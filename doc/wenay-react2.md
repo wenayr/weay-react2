@@ -459,6 +459,33 @@ const args = useListenArgs(listen)
 
 The hook does not choose transport. `remoteStore` needs `{ get(mask?), changed }` and may also provide `changedPaths`; apps may implement it with RPC, WebSocket, SSE, or test HTTP. `changedPaths` is used as a transport optimization: mirror pulls `mask ∩ paths` instead of the whole mask. `initial` is only the local mirror seed; changing it does not reset an existing mirror. `mask` is treated as a small declarative StoreMask, so structurally equal inline masks do not resubscribe. For add/delete keys, subscribe to the parent object node with `useStoreKeys(node)`; this also covers deep objects. If a state key conflicts with StoreNode methods such as `count`, use `store.node.at("count")`.
 
+### common2 Resource and AI clients
+
+`wenay-common2@1.0.77` adds account-filtered file/job clients; `1.0.78` adds
+provider-neutral AI-run clients. Create and own the common2 client at the RPC
+boundary, then hand that already-created resource to React:
+
+```tsx
+import {Ai, Resource} from "wenay-common2"
+import {useAiRunClient, useFileJobClient} from "wenay-react2"
+
+const aiClient = Ai.createAiRunClient({remote: rpc.func.ai})
+const fileClient = Resource.createFileJobClient({remote: rpc.func.files})
+
+function AssistantPanel() {
+    const ai = useAiRunClient(aiClient)
+    const files = useFileJobClient(fileClient)
+    // ai.runs / approvals / inputs are durable Store state.
+    // ai.lastEvent is the latest replayed semantic event (delta, progress, completion...).
+    // files.files / files.jobs are the account-filtered Resource Store state.
+}
+```
+
+The hooks only subscribe to the local Store and `ready`/event lifecycle. They do
+not create or close the clients, retry `createRun`, put raw input in React state,
+or choose provider, storage, upload, ACL, transport, or server runner behavior.
+Keep the common2 request idempotency and server-side security boundary intact.
+
 ## Replay React Adapter
 Client-side hooks over the wenay-common2 Replay stack (snapshot + sequenced delta line). Server parts (`conflateReplay`, `archiveReplay`, `createRpcServerAuto` replayOpts) are per-connection and stay hook-free by design.
 

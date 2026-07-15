@@ -498,7 +498,10 @@ const ordersGrid = createColumnGrid<Order>({
 
 export function OrdersHeader() {
     const Chrome = ordersGrid.Chrome
-    return <div className="ordersHeaderActions"><Chrome /></div>
+    return <div className="wenayGridChromeArea ordersHeaderActions">
+        <h2>Orders</h2>
+        <Chrome />
+    </div>
 }
 ```
 
@@ -508,6 +511,10 @@ column controls, size actions, selected-row copy, and declarative app commands.
 Right-click copy selects the clicked row only when needed and appends its item to
 `contextItems`; it does not replace application items. `Ctrl/Cmd+C` and existing
 long-touch/context-menu layers remain untouched.
+
+`wenayGridChromeArea` is an optional neutral header wrapper. It makes the desktop
+trigger discoverable when the pointer enters the whole header while retaining the
+same fixed trigger slot and without coupling the library to an app header style.
 
 ## Toolbar With Local Commands
 

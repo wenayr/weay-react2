@@ -275,6 +275,23 @@ useColumnGrid(opts) -> same controller, captured once for component-local setups
 - Use raw `createColumnState` plus `createToolbar` when the app needs a custom skin like QA card 30,
   a runtime `presentGate`, special group mode buttons, or nonstandard persistence timing.
 
+Grid Chrome (`createGridChrome`, optional `createColumnGrid({chrome})`):
+- Chrome is the one compact command surface around an existing grid; it owns only
+  popover UI and a late-bound GridApi reference. `createColumnState` remains the
+  only owner of column layout and persistence.
+- Mount `<grid.Chrome/>` in a stable header slot. Wrap the title/header and Chrome
+  in `.wenayGridChromeArea` when the desktop trigger should reveal on whole-header
+  hover/focus. The wrapper is layout-only and has no app palette; Chrome styling is
+  `.wenayGridChrome*` plus `--grid-chrome-*` tokens.
+- Fine pointers hide only the trigger face, never its reserved slot; coarse pointers
+  or a narrow layout make the trigger persistently visible at a 44px target. Do not
+  emulate this with user-agent checks or an app-owned hover listener.
+- Right-click copy is composed through `chrome.contextItems` and injected `copy`;
+  the library selects a different clicked row only when necessary, then snapshots
+  current selected rows. It deliberately owns neither Ctrl/Cmd+C nor long-touch.
+- QA card 47 is the mandatory live integration check: header discoverability,
+  Escape/outside close, copy composition, and stale-API-safe remount.
+
 Icon menu (ColumnsMenu / MenuStrip, `grid/columnState/ColumnsMenu.tsx`):
 ```
 <MenuStrip items={MenuStripItem[]} onItem? onMove? move? tail? holdMs?=150 compact? />
@@ -746,6 +763,7 @@ Current tokenized prefixes:
 - `--cols-menu-*` for compact `ColumnsMenu/MenuStrip` chrome.
 - `--cols-dots-*` for `ColumnDots` chrome.
 - `--cols-card-*` for `CardList` chrome.
+- `--grid-chrome-*` for the compact Grid Chrome trigger/popover.
 - `--wenay-z-modal` for modal/overlay stacking.
 
 Normalization rule: new shared CSS should first try an existing token. Add a new token only when a value is reused by a shared primitive or is expected to be theme-overridden by apps. One-off app/demo styles should stay in the demo/app wrapper, not in library tokens. Do not delete a default style/class without a replacement class/token path and changelog entry; visually broken defaults are treated as a compatibility break.
@@ -756,7 +774,7 @@ Open normalization candidates:
 - `src/common/src/components/ParamsEditor.tsx` and `src/common/src/components/Input.tsx`: if these stay public primitives, define default class/token contracts instead of component-owned visual styling.
 - `src/common/src/styles/commentaryStyles.css`: standalone `.commentary` CSS is not imported by the root style bundle; either import/tokenize it if still used, or mark it as a local component concern.
 
-Recently normalized: mouse context-menu item colors through `--menu-*`, `--menu-outline-color` for `OutlineDragDemo`, `--logs-*` for logger chrome, `--dlg-scrim` in `ModalProvider`, compact `ColumnsMenu/MenuStrip` visuals through `.wenayColsMenu*` / `--cols-menu-*`, card-29 mobile primitives through `--cols-dots-*` / `--cols-card-*`, and createColumnGrid overlay through `.wenayColumnGrid*` / `--cols-grid-*`.
+Recently normalized: mouse context-menu item colors through `--menu-*`, `--menu-outline-color` for `OutlineDragDemo`, `--logs-*` for logger chrome, `--dlg-scrim` in `ModalProvider`, compact `ColumnsMenu/MenuStrip` visuals through `.wenayColsMenu*` / `--cols-menu-*`, card-29 mobile primitives through `--cols-dots-*` / `--cols-card-*`, createColumnGrid overlay through `.wenayColumnGrid*` / `--cols-grid-*`, and Grid Chrome through `.wenayGridChrome*` / `--grid-chrome-*`.
 
 ## Cleanup Inventory
 
