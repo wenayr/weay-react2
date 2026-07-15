@@ -47,6 +47,23 @@ function Check(p: { id?: string; n: number; title: string; do: string; expect: s
     );
 }
 
+/* ---------- showcase building blocks: the stand teaches a public integration, not just a test ---------- */
+function ShowcasePanel(p: { eyebrow: string; title: string; children: React.ReactNode; tone?: "blue" | "violet" | "green" }) {
+    return <section className={`wenayQaShowcasePanel wenayQaShowcasePanel_${p.tone ?? "blue"}`}>
+        <div className="wenayQaShowcaseEyebrow">{p.eyebrow}</div>
+        <h3 className="wenayQaShowcaseTitle">{p.title}</h3>
+        {p.children}
+    </section>;
+}
+
+function ExampleCode(p: { children: string }) {
+    return <pre className="wenayQaExampleCode"><code>{p.children.trim()}</code></pre>;
+}
+
+function DemoHint(p: { children: React.ReactNode }) {
+    return <div className="wenayQaDemoHint"><span aria-hidden>↗</span><span>{p.children}</span></div>;
+}
+
 /* ---------- 1. Reactivity: updateBy / renderBy ---------- */
 const shared = { count: 0 };
 const Subscriber = () => { updateBy(shared); return <span style={{ fontSize: 22, fontWeight: 700 }}>count = {shared.count}</span>; };
@@ -899,24 +916,52 @@ const GridChromeDemo = () => {
     const Chrome = grid.Chrome;
     const Table = grid.Table;
 
-    return <div style={{display: "grid", gap: 8}}>
-        <div className="wenayGridChromeArea" style={{justifyContent: "space-between", gap: 10, minHeight: 36, padding: "0 8px", border: "1px solid #40516d", background: "#26354f", color: "#f0f6fc"}}>
+    return <div className="wenayQaShowcaseGrid">
+        <ShowcasePanel eyebrow="LIVE EXAMPLE" title="Список сделок без вечной полосы кнопок" tone="violet">
+        <DemoHint>Наведите на шапку — ⋮ появится в зарезервированном месте. На touch-экране он виден всегда.</DemoHint>
+        <div className="wenayQaGridDemo">
+        <div className="wenayGridChromeArea wenayQaGridHeader">
             <div style={{minWidth: 0}}>
                 <b>Сделки</b><span style={{marginLeft: 8, opacity: .7, fontSize: 12}}>4 колонки · 3 строки</span>
             </div>
             <Chrome />
         </div>
         <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12}}>
-            <button onClick={() => setMounted(value => !value)}>{mounted ? "remount grid" : "mount grid"}</button>
+            <button onClick={() => setMounted(value => !value)}>{mounted ? "Перемонтировать grid" : "Подключить grid"}</button>
             <span aria-live="polite">{last}</span>
         </div>
         <contextMenu.Layer zIndex={120}>
             <div style={{height: 210}}>
                 {mounted
                     ? <Table rowData={tbColRows} getRowId={params => params.data.id} />
-                    : <div style={{height: "100%", display: "grid", placeItems: "center", color: "#57606a", border: "1px dashed #8c959f"}}>Grid is unmounted; Chrome keeps its column state.</div>}
+                    : <div style={{height: "100%", display: "grid", placeItems: "center", color: "#57606a", border: "1px dashed #8c959f"}}>Grid отключён; Chrome сохраняет только своё UI-состояние.</div>}
             </div>
         </contextMenu.Layer>
+        </div>
+        <div className="wenayQaPills"><span>Колонки</span><span>Размер</span><span>Данные</span><span>Команды приложения</span></div>
+        </ShowcasePanel>
+        <ShowcasePanel eyebrow="CONNECT IT" title="Подключение — один существующий column state" tone="blue">
+            <ExampleCode>{`
+const grid = createColumnGrid<Order>({
+  key: "orders", columnDefs,
+  chrome: {
+    copy: ({rows}) => copyOrders(rows),
+    saveColumns: ({columnState}) => saveLayout(columnState),
+    contextItems: appRowMenu,
+    commands: [{key: "refresh", group: "table", name: "Обновить", run}],
+  },
+})
+
+<header className="wenayGridChromeArea">
+  <h2>Сделки</h2><grid.Chrome />
+</header>
+<grid.Table rowData={rows} />`}</ExampleCode>
+            <div className="wenayQaMiniChecklist">
+                <span>✓ Никакого второго column state</span>
+                <span>✓ Copy остаётся доменной функцией приложения</span>
+                <span>✓ App context menu дополняется, а не заменяется</span>
+            </div>
+        </ShowcasePanel>
     </div>;
 };
 
@@ -953,18 +998,41 @@ const AiRunClientDemo = () => {
         qaFileStore.state.jobs["qa-job"] = {id: "qa-job", fileId: "qa-file", owner: "qa", state: "ready", progress: 100, createdAt: Date.now(), updatedAt: Date.now()};
         void Observe.flushReactive(qaFileStore.state);
     }
-    return <div style={{display: "grid", gap: 8}}>
-        <div style={{display: "flex", gap: 8, flexWrap: "wrap"}}>
-            <button onClick={start}>start run</button>
-            <button onClick={finish} disabled={!run || run.state == "completed"}>complete run</button>
-        </div>
-        <div style={{fontSize: 13}}>ready: <b>{String(ai.ready)}</b> · state: <b>{run?.state ?? "idle"}</b> · progress: <b>{run?.progress ?? 0}%</b></div>
-        <div style={{fontSize: 13}}>last semantic event: <b>{ai.lastEvent?.type ?? "—"}</b></div>
-        <div style={{borderTop: "1px dashed #d0d7de", paddingTop: 8, display: "grid", gap: 6}}>
-            <div style={{fontSize: 12, fontWeight: 700}}>Resource file job</div>
-            <div><button onClick={completeFileJob}>complete upload/job</button></div>
-            <div style={{fontSize: 13}}>file: <b>{files.files["qa-file"]?.state ?? "idle"}</b> · job: <b>{files.jobs["qa-job"]?.state ?? "idle"}</b> · progress: <b>{files.jobs["qa-job"]?.progress ?? 0}%</b></div>
-        </div>
+    return <div className="wenayQaShowcaseGrid">
+        <ShowcasePanel eyebrow="LIVE STATE" title="React показывает уже созданный workflow-клиент" tone="green">
+            <DemoHint>Сценарий имитирует локальный Store и semantic Replay; реальный runner и RPC остаются за границей React.</DemoHint>
+            <div className="wenayQaActionRow">
+                <button onClick={start}>1. Начать AI-run</button>
+                <button onClick={finish} disabled={!run || run.state == "completed"}>2. Завершить AI-run</button>
+            </div>
+            <div className="wenayQaMetricGrid">
+                <span>ready <b>{String(ai.ready)}</b></span><span>state <b>{run?.state ?? "idle"}</b></span>
+                <span>progress <b>{run?.progress ?? 0}%</b></span><span>event <b>{ai.lastEvent?.type ?? "—"}</b></span>
+            </div>
+            <div className="wenayQaWorkflowDivider" />
+            <div className="wenayQaActionRow">
+                <b style={{fontSize: 13}}>Файл + job</b>
+                <button onClick={completeFileJob}>Завершить upload/job</button>
+            </div>
+            <div className="wenayQaMetricGrid"><span>file <b>{files.files["qa-file"]?.state ?? "idle"}</b></span><span>job <b>{files.jobs["qa-job"]?.state ?? "idle"}</b></span><span>progress <b>{files.jobs["qa-job"]?.progress ?? 0}%</b></span></div>
+        </ShowcasePanel>
+        <ShowcasePanel eyebrow="OWNERSHIP" title="Клиент создаётся у RPC-границы, hook — только view" tone="blue">
+            <ExampleCode>{`
+// application boundary, outside React
+const aiClient = Ai.createAiRunClient({remote: rpc.func.ai})
+const fileClient = Resource.createFileJobClient({remote: rpc.func.files})
+
+function AssistantPanel() {
+  const ai = useAiRunClient(aiClient)
+  const files = useFileJobClient(fileClient)
+  return <RunState runs={ai.runs} files={files.files} />
+}`}</ExampleCode>
+            <div className="wenayQaMiniChecklist">
+                <span>✓ Store, ready и AI semantic event</span>
+                <span>✓ Без raw prompt в React state</span>
+                <span>✓ Provider, ACL, storage и retry — ответственность приложения</span>
+            </div>
+        </ShowcasePanel>
     </div>;
 };
 

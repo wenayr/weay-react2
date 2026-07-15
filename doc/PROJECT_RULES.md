@@ -66,8 +66,12 @@ Rules:
 Every new user-facing library capability must be added to the active QA stand in
 `src/common/testUseReact/qa.tsx` before it is considered ready to publish. The
 card must exercise the real public integration path, describe the manual checks
-and expected behaviour, and be run once as a single local Vite instance. Unit
-tests do not replace this integration/demo requirement.
+and expected behaviour, and be run once as a single local Vite instance. A new
+feature card is also a product-quality demonstration: it must show an
+application-like live result, the smallest useful connection snippet, and the
+ownership boundary (what the library does and what the app still owns). Do not
+add a bare button row or an isolated API call merely to claim stand coverage.
+Unit tests do not replace this integration/demo requirement.
 
 Recommended entry shape:
 

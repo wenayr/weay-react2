@@ -1021,6 +1021,10 @@ Current strong examples:
 - `qa.tsx` card 25 for local `createToolbar` config/settings behavior.
 - `qa.tsx` cards 28-32 for `columnState`, `createColumnGrid`, `ColumnsMenu`, `ColumnDots`,
   `CardList`, and `createToolbar({source})`.
+- `qa.tsx` card 47 for Grid Chrome: a live table header beside the minimal
+  `createColumnGrid({chrome})` connection, including the ownership of copy and app menu items.
+- `qa.tsx` card 48 for common2 AI/file-job clients: a live Store/event transition beside the
+  RPC-boundary ownership pattern for `useAiRunClient` and `useFileJobClient`.
 - `qa.tsx` cards 23-26 for Replay hooks.
 - `src/common/src/grid/agGrid4/example.tsx` for `useAgGrid` / `AgGridTable` controller examples.
 - `qa.tsx` active cards for current work.
@@ -1036,6 +1040,9 @@ Legacy or low-level examples:
 When adding an example:
 
 - Explain what problem it solves.
+- Give the reader one attractive, app-like live result before asking them to inspect a control.
+- Put a short, copyable integration snippet beside that result; never make a reader reconstruct
+  the public connection from test wiring.
 - Name the owner of lifecycle/state.
 - Mention what the app still owns.
 - Prefer root imports.

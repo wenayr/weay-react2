@@ -753,6 +753,13 @@ Style entry points:
 - `src/common/src/styles/styleGrid.ts` and `src/common/src/grid/agGrid4/theme.ts` - ag-grid theme setup from `tokens.grid`.
 - QA stand: `npm run testReact -- --host 127.0.0.1 --port 3002`, entry `src/common/testUseReact/qa.tsx`.
 
+The QA stand is both an integration lab and an adopter-facing demonstration. Its
+`wenayQa*` showcase classes deliberately use one-off demo presentation only:
+each new capability should place a real interactive result next to a compact
+connection snippet and a statement of ownership. They are not a consumer theme,
+do not introduce tokens, and must not leak into a public component's visual
+contract.
+
 Current tokenized prefixes:
 - `--color-*` for base palette.
 - `--menu-*` for mouse context-menu and right-menu visuals.
