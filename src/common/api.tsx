@@ -37,6 +37,7 @@ export * from "./src/grid/agGrid4";
 // Toolbar) ships from its own module so grid-less consumers can import the barrel directly.
 export * from "./src/grid/columnState";
 export * from "./src/grid/columnState/columnGrid";
+export * from "./src/grid/gridChrome";
 
 // 6. BASE COMPONENTS - depend on hooks
 export * from "./src/components/Buttons";

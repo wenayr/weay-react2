@@ -762,6 +762,102 @@ body {
 .wenayColumnGridBody {
   min-width: 0;
 }
+
+/* Grid Chrome: place this stable-size slot beside a grid header or table controls.
+   The trigger itself never changes layout; fine-pointer visibility is CSS-only. */
+.wenayGridChrome {
+  position: relative;
+  flex: 0 0 var(--grid-chrome-trigger-size, 28px);
+  width: var(--grid-chrome-trigger-size, 28px);
+  height: var(--grid-chrome-trigger-size, 28px);
+  min-width: var(--grid-chrome-trigger-size, 28px);
+  min-height: var(--grid-chrome-trigger-size, 28px);
+}
+.wenayGridChromeTrigger {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: var(--grid-chrome-trigger-border, 1px solid transparent);
+  border-radius: var(--grid-chrome-trigger-radius, 6px);
+  background: var(--grid-chrome-trigger-bg, transparent);
+  color: var(--grid-chrome-trigger-color, inherit);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+.wenayGridChromeTrigger:hover,
+.wenayGridChromeTrigger:focus-visible {
+  background: var(--grid-chrome-trigger-hover-bg, rgba(255, 255, 255, 0.08));
+  outline: none;
+}
+.wenayGridChromePopover {
+  position: absolute;
+  z-index: var(--wenay-z-grid-chrome, 12);
+  top: calc(100% + var(--grid-chrome-gap, 4px));
+  right: 0;
+  min-width: var(--grid-chrome-pop-min-width, 220px);
+  padding: var(--grid-chrome-pop-padding, 8px);
+  border: var(--grid-chrome-pop-border, 1px solid var(--color-border-common));
+  border-radius: var(--grid-chrome-pop-radius, 8px);
+  background: var(--grid-chrome-pop-bg, var(--color-bg-dark));
+  box-shadow: var(--grid-chrome-pop-shadow, 0 8px 28px rgba(0, 0, 0, 0.5));
+}
+.wenayGridChromeGroup + .wenayGridChromeGroup {
+  margin-top: var(--grid-chrome-group-gap, 6px);
+  padding-top: var(--grid-chrome-group-gap, 6px);
+  border-top: 1px solid var(--grid-chrome-group-divider, rgba(255, 255, 255, 0.12));
+}
+.wenayGridChromeGroupTitle {
+  margin-bottom: 4px;
+  opacity: 0.72;
+  font-size: 11px;
+  font-weight: 700;
+}
+.wenayGridChromeCommands {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+}
+.wenayGridChromeCommand {
+  width: 100%;
+  padding: var(--grid-chrome-command-padding, 6px 8px);
+  border: 0;
+  border-radius: var(--grid-chrome-command-radius, 5px);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.wenayGridChromeCommand:hover:not(:disabled),
+.wenayGridChromeCommand:focus-visible:not(:disabled) {
+  background: var(--grid-chrome-command-hover-bg, rgba(255, 255, 255, 0.08));
+  outline: none;
+}
+.wenayGridChromeCommand:disabled {
+  opacity: var(--grid-chrome-disabled-opacity, 0.48);
+  cursor: default;
+}
+.wenayGridChromeFeedback {
+  margin-top: 6px;
+  color: var(--grid-chrome-feedback-color, inherit);
+  font-size: 11px;
+}
+.wenayGridChromeFeedback_error { color: var(--grid-chrome-feedback-error-color, var(--color-error, #e5484d)); }
+@media (hover: hover) and (pointer: fine) {
+  .wenayGridChrome:not(:hover):not(:focus-within):not(.wenayGridChrome_open) .wenayGridChromeTrigger {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+@media (hover: none), (pointer: coarse), (max-width: 640px) {
+  .wenayGridChrome {
+    width: max(var(--grid-chrome-trigger-size, 28px), 44px);
+    height: max(var(--grid-chrome-trigger-size, 28px), 44px);
+    min-width: max(var(--grid-chrome-trigger-size, 28px), 44px);
+    min-height: max(var(--grid-chrome-trigger-size, 28px), 44px);
+  }
+}
 .wenayColumnGridControls_dots {
   position: absolute;
   left: var(--cols-grid-dots-x, 10px);

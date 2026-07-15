@@ -467,6 +467,48 @@ Standard:
 - Drop to raw `createColumnState` when a product needs custom grouping, runtime
   presence gates, or a fully custom toolbar skin.
 
+## Grid Chrome: Compact Table Commands
+
+Use `createGridChrome` directly, or enable it on `createColumnGrid`, when table
+commands should be available from one adaptive trigger instead of a permanent row
+of small buttons. It reuses the existing column state; it never creates another
+column config or serializes domain rows itself.
+
+```tsx
+import { createColumnGrid } from "wenay-react2"
+
+const ordersGrid = createColumnGrid<Order>({
+    key: "orders.columns",
+    columnDefs,
+    chrome: {
+        copy({rows}) {
+            navigator.clipboard.writeText(rows.map(order => order.id).join("\n"))
+        },
+        saveColumns({columnState}) {
+            return saveTableLayout(columnState?.api.getConfig())
+        },
+        contextItems(event) {
+            return [{name: "Открыть заказ", onClick: () => openOrder(event.node?.data)}]
+        },
+        commands: [
+            {key: "refresh", group: "table", name: "Обновить", run: () => reloadOrders()},
+        ],
+    },
+})
+
+export function OrdersHeader() {
+    const Chrome = ordersGrid.Chrome
+    return <div className="ordersHeaderActions"><Chrome /></div>
+}
+```
+
+On a fine pointer the slot stays reserved and the trigger appears on hover/focus;
+on touch/coarse layouts CSS keeps a 44px target visible. The popover contains
+column controls, size actions, selected-row copy, and declarative app commands.
+Right-click copy selects the clicked row only when needed and appends its item to
+`contextItems`; it does not replace application items. `Ctrl/Cmd+C` and existing
+long-touch/context-menu layers remain untouched.
+
 ## Toolbar With Local Commands
 
 Use when a command strip has its own commands and user-configurable layout.

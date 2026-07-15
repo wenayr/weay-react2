@@ -169,6 +169,30 @@
   --cols-card-field-line-height: 1.7;
   --cols-card-label-color: #57606a;
   --cols-card-label-min-width: 72px;
+
+  /* Grid Chrome: a reserved command slot next to a table, themed without
+     knowing the application's table/header implementation. */
+  --grid-chrome-gap: 4px;
+  --grid-chrome-trigger-size: 28px;
+  --grid-chrome-trigger-radius: 6px;
+  --grid-chrome-trigger-bg: transparent;
+  --grid-chrome-trigger-color: var(--color-text-base);
+  --grid-chrome-trigger-border: 1px solid transparent;
+  --grid-chrome-trigger-hover-bg: rgba(255, 255, 255, 0.08);
+  --grid-chrome-pop-min-width: 220px;
+  --grid-chrome-pop-bg: var(--color-bg-dark);
+  --grid-chrome-pop-border: 1px solid var(--color-border-common);
+  --grid-chrome-pop-radius: 8px;
+  --grid-chrome-pop-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --grid-chrome-pop-padding: 8px;
+  --grid-chrome-group-gap: 6px;
+  --grid-chrome-group-divider: rgba(255, 255, 255, 0.12);
+  --grid-chrome-command-padding: 6px 8px;
+  --grid-chrome-command-radius: 5px;
+  --grid-chrome-command-hover-bg: rgba(255, 255, 255, 0.08);
+  --grid-chrome-disabled-opacity: 0.48;
+  --grid-chrome-feedback-color: var(--color-text-base);
+  --grid-chrome-feedback-error-color: #e5484d;
   /* Logs. Defaults preserve the old logger look; apps can override in their theme. */
   --logs-notification-text: #fff;
   --logs-notification-accent: #5D9FFA;

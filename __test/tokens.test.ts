@@ -40,6 +40,7 @@ const GROUPS: Array<[cssPrefix: string, group: Record<string, string | number>]>
     ["--wnd-", tokens.wnd],
     ["--dlg-", tokens.dlg],
     ["--tb-", tokens.tb],
+    ["--grid-chrome-", tokens.gridChrome],
     ["--logs-", tokens.logs],
 ];
 

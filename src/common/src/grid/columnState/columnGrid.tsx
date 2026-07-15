@@ -7,6 +7,7 @@ import {CardList} from './CardList'
 import {ColumnDots} from './ColumnDots'
 import {ColumnsMenu} from './ColumnsMenu'
 import {createColumnState, type ColumnMeta, type ColumnsConfig, type ColumnStateController} from './columnState'
+import {createGridChrome, type GridChromeController, type GridChromeOptions, type GridChromeProps} from '../gridChrome'
 
 export type ColumnGridColumnDef<T extends object> = ColDef<T> | ColGroupDef<T>
 
@@ -40,6 +41,8 @@ export type ColumnGridOptions<T extends object> = {
     saveMs?: number
     /** Built by default over the same columnState list source; pass false to skip it. */
     toolbar?: false | ColumnGridToolbarOptions
+    /** Optional adaptive command surface. It reuses this factory's columnState. */
+    chrome?: false | Omit<GridChromeOptions<T>, 'columnState'>
 }
 
 export type ColumnGridTableProps<T extends object> =
@@ -61,6 +64,7 @@ export type ColumnGridControls = false | 'auto' | 'toolbar' | 'menu' | 'dots'
 export type ColumnGridToolbar = ReturnType<typeof createToolbar>
 export type ColumnGridToolbarBarProps = React.ComponentProps<ColumnGridToolbar['Bar']>
 export type ColumnGridToolbarSettingsProps = React.ComponentProps<ColumnGridToolbar['Settings']>
+export type ColumnGridChromeProps = GridChromeProps
 
 export type ColumnGridViewProps<T extends object> = {
     mode?: ColumnGridViewMode
@@ -147,6 +151,7 @@ function mergeClass(a: string | undefined, b: string) {
 export type ColumnGridController<T extends object> = {
     state: ColumnStateController
     toolbar: ColumnGridToolbar | null
+    chrome: GridChromeController<T> | null
     columns: readonly ColumnMeta[]
     columnDefs: AgGridReactProps<T>['columnDefs']
     api: ColumnStateController['api'] & {tableProps: (props?: ColumnGridTableProps<T>) => AgGridTableProps<T>}
@@ -158,6 +163,7 @@ export type ColumnGridController<T extends object> = {
     Cards: (props: ColumnGridCardsProps<T>) => React.JSX.Element
     Toolbar: (props?: ColumnGridToolbarBarProps) => React.JSX.Element | null
     Settings: (props?: ColumnGridToolbarSettingsProps) => React.JSX.Element | null
+    Chrome: (props?: ColumnGridChromeProps) => React.JSX.Element | null
     View: (props: ColumnGridViewProps<T>) => React.JSX.Element
     /** Release factory-lifetime subscriptions; persisted config is untouched. */
     dispose: () => void
@@ -211,9 +217,11 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
         source: state.api.listSource,
         sourceMode: opts.toolbar?.sourceMode,
     })
+    const chromeOptions = opts.chrome === false ? null : opts.chrome ?? null
+    const chrome = chromeOptions ? createGridChrome<T>({...chromeOptions, columnState: state}) : null
 
     function tableProps(props: ColumnGridTableProps<T> = {}): AgGridTableProps<T> {
-        const {onGridReady, onGridPreDestroyed, autoSizeColumns = false, autoSizeOnColumnCountChange = opts.autoSizeOnColumnCountChange === true, columnDefs: localDefs = columnDefs, ...rest} = props
+        const {onGridReady, onGridPreDestroyed, onCellContextMenu, autoSizeColumns = false, autoSizeOnColumnCountChange = opts.autoSizeOnColumnCountChange === true, columnDefs: localDefs = columnDefs, ...rest} = props
         return {
             ...rest,
             columnDefs: localDefs,
@@ -222,6 +230,7 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
                 gridApiForFit = event.api
                 fitOnCountChange = autoSizeOnColumnCountChange
                 state.grid.attach(event.api)
+                chrome?.grid.attach(event.api)
                 // re-seed: the column count may have changed while no grid was attached,
                 // and the first post-remount onChange must not mis-skip the auto-fit
                 visibleCount = state.api.visibleKeys().length
@@ -232,8 +241,17 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
                 if (gridApiForFit === event.api) gridApiForFit = null
                 cancelAnimationFrame(fitRaf)
                 fitRaf = 0
+                chrome?.grid.detach(event.api)
                 state.grid.detach()
                 onGridPreDestroyed?.(event)
+            },
+            onCellContextMenu(event) {
+                const appResult = onCellContextMenu?.(event)
+                // A legacy callback may already open its own menu. Only open the
+                // chrome menu automatically when it has an explicit composer or
+                // there is no app callback to preserve.
+                if (chrome && (!onCellContextMenu || chromeOptions?.contextItems))
+                    chrome.api.openContextMenu(event, Array.isArray(appResult) ? appResult : undefined)
             },
         }
     }
@@ -264,6 +282,12 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
         if (!toolbar) return null
         const ToolbarSettings = toolbar.Settings
         return <ToolbarSettings {...props} />
+    }
+
+    function Chrome(props: ColumnGridChromeProps = {}) {
+        if (!chrome) return null
+        const GridChrome = chrome.Chrome
+        return <GridChrome {...props}/>
     }
 
     function controlKind(mode: ColumnGridViewMode, controls: ColumnGridControls | undefined): Exclude<ColumnGridControls, false | 'auto'> | null {
@@ -307,6 +331,7 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
     function dispose() {
         offConfigChange()
         toolbar?.api.dispose()
+        chrome?.dispose()
         cancelAnimationFrame(fitRaf)
         fitRaf = 0
         gridApiForFit = null
@@ -315,6 +340,7 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
     return {
         state,
         toolbar,
+        chrome,
         columns: state.columns,
         columnDefs,
         api: {...state.api, tableProps},
@@ -326,6 +352,7 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
         Cards,
         Toolbar,
         Settings,
+        Chrome,
         View,
         dispose,
     }

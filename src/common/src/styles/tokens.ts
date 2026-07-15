@@ -163,6 +163,35 @@ export const tokens = {
         labelColor: '#57606a',
         labelMinWidth: '72px',
     },    /** Logs chrome (--logs-*). Defaults preserve the old logger look; apps re-skin via CSS vars. */
+    /** Grid Chrome command slot/popover (--grid-chrome-*). */
+    gridChrome: {
+        gap: '4px',
+        triggerSize: '28px',
+        triggerRadius: '6px',
+        triggerBg: 'transparent',
+        /** var(--color-text-base) in CSS */
+        triggerColor: '#c4c4c4',
+        triggerBorder: '1px solid transparent',
+        triggerHoverBg: 'rgba(255, 255, 255, 0.08)',
+        popMinWidth: '220px',
+        /** var(--color-bg-dark) in CSS */
+        popBg: '#131821',
+        /** var(--color-border-common) in CSS */
+        popBorder: '1px solid rgb(50, 62, 71)',
+        popRadius: '8px',
+        popShadow: '0 8px 28px rgba(0, 0, 0, 0.5)',
+        popPadding: '8px',
+        groupGap: '6px',
+        groupDivider: 'rgba(255, 255, 255, 0.12)',
+        commandPadding: '6px 8px',
+        commandRadius: '5px',
+        commandHoverBg: 'rgba(255, 255, 255, 0.08)',
+        disabledOpacity: 0.48,
+        /** var(--color-text-base) in CSS */
+        feedbackColor: '#c4c4c4',
+        /** Apps can override this semantic feedback token. */
+        feedbackErrorColor: '#e5484d',
+    },    /** Logs chrome (--logs-*). Defaults preserve the old logger look; apps re-skin via CSS vars. */
     logs: {
         notificationText: '#fff',
         notificationAccent: '#5D9FFA',

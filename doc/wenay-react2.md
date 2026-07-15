@@ -366,12 +366,40 @@ const cg = createColumnGrid<Row>({
 <cg.Toolbar settings />
 <cg.Settings />
 ```
-`createColumnGrid` returns `{state, toolbar, api, grid, tableProps, Table, Menu, Dots, Cards, Toolbar, Settings, View, dispose}`; `dispose()` releases factory-lifetime subscriptions (config onChange, toolbar source, pending fit) without touching the persisted config. The columnState BARREL stays ag-grid-free; `createColumnGrid` ships from its own module (both are exported from the package root).
+`createColumnGrid` returns `{state, toolbar, chrome, api, grid, tableProps, Table, Menu, Dots, Cards, Toolbar, Settings, Chrome, View, dispose}`; `dispose()` releases factory-lifetime subscriptions (config onChange, toolbar source, pending fit) without touching the persisted config. The columnState BARREL stays ag-grid-free; `createColumnGrid` ships from its own module (both are exported from the package root).
 Its `Table`/`tableProps()` attach/detach the columnState grid adapter automatically and default
 `autoSizeColumns=false` so restored widths are not overwritten. `autoSizeOnColumnCountChange` is
 separate and only calls `sizeColumnsToFit()` when the visible column count changes. `useColumnGrid(opts)`
 is the same controller captured once for component-local setups; keep module-level `createColumnGrid`
 when the controller must survive route/component remounts.
+
+## Grid Chrome
+`createGridChrome({columnState?, copy?, autoSize?, saveColumns?, commands?, contextItems?})` is an optional
+adaptive command surface over one already-owned GridApi. It owns only the compact trigger,
+popover, feedback, and its late-bound API reference; it never creates or attaches a second
+`createColumnState`. `createColumnGrid({chrome})` injects its own state and composes the same
+ready/pre-destroy lifecycle, while `cg.Chrome` renders the reserved trigger slot where the app's
+table header/control area needs it.
+
+```
+const chrome = createGridChrome<Row>({
+  columnState: cs,
+  copy: ({rows}) => writeRows(rows),
+  saveColumns: ({columnState}) => saveLayout(columnState?.api.getConfig()),
+  contextItems: event => [{name: 'Inspect', onClick: () => inspect(event.node?.data)}],
+  commands: [{key: 'reload', group: 'table', name: 'Reload', run: () => reload()}],
+})
+chrome.grid.attach(api) / chrome.grid.detach(api)   // standalone lifecycle
+<chrome.Chrome />
+```
+
+Groups are `columns`, `size`, `data`, `table`, or a custom string. The built-in Columns group
+uses the supplied state (show/hide, drag order, reset, persisted save); `saveColumns` is the
+optional app persistence hook; the copy callback is
+injected so this library has no domain row format. `chrome.api.openContextMenu(event, appItems?)`
+selects a different clicked row before making a fresh selected-row snapshot and appends
+“Копировать строки” without mutating existing menu items. It intentionally has no Ctrl/Cmd+C or
+long-touch listener, so browser text selection and existing context-menu layers retain control.
 
 QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (toolbar icon menu + grouped sub-column mode button), 31 (Toolbar over the same config), 32 (createColumnGrid wrapper + dots driving table/cards).
 
