@@ -46,6 +46,8 @@ type SettingsSearchTerm = {
 
 type SettingsDialogLayoutState = {
     navWidth: number
+    expandedKeys?: string[]
+    active?: string
 }
 
 const settingsDialogSize = {width: 820, height: 560}
@@ -337,9 +339,9 @@ export type SettingsDialogController = {
 
 export function useSettingsDialogController(props: SettingsDialogProps): SettingsDialogController {
     const [open, setOpen] = useState(false)
-    const [active, setActive] = useState(props.defaultSection)
+    const [active, setActiveState] = useState(() => settingsDialogLayout.active ?? props.defaultSection)
     const [search, setSearch] = useState("")
-    const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+    const [expanded, setExpanded] = useState<Set<string>>(() => new Set(settingsDialogLayout.expandedKeys))
     const [historyOpen, setHistoryOpen] = useState(false)
     const [navWidth, setNavWidth] = useState(() => clampSettingsNavWidth(settingsDialogLayout.navWidth))
     const [navResizing, setNavResizing] = useState(false)
@@ -347,6 +349,9 @@ export function useSettingsDialogController(props: SettingsDialogProps): Setting
     const searchBoxRef = useRef<HTMLDivElement>(null)
     const navResizeRef = useRef<{startX: number, startWidth: number} | null>(null)
     const navWidthRef = useRef(navWidth)
+    const activeRef = useRef(active)
+    const expandedRef = useRef(expanded)
+    const treeInitializedRef = useRef(false)
     registryApi.use()
     const searchHistory = settingsSearchHistory.use()
 
@@ -377,8 +382,23 @@ export function useSettingsDialogController(props: SettingsDialogProps): Setting
     }, [navWidth])
 
     useEffect(() => {
+        activeRef.current = active
+    }, [active])
+
+    useEffect(() => {
+        expandedRef.current = expanded
+    }, [expanded])
+
+    useEffect(() => {
         if (!open) return
-        setExpanded(new Set(branchKeys))
+        const knownKeys = new Set(branchKeys)
+        setExpanded(prev => {
+            if (!treeInitializedRef.current) {
+                treeInitializedRef.current = true
+                if (settingsDialogLayout.expandedKeys == null) return getCurrentBranchKeys(currentNode)
+            }
+            return new Set([...prev].filter(key => knownKeys.has(key)))
+        })
     }, [open, treeSignature])
 
     useEffect(() => {
@@ -434,24 +454,45 @@ export function useSettingsDialogController(props: SettingsDialogProps): Setting
     }
 
     function toggleExpanded(key: string) {
-        setExpanded(prev => {
-            const next = new Set(prev)
-            if (next.has(key)) next.delete(key)
-            else next.add(key)
-            return next
-        })
+        const next = new Set(expandedRef.current)
+        if (next.has(key)) next.delete(key)
+        else next.add(key)
+        saveExpanded(next)
+        setExpanded(next)
+    }
+
+    function setActive(nextValue: React.SetStateAction<string | undefined>) {
+        const next = typeof nextValue == 'function' ? nextValue(activeRef.current) : nextValue
+        settingsDialogLayout.active = next
+        activeRef.current = next
+        renderBy(settingsDialogLayout)
+        memoryMarkDirty("SettingsDialog.layout")
+        setActiveState(next)
     }
 
     function expandAll() {
-        setExpanded(new Set(branchKeys))
+        const next = new Set(branchKeys)
+        saveExpanded(next)
+        setExpanded(next)
     }
 
     function collapseAll() {
-        setExpanded(new Set())
+        const next = new Set<string>()
+        saveExpanded(next)
+        setExpanded(next)
     }
 
     function collapseOutsideCurrent() {
-        setExpanded(getCurrentBranchKeys(currentNode))
+        const next = getCurrentBranchKeys(currentNode)
+        saveExpanded(next)
+        setExpanded(next)
+    }
+
+    function saveExpanded(next: Set<string>) {
+        settingsDialogLayout.expandedKeys = [...next]
+        expandedRef.current = next
+        renderBy(settingsDialogLayout)
+        memoryMarkDirty("SettingsDialog.layout")
     }
 
     function commitSearch(value = search) {

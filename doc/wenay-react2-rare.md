@@ -94,7 +94,7 @@ replacement is a no-op. Tree shape comes from nested `children` or flat sections
 Search matches section labels, `keywords`, `searchText`, and best-effort text extracted from rendered
 React children; matching descendants stay visible and their ancestors auto-expand. The search input uses
 `createSearchHistory({key:"SettingsDialog.searchHistory"})`: Enter commits the current query, the history
-button recalls stored queries, leaving the search box closes the list, and changes are published through memoryProps -> memoryCache. `useSettingsDialogController` exposes the same open/search/tree/history/nav-resize actions for custom settings chrome. Tree controls
+button recalls stored queries, leaving the search box closes the list, and changes are published through memoryProps -> memoryCache. `useSettingsDialogController` exposes the same open/search/tree/history/nav-resize actions for custom settings chrome. The dialog layout persists the selected section and tree expansion: the next open restores the user's last branch shape; the first open reveals only the active branch. Tree controls
 are one compact dotted cycle button in the search row (expanded -> current branch -> collapsed), hidden when
 the tree has too little hierarchy to need it. Closes on the x, a scrim click, and Escape.
 Styling: `--dlg-scrim / bg / border / radius / shadow / nav-bg / nav-width` tokens (tokens.css,
@@ -505,6 +505,8 @@ StickerMenu                          // components/Menu re-export
 ```
 
 Prefer `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, and stays supported through `1.x`; it should not be the primary API in new code. `contextMenu.stats` is local in-memory diagnostics, not hidden analytics: it counts direct `openAt`, `openAtPoint`, legacy Layer queued opens, empty opens, close/replace, source/layer usage, aggregate action outcomes, and keyed action outcomes. It deliberately does not persist, send network requests, or store arbitrary item labels. Per-action stats require explicit `MenuItemStrict.actionKey`; unkeyed actions update `actionTotals` only.
+
+`createRightClickMenu().MenuR` keeps wrapper-only right-click handling by default. Its additive `captureGlobal` prop installs document-level right-click listeners for portal or floating-window content; it is opt-in and removes the listeners on unmount.
 
 `Menu` does not mutate `item.status`. Open/hover state is an internal active index; `status` remains a seed/compatibility value, and custom item renderers receive a view item whose `status` mirrors the current open state.
 

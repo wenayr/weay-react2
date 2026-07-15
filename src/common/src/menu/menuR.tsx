@@ -7,7 +7,7 @@ export function createRightClickMenu(){
     let bb = false; // Global activity flag that prevents opening multiple menus.
 
     // Main MenuR component
-    function MenuR({children, other = () => [], statusOn = true, onUnClick, onConsume, zIndex, className}: {
+    function MenuR({children, other = () => [], statusOn = true, onUnClick, onConsume, zIndex, className, captureGlobal = false}: {
         children: React.ReactElement,                        // Child component
         zIndex?: number,                                     // Context menu z-index value
         other?: () => (MenuItem)[],                        // Additional menu items
@@ -15,8 +15,9 @@ export function createRightClickMenu(){
         onUnClick?: (e: boolean) => void,                    // Callback when the menu closes
         onConsume?: () => void,                              // Called on open after snapshotting items
         className?: (active?: boolean) => string,            // CSS class for the menu
+        captureGlobal?: boolean,                             // Capture right clicks outside the wrapper
     }) {
-        const data = {x: 0, y: 0}; // Current position of the interaction element
+        const rootRef = useRef<HTMLDivElement | null>(null);
         const [show, setShow] = React.useState<{
             status: boolean,                                 // Whether to show the menu
             plusMenu?: MenuItemStrict[],                 // Additional menu
@@ -34,6 +35,48 @@ export function createRightClickMenu(){
         const touchXY = useRef({x: 0, y: 0}); // Current touch coordinates (ref: survives rerenders mid-gesture)
         const touchTime = useRef<null | number>(null); // Touch start time
 
+        function openAt(clientX: number, clientY: number) {
+            if (bb) return; // Menu is already active
+            bb = true;
+            const rect = rootRef.current?.getBoundingClientRect();
+            const menu = other().filter(el => el) as MenuItemStrict[];
+            onConsume?.();
+            setShow({
+                status: true,
+                menu,
+                coordinate: {
+                    x: clientX - (rect?.x ?? 0),
+                    y: clientY - (rect?.y ?? 0)
+                }
+            });
+        }
+
+        function onMouseUp(event: {button: number, clientX: number, clientY: number}) {
+            if (!statusOn) return;
+            if (event.button == 2 || Date.now() - timeEvent.current < 300) {
+                openAt(event.clientX, event.clientY);
+            }
+        }
+
+        useEffect(() => {
+            if (!captureGlobal) return;
+
+            function onDocumentContextMenu(event: MouseEvent) {
+                if (statusOn) event.preventDefault();
+            }
+
+            function onDocumentMouseUp(event: MouseEvent) {
+                onMouseUp(event);
+            }
+
+            document.addEventListener("contextmenu", onDocumentContextMenu);
+            document.addEventListener("mouseup", onDocumentMouseUp);
+            return () => {
+                document.removeEventListener("contextmenu", onDocumentContextMenu);
+                document.removeEventListener("mouseup", onDocumentMouseUp);
+            };
+        }, [captureGlobal, statusOn, other, onConsume]);
+
         return (
             <div className={"maxSize"} style={{position: "relative"}}
                 // Disable the native context menu
@@ -43,14 +86,8 @@ export function createRightClickMenu(){
                          e.stopPropagation();
                      }
                  }}
-                // Determine the interaction position for the current element
-                 ref={(e) => {
-                     if (e) {
-                         const r = e.getBoundingClientRect();
-                         data.x = r.x;
-                         data.y = r.y;
-                     }
-                 }}
+                // Used to convert a document-level pointer coordinate to this menu's layer.
+                 ref={rootRef}
                 // Store initial touch coordinates
                  onTouchStart={(e) => {
                      if (touchXY.current.x == 0) touchXY.current.x = e.touches[0].screenX;
@@ -74,18 +111,7 @@ export function createRightClickMenu(){
                              // More than 300 ms counts as a long press
                              touchTime.current = null;
                              touchXY.current.x = touchXY.current.y = 0;
-                             if (bb) return; // Menu is already active
-                             bb = true;
-                             const menu = other().filter(el => el) as MenuItemStrict[];
-                             onConsume?.();
-                             setShow({
-                                 status: true,
-                                 menu,
-                                 coordinate: {
-                                     x: e.changedTouches[0].clientX - data.x,
-                                     y: e.changedTouches[0].clientY - data.y
-                                 }
-                             });
+                            openAt(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
                          }
                      }
                  }}
@@ -94,17 +120,7 @@ export function createRightClickMenu(){
                      timeEvent.current = Date.now();
                  }}
                 // Handle right mouse click or double click
-                 onMouseUp={(event) => {
-                     if (statusOn) {
-                         if (event.button == 2 || Date.now() - timeEvent.current < 300) {
-                             if (bb) return; // Menu is already active
-                             bb = true;
-                             const menu = other().filter(el => el) as MenuItemStrict[];
-                             onConsume?.();
-                             setShow({status: true, menu, coordinate: {x: event.clientX - data.x, y: event.clientY - data.y}});
-                         }
-                     }
-                 }}
+                 onMouseUp={onMouseUp}
             >
                 {children /* Child element whose events are tracked */}
                 {show.status && statusOn && (

@@ -86,3 +86,20 @@ test("useSettingsDialogController exposes headless open search and tree-cycle st
     expect(screen.getByTestId("open-state").textContent).toBe("open");
     expect(screen.getByTestId("current-section").textContent).toBe("general");
 });
+
+test("SettingsDialog restores the last collapsed tree branch", async () => {
+    const first = render(React.createElement(SettingsDialog, {sections, defaultSection: "general"}));
+    fireEvent.click(screen.getByRole("button", {name: "Open settings"}));
+
+    await waitFor(() => expect(screen.getByRole("treeitem", {name: "General"}).getAttribute("aria-expanded")).toBe("true"));
+    fireEvent.click(screen.getByRole("treeitem", {name: "General"}).querySelector("button")!);
+    expect(screen.getByRole("treeitem", {name: "General"}).getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(screen.getByRole("treeitem", {name: "Display"}));
+    expect(screen.getByText("Display content")).toBeTruthy();
+
+    first.unmount();
+    render(React.createElement(SettingsDialog, {sections, defaultSection: "general"}));
+    fireEvent.click(screen.getByRole("button", {name: "Open settings"}));
+    expect(screen.getByRole("treeitem", {name: "General"}).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByText("Display content")).toBeTruthy();
+});

@@ -159,7 +159,7 @@ const file = useFileInputPanel({callback: file => {}})          // headless file
 
 ## Settings Dialog
 ```
-<SettingsDialog trigger={<span>settings</span>} sections={[{key, name, render, children?, parentKey?, searchText?, keywords?}]} defaultSection? /> // searchable tree + persisted search history; history closes when search focus leaves
+<SettingsDialog trigger={<span>settings</span>} sections={[{key, name, render, children?, parentKey?, searchText?, keywords?}]} defaultSection? /> // searchable tree + persisted search history/selected section/tree expansion; history closes when search focus leaves
 const settings = useSettingsDialogController({sections, defaultSection?}) // open/search/tree/history/resize actions for custom chrome
 registerSettingsSection({key, name, render, parentKey?, searchText?, keywords?}) -> unregister
 ```

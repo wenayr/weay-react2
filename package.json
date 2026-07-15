@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "1.0.52",
+  "version": "1.0.56",
   "description": "Common react",
   "strict": true,
   "main": "dist/index.js",
@@ -11,7 +11,7 @@
     "update": "npm update",
     "build & watch": "npm run _clearDir  &&  tsc --watch",
     "build": "npm run _clearDir  &&  tsc --build --verbose  &&  npm run _afterBuild  && npm run _copyStyle",
-    "pack": "npm run _afterBuild  &&  npm pack .\\dist",
+    "pack": "npm run build  &&  npm pack .\\dist",
     "testReact": "vite",
     "_publish": "npm publish .\\dist",
     "_afterBuild": "node copyCompiledFiles.mjs .\\dist  &&  cd dist  &&  npm pkg delete scripts devDependencies private",
