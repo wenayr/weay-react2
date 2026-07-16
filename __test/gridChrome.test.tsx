@@ -12,7 +12,8 @@ function createApi(rows: {id: string}[] = [{id: 'one'}]) {
         getSelectedRows: jest.fn(() => selected.map(node => node.data)),
         setNodesSelected: jest.fn(({nodes, newValue, clearSelection}) => {
             if (clearSelection) selected = []
-            if (newValue) selected.push(...nodes)
+            if (newValue) selected = [...selected.filter(node => !nodes.includes(node)), ...nodes]
+            else selected = selected.filter(node => !nodes.includes(node))
         }),
         autoSizeAllColumns: jest.fn(),
         sizeColumnsToFit: jest.fn(),
@@ -71,6 +72,25 @@ test('GridChrome keeps tap opening available and reports disabled commands witho
     expect(run).not.toHaveBeenCalled()
 })
 
+test('GridChrome grows through declarative collapsible command groups without changing commands', () => {
+    const chrome = createGridChrome({
+        commandGroups: [{key: 'export', label: 'Экспорт', order: 1, collapsible: true, defaultOpen: false}],
+        commands: [{key: 'download', group: 'export', name: 'Скачать CSV', run: jest.fn()}],
+    })
+    const Chrome = chrome.Chrome
+    render(<Chrome/>)
+
+    fireEvent.click(screen.getByRole('button', {name: 'Команды таблицы'}))
+    const group = screen.getByRole('button', {name: 'Экспорт'})
+    expect(group.getAttribute('aria-expanded')).toBe('false')
+    expect(document.getElementById(group.getAttribute('aria-controls') ?? '')).toBeTruthy()
+    expect(screen.queryByRole('button', {name: 'Скачать CSV'})).toBeNull()
+
+    fireEvent.click(group)
+    expect(screen.getByRole('button', {name: 'Экспорт'}).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', {name: 'Скачать CSV'})).toBeTruthy()
+})
+
 test('GridChrome runs injected column persistence and closes after a one-shot command', async () => {
     const saveColumns = jest.fn()
     const chrome = createGridChrome({
@@ -88,6 +108,7 @@ test('GridChrome runs injected column persistence and closes after a one-shot co
     })
     expect(saveColumns).toHaveBeenCalledWith(expect.objectContaining({columnState: expect.any(Object)}))
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.getByRole('status').textContent).toBe('Сохранить')
 })
 
 test('GridChrome composes app context items, selects the clicked row, then copies that selection', async () => {
@@ -101,7 +122,7 @@ test('GridChrome composes app context items, selects the clicked row, then copie
 
     chrome.api.openContextMenu({api: api as any, node: row, event: new MouseEvent('contextmenu', {clientX: 20, clientY: 30})}, [appItem])
 
-    expect(api.setNodesSelected).toHaveBeenCalledWith({nodes: [row], newValue: true, clearSelection: true})
+    expect(api.setNodesSelected).toHaveBeenCalledWith({nodes: [row], newValue: true})
     const items = menu.openAt.mock.calls[0][1] as Array<{name: string, onClick: () => Promise<void>}>
     expect(items.map((item: {name: string}) => item.name)).toEqual(['Приложение', 'Копировать строки'])
     await items[1].onClick()
@@ -117,8 +138,56 @@ test('GridChrome selects the clicked row before asking the app to compose its co
 
     chrome.api.contextMenuItems({api: api as any, node: row})
 
-    expect(api.setNodesSelected).toHaveBeenCalledWith({nodes: [row], newValue: true, clearSelection: true})
+    expect(api.setNodesSelected).toHaveBeenCalledWith({nodes: [row], newValue: true})
     expect(contextItems).toHaveBeenCalledWith(expect.objectContaining({api, node: row}))
+})
+
+test('GridChrome right-click makes the clicked row exclusive even after a multi-selection', () => {
+    const api = createApi()
+    const first = {data: {id: 'one'}, isSelected: () => true}
+    const second = {data: {id: 'two'}, isSelected: () => true}
+    const clicked = {data: {id: 'three'}, isSelected: () => false}
+    api.setNodesSelected({nodes: [first, second], newValue: true})
+    api.setNodesSelected.mockClear()
+
+    selectGridChromeContextRow(api as any, clicked)
+
+    expect(api.setNodesSelected).toHaveBeenNthCalledWith(1, {nodes: [first, second], newValue: false})
+    expect(api.setNodesSelected).toHaveBeenLastCalledWith({nodes: [clicked], newValue: true})
+    expect(api.getSelectedRows()).toEqual([{id: 'three'}])
+})
+
+test('GridChrome turns an already selected row into the sole selection after a context click', () => {
+    const api = createApi()
+    const first = {data: {id: 'one'}, isSelected: () => true}
+    const clicked = {data: {id: 'two'}, isSelected: () => true}
+    api.setNodesSelected({nodes: [first, clicked], newValue: true})
+    api.setNodesSelected.mockClear()
+
+    selectGridChromeContextRow(api as any, clicked)
+
+    expect(api.setNodesSelected).toHaveBeenNthCalledWith(1, {nodes: [first], newValue: false})
+    expect(api.setNodesSelected).toHaveBeenLastCalledWith({nodes: [clicked], newValue: true})
+    expect(api.getSelectedRows()).toEqual([{id: 'two'}])
+})
+
+test('GridChrome copies only the context-clicked RowNode selection when the real row API is available', async () => {
+    const api = createApi()
+    const first = {data: {id: 'one'}}
+    const row: {data: {id: string}, setSelected?: (selected: boolean, clearSelection?: boolean) => void} = {data: {id: 'two'}}
+    row.setSelected = jest.fn((selected, clearSelection) => {
+        if (clearSelection) api.setNodesSelected({nodes: api.getSelectedNodes(), newValue: false})
+        api.setNodesSelected({nodes: [row], newValue: selected})
+    })
+    api.setNodesSelected({nodes: [first], newValue: true})
+    const copy = jest.fn()
+    const chrome = createGridChrome({copy})
+
+    const items = chrome.api.contextMenuItems({api: api as any, node: row}) as Array<{name: string, onClick: () => Promise<void>}>
+    await items[0].onClick()
+
+    expect(row.setSelected).toHaveBeenCalledWith(true, true)
+    expect(copy).toHaveBeenCalledWith(expect.objectContaining({rows: [{id: 'two'}], node: row}))
 })
 
 test('GridChrome leaves an already selected row intact and does not mutate app menu items', () => {

@@ -287,8 +287,18 @@ Grid Chrome (`createGridChrome`, optional `createColumnGrid({chrome})`):
   or a narrow layout make the trigger persistently visible at a 44px target. Do not
   emulate this with user-agent checks or an app-owned hover listener.
 - Right-click copy is composed through `chrome.contextItems` and injected `copy`;
-  the library selects a different clicked row only when necessary, then snapshots
-  current selected rows. It deliberately owns neither Ctrl/Cmd+C nor long-touch.
+  the library makes the clicked RowNode exclusively selected unless it already is
+  the only selected row, then snapshots current selected rows. It deliberately
+  owns neither Ctrl/Cmd+C nor long-touch.
+- `commandGroups: [{key, label?, order?, collapsible?, defaultOpen?}]` is a
+  presentation registry for growing app command groups. It does not duplicate
+  `commands`: unregistered groups still render in declaration order, while a
+  declared app group can be labelled, ordered and collapsed. Built-in
+  `columns`/`size`/`data` groups retain their stable order but may also be labelled
+  or collapsed. Group controls have native keyboard activation, `aria-expanded`,
+  `aria-controls`, and a visible focus ring. One-shot commands close the popover
+  and leave a brief status toast. The popover has a bounded viewport-height scroll
+  rather than continuing outside the screen.
 - QA card 47 is the mandatory live integration check: header discoverability,
   Escape/outside close, copy composition, and stale-API-safe remount.
 

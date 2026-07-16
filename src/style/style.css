@@ -796,7 +796,10 @@ body {
 .wenayGridChromeTrigger:hover,
 .wenayGridChromeTrigger:focus-visible {
   background: var(--grid-chrome-trigger-hover-bg, rgba(255, 255, 255, 0.08));
-  outline: none;
+}
+.wenayGridChromeTrigger:focus-visible {
+  outline: var(--grid-chrome-focus-outline, 2px solid currentColor);
+  outline-offset: var(--grid-chrome-focus-outline-offset, 2px);
 }
 .wenayGridChromePopover {
   position: absolute;
@@ -804,7 +807,10 @@ body {
   top: calc(100% + var(--grid-chrome-gap, 4px));
   right: 0;
   min-width: var(--grid-chrome-pop-min-width, 220px);
+  max-height: var(--grid-chrome-pop-max-height, min(70vh, 520px));
   padding: var(--grid-chrome-pop-padding, 8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: var(--grid-chrome-pop-border, 1px solid var(--color-border-common));
   border-radius: var(--grid-chrome-pop-radius, 8px);
   background: var(--grid-chrome-pop-bg, var(--color-bg-dark));
@@ -821,6 +827,41 @@ body {
   font-size: 11px;
   font-weight: 700;
 }
+.wenayGridChromeGroupToggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: var(--grid-chrome-group-toggle-min-height, 34px);
+  margin: 0 0 4px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: var(--grid-chrome-command-radius, 5px);
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.82;
+  text-align: left;
+}
+.wenayGridChromeGroupToggle:hover,
+.wenayGridChromeGroupToggle:focus-visible {
+  opacity: 1;
+  background: var(--grid-chrome-command-hover-bg, rgba(255, 255, 255, 0.08));
+}
+.wenayGridChromeGroupToggle:focus-visible {
+  outline: var(--grid-chrome-focus-outline, 2px solid currentColor);
+  outline-offset: var(--grid-chrome-focus-outline-offset, 2px);
+}
+.wenayGridChromeGroupChevron {
+  transition: transform 140ms ease;
+}
+.wenayGridChromeGroupToggle[aria-expanded="true"] .wenayGridChromeGroupChevron {
+  transform: rotate(180deg);
+}
 .wenayGridChromeCommands {
   display: grid;
   gap: 2px;
@@ -828,6 +869,7 @@ body {
 }
 .wenayGridChromeCommand {
   width: 100%;
+  min-height: var(--grid-chrome-command-min-height, 32px);
   padding: var(--grid-chrome-command-padding, 6px 8px);
   border: 0;
   border-radius: var(--grid-chrome-command-radius, 5px);
@@ -840,7 +882,10 @@ body {
 .wenayGridChromeCommand:hover:not(:disabled),
 .wenayGridChromeCommand:focus-visible:not(:disabled) {
   background: var(--grid-chrome-command-hover-bg, rgba(255, 255, 255, 0.08));
-  outline: none;
+}
+.wenayGridChromeCommand:focus-visible:not(:disabled) {
+  outline: var(--grid-chrome-focus-outline, 2px solid currentColor);
+  outline-offset: var(--grid-chrome-focus-outline-offset, 2px);
 }
 .wenayGridChromeCommand:disabled {
   opacity: var(--grid-chrome-disabled-opacity, 0.48);
@@ -850,6 +895,19 @@ body {
   margin-top: 6px;
   color: var(--grid-chrome-feedback-color, inherit);
   font-size: 11px;
+}
+.wenayGridChromeFeedback_toast {
+  position: absolute;
+  z-index: calc(var(--wenay-z-grid-chrome, 12) + 1);
+  top: calc(100% + var(--grid-chrome-gap, 4px));
+  right: 0;
+  width: max-content;
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 6px 8px;
+  border: var(--grid-chrome-feedback-border, 1px solid var(--color-border-common));
+  border-radius: var(--grid-chrome-command-radius, 5px);
+  background: var(--grid-chrome-feedback-bg, var(--color-bg-dark));
+  box-shadow: var(--grid-chrome-feedback-shadow, 0 4px 14px rgba(0, 0, 0, 0.25));
 }
 .wenayGridChromeFeedback_error { color: var(--grid-chrome-feedback-error-color, var(--color-error, #e5484d)); }
 @media (hover: hover) and (pointer: fine) {
@@ -869,6 +927,10 @@ body {
     height: max(var(--grid-chrome-trigger-size, 28px), 44px);
     min-width: max(var(--grid-chrome-trigger-size, 28px), 44px);
     min-height: max(var(--grid-chrome-trigger-size, 28px), 44px);
+  }
+  .wenayGridChromeCommand,
+  .wenayGridChromeGroupToggle {
+    min-height: var(--grid-chrome-touch-command-min-height, 40px);
   }
 }
 .wenayColumnGridControls_dots {
@@ -1496,6 +1558,147 @@ body {
 .wenayQaWorkflowDivider { height: 1px; background: #d1d5db; }
 @media (max-width: 720px) {
   .wenayQaShowcaseGrid { grid-template-columns: 1fr; }
+}
+
+/* QA card 47: competing Grid Chrome directions. They deliberately live under
+   wenayQa/preview names so an app chooses its own theme through className/tokens. */
+.wenayQaChromeLookPicker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.wenayQaChromeLookPicker button {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #d8dee9;
+  border-radius: 8px;
+  color: #475569;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+.wenayQaChromeLookPicker button:hover { border-color: #818cf8; background: #f8f7ff; }
+.wenayQaChromeLookPicker .wenayQaChromeLook_active {
+  border-color: #6d28d9;
+  color: #4c1d95;
+  background: #f5f3ff;
+  box-shadow: 0 0 0 2px rgba(109, 40, 217, 0.12);
+}
+.wenayQaChromeLookPicker b { font-size: 12px; }
+.wenayQaChromeLookPicker small { overflow: hidden; color: inherit; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 1. Paper: familiar light work surface, clear boundaries, generous rhythm. */
+.wenayGridChrome_preview_paper .wenayGridChromePopover {
+  min-width: 304px;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  color: #172554;
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.18);
+  --cols-menu-on-border: 1px solid #4f46e5;
+  --cols-menu-on-bg: #eef2ff;
+  --cols-menu-on-color: #3730a3;
+  --cols-menu-off-border: 1px solid #dbe3ef;
+  --cols-menu-off-bg: #fff;
+  --cols-menu-off-color: #64748b;
+}
+.wenayGridChrome_preview_paper .wenayGridChromeGroup + .wenayGridChromeGroup { border-color: #e2e8f0; }
+.wenayGridChrome_preview_paper .wenayGridChromeGroupTitle { color: #64748b; letter-spacing: 0.04em; text-transform: uppercase; }
+.wenayGridChrome_preview_paper .wenayGridChromeCommand {
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #1e293b;
+  background: transparent;
+}
+.wenayGridChrome_preview_paper .wenayGridChromeCommand:hover:not(:disabled),
+.wenayGridChrome_preview_paper .wenayGridChromeCommand:focus-visible:not(:disabled) { border-color: transparent; background: #f5f7ff; }
+
+/* 2. Palette: a high-contrast command surface that reads as one intentional tool. */
+.wenayGridChrome_preview_palette .wenayGridChromePopover {
+  min-width: 292px;
+  padding: 10px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  color: #e2e8f0;
+  background: linear-gradient(150deg, #111827, #1e293b);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.42);
+  --cols-menu-on-border: 1px solid #60a5fa;
+  --cols-menu-on-bg: #1e3a5f;
+  --cols-menu-on-color: #dbeafe;
+  --cols-menu-off-border: 1px solid #475569;
+  --cols-menu-off-bg: #182235;
+  --cols-menu-off-color: #a5b4c8;
+  --cols-menu-disabled-border: 1px dashed #475569;
+  --cols-menu-disabled-bg: #1f2937;
+  --cols-menu-divider: #334155;
+}
+.wenayGridChrome_preview_palette .wenayGridChromeGroup + .wenayGridChromeGroup { border-color: #334155; }
+.wenayGridChrome_preview_palette .wenayGridChromeGroupTitle { color: #93c5fd; opacity: 1; }
+.wenayGridChrome_preview_palette .wenayGridChromeCommand { padding: 8px 9px; border-radius: 6px; color: #e2e8f0; background: transparent; }
+.wenayGridChrome_preview_palette .wenayGridChromeCommand:hover:not(:disabled),
+.wenayGridChrome_preview_palette .wenayGridChromeCommand:focus-visible:not(:disabled) { background: #334155; }
+
+/* 3. Compact: dense, low-chrome commands for power users and crowded headers. */
+.wenayGridChrome_preview_compact .wenayGridChromePopover {
+  min-width: 244px;
+  padding: 7px;
+  border: 1px solid #94a3b8;
+  border-radius: 7px;
+  color: #1e293b;
+  background: #f8fafc;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+  --cols-menu-gap: 3px;
+  --cols-menu-btn-padding: 2px 6px;
+  --cols-menu-btn-radius: 4px;
+  --cols-menu-btn-font-size: 11px;
+  --cols-menu-on-border: 1px solid #334155;
+  --cols-menu-on-bg: #334155;
+  --cols-menu-off-border: 1px solid #cbd5e1;
+  --cols-menu-off-color: #64748b;
+}
+.wenayGridChrome_preview_compact .wenayGridChromeGroup + .wenayGridChromeGroup { margin-top: 4px; padding-top: 4px; border-color: #cbd5e1; }
+.wenayGridChrome_preview_compact .wenayGridChromeGroupTitle { margin-bottom: 2px; color: #64748b; font-size: 10px; }
+.wenayGridChrome_preview_compact .wenayGridChromeCommands { gap: 1px; margin-top: 2px; }
+.wenayGridChrome_preview_compact .wenayGridChromeCommand { padding: 5px 6px; border-radius: 4px; color: #334155; background: transparent; font-size: 12px; }
+.wenayGridChrome_preview_compact .wenayGridChromeCommand:hover:not(:disabled),
+.wenayGridChrome_preview_compact .wenayGridChromeCommand:focus-visible:not(:disabled) { background: #e2e8f0; }
+
+/* 4. Sections: each intent is a clear mini-card; strongest scanning hierarchy. */
+.wenayGridChrome_preview_sections .wenayGridChromePopover {
+  min-width: 316px;
+  padding: 9px;
+  border: 1px solid #c4b5fd;
+  border-radius: 14px;
+  color: #312e81;
+  background: #f5f3ff;
+  box-shadow: 0 16px 36px rgba(76, 29, 149, 0.2);
+  --cols-menu-on-border: 1px solid #7c3aed;
+  --cols-menu-on-bg: #ede9fe;
+  --cols-menu-on-color: #5b21b6;
+  --cols-menu-off-border: 1px solid #ddd6fe;
+  --cols-menu-off-bg: #fff;
+  --cols-menu-off-color: #6b7280;
+}
+.wenayGridChrome_preview_sections .wenayGridChromeGroup,
+.wenayGridChrome_preview_sections .wenayGridChromeGroup + .wenayGridChromeGroup {
+  margin-top: 7px;
+  padding: 8px;
+  border: 1px solid #ddd6fe;
+  border-radius: 9px;
+  background: #fff;
+}
+.wenayGridChrome_preview_sections .wenayGridChromeGroup:first-child { margin-top: 0; }
+.wenayGridChrome_preview_sections .wenayGridChromeGroupTitle { margin-bottom: 5px; color: #6d28d9; opacity: 1; }
+.wenayGridChrome_preview_sections .wenayGridChromeCommand { padding: 7px 8px; border-radius: 6px; color: #4c1d95; background: #faf5ff; }
+.wenayGridChrome_preview_sections .wenayGridChromeCommand:hover:not(:disabled),
+.wenayGridChrome_preview_sections .wenayGridChromeCommand:focus-visible:not(:disabled) { background: #ede9fe; }
+
+@media (max-width: 520px) {
+  .wenayQaChromeLookPicker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Minimal default section/segment buttons; apps override via sectionClassName /

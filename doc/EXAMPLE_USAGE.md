@@ -490,6 +490,10 @@ const ordersGrid = createColumnGrid<Order>({
         contextItems(event) {
             return [{name: "Открыть заказ", onClick: () => openOrder(event.node?.data)}]
         },
+        commandGroups: [
+            {key: "columns", collapsible: true},
+            {key: "table", label: "Действия с заказами", collapsible: true, defaultOpen: false},
+        ],
         commands: [
             {key: "refresh", group: "table", name: "Обновить", run: () => reloadOrders()},
         ],
@@ -508,7 +512,10 @@ export function OrdersHeader() {
 On a fine pointer the slot stays reserved and the trigger appears on hover/focus;
 on touch/coarse layouts CSS keeps a 44px target visible. The popover contains
 column controls, size actions, selected-row copy, and declarative app commands.
-Right-click copy selects the clicked row only when needed and appends its item to
+Use `commandGroups` only to label/collapse built-in groups and to
+label/order/collapse expanding application groups; `commands` remains the only
+source of actions. Right-click copy makes the clicked row the sole selection
+unless it already is, then appends its item to
 `contextItems`; it does not replace application items. `Ctrl/Cmd+C` and existing
 long-touch/context-menu layers remain untouched.
 

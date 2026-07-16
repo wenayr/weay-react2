@@ -878,9 +878,17 @@ const ColumnGridKitDemo = () => {
 };
 
 /* ---------- 47. Grid Chrome: one compact command surface over createColumnGrid ---------- */
+const gridChromeLooks = [
+    {key: "paper", name: "Панель", note: "светлая, спокойная"},
+    {key: "palette", name: "Палитра", note: "тёмная, контрастная"},
+    {key: "compact", name: "Компакт", note: "плотная, рабочая"},
+    {key: "sections", name: "Секции", note: "явно сгруппированная"},
+] as const;
+
 const GridChromeDemo = () => {
     const [last, setLast] = useState("Откройте ⋮ или нажмите правой кнопкой по строке");
     const [mounted, setMounted] = useState(true);
+    const [look, setLook] = useState<typeof gridChromeLooks[number]["key"]>("paper");
     const [grid] = useState(() => createColumnGrid<tTbColRow>({
         key: "qa47.gridChrome",
         columnDefs: tbColDefs,
@@ -893,6 +901,10 @@ const GridChromeDemo = () => {
             {key: "note", title: "Note", short: "note"},
         ],
         chrome: {
+            commandGroups: [
+                {key: "columns", label: "Колонки", collapsible: true, defaultOpen: true},
+                {key: "table", label: "Команды приложения", collapsible: true, defaultOpen: false},
+            ],
             copy({rows}) {
                 setLast(rows.length ? `Скопированы строки: ${rows.map(row => row.name).join(", ")}` : "Сначала выберите строку");
             },
@@ -918,13 +930,20 @@ const GridChromeDemo = () => {
 
     return <div className="wenayQaShowcaseGrid">
         <ShowcasePanel eyebrow="LIVE EXAMPLE" title="Список сделок без вечной полосы кнопок" tone="violet">
-        <DemoHint>Наведите на шапку — ⋮ появится в зарезервированном месте. На touch-экране он виден всегда.</DemoHint>
+        <DemoHint>Выберите вид меню, затем наведите на шапку и откройте ⋮. Все варианты используют одну и ту же реальную командную поверхность.</DemoHint>
+        <div className="wenayQaChromeLookPicker" role="group" aria-label="Вариант Grid Chrome">
+            {gridChromeLooks.map(option => <button key={option.key} type="button"
+                className={look == option.key ? "wenayQaChromeLook_active" : undefined}
+                aria-pressed={look == option.key} onClick={() => setLook(option.key)}>
+                <b>{option.name}</b><small>{option.note}</small>
+            </button>)}
+        </div>
         <div className="wenayQaGridDemo">
         <div className="wenayGridChromeArea wenayQaGridHeader">
             <div style={{minWidth: 0}}>
                 <b>Сделки</b><span style={{marginLeft: 8, opacity: .7, fontSize: 12}}>4 колонки · 3 строки</span>
             </div>
-            <Chrome />
+            <Chrome className={`wenayGridChrome_preview_${look}`} />
         </div>
         <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12}}>
             <button onClick={() => setMounted(value => !value)}>{mounted ? "Перемонтировать grid" : "Подключить grid"}</button>
@@ -938,7 +957,7 @@ const GridChromeDemo = () => {
             </div>
         </contextMenu.Layer>
         </div>
-        <div className="wenayQaPills"><span>Колонки</span><span>Размер</span><span>Данные</span><span>Команды приложения</span></div>
+        <div className="wenayQaPills"><span>Колонки</span><span>Размер</span><span>Данные</span><span>Команды приложения</span><span>Выбран вид: {gridChromeLooks.find(option => option.key == look)?.name}</span></div>
         </ShowcasePanel>
         <ShowcasePanel eyebrow="CONNECT IT" title="Подключение — один существующий column state" tone="blue">
             <ExampleCode>{`
@@ -948,6 +967,10 @@ const grid = createColumnGrid<Order>({
     copy: ({rows}) => copyOrders(rows),
     saveColumns: ({columnState}) => saveLayout(columnState),
     contextItems: appRowMenu,
+    commandGroups: [
+      {key: "columns", collapsible: true},
+      {key: "table", label: "Действия", collapsible: true},
+    ],
     commands: [{key: "refresh", group: "table", name: "Обновить", run}],
   },
 })
@@ -1983,8 +2006,8 @@ function ActiveChecks() {
             </Check>
 
             <Check id="grid-chrome" n={47} title="Grid Chrome — compact table commands"
-                   do="Hover the dark header, then open ⋮ with mouse or keyboard. Check grouped Columns / Size / Data / Table actions. Select a row and copy it; right-click another row and use both the app item and ‘Копировать строки’. Press Escape or click outside the popover. Use remount grid, then open the menu again. On a narrow/coarse screen the ⋮ trigger remains visible and touch-sized."
-                   expect="The header reserves a stable slot: desktop trigger fades in on header hover/focus without shifting columns; touch keeps a 44px target. The popover stays usable while pointer/focus is inside, closes on Escape/outside/one-shot commands, and ColumnsMenu edits the same persisted column state. Right-click first selects the clicked row when needed, then composes ‘Показать строку’ and ‘Копировать строки’; no permanent copy button or Ctrl/Cmd+C listener is required. After remount, exactly one current Grid API is attached."
+                   do="Hover the dark header, then open ⋮ with mouse or keyboard. Collapse and reopen «Колонки», then check grouped Size / Data / Table actions. Select a row and copy it; right-click another row and use both the app item and ‘Копировать строки’. Press Escape or click outside the popover. Use remount grid, then open the menu again. On a narrow/coarse screen the ⋮ trigger remains visible and touch-sized."
+                   expect="The header reserves a stable slot: desktop trigger fades in on header hover/focus without shifting columns; touch keeps a 44px target. The popover stays usable while pointer/focus is inside, closes on Escape/outside/one-shot commands, and ColumnsMenu edits the same persisted column state. A one-shot command leaves a short status toast. Right-click makes the clicked row the sole selection, then composes ‘Показать строку’ and ‘Копировать строки’; no permanent copy button or Ctrl/Cmd+C listener is required. After remount, exactly one current Grid API is attached."
                    note="This is the required live integration card for createGridChrome/createColumnGrid({chrome}). The dark header is app skin only; Grid Chrome itself ships neutral .wenayGridChrome* classes and --grid-chrome-* variables.">
                 <GridChromeDemo />
             </Check>

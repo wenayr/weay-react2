@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react'
+import React, {useEffect, useId, useRef, useState} from 'react'
 import type {GridApi} from 'ag-grid-community'
 import {ColumnsMenu} from './columnState/ColumnsMenu'
 import type {ColumnStateController} from './columnState/columnState'
@@ -25,6 +25,19 @@ export type GridChromeCommand<T extends object> = {
     /** Default true. Column editors may stay open with false. */
     closeOnRun?: boolean
     run(ctx: GridChromeCommandContext<T>): void | Promise<void>
+}
+
+/** Optional presentation metadata for a growing command group. Unknown command
+ * groups still render, so this is additive rather than a second command API. */
+export type GridChromeCommandGroup = {
+    key: GridChromeGroup
+    label?: string
+    /** Lower values appear first among application-defined groups. */
+    order?: number
+    /** Lets infrequent/app-specific commands stay out of the initial menu scan. */
+    collapsible?: boolean
+    /** Used only when collapsible; defaults to true. The open choice stays local UI state. */
+    defaultOpen?: boolean
 }
 
 export type GridChromeCopy<T extends object> = (data: {
@@ -58,6 +71,8 @@ export type GridChromeOptions<T extends object> = {
     /** Optional app persistence hook; column-state edits are already marked dirty locally. */
     saveColumns?: (ctx: GridChromeCommandContext<T>) => void | Promise<void>
     commands?: readonly GridChromeCommand<T>[]
+    /** Declarative presentation for command groups; commands remain the source of actions. */
+    commandGroups?: readonly GridChromeCommandGroup[]
     /** Existing app menu items, composed before the library copy item. */
     contextItems?: (event: GridChromeCellContext<T>) => readonly MenuItem[]
     contextMenu?: GridChromeContextMenu
@@ -85,14 +100,23 @@ function asAnchor(event?: Event | null): ContextMenuAnchor {
     return {x: 0, y: 0}
 }
 
-/** Select the row under a context gesture only when the existing selection does not own it. */
+/** Select exactly the row under a context gesture; row-level selection is the only
+ * ag-grid public API that can clear an existing multi-selection atomically. */
 export function selectGridChromeContextRow<T extends object>(api: GridApi<T>, node: GridChromeRowNode<T> | null | undefined) {
     if (!node) return
     const selected = api.getSelectedNodes?.() ?? []
-    if (selected.length && node.isSelected?.()) return
-    const apiWithSelection = api as GridApi<T> & {setNodesSelected?: (opts: {nodes: GridChromeRowNode<T>[], newValue: boolean, clearSelection?: boolean}) => void}
-    if (apiWithSelection.setNodesSelected) apiWithSelection.setNodesSelected({nodes: [node], newValue: true, clearSelection: true})
-    else node.setSelected?.(true, true)
+    if (selected.length == 1 && selected[0] == node) return
+    // GridApi.setNodesSelected accepts no clearSelection option in the public API.
+    // RowNode.setSelected does, so prefer it instead of silently accumulating rows.
+    if (node.setSelected) {
+        node.setSelected(true, true)
+        return
+    }
+    // Lightweight/fake GridApi implementations may expose only the batch API.
+    // Make the exclusive selection explicit in that fallback.
+    const otherNodes = selected.filter(selectedNode => selectedNode != node)
+    if (otherNodes.length) api.setNodesSelected({nodes: otherNodes as any, newValue: false})
+    api.setNodesSelected({nodes: [node] as any, newValue: true})
 }
 
 /** Never mutate application menu arrays while adding the optional copy action. */
@@ -170,11 +194,18 @@ export function createGridChrome<T extends object>(opts: GridChromeOptions<T>) {
     function Chrome(props: GridChromeProps = {}) {
         const [open, setOpen] = useState(false)
         const [feedback, setFeedback] = useState<{message: string, kind: 'success' | 'error'} | null>(null)
+        const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
         const [, render] = useState(0)
         const rootRef = useRef<HTMLDivElement | null>(null)
         const triggerRef = useRef<HTMLButtonElement | null>(null)
 
         useEffect(() => subscribe(() => render(v => v + 1)), [])
+
+        useEffect(() => {
+            if (!feedback) return
+            const timer = window.setTimeout(() => setFeedback(null), 1800)
+            return () => window.clearTimeout(timer)
+        }, [feedback])
 
         useEffect(() => {
             if (!open) return
@@ -220,8 +251,13 @@ export function createGridChrome<T extends object>(opts: GridChromeOptions<T>) {
         const visible = (command: GridChromeCommand<T>) => typeof command.visible == 'function' ? command.visible(context) : command.visible != false
         const disabled = (command: GridChromeCommand<T>) => typeof command.disabled == 'function' ? command.disabled(context) : command.disabled == true
         const appCommands = (opts.commands ?? []).filter(visible)
-        const groups = [...new Set(appCommands.map(command => command.group))]
-        const groupTitle = (group: GridChromeGroup) => group == 'columns' ? labels.columns : group == 'size' ? labels.size : group == 'data' ? labels.data : group == 'table' ? labels.table : group
+        const groupConfig = (group: GridChromeGroup) => opts.commandGroups?.find(config => config.key == group)
+        const groupTitle = (group: GridChromeGroup) => groupConfig(group)?.label ?? (group == 'columns' ? labels.columns : group == 'size' ? labels.size : group == 'data' ? labels.data : group == 'table' ? labels.table : group)
+        const appGroups = [...new Set(appCommands.map(command => command.group))].map((group, index) => ({group, index})).sort((left, right) => {
+            const leftOrder = groupConfig(left.group)?.order ?? 1000 + left.index
+            const rightOrder = groupConfig(right.group)?.order ?? 1000 + right.index
+            return leftOrder - rightOrder
+        }).map(item => item.group)
 
         const sizeCommands: GridChromeCommand<T>[] = [
             {
@@ -262,11 +298,23 @@ export function createGridChrome<T extends object>(opts: GridChromeOptions<T>) {
             </div>
         }
 
-        function CommandGroup({title, commands}: {title: string, commands: readonly GridChromeCommand<T>[]}) {
-            if (!commands.length) return null
+        function CommandGroup({group, commands, children}: {group: GridChromeGroup, commands: readonly GridChromeCommand<T>[], children?: React.ReactNode}) {
+            if (!commands.length && !children) return null
+            const contentId = useId()
+            const config = groupConfig(group)
+            const collapsible = config?.collapsible == true
+            const expanded = expandedGroups[String(group)] ?? config?.defaultOpen ?? true
+            const title = groupTitle(group)
+            function toggle() {
+                setExpandedGroups(current => ({...current, [String(group)]: !(current[String(group)] ?? config?.defaultOpen ?? true)}))
+            }
             return <section className="wenayGridChromeGroup" aria-label={title}>
-                <div className="wenayGridChromeGroupTitle">{title}</div>
-                <CommandButtons commands={commands}/>
+                {collapsible
+                    ? <button type="button" className="wenayGridChromeGroupToggle" aria-expanded={expanded} aria-controls={contentId} onClick={toggle}><span>{title}</span><span className="wenayGridChromeGroupChevron" aria-hidden>⌄</span></button>
+                    : <div className="wenayGridChromeGroupTitle">{title}</div>}
+                <div id={contentId} className="wenayGridChromeGroupContent" role="group" aria-label={title} hidden={!expanded}>
+                    {children}<CommandButtons commands={commands}/>
+                </div>
             </section>
         }
 
@@ -279,16 +327,13 @@ export function createGridChrome<T extends object>(opts: GridChromeOptions<T>) {
                     setOpen(v => !v)
                 }}>⋮</button>
             {open && <div className="wenayGridChromePopover" role="dialog" aria-label={labels.trigger}>
-                {opts.columnState && <section className="wenayGridChromeGroup" aria-label={labels.columns}>
-                    <div className="wenayGridChromeGroupTitle">{labels.columns}</div>
-                    <ColumnsMenu state={opts.columnState} compact />
-                    <CommandButtons commands={columnCommands}/>
-                </section>}
-                <CommandGroup title={labels.size} commands={sizeCommands}/>
-                <CommandGroup title={labels.data} commands={dataCommands}/>
-                {groups.map(group => <CommandGroup key={group} title={groupTitle(group)} commands={appCommands.filter(command => command.group == group)}/>) }
+                {opts.columnState && <CommandGroup group="columns" commands={columnCommands}><ColumnsMenu state={opts.columnState} compact /></CommandGroup>}
+                <CommandGroup group="size" commands={sizeCommands}/>
+                <CommandGroup group="data" commands={dataCommands}/>
+                {appGroups.map(group => <CommandGroup key={group} group={group} commands={appCommands.filter(command => command.group == group)}/>) }
                 {feedback && <div className={classNames(['wenayGridChromeFeedback', feedback.kind == 'error' && 'wenayGridChromeFeedback_error'])} role="status">{feedback.message}</div>}
             </div>}
+            {!open && feedback && <div className={classNames(['wenayGridChromeFeedback', 'wenayGridChromeFeedback_toast', feedback.kind == 'error' && 'wenayGridChromeFeedback_error'])} role="status">{feedback.message}</div>}
         </div>
     }
 
