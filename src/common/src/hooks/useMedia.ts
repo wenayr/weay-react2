@@ -27,10 +27,15 @@ export function useMediaSource(
     const [state, setState] = useState<Media.MediaSourceState>(source.state);
     const sync = useCallback(() => setState(source.state), [source]);
     const start = useCallback(async () => {
-        const next = await source.start();
+        const pending = source.start();
+        // common2 changes state to "requesting" synchronously, before the
+        // permission/device promise settles. Publish that control-plane state
+        // without polling while keeping media frames outside React state.
+        sync();
+        const next = await pending;
         setState(next);
         return next;
-    }, [source]);
+    }, [source, sync]);
     const stop = useCallback(() => {
         source.stop();
         sync();
