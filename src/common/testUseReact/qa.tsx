@@ -5,20 +5,22 @@
  * Use the ✓/✗ buttons to mark results as you go. These are also the acceptance criteria for changes from REFACTOR_PLAN.md.
  */
 
-import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
-import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, createColumnGrid, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, useAiRunClient, useFileJobClient, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, useCacheMapPersistence, useResizeObserver, useElementSize, useMediaSource, usePeer, usePeerCalls, usePeerPresence, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { Menu, contextMenu, renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, ModalProvider, useModal, useKeyboard, keyboard, useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, createColumnState, createColumnGrid, ColumnsMenu, ColumnDots, CardList, useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, useAiRunClient, useFileJobClient, useContractSlot, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useReorder, useReorderBoard, memoryCache, useCacheMapPersistence, useResizeObserver, useElementSize, useMediaSource, usePeer, usePeerCalls, usePeerPresence, type BufferTable, type ToolbarItem, type ToolbarConfig, type BoardColumn } from "../api";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
-import { listen as createListen, Observe, Params, Media, Peer } from "wenay-common2";
+import { listen as createListen, Observe, Params, Media, Peer, Contract } from "wenay-common2";
 import type {Ai, Resource} from "wenay-common2";
 import { Button, HoverButton, OutsideClickArea } from "../src/hooks";
 import { FloatingWindow } from "../src/components";
 import { DragBox } from "../src/components/Dnd/FloatingWindow";
 import { MyChartEngine } from "../src/myChart/chartEngine/chartEngineReact";
+import { Sparkline } from "../api";
 import { GridExample, tt } from "./useGrid";
 import { TestParams } from "./testParams";
 import { ReplayVideoDemo, ReplayRouteDemo, ReplayStoreDemo, ReplayStoreEachDemo } from "./replayVideo";
 import {PeerCallDemo, PeerPresenceDemo, MediaRelayAclDemo, MediaRelayAudioDemo, PeerCallVideoAudioDemo} from "../demo/peerMedia";
 import {ConferenceCallDemo} from "../demo/peerConference";
+import {VideoMeetingPlatform} from "../../calls/VideoMeetingPlatform";
 
 
 /* ---------- card wrapper ---------- */
@@ -1059,6 +1061,124 @@ function AssistantPanel() {
     </div>;
 };
 
+/* ---------- 50. common2 Contract runtime: React observes one stable slot ---------- */
+type QaContractEditorApi = {format(value: string): string};
+
+const qaContractRuntime = Contract.createContractRuntime({drainTimeoutMs: 250});
+const qaContractOffer = (
+    id: string,
+    implementationVersion: string,
+    priority: number,
+): Contract.ContractOffer<QaContractEditorApi> => ({
+    id,
+    priority,
+    descriptor: {
+        protocol: 1,
+        contractId: "qa.editor",
+        contractVersion: "1.0.0",
+        implementationId: "qa-editor",
+        implementationVersion,
+        capabilities: ["format"],
+    },
+    open: () => ({
+        api: {format: value => `${implementationVersion}: ${value}`},
+        close() {},
+    }),
+});
+const qaContractV1 = qaContractOffer("qa.editor.v1", "v1", 10);
+const qaContractV2 = qaContractOffer("qa.editor.v2", "v2", 20);
+const qaContractDemand: Contract.ContractDemand = {
+    slotId: "main.editor",
+    contractId: "qa.editor",
+    versionRange: "1.0.0",
+    generation: 1,
+    authorityId: "qa-backend",
+    authorityEpoch: 1,
+    required: true,
+    capabilities: ["format"],
+};
+
+const ContractRuntimeDemo = () => {
+    const slot = useContractSlot(qaContractRuntime, qaContractDemand.slotId);
+    const [result, setResult] = useState("—");
+    const [v2Added, setV2Added] = useState(false);
+    const [v2Revoked, setV2Revoked] = useState(false);
+    const [actionError, setActionError] = useState("");
+    const run = (action: () => Promise<void>) => {
+        setActionError("");
+        void action().catch(error => setActionError(String(error?.message ?? error)));
+    };
+    const startV1 = () => run(async () => {
+        await qaContractRuntime.control.addOffer(qaContractV1);
+        await qaContractRuntime.control.require(qaContractDemand);
+    });
+    const addV2 = () => run(async () => {
+        await qaContractRuntime.control.addOffer(qaContractV2);
+        setV2Added(true);
+        setV2Revoked(false);
+    });
+    const toggleV2 = () => run(async () => {
+        if (v2Revoked) {
+            await qaContractRuntime.control.restoreOffer(qaContractV2.id);
+            setV2Revoked(false);
+        } else {
+            await qaContractRuntime.control.revokeOffer(qaContractV2.id, "QA revoke");
+            setV2Revoked(true);
+        }
+    });
+    const callActive = () => {
+        try {
+            const lease = slot.acquire<QaContractEditorApi>();
+            try { setResult(lease.api.format("saved")); }
+            finally { lease.release(); }
+        } catch (error: any) {
+            setActionError(String(error?.message ?? error));
+        }
+    };
+    return <div className="wenayQaShowcaseGrid">
+        <ShowcasePanel eyebrow="LIVE SLOT" title="Версия меняется, логический editor остаётся" tone="green">
+            <DemoHint>Runtime создан вне React. Hook читает только status Store и binding events одного slot.</DemoHint>
+            <div className="wenayQaActionRow">
+                <button onClick={startV1}>1. Bind v1</button>
+                <button onClick={addV2} disabled={v2Added}>2. Add preferred v2</button>
+                <button onClick={toggleV2} disabled={!v2Added}>{v2Revoked ? "4. Restore v2" : "3. Revoke v2"}</button>
+                <button onClick={callActive} disabled={!slot.binding}>Call through lease</button>
+            </div>
+            <div className="wenayQaMetricGrid">
+                <span>state <b>{slot.state}</b></span>
+                <span>implementation <b>{slot.binding?.descriptor.implementationVersion ?? "—"}</b></span>
+                <span>binding generation <b>{slot.binding?.bindingGeneration ?? 0}</b></span>
+                <span>last event <b>{slot.lastEvent?.reason ?? "—"}</b></span>
+                <span>lease result <b>{result}</b></span>
+                <span>history <b>{slot.history().length}</b></span>
+            </div>
+            <div className="wenayQaStatus">candidates: {slot.status.candidates.map(candidate => `${candidate.offerId}:${candidate.accepted ? "ok" : candidate.reason}`).join(" · ") || "—"}</div>
+            {actionError && <div style={{color: "#cf222e"}}>{actionError}</div>}
+        </ShowcasePanel>
+        <ShowcasePanel eyebrow="OWNERSHIP" title="React не загружает и не переключает модули" tone="blue">
+            <ExampleCode>{`
+// application/loader boundary, outside React
+const runtime = Contract.createContractRuntime({offers, policy})
+await runtime.control.require(demand)
+
+function EditorStatus() {
+  const slot = useContractSlot(runtime, "main.editor")
+  const save = async () => {
+    const lease = slot.acquire<EditorApi>()
+    try { await lease.api.save() }
+    finally { lease.release() }
+  }
+  return <Status state={slot.state} binding={slot.binding} />
+}`}</ExampleCode>
+            <div className="wenayQaMiniChecklist">
+                <span>✓ Prepare-before-switch и fallback остаются в common2</span>
+                <span>✓ Store/replay живут вне сменяемой реализации</span>
+                <span>✓ Hook не владеет runtime и не исполняет загруженный код</span>
+            </div>
+        </ShowcasePanel>
+    </div>;
+};
+
 
 /* ---------- 18. Observe local store/listen hooks ---------- */
 type tObserveLocalState = {
@@ -1838,10 +1958,260 @@ const BoardDemo = () => {
     </div>;
 };
 
-/* ---------- borad ---------- */
+const sparklineQaRows = [
+    {label: "one series", series: {key: "one", data: [4, 7, 5, 11, 8, 13, 10], color: "#0969da"}},
+    {label: "gradient", series: {key: "fill", data: [3, 5, 4, 9, 7, 12, 14], color: "#1a7f37", fillColor: "rgba(46, 160, 67, .35)"}},
+    {label: "two series", series: [
+        {key: "bid", data: [8, 10, 7, 11, 9, 13], color: "#8250df"},
+        {key: "ask", data: [12, 9, 13, 10, 14, 11], color: "#cf222e"},
+    ]},
+    {label: "zero / constant", series: [
+        {key: "zero", data: [0, 0, 0, 0], color: "#57606a"},
+        {key: "constant", data: [5, 5, 5, 5], color: "#bf8700"},
+    ]},
+    {label: "one point", series: {key: "point", data: [7], color: "#0969da"}},
+];
+
+function SparklineQaDemo() {
+    return <div style={{width: "min(460px, 100%)", border: "1px solid #d0d7de", borderRadius: 6, overflow: "hidden"}}>
+        {sparklineQaRows.map((row, index) => <div key={row.label} style={{
+            display: "grid",
+            gridTemplateColumns: "116px minmax(0, 1fr)",
+            alignItems: "center",
+            height: 26,
+            boxSizing: "border-box",
+            borderTop: index ? "1px solid #eaeef2" : undefined,
+            background: index % 2 ? "#f6f8fa" : "#fff",
+        }}>
+            <span style={{padding: "0 8px", fontSize: 11, color: "#57606a", whiteSpace: "nowrap"}}>{row.label}</span>
+            <Sparkline aria-label={row.label} series={row.series} />
+        </div>)}
+    </div>;
+}
+
+/* ---------- 51. Peer packet mesh: dynamic multi-hop routing ---------- */
+const PACKET_MESH_NODES = {
+    client: "Client",
+    "edge-a": "Edge A",
+    "edge-b": "Edge B",
+    server: "Server",
+} as const;
+
+type PacketMeshPayload = {type: "package" | "group"; name: string; bytes: number};
+type PacketMeshNodeId = keyof typeof PACKET_MESH_NODES;
+type PacketMeshOffers = ReturnType<typeof Peer.createPeerPacketOffers<PacketMeshPayload>>;
+
+function createPacketMeshLink(
+    from: PacketMeshNodeId,
+    to: PacketMeshNodeId,
+    cost: number,
+    offers: Record<PacketMeshNodeId, PacketMeshOffers>,
+) {
+    const [emitFrom, messagesFrom] = createListen<[Peer.PeerPacketWire<PacketMeshPayload>]>();
+    const [emitTo, messagesTo] = createListen<[Peer.PeerPacketWire<PacketMeshPayload>]>();
+    let active = false;
+    let removeFrom: (() => void) | null = null;
+    let removeTo: (() => void) | null = null;
+
+    function offer(
+        self: PacketMeshNodeId,
+        peer: PacketMeshNodeId,
+        messages: typeof messagesFrom,
+        emitPeer: typeof emitFrom,
+    ): Peer.PeerPacketOffer<PacketMeshPayload> {
+        return {
+            id: `${self}->${peer}`,
+            peerId: peer,
+            priority: cost,
+            connect() {
+                return {
+                    peerId: peer,
+                    messages,
+                    send(message) {
+                        if (!active) return false;
+                        window.setTimeout(() => { if (active) emitPeer(message); }, 0);
+                        return true;
+                    },
+                    close() {},
+                };
+            },
+        };
+    }
+
+    function install() {
+        if (active) return;
+        active = true;
+        removeFrom = offers[from].control.upsert(offer(from, to, messagesFrom, emitTo));
+        removeTo = offers[to].control.upsert(offer(to, from, messagesTo, emitFrom));
+    }
+
+    function cut() {
+        if (!active) return;
+        active = false;
+        removeFrom?.();
+        removeTo?.();
+        removeFrom = null;
+        removeTo = null;
+    }
+
+    return {from, to, cost, active: () => active, install, cut};
+}
+
+function createPacketMeshQaNetwork() {
+    const nodeIds = Object.keys(PACKET_MESH_NODES) as PacketMeshNodeId[];
+    const offers = Object.fromEntries(nodeIds.map(id => [id, Peer.createPeerPacketOffers<PacketMeshPayload>()])) as Record<PacketMeshNodeId, PacketMeshOffers>;
+    const links = [
+        createPacketMeshLink("client", "edge-a", 7, offers),
+        createPacketMeshLink("edge-a", "edge-b", 9, offers),
+        createPacketMeshLink("edge-b", "server", 11, offers),
+        createPacketMeshLink("client", "edge-b", 40, offers),
+        createPacketMeshLink("client", "server", 65, offers),
+    ];
+    links.forEach(link => link.install());
+    const meshes = Object.fromEntries(nodeIds.map(id => [id, Peer.createPeerPacketMesh<PacketMeshPayload>({
+        meshId: "wenay-react2-qa",
+        nodeId: id,
+        offers: offers[id].api,
+        reconnectMs: 100,
+        probeIntervalMs: 0,
+    })])) as Record<PacketMeshNodeId, Peer.PeerPacketMesh<PacketMeshPayload>>;
+    const primary = links.find(link => link.from === "edge-a" && link.to === "edge-b")!;
+
+    return {
+        meshes,
+        links,
+        primary,
+        snapshot() {
+            const route = meshes.client.routes().find(item => item.targetId === "server") ?? null;
+            return {
+                route,
+                primaryActive: primary.active(),
+                nodes: nodeIds.map(id => ({id, stats: meshes[id].stats()})),
+            };
+        },
+        close() {
+            Object.values(meshes).forEach(mesh => mesh.close());
+            links.forEach(link => link.cut());
+            Object.values(offers).forEach(registry => registry.control.clear());
+        },
+    };
+}
+
+type PacketMeshQaNetwork = ReturnType<typeof createPacketMeshQaNetwork>;
+type PacketMeshQaSnapshot = ReturnType<PacketMeshQaNetwork["snapshot"]>;
+
+function PacketMeshQaDemo() {
+    const networkRef = useRef<PacketMeshQaNetwork | null>(null);
+    const packetNo = useRef(0);
+    const [snapshot, setSnapshot] = useState<PacketMeshQaSnapshot | null>(null);
+    const [events, setEvents] = useState<string[]>([]);
+    const sync = useCallback(() => {
+        const network = networkRef.current;
+        if (network) setSnapshot(network.snapshot());
+    }, []);
+    const note = useCallback((message: string) => {
+        setEvents(current => [`${new Date().toLocaleTimeString()} · ${message}`, ...current].slice(0, 7));
+    }, []);
+
+    useEffect(() => {
+        const network = createPacketMeshQaNetwork();
+        networkRef.current = network;
+        const offs: Array<() => void> = [];
+        Object.entries(network.meshes).forEach(([id, mesh]) => {
+            offs.push(mesh.routeChanges.on(sync));
+            offs.push(mesh.statusChanges.on(sync));
+            offs.push(mesh.packets.on((packet, meta) => {
+                note(`${PACKET_MESH_NODES[id as PacketMeshNodeId]} получил ${packet.name}: ${meta.path.map(node => PACKET_MESH_NODES[node as PacketMeshNodeId] ?? node).join(" → ")}`);
+                sync();
+            }));
+        });
+        const timer = window.setInterval(sync, 250);
+        sync();
+        return () => {
+            window.clearInterval(timer);
+            offs.forEach(off => off());
+            network.close();
+            networkRef.current = null;
+        };
+    }, [note, sync]);
+
+    const send = async () => {
+        const network = networkRef.current;
+        if (!network) return;
+        const name = `packet-${++packetNo.current}`;
+        const result = await network.meshes.client.send("server", {type: "package", name, bytes: 64 * 1024});
+        note(result.ok ? `Client передал ${name}; первый hop ${PACKET_MESH_NODES[result.nextHopId as PacketMeshNodeId] ?? result.nextHopId}` : `${name}: ${result.reason}`);
+        sync();
+    };
+    const broadcast = async () => {
+        const network = networkRef.current;
+        if (!network) return;
+        const name = `group-${++packetNo.current}`;
+        const results = await network.meshes.client.broadcast(["edge-a", "edge-b", "server"], {type: "group", name, bytes: 4096});
+        note(`Групповой ${name}: ${results.filter(result => result.ok).length}/3 маршрутизировано`);
+        sync();
+    };
+    const togglePrimary = () => {
+        const network = networkRef.current;
+        if (!network) return;
+        if (network.primary.active()) {
+            network.primary.cut();
+            note("Канал Edge A ⇄ Edge B отключён — ищем fallback");
+        } else {
+            network.primary.install();
+            note("Канал Edge A ⇄ Edge B восстановлен");
+        }
+        sync();
+    };
+    const label = (id: string) => PACKET_MESH_NODES[id as PacketMeshNodeId] ?? id;
+
+    return <div style={{display: "grid", gap: 12}}>
+        <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
+            <button disabled={!snapshot?.route} onClick={() => void send()}>Отправить Client → Server</button>
+            <button disabled={!snapshot?.route} onClick={() => void broadcast()}>Группа: 3 узла</button>
+            <button disabled={!snapshot} onClick={togglePrimary}>{snapshot?.primaryActive ? "Отключить лучший канал" : "Восстановить лучший канал"}</button>
+            <b style={{color: snapshot?.route ? "#1a7f37" : "#cf222e"}}>
+                {snapshot?.route ? `${snapshot.route.path.map(label).join(" → ")} · cost ${snapshot.route.cost}` : "Маршрут строится…"}
+            </b>
+        </div>
+        <div style={{display: "flex", gap: 8, flexWrap: "wrap"}}>
+            {networkRef.current?.links.map(link => {
+                const selected = snapshot?.route?.path.some((id, index, path) => id === link.from && path[index + 1] === link.to)
+                    || snapshot?.route?.path.some((id, index, path) => id === link.to && path[index + 1] === link.from);
+                return <span key={`${link.from}-${link.to}`} style={{padding: "5px 8px", borderRadius: 999, border: `1px solid ${selected ? "#0969da" : "#d0d7de"}`, background: link.active() ? (selected ? "#ddf4ff" : "#fff") : "#ffebe9", color: link.active() ? "#24292f" : "#cf222e", fontSize: 12}}>
+                    {label(link.from)} ⇄ {label(link.to)} · {link.cost}
+                </span>;
+            })}
+        </div>
+        <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(135px, 1fr))", gap: 8}}>
+            {snapshot?.nodes.map(node => <div key={node.id} style={{border: "1px solid #d0d7de", borderRadius: 8, padding: 9}}>
+                <b>{label(node.id)}</b>
+                <div style={{fontSize: 11, color: "#57606a", marginTop: 4}}>sent {node.stats.sent} · forwarded {node.stats.forwarded} · delivered {node.stats.delivered}</div>
+            </div>)}
+        </div>
+        <div style={{minHeight: 48, padding: 8, borderRadius: 8, background: "#f6f8fa", fontFamily: "ui-monospace, monospace", fontSize: 11}}>
+            {events.length ? events.map(event => <div key={event}>{event}</div>) : "Отправьте пакет или отключите лучший канал."}
+        </div>
+    </div>;
+}
+
+/* ---------- board ---------- */
 function ActiveChecks() {
     return (
         <>
+            <Check id="sparkline" n={49} title="Sparkline — compact canvas chart"
+                   do="Resize the browser and inspect every 26 px row, including the zero/constant and one-point cases."
+                   expect="Every line stays crisp and clipped to its row, fills resize with the card, and no canvas changes row height. The zero/constant rows stay finite and visible."
+                   note="This card uses the public Sparkline API. Rendering is ResizeObserver-driven with DPR scaling and no axes, interaction listeners, or RAF loop.">
+                <SparklineQaDemo />
+            </Check>
+            <Check id="peer-packet-mesh" n={51} title="common2 Peer packet mesh — multi-hop routing + fallback"
+                   do="Send a packet and a group packet. Then disable the best Edge A ⇄ Edge B link, wait for route reconciliation, and send again. Restore the link."
+                   expect="The first route follows Client → Edge A → Edge B → Server. After the link disappears, the mesh selects an available higher-cost fallback without rebuilding the React UI or losing the packet API. Server delivery and per-node forwarding counters grow."
+                   note="New in wenay-common2 1.0.90. The stand uses real createPeerPacketOffers/createPeerPacketMesh registries, reusable sessions, route advertisements and loop/TTL protection. In production every relay remains a trust boundary; origin/path metadata is informational unless the adapter or payload adds provenance."
+                   tall>
+                <PacketMeshQaDemo />
+            </Check>
             <Check n={18} title="Observe hooks - local store and listen"
                    do="Click node.at(count) +1, replace status, plain state mutation + flush, emit listen, and replace whole store."
                    expect="Leaf node, selection, direct state mutation after flush, add/delete object keys, and listen hooks all rerender. The count key is read through node.at(count), so it does not conflict with node.count()."
@@ -1896,10 +2266,10 @@ function ActiveChecks() {
                    note="Registry is a module singleton (registerSettingsSection -> unregister), no React context. Tree shape comes from children or parentKey. Search history uses createSearchHistory -> memoryGetOrCreate/memoryCache dirty channel; this demo loads memoryCache and saves dirty changes with saveDebounced(300). Look via --dlg-* tokens; apps pass their own section classes via sectionClassName/sectionActiveClassName.">
                 <SettingsDialogDemo />
             </Check>
-<Check n={38} title="Media video - capture lifecycle + canvas viewer"
-                   do="Press start camera and grant permission. Move the tab to background for a short time, then return. Press stop, then start again."
-                   expect="The canvas renders without React re-rendering per frame. State jumps idle → live (or idle → denied without a crash; the hook sets state only after start() settles, so no intermediate 'requesting' is shown); the stats line shows drawn frames and frame age. Hidden-tab capture is owned by common2 worker/ImageCapture defaults."
-                   note="useMediaSource owns only permission/device lifecycle. Media.attachVideoCanvas owns JPEG decode and drawing; frame data never enters React state.">
+<Check n={38} title="Media video — balanced / MAX unpaced capture diagnostics"
+                   do="Start in Balanced and grant camera permission. Note capture fps and wire throughput, stop, select MAX, start again, and compare the live numbers. Switching policy deliberately stops the old source."
+                   expect="Balanced targets 12 fps at 960 px. MAX uses fps:0, preserves the source resolution and starts the next capture only after the previous frame was encoded. The line reports actual capture/draw throughput instead of a promised cap; the canvas still bypasses React per frame."
+                   note="MAX/unpaced semantics are new in wenay-common2 1.0.90. It is an explicit diagnostic/publishing policy because CPU and bandwidth rise with the camera and encoder; the calls product keeps a balanced default and has no hard-coded participant cap.">
                 <MediaVideoDemo />
             </Check>
 
@@ -2017,6 +2387,13 @@ function ActiveChecks() {
                    expect="React renders the local account-filtered client Stores and can react to AI semantic Replay events. The hooks do not create hosts, send prompts, own RPC, retry provider calls, or store raw input: common2 and the application keep those responsibilities."
                    note="useAiRunClient and useFileJobClient are the React-facing adoption of common2 1.0.78. Apps supply their own storage, runner, ACL and presentation.">
                 <AiRunClientDemo />
+            </Check>
+
+            <Check id="contract-runtime" n={50} title="common2 Contract runtime — versioned binding view"
+                   do="Bind v1 and call through its lease. Add preferred v2: the binding generation advances and new calls use v2. Revoke v2: the slot falls back to v1 without becoming ownerless. Restore v2 and call again."
+                   expect="React follows one stable slot through status Store and binding events. common2 resolves, prepares, atomically switches, drains leases, falls back and restores; the hook never loads an implementation or owns the runtime."
+                   note="useContractSlot is the React-facing adoption of common2 1.0.89. Contract demand authority, compatibility/integrity policy, loaders, Store/replay continuity and runtime.close remain at the application boundary.">
+                <ContractRuntimeDemo />
             </Check>
 
             <Check n={30} title="columnState toolbar menu - grouped sub-columns"
@@ -2204,44 +2581,73 @@ export function QABoard() {
         window.addEventListener("hashchange", f);
         return () => window.removeEventListener("hashchange", f);
     }, []);
-    const archive = hash === "#archive";
+    const section = hash === "#archive" ? "archive" : hash.startsWith("#video-calls") ? "video-calls" : "active";
+    const videoRoomMatch = hash.match(/^#video-calls\/room\/([^/?#]+)/);
+    if (section === "video-calls") return <VideoMeetingPlatform roomId={videoRoomMatch ? decodeURIComponent(videoRoomMatch[1]) : undefined} />;
     const link = (on: boolean): React.CSSProperties => ({ padding: "4px 10px", borderRadius: 6, textDecoration: "none", color: on ? "#fff" : "#0969da", background: on ? "#0969da" : "#fff", border: "1px solid #0969da", fontSize: 13 });
     return (
         <div style={{ maxWidth: 920, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
             <h2 style={{ margin: "0 0 4px" }}>QA board wenay-react2</h2>
-            <div style={{ display: "flex", gap: 8, margin: "8px 0" }}>
-                <a href="#" style={link(!archive)}>Active checks</a>
-                <a href="#archive" style={link(archive)}>Verified archive</a>
+            <div style={{ display: "flex", gap: 8, margin: "8px 0", flexWrap: "wrap" }}>
+                <a href="#" style={link(section === "active")}>Active checks</a>
+                <a href="#video-calls" style={link(false)}>Видеозвонки</a>
+                <a href="#archive" style={link(section === "archive")}>Verified archive</a>
             </div>
             <div style={{ color: "#57606a", fontSize: 13, marginBottom: 8 }}>
-                {archive ? "Verified and fixed nodes are kept for repeated checks." : "Click elements, compare with Expected, and mark ✓/✗. Token regression (S1): the appearance of ALL cards/menus/grids should not have changed; variables were moved to tokens.css without changing values."}
+                {section === "archive" ? "Verified and fixed nodes are kept for repeated checks." : "Click elements, compare with Expected, and mark ✓/✗. Token regression (S1): the appearance of ALL cards/menus/grids should not have changed; variables were moved to tokens.css without changing values."}
             </div>
-            {archive ? <ArchiveChecks /> : <ActiveChecks />}
+            {section === "archive" ? <ArchiveChecks /> : <ActiveChecks />}
         </div>
     );
 }
 /* ---------- 38/39. Media sources: common2 capture + viewer helpers ---------- */
-const MediaVideoDemo = () => {
-    const media = useMediaSource("video", {fps: 12, replay: {history: 32, current: "last"}});
+type MediaVideoMode = "balanced" | "max";
+
+const MediaVideoCapture = ({mode}: {mode: MediaVideoMode}) => {
+    const media = useMediaSource("video", mode === "max"
+        ? {fps: 0, codec: "webp", replay: {history: 32, current: "last"}}
+        : {fps: 12, width: 960, codec: "webp", replay: {history: 32, current: "last"}});
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const [stats, setStats] = useState({frames: 0, drawn: 0, perSec: 0, ageMs: 0});
+    const [stats, setStats] = useState({frames: 0, drawn: 0, perSec: 0, ageMs: 0, sourceFps: 0, mbps: 0, dropped: 0});
     const [error, setError] = useState<string | null>(null);
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const view = Media.attachVideoCanvas(media.listen, canvas, {onError: e => setError(String(e))});
-        const timer = window.setInterval(() => setStats(view.stats()), 500);
+        let previousBytes = 0;
+        let previousAt = performance.now();
+        const timer = window.setInterval(() => {
+            const source = media.stats();
+            const now = performance.now();
+            const bytesPerSecond = Math.max(0, source.bytes - previousBytes) * 1000 / Math.max(1, now - previousAt);
+            previousBytes = source.bytes;
+            previousAt = now;
+            setStats({...view.stats(), sourceFps: source.fps, mbps: bytesPerSecond * 8 / 1_000_000, dropped: source.dropped});
+        }, 500);
         return () => { window.clearInterval(timer); view.off(); };
-    }, [media.listen]);
+    }, [media]);
     return <div style={{display: "grid", gap: 8}}>
         <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
             <button onClick={() => void media.start()}>start camera</button>
             <button onClick={media.stop}>stop</button>
             <b>state: {media.state}</b>
-            <span style={{fontSize: 12}}>drawn {stats.drawn}, {stats.perSec}/s, age {Math.round(stats.ageMs)}ms</span>
+            <span style={{fontSize: 12}}>capture {stats.sourceFps.toFixed(1)} fps · wire {stats.mbps.toFixed(2)} Mbit/s · drawn {stats.perSec.toFixed(1)}/s · age {Math.round(stats.ageMs)}ms · dropped {stats.dropped}</span>
         </div>
         {error && <div style={{color: "#cf222e"}}>viewer error: {error}</div>}
         <canvas ref={canvasRef} width={320} height={180} style={{width: 320, height: 180, background: "#111", borderRadius: 8}} />
+    </div>;
+};
+
+const MediaVideoDemo = () => {
+    const [mode, setMode] = useState<MediaVideoMode>("balanced");
+    return <div style={{display: "grid", gap: 10}}>
+        <div style={{display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap"}}>
+            <span style={{fontSize: 12, color: "#57606a"}}>Capture policy:</span>
+            <button aria-pressed={mode === "balanced"} onClick={() => setMode("balanced")} style={btn(mode === "balanced", "#0969da")}>Balanced · 12 fps</button>
+            <button aria-pressed={mode === "max"} onClick={() => setMode("max")} style={btn(mode === "max", "#8250df")}>MAX · unpaced</button>
+            {mode === "max" && <b style={{fontSize: 11, color: "#8250df"}}>fps: 0 · source resolution</b>}
+        </div>
+        <MediaVideoCapture key={mode} mode={mode} />
     </div>;
 };
 

@@ -22,6 +22,16 @@ function fakeMedia() {
 
 test("useMediaSource owns control lifecycle but leaves frames on the source listen", async () => {
     const source = fakeMedia();
+    let finishStart: (() => void) | undefined;
+    source.start = jest.fn(() => {
+        source.state = "requesting";
+        return new Promise<Media.MediaSourceState>(resolve => {
+            finishStart = () => {
+                source.state = "live";
+                resolve("live");
+            };
+        });
+    });
     (Media.createVideoSource as jest.Mock).mockReturnValue(source);
     function Probe() {
         const media = useMediaSource("video", {replay: true});
@@ -29,6 +39,8 @@ test("useMediaSource owns control lifecycle but leaves frames on the source list
     }
     const view = render(<Probe />);
     fireEvent.click(screen.getByText("start"));
+    expect(screen.getByTestId("state").textContent).toBe("requesting");
+    await act(async () => finishStart?.());
     await waitFor(() => expect(screen.getByTestId("state").textContent).toBe("live"));
     expect(source.start).toHaveBeenCalledTimes(1);
     view.unmount();

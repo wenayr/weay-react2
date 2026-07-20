@@ -9,3 +9,4 @@ export * from './useMedia';
 export * from './usePeer';export * from './usePeerCall';
 export * from './useRoute';
 export * from './useWorkflows';
+export * from './useContractRuntime';
