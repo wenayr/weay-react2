@@ -486,6 +486,71 @@ not create or close the clients, retry `createRun`, put raw input in React state
 or choose provider, storage, upload, ACL, transport, or server runner behavior.
 Keep the common2 request idempotency and server-side security boundary intact.
 
+### common2 Contract runtime
+
+`wenay-common2@1.0.89` adds a frontend-neutral versioned implementation
+runtime. Create and own it at the application/loader boundary; React observes
+one stable logical slot:
+
+```tsx
+import {Contract} from "wenay-common2"
+import {useContractSlot} from "wenay-react2"
+
+const runtime = Contract.createContractRuntime({offers, policy})
+await runtime.control.require(editorDemand)
+
+function EditorStatus() {
+    const slot = useContractSlot(runtime, "main.editor")
+
+    async function save() {
+        const lease = slot.acquire<EditorApi>()
+        try { await lease.api.save() }
+        finally { lease.release() }
+    }
+
+    // slot.state / status / binding / lastEvent
+    // slot.explain() / history()
+}
+```
+
+`useContractSlot` subscribes to the runtime status Store and filters binding
+events by `slotId`. It does not discover, download, compile, verify or execute
+implementations; it does not call `require`, choose compatibility/integrity
+policy, own durable Store/replay state, or close the runtime. Acquiring an API
+is deliberately explicit and returns common2's lease, which the caller must
+release in `finally`. QA card 50 demonstrates preferred replacement,
+revoke/fallback and restore.
+
+`Observe.createStoreReplicaSet` from common2 1.0.88 stays transport/application
+infrastructure. Its Store status can already be consumed with the generic
+Observe hooks when an application needs to render it; no replica protocol is
+implemented in React.
+
+### common2 packet mesh and MAX video
+
+`wenay-common2@1.0.90` adds two application-facing capabilities that the QA
+stand exposes directly:
+
+- `Peer.createPeerPacketOffers` and `Peer.createPeerPacketMesh` build reusable
+  direct or multi-hop packet routes with path scoring, TTL/loop protection,
+  reconnect and fallback. This is a transport/application controller rather
+  than a React protocol, so no redundant hook was added. QA card 51 subscribes
+  to its low-frequency route/status lines and demonstrates direct delivery,
+  group routing, a link failure and automatic fallback.
+- `Media.createVideoSource({fps: 0})` is the explicit unpaced MAX policy. It
+  preserves the selected source resolution and starts the next capture after
+  the previous frame is encoded instead of enforcing an artificial attempt
+  cap. `useMediaSource("video", {fps: 0})` already forwards this option; QA card
+  38 compares it with a balanced 12 fps profile and reports actual capture fps,
+  draw rate and wire throughput.
+
+MAX is intentionally opt-in because CPU and bandwidth depend on the device and
+encoder. The Wenay Calls product keeps a balanced publishing default. Neither
+the React UI nor the room server imposes a hard-coded participant limit;
+production capacity remains a deployment/relay/SFU decision. RPC Listen
+`{current: true}` forwarding and deduplicated late delivery in common2 1.0.90
+are transparent transport fixes and require no React wrapper changes.
+
 ## Replay React Adapter
 Client-side hooks over the wenay-common2 Replay stack (snapshot + sequenced delta line). Server parts (`conflateReplay`, `archiveReplay`, `createRpcServerAuto` replayOpts) are per-connection and stay hook-free by design.
 
@@ -531,7 +596,46 @@ Route hand-off here is the MANUAL surface (`switchRoute`). common2 1.0.67 `Repla
 
 Conference composition ships as a live example: `wenay-react2/demo/peer-conference` (QA card 46) builds a 3-way host-star room where group calling is COMPOSED from pairwise calls (one CallManager holds N-1 concurrent outgoing calls; the roster of active calls is the single ACL authority), the grid rides `Peer.createMediaRelay` fan-out, and a focus pair rides `Replay.createRouteCoordinator` over ONE owner-sequenced line served by BOTH routes — an in-proc `serveReplayChannel` hop and a WebRTC datachannel (`createWebRtcConnector`/`acceptWebRtcDirect`) — so hand-offs are gap-free by seq. Never serve a coordinator route from `relay.watchOf` lines: those are per-watcher re-sequenced journals. `useRouteState(coordinator, link)` is the thin React binding for the route chip: state, last reason, 500ms connector metrics and a short hand-off log; the caller owns coordinator/link lifecycle. The real-backend variant lives in [`doc/examples/conference-server.mjs`](examples/conference-server.mjs) + [`conference-client.html`](examples/conference-client.html): the Node server owns the peer host, the room policy (accepted calls join both parties; offers are brokered only inside a shared room) and the media relay; browser seats connect over Socket.IO, and each peer-store pair can `promoteDirect()` to a real RTCPeerConnection negotiated through that same server hub.
 
+`#video-calls` is now a standalone Wenay Calls product route rather than a QA card. A host enters a name and meeting title, creates a server-owned room, and receives a shareable `#video-calls/room/<id>` URL. A guest opens the URL, enters a display name and joins the same room. Participants, chat messages, host moderation, room closure and media permissions synchronize over a dedicated Socket.IO/RPC endpoint; camera, microphone and screen frames use a policy-gated common2 media relay. The server removes disconnected seats after a reconnect grace period and rejects media from non-members. There is no arbitrary UI participant cap: practical capacity is a deployment/SFU and bandwidth decision.
+
 Media lines (common2 1.0.66 `Media.createAudioSource` / `Media.createVideoSource`) are ordinary binary Listen sources; with `replay:true` their `listen` is a replay line, so `useReplaySubscribe` / `useReplayFrame` consume mic/camera frames with no media-specific hook. `useMediaSource(kind, options)` is only the capture lifecycle adapter (`start`, `stop`, device selection, state and stats); it stops a started source on unmount and returns `listen` unchanged. Each frame is one `Uint8Array` (`Media.decodeMediaFrame`); draw/play it via ref (canvas, AudioContext), never useState — the same rule as any high-frequency line. Without `replay`, the plain `listen` works with the listen hooks above.
+
+## Communication UI
+```tsx
+import {VideoCall, useVideoCallController} from "wenay-react2"
+// or the independent entry: wenay-react2/communication
+
+const phase = call.active ? "active" : call.ringing ? "ringing" : "lobby"
+const ui = useVideoCallController({phase, speakerId: participants[0].id})
+
+<VideoCall
+  controller={ui}
+  phase={phase}
+  meeting={meeting}
+  participants={participants}
+  selfParticipantId={me}
+  canvasRef={remoteCanvasRef}
+  cameraState={camera.state}
+  microphoneState={microphone.state}
+  screenShareState={screen.state}
+  screenVideoRef={screen.videoRef}
+  recording={recording}
+  rooms={rooms}
+  assistant={assistant}
+  onJoin={call.start}
+  onHangup={call.hangup}
+  onToggleCamera={camera.toggle}
+  onToggleMicrophone={microphone.toggle}
+  onToggleScreenShare={screen.toggle}
+  onToggleRecording={recording.toggle}
+  onJoinRoom={rooms.join}
+  onLeaveRoom={rooms.leave}
+  onAssistantCommand={assistant.run}
+/>
+```
+`VideoCall` is the second communication layer: a controlled product surface based on the call design, not a second protocol. The app owns call authorization, participant/room truth, capture, relay/direct routes, translation service, recording policy and canvas/video attachment. `useVideoCallController` owns only visual state (`panel`, `focusMode`, `layout`, `speakerId`, poll/effect/drafts, laser pointer, elapsed timer and inactivity-hiding controls). The shipped `videoCallShowcase.tsx` adapter demonstrates the boundary with real `Peer.createCallManager`, `Peer.createMediaRelay`, `usePeerCalls`, `useMediaSource`, `getDisplayMedia`, `MediaRecorder` and optional Web Speech recognition. The package does not embed an AI vendor or secret: production caption translation is supplied by the application; the stand uses a deterministic RU → EN fixture.
+
+The working application composition lives in `src/calls/VideoMeetingPlatform.tsx`; its development backend is registered in `vite.config.ts` at `/__video-call-rpc`. Unlike the lower-level showcase, it provides the complete create-link/name/join/leave/end lifecycle and uses the public `VideoCall` surface for the in-room UI. Camera, microphone and screen permissions are requested only from explicit user controls. A production deployment must run the same room/RPC authority behind HTTPS/WSS and size its relay or SFU for the intended concurrency.
 
 Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. With `wenay-common2@^1.0.75`, a temporary RPC transport disconnect/reconnect keeps the same logical `remote`: common2 rebinds its physical Listen subscription, catches up from its own last delivered seq, and deduplicates racing live events. React must not call `restart()`, remount, change a key, or add Socket.IO listeners for that case. `policy: "queue"` is the lossless choice; `"frame"` is deliberately conflated. A retained-history gap without a keyframe is a terminal `error`, not a fresh start. Deliberate `client.dispose()`/`close()` and hub `connect()`/`setToken()` are hard teardown boundaries, not auto-reconnects. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. Freshness: detection lives in wenay-common2 (`staleMs` watchdog); the non-route hooks mirror its edge-triggered `onStale` into `stale`, so a fresh 100 ev/s line causes zero extra renders. Route hand-off is explicit through `switchRoute(nextRemote, {label?, since?, reset?, policy?, hint?})`: old route stays live while the replacement catches up by `seq`, then closes. `useReplayHistory` is archive playback — staleness does not apply. QA cards 23 (video line + conflation + time travel + freshness), 24 (store sync), 25 (per-key feed), and 26 (route hand-off) are the live examples.
 
@@ -582,11 +686,52 @@ Shared CSS variables include `--menu-outline-color`, `--logs-*`, `--dlg-*`, `--w
 
 ## Charts
 ```
+<div style={{width: 150, height: 23}}>
+  <Sparkline series={{
+    key: "price",
+    data: row.priceHistory,
+    color: "#2f81f7",
+    fillColor: "rgba(47, 129, 247, .25)", // optional gradient fill
+  }} />
+</div>
+
+<Sparkline series={[
+  {key: "bid", data: row.bidHistory, color: "#1a7f37"},
+  {key: "ask", data: row.askHistory, color: "#cf222e", show: showAsk},
+]} />
+
 <MyChartEngine style={{height: 400}} />
 createChartCanvas(config) -> canvas controller
 ```
 
-The chart engine surface is still mostly low-level. Keep product-specific chart wrappers in the app.
+`Sparkline` is the canonical non-interactive chart for compact rows. Its own root
+must receive a real height from the parent (20-40 px is supported). It observes
+that root with `ResizeObserver`, keeps the canvas CSS size unchanged while
+scaling the bitmap by `devicePixelRatio`, and redraws only when series, size,
+theme, line width, or padding changes. `fillColor` enables a transparent vertical
+gradient. Empty data, zero values, one point, hidden series, and constant ranges
+are supported. Pass a new `theme={{lineColor, backgroundColor}}` value when the
+application theme changes.
+
+Migration from a local `CMiniGraph`:
+
+```tsx
+// Before
+<CMiniGraph points={row.priceHistory} color="#2f81f7" />
+
+// After (wenay-react2 1.0.61)
+<div style={{width: "100%", height: 23}}>
+  <Sparkline
+    aria-label="Price history"
+    series={{key: "price", data: row.priceHistory, color: "#2f81f7"}}
+  />
+</div>
+```
+
+Keep `data` and `series` references stable between unrelated React renders (for
+example with `useMemo`) so a table redraw happens only when its values change.
+The older chart engine surface remains low-level, and `MyChartEngine` remains a
+demo; neither is used by `Sparkline`.
 
 ## QA Stand
 ```

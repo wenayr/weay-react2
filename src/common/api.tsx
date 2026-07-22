@@ -10,6 +10,7 @@ import * as contextMenuKit from "./src/menu/menuMouse";
 import * as rightClickMenuKit from "./src/menu/menuR";
 import * as logsKit from "./src/logs/logs";
 import * as updateByKit from "./updateBy";
+import * as communicationKit from "./src/components/Communication";
 
 // 0. STYLES - independent
 export * from "./src/styles/styleGrid";
@@ -67,6 +68,10 @@ export * from "./src/components/UiSlot";
 // pure Settings editor works both in the bar's gear popover and in a settings section
 export * from "./src/components/Toolbar";
 
+// 11d. Communication UI. Protocol/media ownership is injected by the app;
+// VideoCall + useVideoCallController own only the product surface and UI state.
+export * from "./src/components/Communication";
+
 // 12. MENU - depends on components
 export { Menu, MenuProgress, MenuElement as MenuItemElement } from "./src/menu/menu";
 export type { MenuItem, MenuItemStrict } from "./src/menu/menu";
@@ -79,6 +84,7 @@ export * from "./src/logs/logsContext";
 export * from "./src/logs/miniLogs";
 
 // 14. CHARTS - highest level
+export * from "./src/myChart/Sparkline";
 export * from "./src/myChart/1/myChart";
 export * from "./src/myChart/1/myChartTest";
 export * from "./src/myChart/chartEngine/chartEngineReact";
@@ -95,5 +101,6 @@ export const kit = {
         rightClick: rightClickMenuKit,
     },
     logs: logsKit,
+    communication: communicationKit,
     updateBy: updateByKit,
 } as const;
