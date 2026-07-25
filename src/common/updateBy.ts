@@ -1,5 +1,9 @@
-import React, { useCallback, useLayoutEffect, useSyncExternalStore } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { listen as createListen, waitRun } from "wenay-common2";
+
+// изоморфный layout-эффект: на сервере (SSR) useLayoutEffect шумит предупреждением,
+// поэтому там падаем на useEffect
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type Listener = (a?: any) => void;
 
@@ -67,6 +71,7 @@ function runTriggerPass(obj: object, state: ObserverState, reverse: boolean, las
 }
 
 const MAX_TRIGGER_PASSES = 100;
+let warnedMaxPasses = false;
 
 function triggerUpdate(obj: object, reverse = false, lastOnly = false) {
     const listen = updateListens.get(obj);
@@ -87,6 +92,14 @@ function triggerUpdate(obj: object, reverse = false, lastOnly = false) {
             state.pending = false;
             runTriggerPass(obj, state, reverse, lastOnly);
             if (!state.pending) break;
+        }
+        if (state.pending && !warnedMaxPasses) {
+            warnedMaxPasses = true;
+            console.error(
+                `updateBy: triggerUpdate достиг предела MAX_TRIGGER_PASSES (${MAX_TRIGGER_PASSES}) — ` +
+                `слушатель синхронно перезапускает renderBy по тому же объекту. ` +
+                `Коалесцирование прервано, дальнейшие проходы в этом цикле пропущены.`
+            );
         }
     } finally {
         state.running = false;
@@ -142,7 +155,7 @@ export function useUpdateBy<T extends object>(a: T, f?: UpdateCallback<T>) {
         () => (hasF ? 0 : (map3.get(a)?.version ?? 0))
     );
 
-    useLayoutEffect(() => {
+    useIsoLayoutEffect(() => {
         if (!hasF) return;
 
         const state = getObserverState(a);

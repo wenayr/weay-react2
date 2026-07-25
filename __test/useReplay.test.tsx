@@ -1,11 +1,11 @@
 import React, {StrictMode, useRef, useState} from "react";
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {Observe, Replay} from "wenay-common2";
-import {useReplayRouteSubscribe, useStoreReplayEach, useStoreReplayRouteMirror} from "../src/common/src/hooks/useReplay";
+import {useReplayRouteSubscribe, useStoreReplayEach, useStoreReplayMirror, useStoreReplayRouteMirror} from "../src/common/src/hooks/useReplay";
 import {useStoreNode} from "../src/common/src/hooks/useObserveStore";
 
 type Rows = Record<string, {qty: number}>;
-type RowsRemote = Replay.ReplayRemote<[Observe.StorePatch]>;
+type RowsRemote = Observe.StoreReplayRemote;
 
 function EachFeedProbe({remote}: {remote: RowsRemote}) {
     const logRef = useRef<string[]>([]);
@@ -73,7 +73,7 @@ test("useStoreReplayEach folds keyframe expansion, per-key updates, deletes and 
 type NumRemote = Replay.ReplayRemote<[number]>;
 
 type World = {qty: number};
-type WorldRemote = Replay.ReplayRemote<[Observe.StorePatch]>;
+type WorldRemote = Observe.StoreReplayRemote;
 
 function failingRemote<Z extends any[]>(): Replay.ReplayRemote<Z> {
     const fail = () => { throw new Error("bad route"); };
@@ -118,6 +118,44 @@ function StoreRouteProbe({remoteA, remoteB, bad}: {remoteA: WorldRemote, remoteB
     </div>;
 }
 
+function failingStoreRemote(): Observe.StoreReplayRemote {
+    const fail = () => { throw new Error("bad route"); };
+    return {
+        line: {on: () => () => {}},
+        since: async () => fail(),
+        keyframe: async () => fail(),
+    };
+}
+
+function BatchStoreProbe({remote}: {remote: Observe.StoreReplayRemote}) {
+    const [batchCount, setBatchCount] = useState(0);
+    const mirror = useStoreReplayMirror<World>(remote, {qty: 0}, {
+        onBatch: () => setBatchCount(count => count + 1),
+    });
+    const qty = useStoreNode(mirror.store.node.qty);
+
+    return <div>
+        <output data-testid="batch-store-ready">{String(mirror.ready)}</output>
+        <output data-testid="batch-store-qty">{qty.value}</output>
+        <output data-testid="batch-store-count">{batchCount}</output>
+    </div>;
+}
+
+test("useStoreReplayMirror applies Store Replay V2 envelopes", async () => {
+    const server = Observe.createStore<World>({qty: 1});
+    const exposed = Observe.exposeStoreReplay(server, {history: 64});
+
+    expect(Observe.storeReplayMode()).toBe("v2");
+    render(<StrictMode><BatchStoreProbe remote={exposed.api.replay}/></StrictMode>);
+
+    await waitFor(() => expect(screen.getByTestId("batch-store-ready").textContent).toBe("true"));
+    await waitFor(() => expect(screen.getByTestId("batch-store-qty").textContent).toBe("1"));
+    await waitFor(() => expect(Number(screen.getByTestId("batch-store-count").textContent)).toBeGreaterThan(0));
+
+    await mutateServer(server, () => { server.state.qty = 2; });
+    await waitFor(() => expect(screen.getByTestId("batch-store-qty").textContent).toBe("2"));
+});
+
 test("useReplayRouteSubscribe switches routes explicitly and keeps old route after failed replacement", async () => {
     let last = 0;
     const [emit, replay] = Replay.replayListen<[number]>({history: 64, current: () => [last]});
@@ -157,7 +195,7 @@ test("useStoreReplayRouteMirror switches store replay routes and converges after
     const exposed = Observe.exposeStoreReplay(server, {history: 64});
     const remoteA = exposed.api.replay;
     const remoteB = exposed.api.replay;
-    const bad = failingRemote<[Observe.StorePatch]>();
+    const bad = failingStoreRemote();
 
     render(<StrictMode><StoreRouteProbe remoteA={remoteA} remoteB={remoteB} bad={bad}/></StrictMode>);
 

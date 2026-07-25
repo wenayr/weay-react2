@@ -46,6 +46,7 @@ export function ParamRow(props: {
                         border: "1px solid lightgray",
                         borderRadius: "4px",
                         zIndex: 10,
+                        pointerEvents: "none", // Do not interrupt hover on the parameter name
                         whiteSpace: "pre-line", // otherwise "\n" collapses into spaces
                     }}
                 >

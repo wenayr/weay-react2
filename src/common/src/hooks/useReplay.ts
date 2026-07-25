@@ -7,10 +7,12 @@ type StoreEachCtx = Observe.StoreEachCtx;
 type StorePatch = Observe.StorePatch;
 type ReplayEvent<Z extends any[]> = Replay.ReplayEvent<Z>;
 type ReplayRemote<Z extends any[]> = Replay.ReplayRemote<Z>;
+type StoreReplayRemote = Observe.StoreReplayRemote;
 type StaleInfo = Replay.StaleInfo;
 export type ReplayRouteEvent = Replay.ReplayRouteEvent;
 export type ReplayRouteSwitchOptions = Replay.ReplayRouteSwitchOpts;
 type ReplayRouteHandle<Z extends any[]> = (() => void) & {ready: Promise<void>, switch: (nextRemote: ReplayRemote<Z>, nextOpts?: ReplayRouteSwitchOptions) => Promise<void>, seq: () => number, label: () => string | undefined, active: () => boolean};
+type StoreReplayRouteHandle = (() => void) & {ready: Promise<void>, switch: (nextRemote: StoreReplayRemote, nextOpts?: ReplayRouteSwitchOptions) => Promise<void>, seq: () => number, label: () => string | undefined, active: () => boolean};
 
 /**
  * React bridge over the Replay stack (snapshot + sequenced delta line) of wenay-common2.
@@ -337,7 +339,17 @@ export function useReplayRouteSubscribe<Z extends any[]>(
 
     return useMemo(() => ({ready, error, route, switching, seq, label: currentLabel, active, switchRoute}), [ready, error, route, switching, seq, currentLabel, active, switchRoute]);
 }
-export type UseStoreReplaySyncOptions = UseReplaySubscribeOptions;
+export type UseStoreReplaySyncOptions<T extends object = any> = UseReplaySubscribeOptions & {
+    /**
+     * @deprecated Store Replay V2 is the only wire in wenay-common2 2.x.
+     * Kept as an ignored compatibility option for consumers compiled against 1.x.
+     */
+    batch?: boolean;
+    /** Called after one physical Store Replay V2 envelope has been applied to the mirror store. */
+    onBatch?: (patches: readonly StorePatch[], store: Observe.Store<T>) => void;
+    /** Optional synchronous validation before a Store Replay V2 envelope is applied. */
+    validateBatch?: (patches: readonly StorePatch[], store: Observe.Store<T>) => void;
+};
 
 export type StoreReplaySyncController = ReplaySubscribeController;
 
@@ -349,15 +361,16 @@ export type StoreReplaySyncController = ReplaySubscribeController;
  */
 export function useStoreReplaySync<T extends object>(
     store: Observe.Store<T> | null | undefined,
-    remote: ReplayRemote<[StorePatch]> | null | undefined,
-    options: UseStoreReplaySyncOptions = {},
+    remote: StoreReplayRemote | null | undefined,
+    options: UseStoreReplaySyncOptions<T> = {},
 ): StoreReplaySyncController {
-    const {since, keepSeq = true, enabled = true, onSeq, onError, staleMs, onStale, policy, hint} = options;
+    const {since, keepSeq = true, enabled = true, onSeq, onError, staleMs, onStale, policy, hint, onBatch, validateBatch} = options;
     const hooksRef = useLatestRef({onSeq, onError, onStale});
+    const batchHooksRef = useLatestRef({onBatch, validateBatch});
     const hintRef = useLatestRef(hint);
     const seqRef = useRef<number | undefined>(since);
     const subRef = useRef<(() => void) & {seq: () => number, lastTs: () => number} | null>(null);
-    const lastRemoteRef = useRef<ReplayRemote<[StorePatch]> | null | undefined>(undefined);
+    const lastRemoteRef = useRef<StoreReplayRemote | null | undefined>(undefined);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<unknown>(null);
     const [stale, setStale] = useState(false);
@@ -376,6 +389,8 @@ export function useStoreReplaySync<T extends object>(
             since: seqRef.current,
             policy,
             hint: hintRef.current,
+            onBatch: (patches, currentStore) => batchHooksRef.current.onBatch?.(patches, currentStore),
+            validateBatch: (patches, currentStore) => batchHooksRef.current.validateBatch?.(patches, currentStore),
             onSeq: seq => {
                 seqRef.current = seq;
                 hooksRef.current.onSeq?.(seq);
@@ -420,9 +435,26 @@ export function useStoreReplaySync<T extends object>(
     return useMemo(() => ({ready, error, stale, seq, lastTs, restart}), [ready, error, stale, seq, lastTs, restart]);
 }
 
-export type UseStoreReplayRouteSyncOptions = UseReplayRouteSubscribeOptions;
+export type UseStoreReplayRouteSyncOptions<T extends object = any> = UseReplayRouteSubscribeOptions & {
+    /**
+     * @deprecated Store Replay V2 is the only wire in wenay-common2 2.x.
+     * Kept as an ignored compatibility option for consumers compiled against 1.x.
+     */
+    batch?: boolean;
+    onBatch?: (patches: readonly StorePatch[], store: Observe.Store<T>) => void;
+    validateBatch?: (patches: readonly StorePatch[], store: Observe.Store<T>) => void;
+};
 
-export type StoreReplayRouteSyncController = ReplayRouteController<[StorePatch]>;
+export type StoreReplayRouteSyncController = {
+    readonly ready: boolean;
+    readonly error: unknown;
+    readonly route: ReplayRouteEvent | null;
+    readonly switching: boolean;
+    seq(): number;
+    label(): string | undefined;
+    active(): boolean;
+    switchRoute(nextRemote: StoreReplayRemote, options?: ReplayRouteSwitchOptions): Promise<void>;
+};
 
 /**
  * Route-replaceable store replay sync. The supplied store remains the fold target while
@@ -430,17 +462,18 @@ export type StoreReplayRouteSyncController = ReplayRouteController<[StorePatch]>
  */
 export function useStoreReplayRouteSync<T extends object>(
     store: Observe.Store<T> | null | undefined,
-    remote: ReplayRemote<[StorePatch]> | null | undefined,
-    options: UseStoreReplayRouteSyncOptions = {},
+    remote: StoreReplayRemote | null | undefined,
+    options: UseStoreReplayRouteSyncOptions<T> = {},
 ): StoreReplayRouteSyncController {
-    const {since, keepSeq = true, enabled = true, label, onSeq, onError, onRoute, policy, hint} = options;
+    const {since, keepSeq = true, enabled = true, label, onSeq, onError, onRoute, policy, hint, onBatch, validateBatch} = options;
     const hooksRef = useLatestRef({onSeq, onError, onRoute});
+    const batchHooksRef = useLatestRef({onBatch, validateBatch});
     const hintRef = useLatestRef(hint);
     const seqRef = useRef<number | undefined>(since);
     const labelRef = useRef<string | undefined>(label);
     const activeRef = useRef(false);
-    const subRef = useRef<ReplayRouteHandle<[StorePatch]> | null>(null);
-    const lastRemoteRef = useRef<ReplayRemote<[StorePatch]> | null | undefined>(undefined);
+    const subRef = useRef<StoreReplayRouteHandle | null>(null);
+    const lastRemoteRef = useRef<StoreReplayRemote | null | undefined>(undefined);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<unknown>(null);
     const [route, setRoute] = useState<ReplayRouteEvent | null>(null);
@@ -464,6 +497,8 @@ export function useStoreReplayRouteSync<T extends object>(
             label,
             policy,
             hint: hintRef.current,
+            onBatch: (patches, currentStore) => batchHooksRef.current.onBatch?.(patches, currentStore),
+            validateBatch: (patches, currentStore) => batchHooksRef.current.validateBatch?.(patches, currentStore),
             onSeq: seq => {
                 seqRef.current = seq;
                 hooksRef.current.onSeq?.(seq);
@@ -523,7 +558,7 @@ export function useStoreReplayRouteSync<T extends object>(
     const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
     const currentLabel = useCallback(() => subRef.current?.label() ?? labelRef.current, []);
     const active = useCallback(() => subRef.current?.active() ?? activeRef.current, []);
-    const switchRoute = useCallback((nextRemote: ReplayRemote<[StorePatch]>, switchOptions?: ReplayRouteSwitchOptions) => {
+    const switchRoute = useCallback((nextRemote: StoreReplayRemote, switchOptions?: ReplayRouteSwitchOptions) => {
         const sub = subRef.current;
         if (!sub) return Promise.reject(new Error("useStoreReplayRouteSync: no active route subscription"));
         setError(null);
@@ -539,9 +574,9 @@ export type StoreReplayRouteMirrorController<T extends object> = StoreReplayRout
 
 /** Create a local mirror store and keep it synced through a route-replaceable replay remote. */
 export function useStoreReplayRouteMirror<T extends object>(
-    remote: ReplayRemote<[StorePatch]> | null | undefined,
+    remote: StoreReplayRemote | null | undefined,
     initial: T,
-    options: UseStoreReplayRouteSyncOptions = {},
+    options: UseStoreReplayRouteSyncOptions<T> = {},
 ): StoreReplayRouteMirrorController<T> {
     const storeRef = useRef<{remote: typeof remote, store: Observe.Store<T>} | null>(null);
     if (!storeRef.current || storeRef.current.remote !== remote) {
@@ -561,9 +596,9 @@ export type StoreReplayMirrorController<T extends object> = StoreReplaySyncContr
  * so reconnect is a journal tail, not a keyframe. A new `remote` recreates the store.
  */
 export function useStoreReplayMirror<T extends object>(
-    remote: ReplayRemote<[StorePatch]> | null | undefined,
+    remote: StoreReplayRemote | null | undefined,
     initial: T,
-    options: UseStoreReplaySyncOptions = {},
+    options: UseStoreReplaySyncOptions<T> = {},
 ): StoreReplayMirrorController<T> {
     const storeRef = useRef<{remote: typeof remote, store: Observe.Store<T>} | null>(null);
     if (!storeRef.current || storeRef.current.remote !== remote) {
@@ -574,7 +609,7 @@ export function useStoreReplayMirror<T extends object>(
     return useMemo(() => ({...sync, store}), [sync, store]);
 }
 
-export type UseStoreReplayEachOptions<T extends object> = UseStoreReplaySyncOptions & {
+export type UseStoreReplayEachOptions<T extends object> = UseStoreReplaySyncOptions<T> & {
     /**
      * Seed of the internal mirror store. Creation-time only (a later identity change does nothing).
      * Reconnect after a FULL unmount: pass the saved snapshot together with `since`
@@ -600,7 +635,7 @@ export type UseStoreReplayEachOptions<T extends object> = UseStoreReplaySyncOpti
  * subscriptions: controller.store (useStoreNode/useStoreKeys work on it as usual).
  */
 export function useStoreReplayEach<T extends object>(
-    remote: ReplayRemote<[StorePatch]> | null | undefined,
+    remote: StoreReplayRemote | null | undefined,
     cb: (key: string, value: T[keyof T] | undefined, ctx: StoreEachCtx) => void,
     options: UseStoreReplayEachOptions<T> = {},
 ): StoreReplayMirrorController<T> {

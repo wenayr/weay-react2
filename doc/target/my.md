@@ -22,6 +22,23 @@
 
 ## Ready
 
+- **common2 2.0.1 + TypeScript 7 adoption — DONE in 1.0.65.** Dependency
+  updated to `^2.0.1`; React/ReactDOM, AG Grid, Vite and Jest were refreshed to
+  current releases. The build now uses TypeScript 7 with bundler resolution,
+  Jest uses SWC, and confirmed-unused Babel/test/runtime packages were removed.
+  The upstream RPC guard scanner remains a common2-level API and requires no
+  duplicate React wrapper. Verified with the TypeScript source/test check,
+  33/33 Jest suites (122 tests), package/packed-consumer builds, and the live
+  QA stand including Store Replay V2, AG Grid 36, and video-room creation.
+
+- **common2 2.0.0 adoption — DONE in 1.0.64.** Dependency updated to
+  `^2.0.0`. Store Replay hooks and QA card 24 now use the sole V2 facade
+  directly, expose `onBatch` / `validateBatch`, and report invariant mode
+  `"v2"`. RPB/1-RPB/3, MessagePack, legacy Store Replay lines and numbered
+  batch negotiation were removed upstream and are intentionally not recreated
+  in React. The old `batch` React option is an ignored deprecated compatibility
+  field. Peer relay patch routes remain separate and unchanged.
+
 - **common2 1.0.90 adoption — DONE in 1.0.62.** Dependency updated to
   `^1.0.90`. QA card 51 uses the real `createPeerPacketOffers` /
   `createPeerPacketMesh` surface for multi-hop delivery, group routing and

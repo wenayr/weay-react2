@@ -332,6 +332,44 @@ test("useStoreMirror restarts auto sync when partial option changes", async () =
     await waitFor(() => expect(screen.getByTestId("partial-deep-keys").textContent).toBe("x,y,z"));
     expect(getMasks.at(-1)).toEqual(mirrorMask);
 });
+test("useStoreMirror releases the sync subscription when unmounted mid-flight (no leak)", async () => {
+    let resolveGet: (() => void) | null = null;
+    let changedSubs = 0;
+    const full = createMirrorState();
+    const remote: RemoteStoreLike<MirrorState> = {
+        get() {
+            return new Promise<MirrorState>(resolve => {
+                resolveGet = () => resolve(full);
+            });
+        },
+        changed: {
+            on() {
+                changedSubs++;
+                return () => { changedSubs--; };
+            },
+        },
+    };
+
+    const {unmount} = render(<MirrorProbe remote={remote} />);
+    // common2 1.0.92 subscribes before the initial pull so a mutation in the get()->on()
+    // window cannot be lost; the hook must still release that early subscription after cancel.
+    await waitFor(() => expect(resolveGet).not.toBeNull());
+    expect(changedSubs).toBe(1);
+
+    // component goes away while the initial pull is still in flight
+    unmount();
+
+    await act(async () => {
+        resolveGet!();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+    });
+
+    // the subscription store.sync created AFTER the await must be released, not orphaned
+    expect(changedSubs).toBe(0);
+});
+
 test("useStoreMirror keeps an inline structurally equal mask from resyncing on rerender", async () => {
     const remoteStore = Observe.createStore<MirrorState>(createMirrorState());
     const exposed = Observe.exposeStore(remoteStore);

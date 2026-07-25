@@ -42,6 +42,21 @@ kit.updateBy
 
 The root export is still flat. `kit` is useful when a large file needs grouped names.
 
+## Toolchain / Development
+
+- The supported project compiler is TypeScript 7. Module lookup is
+  `"Bundler"` because the published package and QA stand are ESM/browser
+  surfaces assembled by Vite.
+- `tsconfig.json` deliberately fixes `rootDir: "src"` and `types: []`;
+  `tsconfig.test.json` opts Jest and Node globals back into the test tree.
+- CSS imports are declared by `src/styles.d.ts`, which satisfies TypeScript
+  7's side-effect import validation while leaving CSS loading to Vite and
+  package consumers.
+- Jest 30 transforms TypeScript and TSX with SWC. There is no Babel or
+  `ts-node` release path.
+- Release verification starts with `npm run typecheck`, then Jest, a package
+  build, packed-artifact checks, and the browser QA stand.
+
 ## Modal Low Level
 ```
 useModal()                         // callable controller with show/open/close/set
@@ -573,18 +588,31 @@ useReplaySubscribe(remote, cb, {since?, keepSeq?=true, enabled?=true, onSeq?, on
   -> {ready, error, stale, seq(), lastTs(), restart(since?)}
 useReplayRouteSubscribe(remote, cb, {since?, keepSeq?=true, enabled?=true, label?, onSeq?, onError?, onRoute?, policy?, hint?})
   -> {ready, error, route, switching, seq(), label(), active(), switchRoute(nextRemote, opts?)}
-useStoreReplaySync(store, remote, sameOpts)  -> same controller       // Observe.syncStoreReplay wrapper
-useStoreReplayRouteSync(store, remote, routeOpts) -> route controller  // Observe.syncStoreReplayRoute wrapper
-useStoreReplayMirror(remote, initial, sameOpts) -> controller & {store}   // creates the mirror store in a ref
-useStoreReplayRouteMirror(remote, initial, routeOpts) -> route controller & {store}
-useStoreReplayEach(remote, cb, sameOpts & {initial?, drain?}) -> controller & {store}   // per-key fold: Observe.syncStoreReplayEach counterpart
+useStoreReplaySync(store, remote, sameOpts & {onBatch?, validateBatch?, batch?})  -> same controller
+useStoreReplayRouteSync(store, remote, routeOpts & {onBatch?, validateBatch?, batch?}) -> route controller
+useStoreReplayMirror(remote, initial, sameOpts & {onBatch?, validateBatch?, batch?}) -> controller & {store}
+useStoreReplayRouteMirror(remote, initial, routeOpts & {onBatch?, validateBatch?, batch?}) -> route controller & {store}
+useStoreReplayEach(remote, cb, sameOpts & {initial?, drain?, onBatch?, validateBatch?, batch?}) -> controller & {store}
 useReplayFrame(remote, cb, {intervalMs?=300, since?, keepSeq?=true, enabled?=true, hint?, onSeq?, onError?})
   -> {ready, error, seq(), pull(hint?), restart(since?)}              // pull-at-own-pace over remote.frame()
 useReplayHistory(history, apply, {head?, reset?, tickMs?=300, autoPlay?=true})
   -> {live, seq, head, pause(), play(), seek({seq?|ts?})}
 ```
 Semantics that are easy to get wrong:
-- **common2 1.0.76 WebRTC maintenance.** Direct replay now uses a portable binary codec, preserving `Uint8Array` Media frames byte-for-byte across relay → WebRTC direct → relay hand-offs. Per-account replay mirrors also start and stop independently as accounts appear or disappear. These are core transport/lifecycle fixes: no React API or application wiring changes are required.
+- **common2 2.0.0 Store Replay reset.** Store Replay has one supported facade,
+  `Observe.exposeStoreReplay(...).api.replay`, one mode (`"v2"`), and one JSON
+  RPC application wire. RPB/1-RPB/3, MessagePack, legacy Store Replay,
+  numbered batch codecs and their negotiation/diagnostics were removed
+  upstream after JSON measured better. React calls `syncStoreReplay` and
+  `syncStoreReplayRoute` directly. `onBatch` observes each applied physical V2
+  envelope; `validateBatch` runs before apply. `batch` remains in React types
+  only as a deprecated ignored compatibility field. Peer relay patch routes are
+  separate and unchanged.
+- **common2 1.0.76 WebRTC maintenance (historical).** Direct media replay uses
+  its transport codec to preserve `Uint8Array` Media frames byte-for-byte
+  across relay → WebRTC direct → relay hand-offs. This is distinct from the
+  removed RPB application RPC wire. Per-account replay mirrors also start and
+  stop independently as accounts appear or disappear.
 - **Identity and reconnect boundary (common2 1.0.75).** `remote` identifies one logical Replay line. A temporary Socket.IO disconnect/reconnect keeps that object identity, so the React effect stays mounted while common2 rebinds the physical Listen subscription, restores live delivery first, catches up from its private `lastDelivered seq`, drains the racing queue, and deduplicates. Do not call `restart()`, remount with a new key, replace `remote`, poll, or attach transport listeners in React. The retained journal must cover the cursor; a sacred-line eviction with no keyframe is terminal `error`/`onError`, never a silent reset to `since: 0` or latest. `policy: 'queue'` is lossless and must deliver every retained event exactly once; `policy: 'frame'` is explicitly lossy/conflated and is not a journal-integrity check.
 **Identity matrix**
 - **Hard teardown is intentional.** `client.close()`/`dispose()` and hub `connect()`/`setToken()` end the old logical generation. React must clean up normally and must not resurrect that subscription automatically; after an intentional new client or credentials generation, provide its new `remote` as a normal new subscription. Ordinary RPC/pipe calls are not replayed by this contract.
@@ -605,7 +633,7 @@ Semantics that are easy to get wrong:
 - Peer SDK (common2 1.0.69 `Peer` / `wenay-common2/peer`): the one-call layer over rpc + store + replay + route coordinator — `createPeerClient({remote, account, initial, rtc?})` publishes the own store as a patch line and `peer(account)` returns a live mirrored store + route control; relay and direct share the OWNER's seq space (`createPatchRelayJournal`), so hand-offs are plain seq resumes, no keyframe reset. This is the intended React adoption surface (a `usePeer` adapter is the target-backlog item, superseding the raw coordinator-link hook idea): the mirrored store already plugs into `useStoreNode`/`useStoreKeys` as-is. 1.0.70 ships the oracle suites + `demo/` stand in the package — living examples per subsystem (`replay/peer-sdk.test.ts` is the Peer contract).
 - Media capture (common2 1.0.66 `Media` namespace / `wenay-common2/media`): CONSUMPTION needs no new hooks — `Media.createAudioSource` / `Media.createVideoSource` return `[emit, listen] & control`, with `replay:true` the `listen` is a normal replay line, so `useReplaySubscribe` / `useReplayFrame` cover it; frames are one `Uint8Array` (40-byte fixed header + raw payload, `Media.decodeMediaFrame`) and follow the existing fold-outside-React rule (canvas/AudioContext via ref). The capture `control` side (`start()` resolving to `'idle'|'requesting'|'live'|'denied'|'no-device'|'error'`, `stop()`, `setDevice`, `listDevices`, stats) is a permission/device/lifecycle state machine — exactly hook-shaped; a `useMediaSource` capture hook + QA card is a recorded target goal (supersedes the earlier "wrap it app-locally" stance). Backpressure defaults live in common2 (audio = lossless queue, video `replay:true` = keep-latest frame recovery); the client-side knobs are the same `policy`/`hint` as any replay line.
 
-QA cards 23/24/25/26 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `Replay.replayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror); client E = pull path (`useReplayFrame` over the direct remote with a wrapped counting `frame()`, pace switch 250ms/1s/3s keeps seq). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Card 25 = per-key feed (`useStoreReplayEach` over `exposeStoreReplay`): a dict-of-rows store, producer touches ONE random row per tick, the fold target is a plain Map with per-row cb counters — only the mutated row's counter grows, keyframe/`replace` are the only whole-table expansions, delete arrives as `(key, undefined)`. Card 26 = route hand-off (`useReplayRouteSubscribe` over the same video line): one canvas starts on relay, switches direct/relay by `switchRoute`, and failed replacement keeps the previous route alive. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
+QA cards 23/24/33/34 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `Replay.replayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror); client E = pull path (`useReplayFrame` over the direct remote with a wrapped counting `frame()`, pace switch 250ms/1s/3s keeps seq). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Card 33 = per-key feed (`useStoreReplayEach` over `exposeStoreReplay`): a dict-of-rows store, producer touches ONE random row per tick, the fold target is a plain Map with per-row cb counters — only the mutated row's counter grows, keyframe/`replace` are the only whole-table expansions, delete arrives as `(key, undefined)`. Card 34 = route hand-off (`useReplayRouteSubscribe` over the same video line): one canvas starts on relay, switches direct/relay by `switchRoute`, and failed replacement keeps the previous route alive. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
 
 ## Logs
 Frequent global logger:

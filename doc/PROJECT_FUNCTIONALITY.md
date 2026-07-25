@@ -75,6 +75,14 @@ New hook/controller surfaces should prefer migration without breaking old public
 
 For diagnostics, the library may expose local counters/listeners, but it must not send hidden analytics. Apps decide whether to read, persist, or report those counters.
 
+## Maintainer Toolchain
+
+The package and its QA stand are compiled with TypeScript 7 using bundler
+module resolution. Vite owns the browser development/build pipeline; Jest 30
+uses SWC for TypeScript/TSX transforms, so tests do not depend on the
+TypeScript compiler's programmatic API. `npm run typecheck` checks both the
+published source surface and the Jest test tree before a release.
+
 ## Functional Areas
 
 ### Render Memory
@@ -280,10 +288,21 @@ Main APIs:
 Use these for high-frequency event lines, state sync from a replay source, and
 route hand-off between relay/direct transports.
 
+With `wenay-common2@2.x`, Store Replay has one wire and one public facade:
+`Observe.exposeStoreReplay(...).api.replay`, consumed by
+`Observe.syncStoreReplay` and the React Store Replay hooks. It always uses
+Store Replay V2 envelopes over JSON RPC. The removed RPB/1-RPB/3, MessagePack,
+legacy Store Replay lines, numbered batch codecs, and negotiation flags are not
+React extension points and must not be recreated in the stand. `onBatch` runs
+after each physical V2 envelope; `validateBatch` can reject an envelope before
+it mutates the target store. The deprecated React `batch` option is accepted
+only as an ignored source-compatibility field.
+
 Transport reconnect and replay recovery belong to `wenay-common2`, not these
-hooks. With a stable RPC `remote`, common2 1.0.75 rebinds a transiently lost
-physical Listen subscription, resumes from its own delivered seq, orders and
-deduplicates catch-up, and reports an unrecoverable journal gap as an error.
+hooks. With a stable RPC `remote`, the reconnect contract introduced in common2
+1.0.75 and retained in 2.x rebinds a transiently lost physical Listen
+subscription, resumes from its own delivered seq, orders and deduplicates
+catch-up, and reports an unrecoverable journal gap as an error.
 `wenay-react2` owns only React mount/unmount, StrictMode-safe callback refs,
 and controller state; it must not add reconnect listeners, retry timers, or a
 second journal. Deliberate client disposal or token rotation is a hard

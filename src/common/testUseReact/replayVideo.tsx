@@ -514,7 +514,12 @@ export const ReplayStoreDemo = () => {
     const demo = useMemo(() => getStoreReplayDemo(), []);
     const [enabled, setEnabled] = useState(true);
     const [stalled, setStalled] = useState(false);
-    const mirror = useStoreReplayMirror<tWorld>(demo.remote, {ticks: 0, price: 0, note: "", bag: {}}, {enabled, staleMs: 2500});
+    const batches = useRef(0);
+    const mirror = useStoreReplayMirror<tWorld>(demo.remote, {ticks: 0, price: 0, note: "", bag: {}}, {
+        enabled,
+        staleMs: 2500,
+        onBatch: () => { batches.current++; },
+    });
     const ticks = useStoreNode(mirror.store.node.ticks);
     const price = useStoreNode(mirror.store.node.price);
     const note = useStoreNode(mirror.store.node.note);
@@ -544,6 +549,8 @@ export const ReplayStoreDemo = () => {
             <span>stale: <b style={{color: mirror.stale ? "#cf222e" : "#2da44e"}}>{String(mirror.stale)}</b></span>
             <span>lastTs: <b>{mirror.lastTs() > 0 ? new Date(mirror.lastTs()).toLocaleTimeString() : "-"}</b></span>
             <span>seq: <b>{mirror.seq()}</b></span>
+            <span>transport: <b>{Observe.storeReplayMode()}</b></span>
+            <span>batches: <b>{batches.current}</b></span>
             <span>mirror ticks: <b>{ticks.value}</b></span>
             <span>mirror price: <b>{price.value}</b></span>
             <span>mirror note: <b>{note.value}</b></span>
@@ -557,7 +564,7 @@ export const ReplayStoreDemo = () => {
 
 type tRow = {qty: number, px: number};
 type tRows = Record<string, tRow>;
-type tRowsRemote = Replay.ReplayRemote<[Observe.StorePatch]>;
+type tRowsRemote = Observe.StoreReplayRemote;
 
 function createStoreEachDemo() {
     let n = 2;

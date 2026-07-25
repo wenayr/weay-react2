@@ -68,17 +68,33 @@ function useLatestRef<T>(value: T) {
     return ref;
 }
 
+// Значение читается в рендере, подписка ставится в эффекте — изменение стора в этом окне
+// теряется. Сравниваем то, что отрендерили, с актуальным на момент установки подписки;
+// Object.is отсекает общий случай без затрат (та же ссылка / примитив), сериализация —
+// запасной структурный путь для snapshot/selection (свежий объект на каждый вызов).
+function sameRenderedValue(a: unknown, b: unknown) {
+    if (Object.is(a, b)) return true;
+    try {
+        return JSON.stringify(a) === JSON.stringify(b);
+    } catch {
+        return false;
+    }
+}
+
 export function useStoreNode<T>(node: StoreNode<T>, options: UseStoreNodeOptions<T> = {}): StoreNodeController<T> {
     const {current, drain, key, mode = "get", fallback} = options;
     const [version, setVersion] = useState(0);
     const refresh = useCallback(() => setVersion(v => v + 1), []);
 
-    useEffect(() => {
-        return node.on(() => refresh(), {current, drain, key});
-    }, [node, current, drain, key, refresh]);
-
     const value = useMemo(() => readNode(node, {mode, fallback}), [node, version, mode, fallback]);
     const exists = useMemo(() => node.has(), [node, version]);
+    const renderedValueRef = useLatestRef(value);
+
+    useEffect(() => {
+        const off = node.on(() => refresh(), {current, drain, key});
+        if (!sameRenderedValue(renderedValueRef.current, readNode(node, {mode, fallback}))) refresh();
+        return off;
+    }, [node, current, drain, key, refresh]);
 
     return useMemo(() => ({
         node,
@@ -150,14 +166,19 @@ export function useStoreSelect<T, M extends StoreMask<T>>(
     const [version, setVersion] = useState(0);
     const refresh = useCallback(() => setVersion(v => v + 1), []);
 
-    useEffect(() => {
-        return selection.on(() => refresh(), {current, drain, key});
-    }, [selection, current, drain, key, refresh]);
-
     const value = useMemo(() => {
         const next = selection.get();
         return next === undefined ? fallback as StorePick<T, M> : next;
     }, [selection, version, fallback]);
+    const renderedValueRef = useLatestRef(value);
+
+    useEffect(() => {
+        const off = selection.on(() => refresh(), {current, drain, key});
+        const next = selection.get();
+        const currentValue = next === undefined ? fallback as StorePick<T, M> : next;
+        if (!sameRenderedValue(renderedValueRef.current, currentValue)) refresh();
+        return off;
+    }, [selection, current, drain, key, refresh]);
 
     return useMemo(() => ({
         selection,
@@ -231,6 +252,7 @@ export function useStoreMirror<T extends object, M extends StoreMask<T>>(
     const syncOptionsRef = useLatestRef({current, drain, key, partial, onError});
     const mountedRef = useRef(false);
     const stopRef = useRef<(() => void) | null>(null);
+    const syncGenRef = useRef(0);
     const [ready, setReady] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [error, setError] = useState<unknown>(null);
@@ -249,18 +271,21 @@ export function useStoreMirror<T extends object, M extends StoreMask<T>>(
         mountedRef.current = true;
         return () => {
             mountedRef.current = false;
+            syncGenRef.current++;
             stopRef.current?.();
             stopRef.current = null;
         };
     }, []);
 
     const stop = useCallback(() => {
+        syncGenRef.current++;
         stopRef.current?.();
         stopRef.current = null;
         if (mountedRef.current) setReady(false);
     }, []);
 
     const sync = useCallback(async (nextMask: M = stableMask, opts?: StoreSyncOpts) => {
+        const generation = ++syncGenRef.current;
         stopRef.current?.();
         stopRef.current = null;
         if (mountedRef.current) {
@@ -281,14 +306,20 @@ export function useStoreMirror<T extends object, M extends StoreMask<T>>(
                     (overrideOnError ?? syncOptionsRef.current.onError)?.(error);
                 },
             });
+            // подписка пришла из устаревшего/отменённого прохода (перезапуск sync, stop
+            // или размонтирование за время await) — немедленно освобождаем, иначе утечка
+            if (generation !== syncGenRef.current || !mountedRef.current) {
+                off();
+                return off;
+            }
             stopRef.current = off;
-            if (mountedRef.current) setReady(true);
+            setReady(true);
             return off;
         } catch (e) {
             if (mountedRef.current) setError(e);
             throw e;
         } finally {
-            if (mountedRef.current) setSyncing(false);
+            if (generation === syncGenRef.current && mountedRef.current) setSyncing(false);
         }
     }, [store, stableMask, syncOptionsRef]);
 

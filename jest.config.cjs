@@ -1,7 +1,5 @@
-// jest.config.ts
-import type { Config } from 'jest'
-
-const jestConfig: Config = {
+/** @type {import('jest').Config} */
+const jestConfig = {
   verbose: true,
   testEnvironment: 'jsdom',
   setupFiles: ['<rootDir>/__test/setup.ts'],
@@ -13,6 +11,15 @@ const jestConfig: Config = {
   testRegex: '^.+\\.test\\.(t|j)sx?$',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {'^(\\.{1,2}/.*)\\.js$': '$1'},
+  transform: {
+    '^.+\\.[jt]sx?$': ['@swc/jest', {
+      jsc: {
+        parser: {syntax: 'typescript', tsx: true},
+        transform: {react: {runtime: 'automatic'}},
+      },
+      module: {type: 'commonjs'},
+    }],
+  },
 }
 
-export default jestConfig
+module.exports = jestConfig

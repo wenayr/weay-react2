@@ -870,8 +870,10 @@ export function OrdersFeed() {
 
 Why:
 
-- `wenay-common2@^1.0.75` restores a stable remote after a transient transport
-  reconnect: live delivery, seq catch-up, queued race drain, then dedupe.
+- The reconnect contract introduced in `wenay-common2@1.0.75` remains in
+  `wenay-common2@2.x`: a stable remote survives a transient transport
+  reconnect through live delivery, seq catch-up, queued race drain, then
+  dedupe.
 - `policy: "queue"` keeps every event available in the retained journal;
   `"frame"` is intentionally lossy and belongs to visual/latest-value feeds.
 - Callback identity and ordinary parent rerenders do not recreate the

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node", "jest"]
+  },
+  "files": [],
+  "include": [
+    "src/styles.d.ts",
+    "__test/**/*.ts",
+    "__test/**/*.tsx"
+  ]
+}
