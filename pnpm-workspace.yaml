@@ -4,4 +4,4 @@ allowBuilds:
   unrs-resolver: true
   utf-8-validate: true
 minimumReleaseAgeExclude:
-  - wenay-common2@1.0.83 || 1.0.84 || 1.0.87 || 1.0.89 || 1.0.90 || 1.0.91 || 1.0.92 || 1.0.94 || 2.0.0 || 2.0.1
+  - wenay-common2@1.0.83 || 1.0.84 || 1.0.87 || 1.0.89 || 1.0.90 || 1.0.91 || 1.0.92 || 1.0.94 || 2.0.0 || 2.0.1 || 2.1.1 || 2.1.2 || 2.1.3

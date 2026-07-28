@@ -48,6 +48,26 @@ If the package is updated, read the changelog from the newly installed package b
 - If work is paused or blocked locally, leave the progress file in place and make the next required action explicit.
 - If the paused state must be committed or handed off, promote the useful part into a durable doc such as `ROADMAP`, `RECOMMENDATIONS`, `doc/target`, or `doc/changes`, instead of relying on an ignored progress file.
 
+## Generated Declarations
+
+- `lib/**/*.d.ts` files are generated artifacts. Never edit them by hand.
+- For a compact public-surface overview, read `lib/index.d.ts`,
+  `lib/native/index.d.ts`, or the matching generated entrypoint before
+  traversing implementation files.
+- Treat declarations as an export/type map, not as evidence of runtime
+  behavior, lifecycle, errors, performance, or ownership. Verify those in
+  source, tests, and public documentation.
+- Run `npm run types:generate` after changing exported types. Use
+  `npm run types:watch` while iterating on public type surfaces.
+- After generation, inspect the declaration changes for intended exports and
+  accidental widening, narrowing, or new public symbols. Never assume a
+  declaration watcher is already running.
+- `npm run types:generate` validates the resulting public declaration graph;
+  use `npm run types:check` to repeat that consumer-side check without
+  regenerating declarations.
+- A full `npm run build` also regenerates declarations and removes stale build
+  artifacts, and is required before publishing.
+
 ## Recent Changes Catalog
 
 Every meaningful code, public API, dependency, migration, or documentation-policy change must add or update a file in `doc/changes/`.

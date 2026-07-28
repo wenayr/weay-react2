@@ -387,6 +387,13 @@ async function handleQaObserve(req: IncomingMessage, res: ServerResponse, next: 
 }
 
 export default defineConfig({
+  define: {
+    // react-draggable (used by react-rnd) reads this flag at runtime. Vite does
+    // not provide Node's global `process` in the browser, so the first controlled
+    // position update would otherwise crash the whole QA stand.
+    'process.env.DRAGGABLE_DEBUG': 'false',
+    'process.env.NODE_ENV': JSON.stringify('development'),
+  },
   plugins: [
     react(),
     {

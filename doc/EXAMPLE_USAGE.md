@@ -152,6 +152,12 @@ Standard:
 - Provide `getRowId` when selection, row state, streaming overlays, or stable
   identity matters.
 - Do not create a buffer just to render a static list.
+- The wrapper registers its targeted default AG Grid module set once. For an
+  optional feature, pass the native per-grid module list, for example
+  `modules={[CsvExportModule]}`. Bare `AgGridReact` users can call
+  `ensureAgGridModules()` before rendering.
+- `GridStyleDefault()` configures theme/global options only; it does not
+  register feature bundles.
 
 ## Streaming Or Patch-Updating Table
 

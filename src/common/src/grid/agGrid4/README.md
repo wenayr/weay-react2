@@ -9,6 +9,7 @@
 |------|------|
 | `core.ts` | `createGridBuffer`: row buffer, add/update/remove delivery, attach/detach/sync lifecycle |
 | `agGrid4.tsx` | `useAgGrid` controller + `AgGridTable` component defaults |
+| `modules.ts` | idempotent targeted AG Grid module registration |
 | `columnBuffer.ts` | `createColumnBuffer`: persisted exact set of dynamic names + grid lifecycle replay |
 | `gridUtils.ts` | `colDefCentered`, `colDefWrap`, `numericComparator` |
 | `theme.ts` | cached ag-grid theme builder/hook |
@@ -66,6 +67,27 @@ const grid = useAgGrid({ core: mainTable })
 ```
 
 The controller keeps the existing aliases: `update`, `updateData`, `remove`, `clean`, `sync`, `fit`, `flush`, `sizeColumnsToFit`, `flushAsyncTransactions`, `apiRef`, `props`, `gridProps`, `getApi`, and `withApi`.
+
+## AG Grid Modules
+
+`useAgGrid` registers `defaultAgGridModules` once, before the first grid is
+created. The shared baseline contains the client-side row model and transaction
+API, row/column/event/render/scroll APIs, autosize, selection,
+text/number/date filters, row/cell styling, and tooltips. It deliberately does
+not contain `AllCommunityModule`.
+
+Optional features stay grid-scoped through AG Grid's normal `modules` prop:
+
+```tsx
+import { CsvExportModule } from 'ag-grid-community'
+
+<AgGridTable<Row> modules={[CsvExportModule]} rowData={rows} columnDefs={cols} />
+```
+
+For a bare `AgGridReact` integration, call `ensureAgGridModules()` before
+rendering or register `defaultAgGridModules` with `ModuleRegistry` yourself.
+Development validation follows `process.env.NODE_ENV`; production bundlers
+must replace that standard expression (Vite and the release probe do).
 
 ## AgGridTable
 

@@ -5,19 +5,9 @@
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { AgGridReact, AgGridReactProps } from 'ag-grid-react'
 import type { GridApi, GetRowIdParams, GridPreDestroyedEvent, GridReadyEvent } from 'ag-grid-community'
-import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 import { createGridBuffer, type BufferTable, type GetId, type GridBufferCore, type GridBufferMode, type PushOptions } from './core'
+import { ensureAgGridModules } from './modules'
 import { useAgGridTheme } from './theme'
-
-// ag-grid v35 requires module registration. Do it lazily and once, on the first hook
-// use, not when the package is imported (the entry stays side-effect-free).
-// Re-registration by a consumer that already calls GridStyleDefault() is harmless.
-let modulesRegistered = false
-function ensureAgGridModules() {
-    if (modulesRegistered) return
-    modulesRegistered = true
-    ModuleRegistry.registerModules([AllCommunityModule])
-}
 
 export type UseAgGridOptions<T> = {
     /** How to get a row id. Defaults to the `id` field. Captured once (first render). */

@@ -20,7 +20,6 @@
     "jsx": "react-jsx"
   },
   "files": [
-    "src/styles.d.ts",
     "src/index.ts",
     "src/native/index.ts",
     "src/common/demo/peerMedia.tsx",

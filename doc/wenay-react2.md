@@ -247,6 +247,20 @@ const menu = useRightMenuController({elements, keyForSave?})
 `DropdownMenu` is a floating action menu with caller-owned trigger/content styling, not the main context-menu primitive. `useRightMenuController` exposes the same open/fixed/select/submenu/drag state for custom views; `DropdownMenu` remains the compatible visual wrapper.
 
 ## agGrid4
+`AgGridTable`/`useAgGrid` register a targeted default module baseline exactly
+once before the first grid. The baseline covers client-side rows and
+transactions, row/column/event/render/scroll APIs, autosize, selection,
+text/number/date filters, row/cell styling, and tooltips. It does not use
+`AllCommunityModule`.
+
+Optional AG Grid features remain grid-scoped:
+```
+<AgGridTable modules={[CsvExportModule]} rowData={rows} columnDefs={cols} />
+```
+For bare `AgGridReact`, call `ensureAgGridModules()` first or register the
+exported `defaultAgGridModules`. `GridStyleDefault()` only configures the theme
+and global grid options.
+
 Plain declarative rows:
 ```
 <AgGridTable<Row> rowData={rows} columnDefs={cols} />
@@ -685,7 +699,7 @@ tokens.menu.outlineColor
 tokens.logs.notificationAccent
 tokens.zIndex.modal
 
-GridStyleDefault()                               // inject legacy grid CSS vars/classes
+GridStyleDefault()                               // shared theme + global grid options
 StyleGridDefault                                 // common ag-grid style object
 buildAgTheme("dark" | "light")
 useAgGridTheme("dark" | "light")

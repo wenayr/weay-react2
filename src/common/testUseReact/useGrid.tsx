@@ -1,14 +1,14 @@
 import React, {useEffect, useRef, useState} from "react";
 
 import {ColDef, GridReadyEvent} from "ag-grid-community";
-import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import {sleepAsync} from "wenay-common2";
 import {updateBy} from "../updateBy";
 import {contextMenu} from "../src/menu/menuMouse";
+import {ensureAgGridModules} from "../src/grid/agGrid4";
 import {applyGridRows} from "../src/utils";
 
-ModuleRegistry.registerModules([AllCommunityModule]);
+ensureAgGridModules();
 
 interface IRow {
     make: string;
