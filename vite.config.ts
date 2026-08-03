@@ -7,7 +7,10 @@ import {createRpcServerAuto, listen, Observe, Peer, Replay} from 'wenay-common2'
 /* Real Socket.IO/RPC source for the reconnect QA card. This deliberately lives in
  * the Vite-only stand: React receives the normal common2 RPC remote and does not
  * know about the socket or its reconnect lifecycle. */
-const [emitQaReplay, qaReplay] = Replay.replayListen<[number]>({history: 20_000});
+const [emitQaReplay, qaReplay] = Replay.replayListen<[number]>({
+  history: 20_000,
+  keepMs: 10 * 60_000,
+});
 let qaReplayProduced = 0;
 let qaReplayTimer: ReturnType<typeof setInterval> | null = null;
 const qaReplayEmit = (count = 1) => {
@@ -19,6 +22,7 @@ const qaReplayStats = () => ({
   head: qaReplay.head(),
   // RPC Replay uses the envelope `line` surface, not the legacy payload `on` surface.
   listeners: qaReplay.line.count(),
+  journal: qaReplay.journalWindow(),
   producing: qaReplayTimer != null,
 });
 const qaReplayApi = {

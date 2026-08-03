@@ -1,7 +1,7 @@
 import React, {StrictMode, useRef, useState} from "react";
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {Observe, Replay} from "wenay-common2";
-import {useReplayRouteSubscribe, useStoreReplayEach, useStoreReplayMirror, useStoreReplayRouteMirror} from "../src/common/src/hooks/useReplay";
+import {useReplayRouteSubscribe, useStoreLazyLineMirror, useStoreReplayEach, useStoreReplayMirror, useStoreReplayRouteMirror} from "../src/common/src/hooks/useReplay";
 import {useStoreNode} from "../src/common/src/hooks/useObserveStore";
 
 type Rows = Record<string, {qty: number}>;
@@ -154,6 +154,37 @@ test("useStoreReplayMirror applies Store Replay V2 envelopes", async () => {
 
     await mutateServer(server, () => { server.state.qty = 2; });
     await waitFor(() => expect(screen.getByTestId("batch-store-qty").textContent).toBe("2"));
+});
+
+function LazyLineProbe({remote}: {remote: Observe.StoreLazyRemote}) {
+    const mirror = useStoreLazyLineMirror<Rows>(remote, {}, {
+        readBytes: 128,
+        fillIntervalMs: 0,
+        liveIntervalMs: 10,
+    });
+    const rows = useStoreNode(mirror.store.node, {mode: "snapshot"});
+
+    return <div>
+        <output data-testid="lazy-filled">{String(mirror.filled)}</output>
+        <output data-testid="lazy-rows">{Object.keys(rows.value).sort().map(key => `${key}=${rows.value[key].qty}`).join(" ")}</output>
+        <output data-testid="lazy-cursor">{mirror.cursor()?.key ?? "-"}</output>
+    </div>;
+}
+
+test("useStoreLazyLineMirror progressively fills and follows live top-level values", async () => {
+    const server = Observe.createStore<Rows>({a: {qty: 1}, b: {qty: 2}});
+    const lazy = Observe.exposeStoreLazyLine(server, {chunkBytes: 128});
+
+    render(<StrictMode><LazyLineProbe remote={lazy.api}/></StrictMode>);
+
+    await waitFor(() => expect(screen.getByTestId("lazy-filled").textContent).toBe("true"));
+    await waitFor(() => expect(screen.getByTestId("lazy-rows").textContent).toBe("a=1 b=2"));
+    expect(screen.getByTestId("lazy-cursor").textContent).not.toBe("-");
+
+    await mutateServer(server, () => { server.state.a.qty = 5; server.state.c = {qty: 3}; });
+    await waitFor(() => expect(screen.getByTestId("lazy-rows").textContent).toBe("a=5 b=2 c=3"));
+
+    lazy.close();
 });
 
 test("useReplayRouteSubscribe switches routes explicitly and keeps old route after failed replacement", async () => {

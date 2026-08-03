@@ -8,6 +8,8 @@ type StorePatch = Observe.StorePatch;
 type ReplayEvent<Z extends any[]> = Replay.ReplayEvent<Z>;
 type ReplayRemote<Z extends any[]> = Replay.ReplayRemote<Z>;
 type StoreReplayRemote = Observe.StoreReplayRemote;
+type StoreLazyRemote = Observe.StoreLazyRemote;
+type StoreLazyCursor = Observe.StoreLazyCursor;
 type StaleInfo = Replay.StaleInfo;
 export type ReplayRouteEvent = Replay.ReplayRouteEvent;
 export type ReplayRouteSwitchOptions = Replay.ReplayRouteSwitchOpts;
@@ -606,6 +608,129 @@ export function useStoreReplayMirror<T extends object>(
     }
     const store = storeRef.current.store;
     const sync = useStoreReplaySync(store, remote, options);
+    return useMemo(() => ({...sync, store}), [sync, store]);
+}
+
+export type UseStoreLazyLineSyncOptions = Observe.StoreLazySyncOpts & {
+    /** false = pause reads and close the current progressive sync. Default true. */
+    enabled?: boolean;
+    /** Keep the subscriber-owned cursor across restart/enable cycles. Default true. */
+    keepCursor?: boolean;
+};
+
+export type StoreLazyLineSyncController = {
+    /** The initial progressive fill reached the current end of the key space. */
+    readonly filled: boolean;
+    readonly error: unknown;
+    /** Current resumable subscriber cursor. Reading it does not re-render. */
+    cursor(): StoreLazyCursor | null;
+    /** Restart reads; an explicit cursor overrides the current resume point. */
+    restart(cursor?: StoreLazyCursor | null): void;
+};
+
+/**
+ * React lifecycle wrapper over `Observe.syncStoreLazyLine`.
+ *
+ * Lazy lines progressively merge absolute top-level values instead of transferring one
+ * monolithic keyframe. The cursor and mirror state survive StrictMode effect restarts and
+ * enabled toggles, so slow links resume the fill instead of starting over.
+ */
+export function useStoreLazyLineSync<T extends object>(
+    store: Observe.Store<T> | null | undefined,
+    remote: StoreLazyRemote | null | undefined,
+    options: UseStoreLazyLineSyncOptions = {},
+): StoreLazyLineSyncController {
+    const {
+        enabled = true,
+        keepCursor = true,
+        cursor,
+        readBytes,
+        fillIntervalMs,
+        liveIntervalMs,
+        fillOnly,
+        onCursor,
+        onProgress,
+        onError,
+    } = options;
+    const hooksRef = useLatestRef({onCursor, onProgress, onError});
+    const cursorRef = useRef<StoreLazyCursor | null>(cursor ?? null);
+    const lastRemoteRef = useRef<StoreLazyRemote | null | undefined>(undefined);
+    const closeRef = useRef<(() => void) | null>(null);
+    const [filled, setFilled] = useState(false);
+    const [error, setError] = useState<unknown>(null);
+    const [epoch, setEpoch] = useState(0);
+
+    useEffect(() => {
+        if (!store || !remote || !enabled) return;
+        if (lastRemoteRef.current !== undefined && lastRemoteRef.current !== remote) {
+            cursorRef.current = cursor ?? null;
+        }
+        lastRemoteRef.current = remote;
+
+        let alive = true;
+        setFilled(false);
+        setError(null);
+        const sync = Observe.syncStoreLazyLine(store, remote, {
+            cursor: cursorRef.current,
+            readBytes,
+            fillIntervalMs,
+            liveIntervalMs,
+            fillOnly,
+            onCursor: next => {
+                cursorRef.current = next;
+                hooksRef.current.onCursor?.(next);
+            },
+            onProgress: progress => hooksRef.current.onProgress?.(progress),
+            onError: nextError => {
+                if (alive) setError(nextError);
+                hooksRef.current.onError?.(nextError);
+            },
+        });
+        closeRef.current = sync.close;
+        sync.filled.then(
+            () => { if (alive) setFilled(true); },
+            nextError => { if (alive) setError(nextError); },
+        );
+        return () => {
+            alive = false;
+            closeRef.current = null;
+            sync.close();
+            if (!keepCursor) cursorRef.current = cursor ?? null;
+        };
+        // callback identities and the initial cursor ride refs/config; wire cadence changes restart.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [store, remote, enabled, epoch, readBytes, fillIntervalMs, liveIntervalMs, fillOnly]);
+
+    const currentCursor = useCallback(() => cursorRef.current, []);
+    const restart = useCallback((nextCursor?: StoreLazyCursor | null) => {
+        if (nextCursor !== undefined) cursorRef.current = nextCursor;
+        closeRef.current?.();
+        setEpoch(value => value + 1);
+    }, []);
+
+    return useMemo(() => ({filled, error, cursor: currentCursor, restart}), [filled, error, currentCursor, restart]);
+}
+
+export type StoreLazyLineMirrorController<T extends object> = StoreLazyLineSyncController & {
+    readonly store: Observe.Store<T>;
+};
+
+/** Create a local Store and progressively keep it merged from a lazy-line remote. */
+export function useStoreLazyLineMirror<T extends object>(
+    remote: StoreLazyRemote | null | undefined,
+    initial: T,
+    options: UseStoreLazyLineSyncOptions & {drain?: StoreDrain} = {},
+): StoreLazyLineMirrorController<T> {
+    const {drain, ...syncOptions} = options;
+    const storeRef = useRef<{remote: typeof remote, store: Observe.Store<T>} | null>(null);
+    if (!storeRef.current || storeRef.current.remote !== remote) {
+        storeRef.current = {
+            remote,
+            store: Observe.createStore<T>(initial, drain !== undefined ? {drain} : undefined),
+        };
+    }
+    const store = storeRef.current.store;
+    const sync = useStoreLazyLineSync(store, remote, syncOptions);
     return useMemo(() => ({...sync, store}), [sync, store]);
 }
 
