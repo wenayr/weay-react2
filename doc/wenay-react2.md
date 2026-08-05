@@ -123,6 +123,8 @@ const b = useReorderBoard({columns: [{key, items}], commit,                 // d
 <div ref={b.columnRef('todo')}>{items.map(k => ...b.item(k)...)}</div>      // one div per column, any count
 b.over                                                                      // {col, index} | null - live target
 // column gravity is YOUR CSS: justify-content flex-start packs up, flex-end packs down
+// draggable column wrappers stay headless too: compose a second useReorder over column keys,
+// bind its item(key).props to YOUR header and item(key).style to YOUR complete wrapper.
 
 <FloatingWindow keyForSave="tool" size={{width: 320, height: 240}} header={<div>Tool</div>}
                 closable closeOnEscape onClose={reason => setOpen(false)}> {/* legacy onClickClose remains */}
@@ -131,6 +133,9 @@ b.over                                                                      // {
 // Default: fixed body-portal host + absolute window in viewport coordinates, click-to-front.
 // Title double-click/two taps: maximize/restore. Top-centre drag: half/quarter Snap Layout.
 // WindowPortal keeps a menu/tooltip in the owning window's isolated layer.
+// Optional desktop surface: <FloatingWindowTaskbar stackGroup="tools" />.
+// Add minimizable + stackGroup="tools" + layoutGroup="saved-tools" + stable windowId to members.
+// Win/Meta+Left/Right snaps, Up maximizes, Down restores and then minimizes.
 // Rare embedded/parent-relative case: <FloatingWindow portal={false} ... />
 
 const wnd = useFloatingWindowController({keyForSave: "custom-tool", size: {width: 320, height: 240}})

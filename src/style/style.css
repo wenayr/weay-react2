@@ -373,6 +373,7 @@ body {
   --wnd-close-top: 4px;
   --wnd-close-right: 4px;
   --wnd-maximize-right: 36px;
+  --wnd-minimize-right: 68px;
 }
 /* Header drag zone. Color/font tokens are undeclared by default: an unresolved var()
    makes the property fall back to its inherited value, i.e. exactly the legacy look. */
@@ -397,6 +398,9 @@ body {
   padding: 0 72px 0 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.wenayWnd:has(.wenayWndMinimize) .wenayWndTitle {
+  padding-right: 104px;
 }
 /* Default header content when no header element is passed (striped drag strip) */
 .wenayWndHeaderDef {
@@ -467,6 +471,14 @@ body {
 }
 .wenayWndMaximize {
   right: var(--wnd-maximize-right, 20px);
+}
+.wenayWndMinimize {
+  right: var(--wnd-minimize-right, 52px);
+}
+.wenayWndMinimize > span {
+  width: 10px;
+  height: 1.5px;
+  background: currentColor;
 }
 .wenayWndMaximize > span {
   width: 9px;
@@ -550,6 +562,47 @@ body {
   box-sizing: border-box;
   pointer-events: none;
   backdrop-filter: blur(2px);
+}
+
+/* Optional common window panel. Consumers can replace every item through
+   FloatingWindowTaskbar.renderItem or use the manager hook without this CSS. */
+.wenayWindowTaskbar {
+  position: fixed;
+  z-index: 2147483647;
+  left: 50%;
+  bottom: 10px;
+  display: flex;
+  gap: 5px;
+  max-width: calc(100vw - 20px);
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--color-border-common, #323e47) 78%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-bg-dark, #131821) 92%, transparent);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .38);
+  pointer-events: auto;
+  transform: translateX(-50%);
+  backdrop-filter: blur(14px);
+}
+.wenayWindowTaskbarItem {
+  min-width: 72px;
+  max-width: 180px;
+  height: 30px;
+  overflow: hidden;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--color-text-base, #c4c4c4);
+  background: rgba(255, 255, 255, .06);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.wenayWindowTaskbarItem[data-active="true"] {
+  border-color: var(--menu-outline-color, #007bff);
+  background: rgba(255, 255, 255, .14);
+}
+.wenayWindowTaskbarItem[data-minimized="true"] {
+  opacity: .62;
 }
 
 @media (prefers-reduced-motion: reduce) {

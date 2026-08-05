@@ -70,6 +70,7 @@
   --wnd-close-hover: #fff;
   --wnd-close-hover-bg: #e5484d;
   --wnd-maximize-right: calc(var(--wnd-close-right) + var(--wnd-close-size) + 4px);
+  --wnd-minimize-right: calc(var(--wnd-maximize-right) + var(--wnd-close-size) + 4px);
   --wnd-control-bg: var(--wnd-close-bg);
   --wnd-control-hover-bg: rgba(255, 255, 255, 0.16);
 

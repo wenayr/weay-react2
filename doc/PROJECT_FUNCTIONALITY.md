@@ -123,7 +123,7 @@ Main APIs:
 - `useOutside`, `OutsideClickArea`
 - `Button`, `OutsideButton`, `HoverButton`, `AbsoluteButton`
 - `FloatingWindow`, `useFloatingWindowController`
-- `WindowPortal`, `useFloatingWindowManager`
+- `WindowPortal`, `useFloatingWindowManager`, `FloatingWindowTaskbar`
 - `useDraggableApi`, `useReorder`, `useReorderBoard`
 
 Use these when the UI problem is generic: outside-click closing, draggable
@@ -134,6 +134,10 @@ It also provides title-bar/button maximize and restore, mouse/touch double activ
 keyboard move/resize, Windows 11-like half/quarter Snap Layouts, vetoable close reasons,
 and window-scoped portals for menus/tooltips. Scrim overlays independently arbitrate
 Escape/outside clicks to the top dialog and trap/restore focus.
+The optional sibling desktop layer adds minimize/restore, a replaceable common taskbar,
+persisted `layoutGroup` Snap members, small cascade placement, and Win/Meta+Arrow commands.
+It reuses `floatingWindowMap`; applications can omit the rendered taskbar and consume only
+the manager hook, so the base window does not become an app-shell framework.
 Set `portal={false}` only for a deliberately parent-relative embedded window.
 Use `useFloatingWindowController` only for custom chrome around the same
 geometry/stack/resize behavior; custom chrome must provide its own portal and

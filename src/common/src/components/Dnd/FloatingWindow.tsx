@@ -8,13 +8,20 @@ import React, {
 } from "react";
 import { Rnd, type RndResizeCallback } from "react-rnd";
 import {createPortal} from "react-dom";
-import {createUpdateApi} from "../../../updateBy";
 import {floatingWindowMap} from "../../utils/persistedMaps";
 import {useDraggableApi} from "../../hooks/useDraggable";
+import {cascadeWindowPosition, useFloatingDesktopWindow} from "./FloatingDesktop";
+export {FloatingWindowTaskbar, useFloatingWindowManager} from "./FloatingDesktop";
+export type {FloatingDesktopWindow, FloatingWindowManager, FloatingWindowTaskbarProps} from "./FloatingDesktop";
 
 export type FloatingWindowPosition = { x: number; y: number };
 export type FloatingWindowSize = { height: number | string; width: number | string };
-export type FloatingWindowSavedGeometry = { position: FloatingWindowPosition; size: FloatingWindowSize };
+export type FloatingWindowSavedGeometry = {
+    position: FloatingWindowPosition;
+    size: FloatingWindowSize;
+    snapRegion?: FloatingWindowSnapRegion | null;
+    freeGeometry?: {position: FloatingWindowPosition; size: FloatingWindowSize};
+};
 export type FloatingWindowMode = "normal" | "maximized";
 export type FloatingWindowSnapRegion = "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export type FloatingWindowCloseReason = "close-button" | "escape" | "programmatic";
@@ -33,6 +40,8 @@ export type FloatingWindowProps = {
     windowId?: string;
     /** Windows only reorder against peers in the same group. */
     stackGroup?: string;
+    /** Persist a multi-window layout as `${layoutGroup}:${windowId}` without repeating keyForSave. */
+    layoutGroup?: string;
     zIndex?: number;
     disableDragging?: () => boolean;
     keyForSave?: string;
@@ -40,12 +49,16 @@ export type FloatingWindowProps = {
     position?: FloatingWindowPosition;
     size?: FloatingWindowSize;
     title?: ReactNode;
+    taskbarLabel?: ReactNode;
     ariaLabel?: string;
     maximizable?: boolean;
+    minimizable?: boolean;
     /** Enable the Windows 11-like layout picker while dragging near the top centre. */
     snappable?: boolean;
     defaultMaximized?: boolean;
+    defaultMinimized?: boolean;
     onModeChange?: (mode: FloatingWindowMode) => void;
+    onMinimizedChange?: (minimized: boolean) => void;
     onSnapChange?: (region: FloatingWindowSnapRegion | null) => void;
     onActiveChange?: (active: boolean) => void;
     onPositionChange?: (position: FloatingWindowPosition) => void;
@@ -63,6 +76,8 @@ export type FloatingWindowProps = {
     header?: React.ReactElement | boolean;
     overflow?: boolean;
     sizeByWindow?: boolean;
+    /** Cascade windows that have neither a saved nor explicit position. */
+    cascade?: boolean;
     /**
      * Render in the shared viewport layer (document.body) so ancestor stacking
      * contexts and overflow cannot trap the window. Disable only for a window
@@ -94,6 +109,7 @@ export type FloatingWindowController = {
     dragging: boolean;
     active: boolean;
     mode: FloatingWindowMode;
+    minimized: boolean;
     snapRegion: FloatingWindowSnapRegion | null;
     snapLayoutVisible: boolean;
     snapPreview: FloatingWindowSnapRegion | null;
@@ -103,6 +119,8 @@ export type FloatingWindowController = {
     maximize(): void;
     restore(): void;
     toggleMaximize(): void;
+    minimize(): void;
+    unminimize(): void;
     snapTo(region: FloatingWindowSnapRegion): void;
     showSnapLayout(): void;
     hideSnapLayout(): void;
@@ -121,47 +139,6 @@ export type FloatingWindowController = {
 // Map of all popup window sizes; declared in utils/persistedMaps (memoryCache registry must not
 // import the component layer) and re-exported here so the public surface is unchanged
 export { floatingWindowMap };
-
-// limit={{x:{min:0}, y:{min:0}}}
-let k = 0;
-type OpenWindow = { k: number; publicId: string; group: string; baseZIndex: number };
-const openWindows: { ar: OpenWindow[] } = { ar: [] };
-const openWindowsApi = createUpdateApi(openWindows);
-
-function resolveWindowStack(id: OpenWindow) {
-    let resolvedZIndex = id.baseZIndex;
-    const group = openWindows.ar.filter(entry => entry.group == id.group);
-    for (let index = 0; index < group.length; index++) {
-        const entry = group[index];
-        resolvedZIndex = index == 0
-            ? entry.baseZIndex
-            : Math.max(entry.baseZIndex, resolvedZIndex + 2);
-        if (entry === id) return {index, zIndex: resolvedZIndex, active: index == group.length - 1};
-    }
-    return null;
-}
-
-export type FloatingWindowManager = {
-    ids: readonly string[];
-    activeId?: string;
-    bringToFront(windowId: string): void;
-};
-
-export function useFloatingWindowManager(stackGroup = "window"): FloatingWindowManager {
-    openWindowsApi.use();
-    const entries = openWindows.ar.filter(entry => entry.group == stackGroup);
-    return {
-        ids: entries.map(entry => entry.publicId),
-        activeId: entries.at(-1)?.publicId,
-        bringToFront(windowId) {
-            const index = openWindows.ar.findIndex(entry => entry.group == stackGroup && entry.publicId == windowId);
-            if (index < 0) return;
-            const [entry] = openWindows.ar.splice(index, 1);
-            openWindows.ar.push(entry);
-            openWindowsApi.render();
-        },
-    };
-}
 
 const WindowPortalContext = React.createContext<Element | null>(null);
 
@@ -227,24 +204,32 @@ export const FloatingWindow: typeof FloatingWindowBase = (a) => {
 export function useFloatingWindowController({
     windowId,
     stackGroup = "window",
-    keyForSave: ks,
+    layoutGroup,
+    keyForSave,
     position,
     size,
+    taskbarLabel,
     zIndex = 9,
     onUpdate,
     limit,
     sizeByWindow = true,
     disableDragging,
     maximizable = true,
+    minimizable = false,
     snappable = true,
+    cascade = true,
     defaultMaximized = false,
+    defaultMinimized = false,
     onModeChange,
+    onMinimizedChange,
     onSnapChange,
     onActiveChange,
     onPositionChange,
     onSizeChange,
 }: FloatingWindowControllerOptions = {}): FloatingWindowController {
-    const positionDef: tPosition = { x: 0, y: 0, ...(position ?? {}) };
+    const desktop = useFloatingDesktopWindow({windowId, group: stackGroup, baseZIndex: zIndex, label: taskbarLabel});
+    const ks = keyForSave ?? (layoutGroup && windowId ? `${layoutGroup}:${windowId}` : undefined);
+    const positionDef: tPosition = { ...(cascade ? cascadeWindowPosition(desktop.entry.key) : {x: 0, y: 0}), ...(position ?? {}) };
     const sizeDef: tSize = { height: 0, width: 0, ...(size ?? {}) };
 
     let map: tRND | undefined;
@@ -254,19 +239,7 @@ export function useFloatingWindowController({
     const savedPosition = map?.position ?? positionDef;
     const savedSize = map?.size ?? sizeDef;
 
-    const generatedId = useRef(`wenay-window-${k}`);
-    const id2 = useRef<OpenWindow>({
-        k: k++,
-        publicId: windowId ?? generatedId.current,
-        group: stackGroup,
-        baseZIndex: zIndex,
-    });
-    const id = id2.current;
-    id.publicId = windowId ?? generatedId.current;
-    id.group = stackGroup;
-    id.baseZIndex = zIndex;
-    openWindowsApi.use();
-    const stack = resolveWindowStack(id) ?? {index: 0, zIndex, active: false};
+    const stack = desktop.stack;
 
     const lastC = useRef<{ x: number; y: number } | null>(null);
     const lastT = useRef<{ x: number; y: number; id: number } | null>(null);
@@ -284,7 +257,8 @@ export function useFloatingWindowController({
     const [height, setHeight] = useState(savedSize.height);
     const [update, setUpdate] = useState(0);
     const [mode, setMode] = useState<FloatingWindowMode>(defaultMaximized ? "maximized" : "normal");
-    const [snapRegion, setSnapRegion] = useState<FloatingWindowSnapRegion | null>(null);
+    const [minimized, setMinimized] = useState(defaultMinimized);
+    const [snapRegion, setSnapRegion] = useState<FloatingWindowSnapRegion | null>(map?.snapRegion ?? null);
     const [snapLayoutVisible, setSnapLayoutVisible] = useState(false);
     const [snapPreview, setSnapPreview] = useState<FloatingWindowSnapRegion | null>(null);
     const snapPreviewRef = useRef<FloatingWindowSnapRegion | null>(null);
@@ -293,11 +267,11 @@ export function useFloatingWindowController({
         size: {...savedSize},
     });
     const unsnappedGeometry = useRef<FloatingWindowSavedGeometry>({
-        position: {...savedPosition},
-        size: {...savedSize},
+        position: {...(map?.freeGeometry?.position ?? savedPosition)},
+        size: {...(map?.freeGeometry?.size ?? savedSize)},
     });
-    const callbacksRef = useRef({onModeChange, onSnapChange, onActiveChange, onPositionChange, onSizeChange});
-    callbacksRef.current = {onModeChange, onSnapChange, onActiveChange, onPositionChange, onSizeChange};
+    const callbacksRef = useRef({onModeChange, onMinimizedChange, onSnapChange, onActiveChange, onPositionChange, onSizeChange});
+    callbacksRef.current = {onModeChange, onMinimizedChange, onSnapChange, onActiveChange, onPositionChange, onSizeChange};
     const snapLayoutVisibleRef = useRef(snapLayoutVisible);
     snapLayoutVisibleRef.current = snapLayoutVisible;
 
@@ -315,8 +289,16 @@ export function useFloatingWindowController({
         setMode(next);
         callbacksRef.current.onModeChange?.(next);
     };
+    const changeMinimized = (next: boolean) => {
+        setMinimized(next);
+        callbacksRef.current.onMinimizedChange?.(next);
+    };
     const changeSnapRegion = (next: FloatingWindowSnapRegion | null) => {
         setSnapRegion(next);
+        if (map) {
+            map.snapRegion = next;
+            if (ks) floatingWindowMap.touch(ks);
+        }
         callbacksRef.current.onSnapChange?.(next);
     };
     const previewSnap = (next: FloatingWindowSnapRegion | null) => {
@@ -345,6 +327,10 @@ export function useFloatingWindowController({
         if (!snappable || typeof window == "undefined") return;
         if (!snapRegion && mode == "normal") {
             unsnappedGeometry.current = {position: {x, y}, size: {width, height}};
+            if (map) map.freeGeometry = {
+                position: {...unsnappedGeometry.current.position},
+                size: {...unsnappedGeometry.current.size},
+            };
         }
         const geometry = snapGeometry(region);
         commitPosition(geometry.position);
@@ -367,6 +353,22 @@ export function useFloatingWindowController({
         changeMode("normal");
     };
     const toggleMaximize = () => mode == "maximized" ? restore() : maximize();
+    const minimize = () => {
+        if (!minimizable || minimized) return;
+        changeMinimized(true);
+    };
+    const unminimize = () => {
+        if (!minimized) {
+            desktop.bringToFront();
+            return;
+        }
+        changeMinimized(false);
+        desktop.bringToFront();
+    };
+
+    useLayoutEffect(() => {
+        desktop.sync({minimized, mode, snapRegion, actions: {minimize, restore: unminimize}});
+    }, [minimized, mode, snapRegion]);
 
     const updateSnapPicker = (clientX: number, clientY: number) => {
         if (!snappable || typeof window == "undefined" || typeof document == "undefined") return;
@@ -379,6 +381,13 @@ export function useFloatingWindowController({
         const hit = document.elementFromPoint?.(clientX, clientY) as HTMLElement | null | undefined;
         const region = hit?.closest<HTMLElement>("[data-wenay-snap-region]")?.dataset.wenaySnapRegion as FloatingWindowSnapRegion | undefined;
         previewSnap(region ?? null);
+    };
+
+    const restoreFreeGeometry = () => {
+        const restored = unsnappedGeometry.current;
+        commitPosition({...restored.position});
+        commitSize({...restored.size});
+        changeSnapRegion(null);
     };
 
     const detachSnappedForDrag = (clientX: number, clientY: number) => {
@@ -401,10 +410,6 @@ export function useFloatingWindowController({
         announcedActive.current = stack.active;
         callbacksRef.current.onActiveChange?.(stack.active);
     }, [stack.active]);
-
-    useEffect(() => {
-        openWindowsApi.render();
-    }, [zIndex, stackGroup]);
 
     const limitRef = useRef(limit);
     useLayoutEffect(() => { limitRef.current = limit; });
@@ -510,18 +515,6 @@ export function useFloatingWindowController({
             document.removeEventListener("touchend", touchEndHandler);
         };
     }, [a, b]);
-
-    useEffect(() => {
-        openWindows.ar.push(id);
-        openWindowsApi.render();
-        return () => {
-            const z = openWindows.ar.findIndex((v) => v.k === id.k);
-            if (z >= 0) {
-                openWindows.ar.splice(z, 1);
-                openWindowsApi.render();
-            }
-        };
-    }, []);
 
     if (mode == "normal") {
         savedSize.height = height;
@@ -637,23 +630,23 @@ export function useFloatingWindowController({
         toggleMaximize();
     };
 
-    const bringToFront = () => {
-        const z = openWindows.ar.findIndex((v) => v === id);
-        if (z < 0) return;
-        const lastInGroup = openWindows.ar.findLastIndex(entry => entry.group == id.group);
-        if (z !== lastInGroup) {
-            const buf = openWindows.ar[z];
-            openWindows.ar.splice(z, 1);
-            openWindows.ar.push(buf);
-            openWindowsApi.render();
-        }
-    };
+    const bringToFront = desktop.bringToFront;
     const onWindowMouseDown: React.MouseEventHandler<HTMLDivElement> = bringToFront;
     const onWindowPointerDown: React.PointerEventHandler<HTMLDivElement> = bringToFront;
 
     const onWindowKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
         const target = e.target as HTMLElement;
         if (target.matches("input, textarea, select, button, [contenteditable='true']")) return;
+        if (e.metaKey && !e.altKey && e.key.startsWith("Arrow")) {
+            e.preventDefault();
+            if (e.key == "ArrowLeft") snapTo("left");
+            else if (e.key == "ArrowRight") snapTo("right");
+            else if (e.key == "ArrowUp") maximize();
+            else if (mode == "maximized") restore();
+            else if (snapRegion) restoreFreeGeometry();
+            else minimize();
+            return;
+        }
         if (e.altKey && e.key == "Enter") {
             e.preventDefault();
             toggleMaximize();
@@ -698,6 +691,7 @@ export function useFloatingWindowController({
         dragging: a || b,
         active: stack.active,
         mode,
+        minimized,
         snapRegion,
         snapLayoutVisible,
         snapPreview,
@@ -707,6 +701,8 @@ export function useFloatingWindowController({
         maximize,
         restore,
         toggleMaximize,
+        minimize,
+        unminimize,
         snapTo,
         showSnapLayout: () => setSnapLayoutVisible(true),
         hideSnapLayout,
@@ -731,15 +727,20 @@ export function FloatingWindowBase({
                                 children,
                                 windowId,
                                 stackGroup = "window",
+                                layoutGroup,
                                 keyForSave: ks,
                                 position,
                                 size,
                                 title,
+                                taskbarLabel,
                                 ariaLabel,
                                 maximizable,
+                                minimizable,
                                 snappable,
                                 defaultMaximized = false,
+                                defaultMinimized = false,
                                 onModeChange,
+                                onMinimizedChange,
                                 onSnapChange,
                                 onActiveChange,
                                 onPositionChange,
@@ -759,6 +760,7 @@ export function FloatingWindowBase({
                                 closable,
                                 closeOnEscape = false,
                                 sizeByWindow = true,
+                                cascade,
                                 portal = true,
                                 portalContainer,
                             }: FloatingWindowProps) {
@@ -766,6 +768,7 @@ export function FloatingWindowBase({
     const showClose = closable ?? !!(onClose || clickClose);
     const portalEnabled = portal && typeof document != "undefined";
     const canMaximize = maximizable ?? portalEnabled;
+    const canMinimize = minimizable ?? false;
     const canSnap = snappable ?? portalEnabled;
     // `limit` remains coordinate-system-relative. The default portal uses viewport
     // coordinates; an embedded portal={false} window uses its positioned parent.
@@ -774,18 +777,24 @@ export function FloatingWindowBase({
     const controller = useFloatingWindowController({
         windowId,
         stackGroup,
+        layoutGroup,
         keyForSave: ks,
         position,
         size,
+        taskbarLabel: taskbarLabel ?? title ?? windowId,
         zIndex,
         onUpdate,
         disableDragging,
         limit,
         sizeByWindow,
         maximizable: canMaximize,
+        minimizable: canMinimize,
         snappable: canSnap,
+        cascade: cascade ?? portalEnabled,
         defaultMaximized,
+        defaultMinimized,
         onModeChange,
+        onMinimizedChange,
         onSnapChange,
         onActiveChange,
         onPositionChange,
@@ -845,6 +854,7 @@ export function FloatingWindowBase({
         controller.active && "wenayWindowRoot_active",
         controller.mode == "maximized" && "wenayWindowRoot_maximized",
         controller.snapRegion && "wenayWindowRoot_snapped",
+        controller.minimized && "wenayWindowRoot_minimized",
     ].filter(Boolean).join(" ");
 
     const windowNode = (
@@ -858,12 +868,14 @@ export function FloatingWindowBase({
                 zIndex: controller.zIndex,
                 isolation: "isolate",
                 pointerEvents: "auto",
+                display: controller.minimized ? "none" : undefined,
             }}
             data-wenay-window=""
             data-window-id={windowId}
             data-wenay-window-layer={portalEnabled ? "viewport" : "parent"}
             data-active={controller.active ? "true" : "false"}
             data-mode={controller.mode}
+            data-minimized={controller.minimized ? "true" : "false"}
             data-snap-region={controller.snapRegion ?? undefined}
             data-position-x={controller.position.x}
             data-position-y={controller.position.y}
@@ -904,6 +916,19 @@ export function FloatingWindowBase({
                     )}
                     {typeof children === "function" ? children(controller.update) : children}
                 </div>
+                {showHeader && canMinimize && (
+                    <button
+                        type="button"
+                        className="wenayWndControl wenayWndMinimize"
+                        title="Minimize"
+                        aria-label="Minimize"
+                        onMouseDown={event => event.stopPropagation()}
+                        onPointerDown={event => event.stopPropagation()}
+                        onClick={controller.minimize}
+                    >
+                        <span aria-hidden="true" />
+                    </button>
+                )}
                 {showHeader && canMaximize && (
                     <button
                         type="button"

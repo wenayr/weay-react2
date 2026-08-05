@@ -743,7 +743,7 @@ Standard:
 Use when a settings editor needs to stay stable while the bar itself reflows.
 
 ```tsx
-import { FloatingWindow, OutsideClickArea, WindowPortal } from "wenay-react2"
+import { FloatingWindow, FloatingWindowTaskbar, OutsideClickArea, WindowPortal } from "wenay-react2"
 
 const OrdersToolbarSettings = ordersToolbar.Settings
 
@@ -753,9 +753,12 @@ export function ToolbarSettingsWindow({ open, close }: { open: boolean; close: (
     return (
         <OutsideClickArea status={open} outsideClick={close}>
             <FloatingWindow
-                keyForSave="orders.toolbar.settings"
+                windowId="toolbar-settings"
+                stackGroup="tool-windows"
+                layoutGroup="saved-tool-layout"
                 size={{ width: 360, height: 420 }}
                 title="Toolbar"
+                minimizable
                 closable
                 closeOnEscape
                 beforeClose={() => confirm("Discard unsaved changes?")}
@@ -772,6 +775,10 @@ export function ToolbarSettingsWindow({ open, close }: { open: boolean; close: (
         </OutsideClickArea>
     )
 }
+
+// Render once near the app shell. Replace its items through renderItem, or use
+// useFloatingWindowManager("tool-windows") for completely custom markup.
+<FloatingWindowTaskbar stackGroup="tool-windows" />
 ```
 
 Why:
@@ -788,6 +795,8 @@ Why:
   so a popup from an inactive window cannot cover the active window.
 - Keyboard: `Alt+Enter` maximizes/restores; `Alt+Arrow` moves;
   `Alt+Ctrl+Arrow` resizes.
+- `Win/Meta+Left/Right` snaps, Up maximizes, and Down progressively restores
+  then minimizes. `layoutGroup + windowId` persists the Snap/free arrangement.
 - `OutsideClickArea` owns outside-click closing.
 
 Standard:

@@ -1,6 +1,6 @@
 import React from "react";
-import {fireEvent, render, screen} from "@testing-library/react";
-import {FloatingWindow, WindowPortal} from "../src/common/src/components/Dnd/FloatingWindow";
+import {fireEvent, render, screen, within} from "@testing-library/react";
+import {FloatingWindow, FloatingWindowTaskbar, WindowPortal} from "../src/common/src/components/Dnd/FloatingWindow";
 import {OutsideClickArea} from "../src/common/src/hooks/useOutside";
 
 function rootFor(testId: string) {
@@ -234,6 +234,91 @@ describe("FloatingWindow viewport layer", () => {
 
         fireEvent.keyDown(root, {key: "Enter", altKey: true});
         expect(root.dataset.mode).toBe("maximized");
+    });
+
+    test("optional taskbar minimizes and restores the whole window", () => {
+        render(<>
+            <FloatingWindow windowId="task-one" stackGroup="task-test" title="One" minimizable size={{width: 220, height: 140}}>
+                <div data-testid="task-one-content">one</div>
+            </FloatingWindow>
+            <FloatingWindow windowId="task-two" stackGroup="task-test" title="Two" minimizable size={{width: 220, height: 140}}>
+                <div data-testid="task-two-content">two</div>
+            </FloatingWindow>
+            <FloatingWindowTaskbar stackGroup="task-test" portal={false} />
+        </>);
+
+        const first = rootFor("task-one-content");
+        fireEvent.mouseDown(screen.getByTestId("task-one-content"));
+        fireEvent.click(within(first).getByRole("button", {name: "Minimize"}));
+
+        expect(first.dataset.minimized).toBe("true");
+        expect(first.style.display).toBe("none");
+        const taskButton = screen.getByRole("button", {name: "One"});
+        expect(taskButton.dataset.minimized).toBe("true");
+
+        fireEvent.click(taskButton);
+        expect(first.dataset.minimized).toBe("false");
+        expect(first.style.display).toBe("");
+        expect(first.dataset.active).toBe("true");
+    });
+
+    test("windows without an explicit or saved position cascade", () => {
+        render(<>
+            <FloatingWindow stackGroup="cascade-test" size={{width: 160, height: 100}}><div data-testid="cascade-a">a</div></FloatingWindow>
+            <FloatingWindow stackGroup="cascade-test" size={{width: 160, height: 100}}><div data-testid="cascade-b">b</div></FloatingWindow>
+        </>);
+        const a = rootFor("cascade-a");
+        const b = rootFor("cascade-b");
+        expect(a.dataset.positionX).not.toBe(b.dataset.positionX);
+        expect(a.dataset.positionY).not.toBe(b.dataset.positionY);
+    });
+
+    test("Meta+Arrow provides Windows-style snap, maximize, restore and minimize", () => {
+        render(
+            <FloatingWindow title="Keyboard desktop" minimizable position={{x: 70, y: 80}} size={{width: 260, height: 170}}>
+                <div data-testid="desktop-keyboard">desktop keyboard</div>
+            </FloatingWindow>
+        );
+        const root = rootFor("desktop-keyboard");
+
+        fireEvent.keyDown(root, {key: "ArrowLeft", metaKey: true});
+        expect(root.dataset.snapRegion).toBe("left");
+        fireEvent.keyDown(root, {key: "ArrowUp", metaKey: true});
+        expect(root.dataset.mode).toBe("maximized");
+        fireEvent.keyDown(root, {key: "ArrowDown", metaKey: true});
+        expect(root.dataset.mode).toBe("normal");
+        expect(root.dataset.snapRegion).toBe("left");
+        fireEvent.keyDown(root, {key: "ArrowDown", metaKey: true});
+        expect(root.dataset.snapRegion).toBeUndefined();
+        expect(root.dataset.positionX).toBe("70");
+        fireEvent.keyDown(root, {key: "ArrowDown", metaKey: true});
+        expect(root.dataset.minimized).toBe("true");
+    });
+
+    test("layoutGroup persists a snapped group member and its free geometry", () => {
+        const first = render(
+            <FloatingWindow windowId="persisted-a" layoutGroup="saved-layout-test" position={{x: 91, y: 73}} size={{width: 280, height: 190}}>
+                <div data-testid="persisted-first">first mount</div>
+            </FloatingWindow>
+        );
+        const root = rootFor("persisted-first");
+        fireEvent.keyDown(root, {key: "ArrowRight", metaKey: true});
+        expect(root.dataset.snapRegion).toBe("right");
+        first.unmount();
+
+        render(
+            <FloatingWindow windowId="persisted-a" layoutGroup="saved-layout-test" size={{width: 100, height: 100}}>
+                <div data-testid="persisted-second">second mount</div>
+            </FloatingWindow>
+        );
+        const restored = rootFor("persisted-second");
+        expect(restored.dataset.snapRegion).toBe("right");
+        fireEvent.keyDown(restored, {key: "ArrowDown", metaKey: true});
+        expect(restored.dataset.snapRegion).toBeUndefined();
+        expect(restored.dataset.positionX).toBe("91");
+        expect(restored.dataset.positionY).toBe("73");
+        expect(restored.style.width).toBe("280px");
+        expect(restored.style.height).toBe("190px");
     });
 
     test("modern close API reports reasons and beforeClose can veto", () => {

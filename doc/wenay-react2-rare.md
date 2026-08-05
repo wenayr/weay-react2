@@ -97,6 +97,15 @@ cell applies it, and dragging a snapped window restores its previous free size. 
 keeps menus/tooltips in the owning window's isolated layer. `useFloatingWindowManager(group)`
 exposes group order and programmatic bring-to-front. `beforeClose` plus `onClose(reason)` cover
 vetoable close flows; the legacy `onClickClose` remains supported.
+Desktop additions stay in the small sibling module `FloatingDesktop.tsx`, not in the geometry/
+drag implementation: `FloatingWindowTaskbar` is an optional common panel, while
+`useFloatingWindowManager` is its headless replacement (`windows`, minimize/restore/bringToFront).
+Set `minimizable` only when one of those restore surfaces exists. `layoutGroup + windowId`
+derives a stable persisted key for each group member and stores both its Snap region and previous
+free geometry in the existing `floatingWindowMap`; no second persistence system is involved.
+Unpositioned viewport windows cascade in eight small slots (`cascade={false}` opts out).
+Focused window roots accept Win/Meta+Left/Right (Snap), Up (maximize), and Down
+(restore Snap/maximize, then minimize); the existing Alt keyboard fallback remains available.
 
 Left-side modal/menu helpers:
 ```
@@ -404,6 +413,8 @@ FloatingWindowBase(props)                  // lower-level react-rnd wrapper
 FloatingWindow(props)                      // canonical floating window component
 useFloatingWindowController(options)       // headless geometry/stack/drag/resize controller for custom chrome
 useFloatingWindowManager(stackGroup?)      // order, active id, programmatic bring-to-front
+FloatingWindowTaskbar                      // optional common restore panel; renderItem is replaceable
+FloatingDesktopWindow                      // headless taskbar/manager snapshot
 WindowPortal                               // popup/menu portal scoped to the owning window layer
 floatingWindowMap                           // persisted RND map (ObservableMap)
 FloatingWindowUpdate
@@ -491,7 +502,14 @@ useReorderBoard({columns: [{key, items}], commit(next), canDrag?, holdMs?,
   onOverChange (only when the target slot changes; compare prev.col != over.col for column
   crossings), onDragEnd (final slot + committed flag; a plain click is committed=false).
   `over`/`dragKey` are also returned reactively for render-time styling (column highlight).
-- QA card 27 is the live example (5 columns, mixed gravity, empty column, add-column).
+- Container order stays deliberately compositional rather than baked into the board hook:
+  create a second `useReorder({order: columns.map(c => c.key), commit})`, attach its
+  `listRef` to the outer container, its `item(key).props` to the consumer-rendered header,
+  and its `item(key).style` to the complete column wrapper. Buttons in that header remain
+  interactive because `useReorder` never starts from `button/input/select/textarea/a`.
+  Neither hook renders a header, delete button, tray, or visual style.
+- QA card 27 is the live example: compact left tray/actions, item drag between bodies,
+  complete-column drag by consumer headers, header `Del`, mixed gravity, and an empty column.
 
 ## Grid Row Utilities
 ```

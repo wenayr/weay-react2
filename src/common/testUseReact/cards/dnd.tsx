@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useReorder, useReorderBoard, renderBy, updateBy, type BoardColumn } from "../../api";
 import { Button } from "../../src/hooks";
-import { FloatingWindow, WindowPortal, type FloatingWindowMode, type FloatingWindowSnapRegion } from "../../src/components";
+import { FloatingWindow, FloatingWindowTaskbar, WindowPortal, type FloatingWindowMode, type FloatingWindowSnapRegion } from "../../src/components";
 import { DragBox } from "../../src/components/Dnd/FloatingWindow";
 import { Check } from "../standKit";
 
@@ -92,9 +92,13 @@ function FloatingWindowStackDemo() {
 
         {firstOpen && <FloatingWindow
             windowId="qa-window-a"
+            stackGroup="qa-desktop"
+            layoutGroup="qa-desktop-layout"
+            taskbarLabel="Window A"
             position={{x: 110, y: 110}}
             size={{width: 340, height: 220}}
             moveOnlyHeader
+            minimizable
             overflow={false}
             onClickClose={() => setFirstOpen(false)}
             onActiveChange={setFirstActive}
@@ -106,9 +110,14 @@ function FloatingWindowStackDemo() {
         </FloatingWindow>}
 
         {secondOpen && <FloatingWindow
+            windowId="qa-window-b"
+            stackGroup="qa-desktop"
+            layoutGroup="qa-desktop-layout"
+            taskbarLabel="Window B"
             position={{x: 300, y: 200}}
             size={{width: 340, height: 220}}
             moveOnlyHeader
+            minimizable
             overflow={false}
             header={<div style={{...stackWindowHeader, background: "#1e3a8a"}}>Window B · intentionally no x</div>}
         >
@@ -128,6 +137,7 @@ function FloatingWindowStackDemo() {
                 }}>B child: z-index 999999</div>
             </div>
         </FloatingWindow>}
+        <FloatingWindowTaskbar stackGroup="qa-desktop" />
     </div>;
 }
 
@@ -220,7 +230,7 @@ const boardState = {
     gravity: { c1: "top", c2: "bottom", c3: "top", c4: "bottom", c5: "top" } as { [k: string]: string },
     // side tray: freshly created blocks land here, then drag into the board
     tray: [] as string[],
-    commits: 0, events: 0, last: "-", nextCol: 6, nextItem: 1,
+    commits: 0, columnCommits: 0, events: 0, last: "-", nextCol: 6, nextItem: 1,
 };
 const qaBoardTray = "tray";
 // left-rail trash: a registered board column whose content the commit discards
@@ -228,30 +238,24 @@ const qaBoardTrash = "trash";
 
 const qaBoardStyles: Record<string, React.CSSProperties> = {
     root: { display: "grid", gap: 8, fontSize: 13 },
-    columns: { display: "grid", alignItems: "start", columnGap: 6 },
-    columnControls: { display: "grid", alignItems: "center", columnGap: 6, marginTop: -6 },
-    insertStrip: {
-        width: 20, height: 20, borderRadius: 10, cursor: "pointer", userSelect: "none",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        color: "#9fb3c8", background: "#202c3c", border: "1px solid #38506d", fontSize: 11, fontWeight: 700,
-    },
-    column: { display: "flex", flexDirection: "column", gap: 6, width: 78, height: 240, padding: 6, borderRadius: 8 },
-    columnWrap: { display: "grid", width: 90 },
-    tray: { display: "grid", gap: 6, width: 90, alignContent: "start" },
-    newItem: {
-        height: 24, borderRadius: 6, cursor: "pointer", userSelect: "none",
-        border: "1px dashed #38506d", background: "#202c3c", color: "#9fb3c8", fontSize: 12,
-    },
-    leftRail: { display: "grid", gap: 8, alignContent: "start", width: 44 },
-    addColumn: {
-        width: 44, height: 44, borderRadius: 8, cursor: "pointer", userSelect: "none",
-        border: "1px solid #38506d", background: "#202c3c", color: "#9fb3c8", fontSize: 18, lineHeight: "42px",
-    },
+    workspace: { display: "flex", alignItems: "flex-start", gap: 12, overflowX: "auto", paddingBottom: 6 },
+    columns: { display: "flex", alignItems: "flex-start", gap: 10, minWidth: "max-content" },
+    columnWrap: { width: 112, border: "1px solid #38506d", borderRadius: 9, overflow: "hidden", background: "#17202e" },
+    columnHeader: { display: "flex", alignItems: "center", gap: 4, height: 32, padding: "0 5px 0 8px", color: "#dfe6ef", background: "#243247", userSelect: "none" },
+    columnHandle: { flex: 1, minWidth: 0, cursor: "grab", fontWeight: 700, touchAction: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+    columnAction: { height: 22, minWidth: 22, padding: "0 5px", border: "1px solid #52647a", borderRadius: 5, color: "#c7d4e3", background: "#1b2737", fontSize: 10, cursor: "pointer" },
+    columnDelete: { height: 22, padding: "0 5px", border: "1px solid #8b4b55", borderRadius: 5, color: "#ff9aa6", background: "#321f29", fontSize: 10, cursor: "pointer" },
+    column: { display: "flex", flexDirection: "column", gap: 6, width: "100%", minHeight: 164, padding: 7, boxSizing: "border-box" },
+    leftRail: { display: "grid", gap: 7, width: 104, flex: "0 0 104px", alignContent: "start" },
+    toolButtons: { display: "flex", gap: 5 },
+    toolButton: { flex: 1, height: 28, padding: "0 6px", border: "1px solid #38506d", borderRadius: 6, color: "#c7d4e3", background: "#202c3c", fontSize: 11, cursor: "pointer" },
+    trayShell: { display: "grid", gap: 5, padding: 6, border: "1px dashed #52647a", borderRadius: 8, color: "#9fb3c8", background: "#151e2a" },
+    trayLabel: { fontSize: 10, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase" },
+    tray: { display: "flex", flexDirection: "column", gap: 6, width: "100%", minHeight: 34 },
     trashZone: {
-        width: 44, height: 64, borderRadius: 8, boxSizing: "border-box", userSelect: "none",
-        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+        width: "100%", height: 34, borderRadius: 7, boxSizing: "border-box", userSelect: "none",
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700,
     },
-    removeColumn: { width: 24, height: 20, border: "1px solid #f4b1aa", borderRadius: 6, cursor: "pointer", color: "#cf222e", background: "#fff", fontSize: 15, lineHeight: "16px" },
     item: {
         height: 32, width: "100%", boxSizing: "border-box", lineHeight: "32px", textAlign: "center", borderRadius: 6,
         color: "#dfe6ef", cursor: "grab", userSelect: "none", touchAction: "none",
@@ -302,6 +306,16 @@ const BoardDemo = () => {
         onOverChange: e => log(`over ${e.over.col}#${e.over.index}` + (e.prev && e.prev.col != e.over.col ? " (column crossed)" : "")),
         onDragEnd: e => log(`drop ${e.key} -> ${e.over.col}#${e.over.index} committed=${e.committed}`),
     });
+    const columnsReorder = useReorder({
+        order: boardState.cols.map(column => column.key),
+        preview: "measure",
+        commit: keys => {
+            const byKey = new Map(boardState.cols.map(column => [column.key, column]));
+            boardState.cols = keys.map(key => byKey.get(key)!).filter(Boolean);
+            boardState.columnCommits++;
+            log(`columns -> ${keys.join(",")}`);
+        },
+    });
     // A column is consumer state: splice at ANY position, the hook picks it up
     // via the live columnRef registry - nothing to tell the hook.
     const addColumnAt = (i: number) => {
@@ -315,66 +329,79 @@ const BoardDemo = () => {
     const removeColumn = (key: string) => {
         const removed = boardState.cols.find(column => column.key == key);
         boardState.cols = boardState.cols.filter(column => column.key != key);
+        if (removed?.items.length) boardState.tray = [...boardState.tray, ...removed.items];
         delete boardState.gravity[key];
-        log(`removed ${key}${removed?.items.length ? ` (${removed.items.length} items)` : ""}`);
+        log(`deleted ${key}${removed?.items.length ? `; ${removed.items.length} items -> tray` : ""}`);
     };
-    const InsertStrip = ({ at }: { at: number }) => (
-        <button title="insert column between" onClick={() => addColumnAt(at)} style={qaBoardStyles.insertStrip}>↔</button>
-    );
+    const toggleGravity = (key: string) => {
+        boardState.gravity[key] = boardState.gravity[key] == "bottom" ? "top" : "bottom";
+        log(`${key} gravity ${boardState.gravity[key]}`);
+    };
     const addItem = () => {
         const k = "E" + boardState.nextItem++;
         boardState.tray = [...boardState.tray, k];
         log(`created ${k}`);
     };
-    const tracks = boardState.cols.map((_, i) => i < boardState.cols.length - 1 ? "90px 20px" : "90px").join(" ");
     const trashOver = r.over?.col == qaBoardTrash;
     return <div style={qaBoardStyles.root}>
-        <div style={{display: "flex", alignItems: "flex-start", gap: 14}}>
+        <div style={qaBoardStyles.workspace}>
             <div style={qaBoardStyles.leftRail}>
-                <button title="add a column at the start" onClick={() => addColumnAt(0)} style={qaBoardStyles.addColumn}>+</button>
-                <div ref={r.columnRef(qaBoardTrash)} title="drop a block here to delete it"
+                <div style={qaBoardStyles.toolButtons}>
+                    <button title="create a new block in the tray" onClick={addItem} style={qaBoardStyles.toolButton}>+ item</button>
+                    <button title="add a column at the start" onClick={() => addColumnAt(0)} style={qaBoardStyles.toolButton}>+ col</button>
+                </div>
+                <div style={qaBoardStyles.trayShell}>
+                    <div style={qaBoardStyles.trayLabel}>new items</div>
+                    <div ref={r.columnRef(qaBoardTray)} style={{
+                        ...qaBoardStyles.tray,
+                        outline: r.over?.col == qaBoardTray ? "1px solid #5d8dcc" : undefined,
+                    }}>
+                        {boardState.tray.map(k => {
+                            const it = r.item(k);
+                            return <div key={k} {...it.props} style={qaBoardItemStyle(it)}>{k}</div>;
+                        })}
+                    </div>
+                </div>
+                <div ref={r.columnRef(qaBoardTrash)} title="drop an item here to delete it"
                      style={{
                          ...qaBoardStyles.trashZone,
                          border: trashOver ? "1px solid #cf5b6a" : "1px dashed #6b4a55",
                          background: trashOver ? "#3a2230" : "#1c1622",
                          color: trashOver ? "#ff8896" : "#cf5b6a",
-                     }}>−</div>
+                     }}>delete item</div>
             </div>
-            <div style={{display: "grid", gap: 8}}>
-                <div style={{...qaBoardStyles.columns, gridTemplateColumns: tracks}}>
-                    {boardState.cols.map((c, ci) => (
-                        <div key={c.key} style={{...qaBoardStyles.columnWrap, gridColumn: ci * 2 + 1}}>
-                            <div ref={r.columnRef(c.key)}
-                                 style={qaBoardColumnStyle(r.over?.col == c.key, boardState.gravity[c.key] == "bottom")}>
-                                {c.items.map(k => {
-                                    const it = r.item(k);
-                                    return <div key={k} {...it.props} style={qaBoardItemStyle(it)}>{k}</div>;
-                                })}
-                            </div>
+            <div ref={columnsReorder.listRef} style={qaBoardStyles.columns} data-testid="board-columns">
+                {boardState.cols.map(c => {
+                    const columnDrag = columnsReorder.item(c.key);
+                    const bottom = boardState.gravity[c.key] == "bottom";
+                    return <section
+                        key={c.key}
+                        data-column-key={c.key}
+                        style={{
+                            ...qaBoardStyles.columnWrap,
+                            ...columnDrag.style,
+                            transition: columnDrag.active && !columnDrag.dragging ? "transform .14s ease" : undefined,
+                            zIndex: columnDrag.dragging ? 2 : undefined,
+                            boxShadow: columnDrag.dragging ? "0 10px 24px rgba(0,0,0,.35)" : undefined,
+                        }}
+                    >
+                        <header {...columnDrag.props} style={qaBoardStyles.columnHeader}>
+                            <span style={qaBoardStyles.columnHandle} title={`drag column ${c.key}`}>⠿ {c.key}</span>
+                            <button title={`toggle ${c.key} gravity`} onClick={() => toggleGravity(c.key)} style={qaBoardStyles.columnAction}>{bottom ? "↓" : "↑"}</button>
+                            <button title={`delete column ${c.key}`} onClick={() => removeColumn(c.key)} style={qaBoardStyles.columnDelete}>Del</button>
+                        </header>
+                        <div ref={r.columnRef(c.key)} style={qaBoardColumnStyle(r.over?.col == c.key, bottom)}>
+                            {c.items.map(k => {
+                                const it = r.item(k);
+                                return <div key={k} {...it.props} style={qaBoardItemStyle(it)}>{k}</div>;
+                            })}
                         </div>
-                    ))}
-                </div>
-                <div style={{...qaBoardStyles.columnControls, gridTemplateColumns: tracks}}>
-                    {boardState.cols.map((c, ci) => <React.Fragment key={c.key}>
-                        <button title={`remove ${c.key}`} onClick={() => removeColumn(c.key)}
-                                style={{...qaBoardStyles.removeColumn, gridColumn: ci * 2 + 1, justifySelf: "center"}}>−</button>
-                        {ci < boardState.cols.length - 1 && <span style={{gridColumn: ci * 2 + 2, justifySelf: "center"}}><InsertStrip at={ci + 1} /></span>}
-                    </React.Fragment>)}
-                </div>
-            </div>
-            <div style={qaBoardStyles.tray}>
-                <button title="create a new block in the tray" onClick={addItem} style={qaBoardStyles.newItem}>+ item</button>
-                <div ref={r.columnRef(qaBoardTray)}
-                     style={{...qaBoardColumnStyle(r.over?.col == qaBoardTray, false), border: "1px dashed #2c3c55"}}>
-                    {boardState.tray.map(k => {
-                        const it = r.item(k);
-                        return <div key={k} {...it.props} style={qaBoardItemStyle(it)}>{k}</div>;
-                    })}
-                </div>
+                    </section>;
+                })}
             </div>
         </div>
         <div style={qaBoardStyles.status}>
-            {boardState.cols.map(c => c.key + (boardState.gravity[c.key] == "bottom" ? "↓" : "↑") + ":[" + c.items.join(",") + "]").join(" ")} tray:[{boardState.tray.join(",")}] | commits: {boardState.commits} | events: {boardState.events} | last: {boardState.last}
+            order:[{boardState.cols.map(c => c.key).join(",")}] · {boardState.cols.map(c => c.key + (boardState.gravity[c.key] == "bottom" ? "↓" : "↑") + ":[" + c.items.join(",") + "]").join(" ")} tray:[{boardState.tray.join(",")}] | item commits: {boardState.commits} | column commits: {boardState.columnCommits} | events: {boardState.events} | last: {boardState.last}
         </div>
     </div>;
 };
@@ -395,10 +422,10 @@ export function Card26() {
 
 export function Card27() {
     return (
-    <Check n={27} title="useReorderBoard - columns, per-column gravity, cross-column drag"
-                       do="Drag blocks between columns: from a top-packed (up arrow) into a bottom-packed (down arrow) column, into the EMPTY column, back. Watch the landing gap: in a bottom-packed column the blocks ABOVE the slot slide UP to make room. Drag within one column too. Use ↔ strictly between two columns to insert a new one. The − directly below a column removes that column; all actions form one aligned lower rail. Click + item in the side tray a few times, drag the created blocks into any column and drag a block back into the tray. On the left rail: + adds a column at the start; drag any block onto the − trash to delete it. Watch the events line: over changes, column crossings, drop."
-                       expect="The dragged block follows the pointer; the hovered column highlights (r.over); survivors glide to exactly where they land on drop - including the source column compacting per ITS gravity and the target column opening a real gap per ITS gravity. One commit per drop (counter); a plain click commits nothing. onOverChange fires only when the slot changes, onDragEnd reports the final slot and committed flag. + item spawns E1, E2... into the dashed tray; the tray highlights on hover-over and accepts blocks like any column, and the status line tracks tray:[...]. The − trash highlights while hovered and swallows the dropped block (last: deleted ...) - it is one more registered column whose content the commit discards."
-                       note="useReorderBoard - the columns extension of useReorder: column gravity is pure consumer CSS (justify-content), the hook never knows it - it measures the real layout (offset-based FLIP with display:none for the dragged and a real margin gap at the landing slot, so CSS decides who moves aside). Columns register via live callback refs - adding one is just consumer state; the side tray IS one more such column rendered aside, so creating blocks needed no new hook API. Same non-goals: no nesting, no collision packing, no autoscroll."
+    <Check n={27} title="useReorderBoard + useReorder - draggable columns and items"
+                       do="Use the compact controls on the left to create an item or a column. Drag new items from the small tray into columns and between columns. Drag an entire column left/right by its ⠿ header. Change top/bottom gravity from the arrow in a header. Press Del in a header; any items from that column must return to the tray. Drop an individual item on delete item to remove only that item."
+                       expect="Items and columns preview and commit independently: item drag never moves a container, header drag moves the complete container, and header buttons stay clickable. The tray grows only with its contents instead of occupying a tall empty box. A new column appears at the start and can immediately be moved anywhere. Deleting a non-empty column preserves its items in the tray."
+                       note="Canonical headless composition: useReorderBoard owns item movement across registered bodies; useReorder owns the outer column order. All section/header/button/body markup and styling belong to the consumer. The stand supplies one compact default design only—neither hook renders UI or assumes a header."
                        tall>
                     <BoardDemo />
                 </Check>
@@ -419,9 +446,9 @@ export function Card35() {
 export function Card52() {
     return (
         <Check n={52} title="FloatingWindow - desktop stacking, maximize and Snap Layout"
-               do="Open both windows. Raise A and B by clicking them. Double-click or double-tap either title bar twice. Drag a title bar to the top centre, hover a layout cell, and release. Toggle A's scoped popup, then raise B over A. Also resize and drag against the viewport edges."
-               expect="The active window rises as one complete isolated layer, including its high-z child and scoped popup. Double-click/two taps maximize and restore the previous geometry. The top-centre picker previews and applies halves/quarters; dragging a snapped window restores its free size. Windows and close chrome remain recoverable inside the viewport."
-               note="The default body portal escapes ancestor transform/overflow. WindowPortal keeps menus/tooltips in their owner's layer. Use portal={false} only for deliberately parent-relative embedded UI. Keyboard: Alt+Enter maximize; Alt+Arrow move; Alt+Ctrl+Arrow resize."
+               do="Open both windows. Raise A/B, minimize each with the title-bar line button, and restore it from the common bottom panel. Test double-click/two taps and the top-centre Snap Layout. Reload/remount after snapping to confirm the group layout returns. Also try Win+Left/Right/Up/Down while a window root is focused."
+               expect="Only one visible window is active. Minimized windows disappear but stay in the common panel; restoring raises the whole isolated layer including scoped popups. Snap/free geometry returns from the saved layout group. Windows without an explicit/saved position cascade instead of opening exactly on top of each other."
+               note="FloatingDesktop is a small optional manager separate from FloatingWindow. FloatingWindowTaskbar can be replaced through renderItem or omitted in favour of useFloatingWindowManager. Keyboard fallback remains: Alt+Enter maximize; Alt+Arrow move; Alt+Ctrl+Arrow resize."
                tall>
             <FloatingWindowStackDemo />
         </Check>

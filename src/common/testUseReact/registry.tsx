@@ -33,7 +33,7 @@ export const qaCards: QaCard[] = [
     { n: 22, section: 'active', title: 'createCallbackHub - one slot, many subscribers', Component: Card22 },
     { n: 25, section: 'active', title: 'createToolbar - customizable toolbar (config / Bar / Settings)', tall: true, Component: Card25 },
     { n: 26, section: 'active', title: 'useReorder - drag blocks in a field (mini dnd)', Component: Card26 },
-    { n: 27, section: 'active', title: 'useReorderBoard - columns, per-column gravity, cross-column drag', tall: true, Component: Card27 },
+    { n: 27, section: 'active', title: 'useReorderBoard + useReorder - draggable columns and items', tall: true, Component: Card27 },
     { n: 35, section: 'active', title: 'DragBox - imperative delta drag (adapter over useDraggableApi)', Component: Card35 },
     { id: 'floating-window-stack', n: 52, section: 'active', title: 'FloatingWindow - desktop stacking, maximize and Snap Layout', tall: true, Component: Card52 },
     { n: 31, section: 'active', title: 'Toolbar over columnState - one config drives toolbar + menu + grid', tall: true, Component: Card31 },

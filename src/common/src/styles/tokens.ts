@@ -54,6 +54,7 @@ export const tokens = {
         closeHover: '#fff',
         closeHoverBg: '#e5484d',
         maximizeRight: 'calc(-12px + 28px + 4px)',
+        minimizeRight: 'calc(calc(-12px + 28px + 4px) + 28px + 4px)',
         controlBg: '#17202e',
         controlHoverBg: 'rgba(255, 255, 255, 0.16)',
     },
