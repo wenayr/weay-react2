@@ -22,6 +22,7 @@ function ModalWrapper({
 
     return <OutsideClickArea outsideClick={outClick} style={{position: "absolute", top: "50%", left: "50%"}}>
         <FloatingWindow
+            portal={false}
             keyForSave={keyForSave}
             size={size}
             zIndex={zIndex}

@@ -1,6 +1,36 @@
-import React, { ReactNode, useEffect, useRef } from 'react';
+import React, { ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { OutsideClickArea } from '../hooks/useOutside';
+import {createUpdateApi} from '../../updateBy';
+
+let overlayKey = 0;
+const overlayStack = {entries: [] as Array<{key: number}>};
+const overlayStackApi = createUpdateApi(overlayStack);
+
+function useTopOverlay() {
+    const entryRef = useRef({key: overlayKey++});
+    const entry = entryRef.current;
+    const [top, setTop] = useState(false);
+    const topRef = useRef(top);
+    topRef.current = top;
+
+    overlayStackApi.use(() => {
+        const next = overlayStack.entries.at(-1) === entry;
+        if (next != topRef.current) setTop(next);
+    });
+
+    useEffect(() => {
+        overlayStack.entries.push(entry);
+        overlayStackApi.render();
+        return () => {
+            const index = overlayStack.entries.indexOf(entry);
+            if (index >= 0) overlayStack.entries.splice(index, 1);
+            overlayStackApi.render();
+        };
+    }, []);
+
+    return top;
+}
 
 export type OverlayProps = {
     children: ReactNode;
@@ -16,6 +46,9 @@ export type OverlayProps = {
     onEscape?: () => void;
     onOutsideClick?: () => void;
     container?: Element;
+    trapFocus?: boolean;
+    role?: React.AriaRole;
+    ariaLabel?: string;
 };
 
 /** INTERNAL (A9): the one portal+scrim+outside-click+Escape composition for the
@@ -34,27 +67,80 @@ export function Overlay({
     onEscape,
     onOutsideClick,
     container,
+    trapFocus = true,
+    role = 'dialog',
+    ariaLabel,
 }: OverlayProps) {
     // callbacks through refs: inline closures must not resubscribe the document listener
     const callbacksRef = useRef({ onEscape, onOutsideClick });
     callbacksRef.current = { onEscape, onOutsideClick };
     const hasEscape = !!onEscape;
+    const top = useTopOverlay();
+    const contentRef = useRef<HTMLDivElement | null>(null);
+    const returnFocusRef = useRef<HTMLElement | null>(null);
 
     useEffect(() => {
-        if (!hasEscape) return;
+        returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        return () => {
+            const target = returnFocusRef.current;
+            if (target?.isConnected) target.focus();
+        };
+    }, []);
+
+    useLayoutEffect(() => {
+        if (!top || !trapFocus) return;
+        const root = contentRef.current;
+        if (!root || root.contains(document.activeElement)) return;
+        const focusable = root.querySelector<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        (focusable ?? root).focus();
+    }, [top, trapFocus]);
+
+    useEffect(() => {
+        if (!top || (!hasEscape && !trapFocus)) return;
         const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key == 'Escape') callbacksRef.current.onEscape?.();
+            if (e.key == 'Escape' && hasEscape) {
+                e.preventDefault();
+                callbacksRef.current.onEscape?.();
+                return;
+            }
+            if (e.key != 'Tab' || !trapFocus) return;
+            const root = contentRef.current;
+            if (!root) return;
+            const focusable = Array.from(root.querySelectorAll<HTMLElement>(
+                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )).filter(element => element.getAttribute('aria-hidden') != 'true');
+            if (focusable.length == 0) {
+                e.preventDefault();
+                root.focus();
+                return;
+            }
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && (document.activeElement == first || !root.contains(document.activeElement))) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement == last) {
+                e.preventDefault();
+                first.focus();
+            }
         };
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
-    }, [hasEscape]);
+    }, [hasEscape, top, trapFocus]);
 
     return createPortal(
         <div className={scrimClassName} style={scrimStyle}>
             <OutsideClickArea
+                ref={contentRef}
                 outsideClick={() => callbacksRef.current.onOutsideClick?.()}
-                status={outsideStatus}
+                status={outsideStatus && top}
                 className={outsideClassName}
+                role={role}
+                aria-modal={role == 'dialog' ? true : undefined}
+                aria-label={ariaLabel}
+                tabIndex={-1}
             >
                 {children}
             </OutsideClickArea>

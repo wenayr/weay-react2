@@ -715,6 +715,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
                 /* no onEscape: the controller owns the two-stage Escape (clear search, then close) */
             >
                     <FloatingWindowBase
+                        portal={false}
                         className="wenayDlgWindow"
                         size={settingsDialogSize}
                         position={settingsDialogPosition}

@@ -467,6 +467,7 @@ const ColumnsMenuDemo = () => {
                     </Qa30SquareButton>
                     {win && (
                         <FloatingWindow
+                            portal={false}
                             keyForSave="qa30.menuSettingsWin"
                             position={{ x: 0, y: 44 }}
                             size={{ width: 300, height: 320 }}

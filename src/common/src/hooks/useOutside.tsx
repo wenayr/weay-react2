@@ -9,6 +9,8 @@ export type UseOutsideOptions<T extends HTMLElement = HTMLDivElement> = {
     onOutside?: () => void;
     status?: boolean;
     enabled?: boolean;
+    /** Treat a logically nested React portal event as an inside interaction. */
+    isInsideEvent?: (event: MouseEvent | TouchEvent) => boolean;
 }
 
 export type UseOutsideApi<T extends HTMLElement = HTMLDivElement> = {
@@ -23,14 +25,16 @@ export type UseOutsideApi<T extends HTMLElement = HTMLDivElement> = {
 }
 
 export function useOutsideApi<T extends HTMLElement = HTMLDivElement>(options: UseOutsideOptions<T>): UseOutsideApi<T> {
-    const {outsideClick, onOutside, ref, status = options.enabled ?? true} = options;
+    const {outsideClick, onOutside, ref, status = options.enabled ?? true, isInsideEvent} = options;
     const internalRef = useRef<T|null>(null);
     const r = ref ?? internalRef;
     const outsideClickRef = useRef(outsideClick ?? onOutside);
+    const isInsideEventRef = useRef(isInsideEvent);
     const [enabled, setEnabled] = useState(status);
     const enabledRef = useRef(enabled);
 
     outsideClickRef.current = outsideClick ?? onOutside;
+    isInsideEventRef.current = isInsideEvent;
     enabledRef.current = enabled;
 
     useEffect(() => {
@@ -40,7 +44,12 @@ export function useOutsideApi<T extends HTMLElement = HTMLDivElement>(options: U
     useEffect(() => {
         function handleClickOutside(event: MouseEvent | TouchEvent) {
             if (!enabledRef.current) return;
-            if (r.current && event.target instanceof Node && !r.current.contains(event.target)) outsideClickRef.current?.();
+            if (
+                r.current &&
+                event.target instanceof Node &&
+                !r.current.contains(event.target) &&
+                !isInsideEventRef.current?.(event)
+            ) outsideClickRef.current?.();
         }
         document.addEventListener("mousedown", handleClickOutside);
         document.addEventListener("touchstart", handleClickOutside);
@@ -105,9 +114,26 @@ export const OutsideClickArea = React.forwardRef<HTMLDivElement, HTMLAttributes<
     outsideClick: () => void,
     status?: boolean,
     zIndex?: number,
-}>( ({children, outsideClick, zIndex, style={}, status = true, ...other}, forwardedRef) => {
+}>( ({
+          children,
+          outsideClick,
+          zIndex,
+          style = {},
+          status = true,
+          onMouseDownCapture,
+          onTouchStartCapture,
+          ...other
+      }, forwardedRef) => {
     const style2 = zIndex ? {...style, zIndex} : style
-    const internalRef = useOutside({outsideClick, status});
+    // React portal events still travel through their logical React ancestors even
+    // when DOM contains() is false. Mark those native events during React capture
+    // so the document listener does not mistake a portalled child for an outside click.
+    const insideEvents = useRef(new WeakSet<Event>());
+    const internalRef = useOutside({
+        outsideClick,
+        status,
+        isInsideEvent: event => insideEvents.current.has(event),
+    });
 
     const combinedRef = React.useCallback((node: HTMLDivElement | null) => {
         internalRef.current = node;
@@ -118,7 +144,19 @@ export const OutsideClickArea = React.forwardRef<HTMLDivElement, HTMLAttributes<
         }
     }, [forwardedRef, internalRef]);
 
-    return <div ref={forwardedRef ? combinedRef : internalRef} style={style2} {...other}>{children}</div>;
+    return <div
+        ref={forwardedRef ? combinedRef : internalRef}
+        style={style2}
+        {...other}
+        onMouseDownCapture={event => {
+            insideEvents.current.add(event.nativeEvent);
+            onMouseDownCapture?.(event);
+        }}
+        onTouchStartCapture={event => {
+            insideEvents.current.add(event.nativeEvent);
+            onTouchStartCapture?.(event);
+        }}
+    >{children}</div>;
 });
 
 function ButtonBase({children, button, style = {}, className = "", state: [a, setA]}: ButtonBaseProps & ButtonState) {

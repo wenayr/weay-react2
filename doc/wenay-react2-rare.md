@@ -68,13 +68,35 @@ confirmModal({modal, func, password?})
 
 `inputModal` and `confirmModal` accept either a setter function or the `useModal()` controller.
 
-Internal Overlay (A9, 2026-07-10): `components/Overlay.tsx` is the ONE portal+scrim+outside-click+
+Internal Overlay (A9, 2026-07-10): `components/Overlay.tsx` is the one portal+scrim+outside-click+
 Escape composition; `ModalProvider` and `SettingsDialog` are adapters over it (behavior 1:1,
 SettingsDialog keeps its own two-stage Escape by NOT passing `onEscape`). It is deliberately not
 exported: apps use ModalProvider/useModal/SettingsDialog. The render-slot stores above, the
 LeftModal drawer (gesture-driven, scrim-less), and `ModalWrapper`/Input helpers (backdrop-less,
-hosted inside another modal slot) are NOT overlays and stay separate. This leaf is also where all
-scrim/portal DOM lives - the seam for a future react-native view layer.
+hosted inside another modal slot) are NOT overlays and stay separate. This leaf owns all scrim
+portals; independent draggable-window portals live in `FloatingWindow`, while headless state stays
+DOM-free for a future react-native view layer.
+Overlays are globally ordered: only the top overlay handles Escape and outside interaction.
+The top dialog traps Tab/Shift+Tab, receives initial focus, and restores focus to its opener on
+unmount. `trapFocus={false}` is the internal escape hatch for non-modal compositions.
+
+Floating windows (2026-08-05): `FloatingWindow`/`FloatingWindowBase` portal a
+`position:fixed; inset:0` host to `document.body` by default and render the Rnd
+window as `position:absolute` inside it. Both roots use `isolation:isolate`; the
+fixed host avoids react-rnd/body-scroll offset drift. The shared controller order raises the pressed root, so every
+descendant (including positioned children with very large local z-index values) stays
+below the complete active window. `portal={false}` is the explicit embedded/parent-relative
+escape hatch. `OutsideClickArea` marks logically nested React portal events as inside,
+so the canonical outside-click wrapper still works across the DOM boundary. QA card 52
+is the active two-window acceptance scenario; `__test/floatingWindow.test.tsx` pins the
+portal, focus, isolation, optional close button, and outside-click contracts.
+Title bars support double-click and two-tap maximize/restore, and the accessible maximize button
+provides the same action. While a free window is dragged to the top-centre activation zone, a
+Windows 11-style Snap Layout picker exposes left/right halves and four quarters; release over a
+cell applies it, and dragging a snapped window restores its previous free size. `WindowPortal`
+keeps menus/tooltips in the owning window's isolated layer. `useFloatingWindowManager(group)`
+exposes group order and programmatic bring-to-front. `beforeClose` plus `onClose(reason)` cover
+vetoable close flows; the legacy `onClickClose` remains supported.
 
 Left-side modal/menu helpers:
 ```
@@ -177,10 +199,12 @@ registered settings section, no prop changes. Semantics that are easy to get wro
   shifts a little (known minor twitch). The core deliberately ships ONLY that inline popover -
   anything richer is a client layer. For a stable, movable editor render `tb.Settings` in your own
   container: a registered settings section (`registerSettingsSection`), or a draggable window -
-  `FloatingWindow` (drag by header, close X, viewport-clamped, position persisted via `keyForSave`)
+  `FloatingWindow` (body portal by default, drag by header, optional close X, click-to-front,
+  viewport-clamped, position persisted via `keyForSave`)
   wrapped in `OutsideClickArea` for close-on-outside-click. Recommended pattern for clients who
-  want the modal-with-title-bar-and-close look; QA card 30 demonstrates it (gear -> Settings in a
-  FloatingWindow, in the card's own positioned layer so it scrolls with the card). This is separate
+  want the modal-with-title-bar-and-close look; QA card 52 demonstrates the canonical viewport
+  layer and window focus order. QA card 30 deliberately passes `portal={false}` for an embedded
+  Settings window that scrolls with its card. This is separate
   from the row REORDER above, which stays on `useReorder` (a floating window would be the wrong tool
   there).
 - `api.useItems()` is the headless bar: ordered, visibility-filtered `[{item, density, content}]`
@@ -379,9 +403,11 @@ wins when both are set).
 FloatingWindowBase(props)                  // lower-level react-rnd wrapper
 FloatingWindow(props)                      // canonical floating window component
 useFloatingWindowController(options)       // headless geometry/stack/drag/resize controller for custom chrome
+useFloatingWindowManager(stackGroup?)      // order, active id, programmatic bring-to-front
+WindowPortal                               // popup/menu portal scoped to the owning window layer
 floatingWindowMap                           // persisted RND map (ObservableMap)
 FloatingWindowUpdate
-FloatingWindowProps / FloatingWindowController / FloatingWindowSavedGeometry
+FloatingWindowProps / FloatingWindowController / FloatingWindowSavedGeometry / FloatingWindowSnapRegion
 
 DragBox(props)                       // delta-drag component; thin adapter over useDraggableApi (A7)
 DragArea(props)                     // @deprecated: unique semantics kept as-is; prefer useDraggableApi/DragBox

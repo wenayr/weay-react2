@@ -123,10 +123,21 @@ Main APIs:
 - `useOutside`, `OutsideClickArea`
 - `Button`, `OutsideButton`, `HoverButton`, `AbsoluteButton`
 - `FloatingWindow`, `useFloatingWindowController`
+- `WindowPortal`, `useFloatingWindowManager`
 - `useDraggableApi`, `useReorder`, `useReorderBoard`
 
 Use these when the UI problem is generic: outside-click closing, draggable
-position, ordered drag-and-drop, or a persistent floating window. Use `useFloatingWindowController` only for custom chrome around the same geometry/stack/resize behavior.
+position, ordered drag-and-drop, or a persistent floating window. `FloatingWindow`
+uses a fixed body-portal host and an absolute window in viewport coordinates by default, keeps its root inside
+the viewport, and raises the entire isolated window stacking context when pressed.
+It also provides title-bar/button maximize and restore, mouse/touch double activation,
+keyboard move/resize, Windows 11-like half/quarter Snap Layouts, vetoable close reasons,
+and window-scoped portals for menus/tooltips. Scrim overlays independently arbitrate
+Escape/outside clicks to the top dialog and trap/restore focus.
+Set `portal={false}` only for a deliberately parent-relative embedded window.
+Use `useFloatingWindowController` only for custom chrome around the same
+geometry/stack/resize behavior; custom chrome must provide its own portal and
+positioned stacking-context root.
 
 Do not hide business flow inside these components. For example, a trade ticket
 window is an app component that may use `FloatingWindow`, not a library

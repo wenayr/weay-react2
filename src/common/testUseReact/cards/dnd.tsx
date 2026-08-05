@@ -1,9 +1,135 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useReorder, useReorderBoard, renderBy, updateBy, type BoardColumn } from "../../api";
 import { Button } from "../../src/hooks";
-import { FloatingWindow } from "../../src/components";
+import { FloatingWindow, WindowPortal, type FloatingWindowMode, type FloatingWindowSnapRegion } from "../../src/components";
 import { DragBox } from "../../src/components/Dnd/FloatingWindow";
 import { Check } from "../standKit";
+
+
+/* ---------- 52. FloatingWindow viewport layer + window stacking ---------- */
+const stackWindowBody: React.CSSProperties = {
+    position: "relative",
+    width: "100%",
+    height: "100%",
+    padding: 16,
+    boxSizing: "border-box",
+    overflow: "hidden",
+    color: "#f8fafc",
+    fontSize: 13,
+};
+
+const stackWindowHeader: React.CSSProperties = {
+    height: 34,
+    display: "flex",
+    alignItems: "center",
+    padding: "0 14px",
+    boxSizing: "border-box",
+    color: "#f8fafc",
+    fontSize: 12,
+    fontWeight: 750,
+    letterSpacing: ".02em",
+};
+
+function WindowABody() {
+    const [popupOpen, setPopupOpen] = useState(false);
+    return <div style={{...stackWindowBody, background: "#991b1b"}}>
+        <b>A starts below B.</b>
+        <div>Click any visible part of A to raise its complete layer.</div>
+        <button onClick={() => setPopupOpen(value => !value)} style={{marginTop: 8}}>toggle A popup</button>
+        {popupOpen && <WindowPortal style={{left: 150, top: 72}}>
+            <div style={{padding: 10, color: "#172554", background: "#dbeafe", border: "1px solid #60a5fa", borderRadius: 7, boxShadow: "0 8px 24px rgba(0,0,0,.3)"}}>
+                A scoped popup: it rises and falls together with A
+            </div>
+        </WindowPortal>}
+        <div style={{
+            position: "absolute",
+            right: 16,
+            bottom: 18,
+            zIndex: 999999,
+            padding: "8px 10px",
+            borderRadius: 7,
+            color: "#450a0a",
+            background: "#fecaca",
+            boxShadow: "0 5px 14px rgba(0,0,0,.28)",
+        }}>A child: z-index 999999</div>
+    </div>;
+}
+
+function FloatingWindowStackDemo() {
+    const [firstOpen, setFirstOpen] = useState(false);
+    const [secondOpen, setSecondOpen] = useState(false);
+    const [firstActive, setFirstActive] = useState(false);
+    const [firstMode, setFirstMode] = useState<FloatingWindowMode>("normal");
+    const [firstSnap, setFirstSnap] = useState<FloatingWindowSnapRegion | null>(null);
+
+    const openBoth = () => {
+        setFirstOpen(true);
+        setSecondOpen(true);
+    };
+
+    return <div style={{
+        position: "relative",
+        transform: "translateZ(0)",
+        zIndex: 0,
+        overflow: "hidden",
+        minHeight: 120,
+        padding: 12,
+        border: "1px dashed #8c959f",
+        borderRadius: 8,
+        background: "#f6f8fa",
+    }}>
+        <div style={{display: "flex", gap: 8, flexWrap: "wrap"}}>
+            <button onClick={openBoth}>open both windows</button>
+            <button onClick={() => setFirstOpen(value => !value)}>{firstOpen ? "close A" : "open A"}</button>
+            <button onClick={() => setSecondOpen(value => !value)}>{secondOpen ? "close B (no x)" : "open B"}</button>
+        </div>
+        <p style={{margin: "10px 0 0", color: "#57606a", fontSize: 12}}>
+            Double-click/double-tap a title bar to maximize/restore. Drag it to the top centre, then choose a Snap Layout target.
+        </p>
+        <p style={{margin: "5px 0 0", color: "#57606a", fontSize: 12, fontFamily: "monospace"}}>
+            A: {firstActive ? "active" : "inactive"} · {firstMode}{firstSnap ? ` · snap:${firstSnap}` : ""}
+        </p>
+
+        {firstOpen && <FloatingWindow
+            windowId="qa-window-a"
+            position={{x: 110, y: 110}}
+            size={{width: 340, height: 220}}
+            moveOnlyHeader
+            overflow={false}
+            onClickClose={() => setFirstOpen(false)}
+            onActiveChange={setFirstActive}
+            onModeChange={setFirstMode}
+            onSnapChange={setFirstSnap}
+            header={<div style={{...stackWindowHeader, background: "#7f1d1d"}}>Window A · with close x</div>}
+        >
+            <WindowABody />
+        </FloatingWindow>}
+
+        {secondOpen && <FloatingWindow
+            position={{x: 300, y: 200}}
+            size={{width: 340, height: 220}}
+            moveOnlyHeader
+            overflow={false}
+            header={<div style={{...stackWindowHeader, background: "#1e3a8a"}}>Window B · intentionally no x</div>}
+        >
+            <div style={{...stackWindowBody, background: "#1d4ed8"}}>
+                <b>B opens on top.</b>
+                <div>After raising A, click B: all of B must cover every child of A.</div>
+                <div style={{
+                    position: "absolute",
+                    left: 16,
+                    bottom: 18,
+                    zIndex: 999999,
+                    padding: "8px 10px",
+                    borderRadius: 7,
+                    color: "#172554",
+                    background: "#bfdbfe",
+                    boxShadow: "0 5px 14px rgba(0,0,0,.28)",
+                }}>B child: z-index 999999</div>
+            </div>
+        </FloatingWindow>}
+    </div>;
+}
 
 
 /* ---------- 35. DragBox - imperative delta drag (adapter over useDraggableApi) ---------- */
@@ -287,6 +413,18 @@ export function Card35() {
                        note="DragBox is now a thin adapter over useDraggableApi (holdMs 0, trackState:false, onMove) - the old bespoke document-listener loop is gone; contract pinned by __test/dragBox.test.tsx. Production consumer: LeftModal sidebar. DragArea deliberately stays as-is (@deprecated: unique semantics - body listeners, stopPropagation per tick, absolute coords).">
                     <DragBoxDemo />
                 </Check>
+    );
+}
+
+export function Card52() {
+    return (
+        <Check n={52} title="FloatingWindow - desktop stacking, maximize and Snap Layout"
+               do="Open both windows. Raise A and B by clicking them. Double-click or double-tap either title bar twice. Drag a title bar to the top centre, hover a layout cell, and release. Toggle A's scoped popup, then raise B over A. Also resize and drag against the viewport edges."
+               expect="The active window rises as one complete isolated layer, including its high-z child and scoped popup. Double-click/two taps maximize and restore the previous geometry. The top-centre picker previews and applies halves/quarters; dragging a snapped window restores its free size. Windows and close chrome remain recoverable inside the viewport."
+               note="The default body portal escapes ancestor transform/overflow. WindowPortal keeps menus/tooltips in their owner's layer. Use portal={false} only for deliberately parent-relative embedded UI. Keyboard: Alt+Enter maximize; Alt+Arrow move; Alt+Ctrl+Arrow resize."
+               tall>
+            <FloatingWindowStackDemo />
+        </Check>
     );
 }
 

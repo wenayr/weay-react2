@@ -125,12 +125,18 @@ b.over                                                                      // {
 // column gravity is YOUR CSS: justify-content flex-start packs up, flex-end packs down
 
 <FloatingWindow keyForSave="tool" size={{width: 320, height: 240}} header={<div>Tool</div>}
-                onClickClose={() => setOpen(false)}>   {/* onCLickClose (typo) = deprecated alias */}
+                closable closeOnEscape onClose={reason => setOpen(false)}> {/* legacy onClickClose remains */}
     <Panel />
 </FloatingWindow>
+// Default: fixed body-portal host + absolute window in viewport coordinates, click-to-front.
+// Title double-click/two taps: maximize/restore. Top-centre drag: half/quarter Snap Layout.
+// WindowPortal keeps a menu/tooltip in the owning window's isolated layer.
+// Rare embedded/parent-relative case: <FloatingWindow portal={false} ... />
 
 const wnd = useFloatingWindowController({keyForSave: "custom-tool", size: {width: 320, height: 240}})
 wnd.position                 // {x,y}; bind wnd.onHeaderMouseDown/onHeaderTouchStart for custom chrome
+wnd.bringToFront()            // or bind wnd.onWindowPointerDown; custom chrome owns its portal/root stacking context
+wnd.snapTo("left")            // programmatic half-screen layout; Alt+Enter toggles maximize in the component
 ```
 
 ## Modal / Input

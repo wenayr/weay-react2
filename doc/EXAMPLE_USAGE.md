@@ -743,7 +743,7 @@ Standard:
 Use when a settings editor needs to stay stable while the bar itself reflows.
 
 ```tsx
-import { FloatingWindow, OutsideClickArea } from "wenay-react2"
+import { FloatingWindow, OutsideClickArea, WindowPortal } from "wenay-react2"
 
 const OrdersToolbarSettings = ordersToolbar.Settings
 
@@ -755,11 +755,19 @@ export function ToolbarSettingsWindow({ open, close }: { open: boolean; close: (
             <FloatingWindow
                 keyForSave="orders.toolbar.settings"
                 size={{ width: 360, height: 420 }}
-                header={<div>Toolbar</div>}
-                onCLickClose={close}
+                title="Toolbar"
+                closable
+                closeOnEscape
+                beforeClose={() => confirm("Discard unsaved changes?")}
+                onClose={close}
                 moveOnlyHeader
             >
-                <OrdersToolbarSettings />
+                <>
+                    <OrdersToolbarSettings />
+                    <WindowPortal style={{ left: 380, top: 72 }}>
+                        <div role="menu">Window-owned menu</div>
+                    </WindowPortal>
+                </>
             </FloatingWindow>
         </OutsideClickArea>
     )
@@ -770,6 +778,16 @@ Why:
 
 - `toolbar.Settings` is presentation-agnostic.
 - `FloatingWindow` owns drag/position/close chrome.
+- `FloatingWindow` portals a fixed viewport host to `document.body` by default,
+  positions the window absolutely inside that host,
+  and raises its complete stacking context when pressed.
+- Double-click/two taps on the title bar and the maximize control toggle the
+  full viewport. Dragging to the top-centre picker snaps to a half or quarter;
+  dragging a snapped title bar restores its previous free size.
+- `WindowPortal` keeps menus, tooltips, and popups in the owning window's layer,
+  so a popup from an inactive window cannot cover the active window.
+- Keyboard: `Alt+Enter` maximizes/restores; `Alt+Arrow` moves;
+  `Alt+Ctrl+Arrow` resizes.
 - `OutsideClickArea` owns outside-click closing.
 
 Standard:
@@ -777,11 +795,14 @@ Standard:
 - Do not bake floating-window behavior into `createToolbar`.
 - Choose the settings container in the app.
 - Reuse `FloatingWindow` rather than inventing another movable modal.
+- Use `portal={false}` only for an intentionally parent-relative embedded window;
+  that window can again be constrained by its parent's stacking/overflow context.
 
 Controller-first variant for custom chrome:
 
 ```tsx
 import type { ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { useFloatingWindowController } from "wenay-react2"
 
 export function CustomFloatingPanel({ children }: { children: ReactNode }) {
@@ -791,21 +812,33 @@ export function CustomFloatingPanel({ children }: { children: ReactNode }) {
         limit: { x: { min: 0 }, y: { min: 0 } },
     })
 
-    return (
+    return createPortal(
         <section
-            onMouseDown={wnd.onWindowMouseDown}
-            style={{ position: "absolute", left: wnd.position.x, top: wnd.position.y, zIndex: wnd.zIndex }}
+            onPointerDown={wnd.onWindowPointerDown}
+            style={{
+                position: "fixed",
+                left: 0,
+                top: 0,
+                transform: `translate(${wnd.position.x}px, ${wnd.position.y}px)`,
+                zIndex: wnd.zIndex,
+                isolation: "isolate",
+            }}
         >
-            <header ref={wnd.headerRef} onMouseDown={wnd.onHeaderMouseDown} onTouchStart={wnd.onHeaderTouchStart}>
+            <header ref={wnd.headerRef} onMouseDown={wnd.onHeaderMouseDown}
+                    onDoubleClick={wnd.onHeaderDoubleClick}
+                    onTouchStart={wnd.onHeaderTouchStart} onTouchEnd={wnd.onHeaderTouchEnd}>
                 Custom panel
             </header>
             {children}
-        </section>
+        </section>,
+        document.body,
     )
 }
 ```
 
-Use the hook only when the default `FloatingWindow` DOM/chrome is not suitable. Keep `FloatingWindow` as the normal path for standard draggable windows.
+Use the hook only when the default `FloatingWindow` DOM/chrome is not suitable.
+The hook owns geometry and focus order, but custom chrome owns its portal and root
+stacking context. Keep `FloatingWindow` as the normal path for standard draggable windows.
 
 ## Observe Store Mirror
 

@@ -350,6 +350,30 @@ body {
   border-radius: var(--wnd-radius);
   box-shadow: var(--wnd-shadow);
 }
+.wenayWindowRoot {
+  transition: opacity var(--wnd-transition-duration, 140ms) ease,
+              filter var(--wnd-transition-duration, 140ms) ease;
+}
+.wenayWindowRoot:not([data-active="true"]) {
+  opacity: var(--wnd-inactive-opacity, 0.92);
+}
+.wenayWindowRoot[data-active="true"] .wenayWnd {
+  box-shadow: var(--wnd-active-shadow, var(--wnd-shadow));
+}
+.wenayWindowRoot:focus-visible {
+  outline: 2px solid var(--menu-outline-color, #007bff);
+  outline-offset: 2px;
+}
+.wenayWindowRoot_maximized .wenayWnd,
+.wenayWindowRoot_snapped .wenayWnd {
+  border-radius: 0;
+}
+.wenayWindowRoot_maximized,
+.wenayWindowRoot_snapped {
+  --wnd-close-top: 4px;
+  --wnd-close-right: 4px;
+  --wnd-maximize-right: 36px;
+}
 /* Header drag zone. Color/font tokens are undeclared by default: an unresolved var()
    makes the property fall back to its inherited value, i.e. exactly the legacy look. */
 .wenayWndHeader {
@@ -365,6 +389,14 @@ body {
   font-size: var(--wnd-header-font-size, inherit);
   letter-spacing: var(--wnd-header-letter-spacing, inherit);
   text-transform: var(--wnd-header-transform, inherit);
+  touch-action: none;
+}
+.wenayWndTitle {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 72px 0 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* Default header content when no header element is passed (striped drag strip) */
 .wenayWndHeaderDef {
@@ -375,6 +407,8 @@ body {
 
 /* Window close button (FloatingWindow and others) */
 .wenayCloseBtn {
+  padding: 0;
+  box-sizing: border-box;
   width: var(--wnd-close-size, 28px);
   height: var(--wnd-close-size, 28px);
   /* keep the clickable zone >= 24x24 whatever the theme sets */
@@ -407,6 +441,123 @@ body {
   position: absolute;
   top: var(--wnd-close-top, -12px);
   right: var(--wnd-close-right, -12px);
+}
+.wenayWndControl {
+  position: absolute;
+  z-index: 1;
+  top: var(--wnd-close-top, -12px);
+  display: grid;
+  place-items: center;
+  width: var(--wnd-close-size, 28px);
+  height: var(--wnd-close-size, 28px);
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  box-sizing: border-box;
+  border: var(--wnd-close-border, 1px solid var(--color-border-common));
+  border-radius: 50%;
+  color: var(--wnd-close-color, var(--color-text-base));
+  background: var(--wnd-control-bg, var(--wnd-close-bg));
+  box-shadow: var(--wnd-close-shadow, 0 2px 6px rgba(0, 0, 0, 0.35));
+  cursor: pointer;
+}
+.wenayWndControl:hover {
+  color: var(--wnd-close-hover, #fff);
+  background: var(--wnd-control-hover-bg, rgba(255, 255, 255, 0.16));
+}
+.wenayWndMaximize {
+  right: var(--wnd-maximize-right, 20px);
+}
+.wenayWndMaximize > span {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+  box-sizing: border-box;
+}
+.wenayWindowRoot_maximized .wenayWndMaximize > span {
+  transform: translate(1px, -1px);
+  box-shadow: -3px 3px 0 -1px var(--wnd-control-bg, var(--wnd-close-bg)),
+              -3px 3px 0 0 currentColor;
+}
+
+/* Windows 11-like snap picker shown while a viewport window is dragged to top centre. */
+.wenaySnapLayout {
+  position: absolute;
+  z-index: 2147483647;
+  top: 8px;
+  left: 50%;
+  display: grid;
+  grid-template-columns: repeat(6, 42px);
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--wnd-border, #8c959f) 70%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--wnd-bg, #fff) 94%, transparent);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, .28);
+  pointer-events: auto;
+  transform: translateX(-50%);
+  backdrop-filter: blur(14px);
+}
+.wenaySnapLayoutOption {
+  width: 42px;
+  height: 38px;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+  color: currentColor;
+  background: transparent;
+  cursor: pointer;
+}
+.wenaySnapLayoutOption:hover,
+.wenaySnapLayoutOption:focus-visible,
+.wenaySnapLayoutOption[data-preview="true"] {
+  outline: none;
+  background: color-mix(in srgb, var(--menu-outline-color, #0078d4) 22%, transparent);
+}
+.wenaySnapLayoutGlyph {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  opacity: .78;
+  box-sizing: border-box;
+}
+.wenaySnapLayoutGlyph_left {
+  clip-path: inset(0 50% 0 0);
+}
+.wenaySnapLayoutGlyph_right {
+  clip-path: inset(0 0 0 50%);
+}
+.wenaySnapLayoutGlyph_top-left {
+  clip-path: inset(0 50% 50% 0);
+}
+.wenaySnapLayoutGlyph_top-right {
+  clip-path: inset(0 0 50% 50%);
+}
+.wenaySnapLayoutGlyph_bottom-left {
+  clip-path: inset(50% 50% 0 0);
+}
+.wenaySnapLayoutGlyph_bottom-right {
+  clip-path: inset(50% 0 0 50%);
+}
+.wenaySnapPreview {
+  position: absolute;
+  z-index: 2147483645;
+  border: 2px solid color-mix(in srgb, var(--menu-outline-color, #0078d4) 68%, white);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--menu-outline-color, #0078d4) 18%, transparent);
+  box-sizing: border-box;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wenayWindowRoot,
+  .wenayCloseBtn,
+  .wenayWndControl {
+    transition: none;
+  }
 }
 
 /* Settings dialog (SettingsDialog). Themed via --dlg-* (tokens.css), dark defaults. */

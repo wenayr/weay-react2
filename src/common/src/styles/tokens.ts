@@ -34,6 +34,9 @@ export const tokens = {
         border: 'none',
         radius: '0',
         shadow: 'none',
+        activeShadow: 'none',
+        inactiveOpacity: '0.92',
+        transitionDuration: '140ms',
         headerBg: 'transparent',
         headerStripes: 'repeating-linear-gradient(139deg, hsla(0, 0%, 100%, 0.1), hsla(0, 0%, 100%, 0.1) 15px, transparent 0, transparent 30px)',
         headerBorder: 'none',
@@ -50,6 +53,9 @@ export const tokens = {
         closeColor: '#c4c4c4',
         closeHover: '#fff',
         closeHoverBg: '#e5484d',
+        maximizeRight: 'calc(-12px + 28px + 4px)',
+        controlBg: '#17202e',
+        controlHoverBg: 'rgba(255, 255, 255, 0.16)',
     },
     /** SettingsDialog chrome (--dlg-*). Dark defaults; apps re-skin via :root[data-theme]. */
     dlg: {

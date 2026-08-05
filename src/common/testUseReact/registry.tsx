@@ -3,7 +3,7 @@ import { Card49, Card6 } from "./cards/chart";
 import { Card51, Card38, Card39, Card40, Card41, Card42, Card43, Card44, Card45, Card46 } from "./cards/peerMedia";
 import { Card18, Card17, Card23, Card24, Card33, Card34, Card48, Card50 } from "./cards/replay";
 import { Card13, Card20, Card21, Card22, Card25, Card3, Card4 } from "./cards/menuModal";
-import { Card26, Card27, Card35, Card2 } from "./cards/dnd";
+import { Card26, Card27, Card35, Card52, Card2 } from "./cards/dnd";
 import { Card31, Card32, Card47, Card30, Card29, Card28 } from "./cards/columns";
 import { Card8, Card1, Card14, Card7, Card19, Card9, Card10, Card11 } from "./cards/logsParams";
 import { Card5, Card12, Card15, Card16 } from "./cards/grid";
@@ -35,6 +35,7 @@ export const qaCards: QaCard[] = [
     { n: 26, section: 'active', title: 'useReorder - drag blocks in a field (mini dnd)', Component: Card26 },
     { n: 27, section: 'active', title: 'useReorderBoard - columns, per-column gravity, cross-column drag', tall: true, Component: Card27 },
     { n: 35, section: 'active', title: 'DragBox - imperative delta drag (adapter over useDraggableApi)', Component: Card35 },
+    { id: 'floating-window-stack', n: 52, section: 'active', title: 'FloatingWindow - desktop stacking, maximize and Snap Layout', tall: true, Component: Card52 },
     { n: 31, section: 'active', title: 'Toolbar over columnState - one config drives toolbar + menu + grid', tall: true, Component: Card31 },
     { n: 32, section: 'active', title: 'createColumnGrid - default grid menu + mobile dots for table/cards', tall: true, Component: Card32 },
     { id: 'grid-chrome', n: 47, section: 'active', title: 'Grid Chrome — compact table commands', Component: Card47 },

@@ -1,0 +1,280 @@
+import React from "react";
+import {fireEvent, render, screen} from "@testing-library/react";
+import {FloatingWindow, WindowPortal} from "../src/common/src/components/Dnd/FloatingWindow";
+import {OutsideClickArea} from "../src/common/src/hooks/useOutside";
+
+function rootFor(testId: string) {
+    const content = screen.getByTestId(testId);
+    const root = content.closest("[data-wenay-window]") as HTMLElement | null;
+    expect(root).not.toBeNull();
+    return root!;
+}
+
+describe("FloatingWindow viewport layer", () => {
+    test("portals to body by default and keeps the parent stacking context out", () => {
+        const {container} = render(
+            <div data-testid="host" style={{transform: "translateZ(0)", overflow: "hidden", zIndex: -1}}>
+                <FloatingWindow size={{width: 240, height: 160}}>
+                    <div data-testid="window-content">content</div>
+                </FloatingWindow>
+            </div>
+        );
+
+        const root = rootFor("window-content");
+        expect(container.contains(root)).toBe(false);
+        const portalRoot = root.closest("[data-wenay-window-portal-root]") as HTMLElement | null;
+        expect(portalRoot).not.toBeNull();
+        expect(portalRoot!.parentElement).toBe(document.body);
+        expect(portalRoot!.style.position).toBe("fixed");
+        expect(portalRoot!.style.inset).toBe("0");
+        expect(portalRoot!.style.isolation).toBe("isolate");
+        expect(portalRoot!.style.pointerEvents).toBe("none");
+        expect(root.dataset.wenayWindowLayer).toBe("viewport");
+        expect(root.style.position).toBe("absolute");
+        expect(root.style.top).toBe("0px");
+        expect(root.style.left).toBe("0px");
+        expect(root.style.isolation).toBe("isolate");
+        expect(root.style.pointerEvents).toBe("auto");
+    });
+
+    test("portal=false is the explicit parent-positioned escape hatch", () => {
+        const {container} = render(
+            <div data-testid="host" style={{position: "relative"}}>
+                <FloatingWindow portal={false} size={{width: 240, height: 160}}>
+                    <div data-testid="embedded-content">content</div>
+                </FloatingWindow>
+            </div>
+        );
+
+        const root = rootFor("embedded-content");
+        expect(container.contains(root)).toBe(true);
+        expect(root.dataset.wenayWindowLayer).toBe("parent");
+        expect(root.style.position).toBe("absolute");
+    });
+
+    test("pressing an older window raises its whole stacking context", () => {
+        render(<>
+            <FloatingWindow zIndex={100} position={{x: 20, y: 20}} size={{width: 240, height: 160}}>
+                <div data-testid="first-window">
+                    first
+                    <span data-testid="first-high-child" style={{position: "absolute", zIndex: 999_999}}>high child</span>
+                </div>
+            </FloatingWindow>
+            <FloatingWindow zIndex={9} position={{x: 80, y: 60}} size={{width: 240, height: 160}}>
+                <div data-testid="second-window">second</div>
+            </FloatingWindow>
+        </>);
+
+        const firstRoot = rootFor("first-window");
+        const secondRoot = rootFor("second-window");
+        const firstPortalRoot = firstRoot.closest("[data-wenay-window-portal-root]") as HTMLElement;
+        const secondPortalRoot = secondRoot.closest("[data-wenay-window-portal-root]") as HTMLElement;
+        expect(Number(firstRoot.style.zIndex)).toBeLessThan(Number(secondRoot.style.zIndex));
+        expect(Number(firstPortalRoot.style.zIndex)).toBeLessThan(Number(secondPortalRoot.style.zIndex));
+        expect(firstRoot.dataset.active).toBe("false");
+        expect(secondRoot.dataset.active).toBe("true");
+
+        fireEvent.mouseDown(screen.getByTestId("first-window"));
+
+        expect(Number(firstRoot.style.zIndex)).toBeGreaterThan(Number(secondRoot.style.zIndex));
+        expect(Number(firstPortalRoot.style.zIndex)).toBeGreaterThan(Number(secondPortalRoot.style.zIndex));
+        expect(firstRoot.dataset.active).toBe("true");
+        expect(secondRoot.dataset.active).toBe("false");
+        expect(screen.getByTestId("first-high-child").closest("[data-wenay-window]")).toBe(firstRoot);
+        expect(firstRoot.style.isolation).toBe("isolate");
+    });
+
+    test("OutsideClickArea treats its portalled window as logically inside", () => {
+        const outsideClick = jest.fn();
+        render(
+            <OutsideClickArea outsideClick={outsideClick}>
+                <FloatingWindow size={{width: 240, height: 160}}>
+                    <button data-testid="inside-portal">inside</button>
+                </FloatingWindow>
+            </OutsideClickArea>
+        );
+
+        fireEvent.mouseDown(screen.getByTestId("inside-portal"));
+        expect(outsideClick).not.toHaveBeenCalled();
+
+        fireEvent.mouseDown(document.body);
+        expect(outsideClick).toHaveBeenCalledTimes(1);
+    });
+
+    test("close chrome is optional and uses an accessible button", () => {
+        const close = jest.fn();
+        const view = render(
+            <FloatingWindow size={{width: 240, height: 160}} onClickClose={close}>
+                <div>closable</div>
+            </FloatingWindow>
+        );
+
+        fireEvent.click(screen.getByRole("button", {name: "Close"}));
+        expect(close).toHaveBeenCalledTimes(1);
+
+        view.rerender(
+            <FloatingWindow size={{width: 240, height: 160}}>
+                <div>without close</div>
+            </FloatingWindow>
+        );
+        expect(screen.queryByRole("button", {name: "Close"})).toBeNull();
+    });
+
+    test("double click and the title-bar control maximize and restore geometry", () => {
+        const onModeChange = jest.fn();
+        render(
+            <FloatingWindow
+                windowId="zoom"
+                title="Zoom"
+                position={{x: 40, y: 50}}
+                size={{width: 320, height: 220}}
+                onModeChange={onModeChange}
+            >
+                <div data-testid="zoom-content">zoom content</div>
+            </FloatingWindow>
+        );
+
+        const root = rootFor("zoom-content");
+        const header = root.querySelector(".wenayWndHeader") as HTMLElement;
+        fireEvent.doubleClick(header);
+        expect(root.dataset.mode).toBe("maximized");
+        expect(root.dataset.positionX).toBe("0");
+        expect(root.dataset.positionY).toBe("0");
+        expect(root.style.width).toBe(`${window.innerWidth}px`);
+        expect(screen.getByRole("button", {name: "Restore"}).getAttribute("aria-pressed")).toBe("true");
+
+        fireEvent.click(screen.getByRole("button", {name: "Restore"}));
+        expect(root.dataset.mode).toBe("normal");
+        expect(root.dataset.positionX).toBe("40");
+        expect(root.dataset.positionY).toBe("50");
+        expect(root.style.width).toBe("320px");
+        expect(onModeChange).toHaveBeenNthCalledWith(1, "maximized");
+        expect(onModeChange).toHaveBeenNthCalledWith(2, "normal");
+    });
+
+    test("two taps on the title bar toggle maximize without a mouse", () => {
+        render(
+            <FloatingWindow title="Touch zoom" position={{x: 30, y: 40}} size={{width: 300, height: 200}}>
+                <div data-testid="touch-zoom-content">touch</div>
+            </FloatingWindow>
+        );
+        const root = rootFor("touch-zoom-content");
+        const header = root.querySelector(".wenayWndHeader") as HTMLElement;
+        const tap = {identifier: 7, clientX: 100, clientY: 80};
+
+        fireEvent.touchStart(header, {changedTouches: [tap]});
+        fireEvent.touchEnd(header, {changedTouches: [tap]});
+        fireEvent.touchStart(header, {changedTouches: [tap]});
+        fireEvent.touchEnd(header, {changedTouches: [tap]});
+        expect(root.dataset.mode).toBe("maximized");
+
+        fireEvent.touchStart(header, {changedTouches: [tap]});
+        fireEvent.touchEnd(header, {changedTouches: [tap]});
+        fireEvent.touchStart(header, {changedTouches: [tap]});
+        fireEvent.touchEnd(header, {changedTouches: [tap]});
+        expect(root.dataset.mode).toBe("normal");
+    });
+
+    test("top-centre drag opens the snap picker and applies a layout", () => {
+        const onSnapChange = jest.fn();
+        render(
+            <FloatingWindow title="Snap me" position={{x: 80, y: 90}} size={{width: 300, height: 200}} onSnapChange={onSnapChange}>
+                <div data-testid="snap-content">snap</div>
+            </FloatingWindow>
+        );
+        const root = rootFor("snap-content");
+        const header = root.querySelector(".wenayWndHeader") as HTMLElement;
+
+        fireEvent.mouseDown(header, {clientX: 120, clientY: 100, buttons: 1});
+        fireEvent.mouseMove(document, {clientX: window.innerWidth / 2, clientY: 10, buttons: 1});
+        expect(screen.getByRole("toolbar", {name: "Snap layouts"})).not.toBeNull();
+
+        fireEvent.mouseEnter(screen.getByRole("button", {name: "Snap left"}));
+        fireEvent.mouseUp(document);
+        expect(root.dataset.snapRegion).toBe("left");
+        expect(root.dataset.positionX).toBe("0");
+        expect(root.dataset.positionY).toBe("0");
+        expect(root.style.width).toBe(`${Math.floor(window.innerWidth / 2)}px`);
+        expect(root.style.height).toBe(`${window.innerHeight}px`);
+        expect(onSnapChange).toHaveBeenLastCalledWith("left");
+        expect(screen.queryByRole("toolbar", {name: "Snap layouts"})).toBeNull();
+
+        fireEvent.mouseDown(header, {clientX: 100, clientY: 10, buttons: 1});
+        expect(root.dataset.snapRegion).toBeUndefined();
+        expect(root.style.width).toBe("300px");
+        expect(onSnapChange).toHaveBeenLastCalledWith(null);
+        fireEvent.mouseUp(document);
+    });
+
+    test("keyboard moves, resizes and toggles a focused window", () => {
+        const onPositionChange = jest.fn();
+        const onSizeChange = jest.fn();
+        render(
+            <FloatingWindow
+                ariaLabel="Keyboard window"
+                title="Keyboard"
+                position={{x: 10, y: 20}}
+                size={{width: 200, height: 120}}
+                onPositionChange={onPositionChange}
+                onSizeChange={onSizeChange}
+            >
+                <div>keyboard content</div>
+            </FloatingWindow>
+        );
+        const root = screen.getByRole("dialog", {name: "Keyboard window"});
+
+        fireEvent.keyDown(root, {key: "ArrowRight", altKey: true});
+        expect(root.dataset.positionX).toBe("20");
+        expect(root.dataset.positionY).toBe("20");
+        expect(onPositionChange).toHaveBeenLastCalledWith({x: 20, y: 20});
+
+        fireEvent.keyDown(root, {key: "ArrowDown", altKey: true, ctrlKey: true});
+        expect(root.style.height).toBe("130px");
+        expect(onSizeChange).toHaveBeenLastCalledWith({width: 200, height: 130});
+
+        fireEvent.keyDown(root, {key: "Enter", altKey: true});
+        expect(root.dataset.mode).toBe("maximized");
+    });
+
+    test("modern close API reports reasons and beforeClose can veto", () => {
+        const onClose = jest.fn();
+        const beforeClose = jest.fn(() => false);
+        const view = render(
+            <FloatingWindow title="Safe close" closable onClose={onClose} beforeClose={beforeClose} closeOnEscape size={{width: 240, height: 160}}>
+                <div>dirty form</div>
+            </FloatingWindow>
+        );
+
+        fireEvent.click(screen.getByRole("button", {name: "Close"}));
+        expect(beforeClose).toHaveBeenCalledWith("close-button");
+        expect(onClose).not.toHaveBeenCalled();
+
+        view.rerender(
+            <FloatingWindow title="Safe close" closable onClose={onClose} beforeClose={() => true} closeOnEscape size={{width: 240, height: 160}}>
+                <div>clean form</div>
+            </FloatingWindow>
+        );
+        fireEvent.keyDown(document, {key: "Escape"});
+        expect(onClose).toHaveBeenCalledWith("escape");
+    });
+
+    test("WindowPortal stays in its owning window stack but outside the Rnd subtree", () => {
+        render(
+            <FloatingWindow title="Portal owner" size={{width: 260, height: 180}}>
+                <div data-testid="portal-owner">
+                    owner
+                    <WindowPortal style={{left: 12, top: 48}}>
+                        <div data-testid="scoped-popup">popup</div>
+                    </WindowPortal>
+                </div>
+            </FloatingWindow>
+        );
+
+        const root = rootFor("portal-owner");
+        const portalRoot = root.closest("[data-wenay-window-portal-root]") as HTMLElement;
+        const popup = screen.getByTestId("scoped-popup");
+        expect(root.contains(popup)).toBe(false);
+        expect(portalRoot.contains(popup)).toBe(true);
+        expect(popup.parentElement?.style.zIndex).toBe("2147483646");
+    });
+});
