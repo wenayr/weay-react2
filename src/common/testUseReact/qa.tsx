@@ -20,6 +20,12 @@ export function QABoard() {
         window.addEventListener("hashchange", f);
         return () => window.removeEventListener("hashchange", f);
     }, []);
+    useEffect(() => {
+        const id = hash.startsWith("#") ? hash.slice(1) : "";
+        if (!id || id === "archive" || id === "video-calls" || id.startsWith("video-calls/")) return;
+        const frame = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({block: "start"}));
+        return () => cancelAnimationFrame(frame);
+    }, [hash]);
     const section = hash === "#archive" ? "archive" : hash.startsWith("#video-calls") ? "video-calls" : "active";
     const videoRoomMatch = hash.match(/^#video-calls\/room\/([^/?#]+)/);
     if (section === "video-calls") return <VideoMeetingPlatform roomId={videoRoomMatch ? decodeURIComponent(videoRoomMatch[1]) : undefined} />;
@@ -29,7 +35,8 @@ export function QABoard() {
         <div style={{ maxWidth: 920, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
             <h2 style={{ margin: "0 0 4px" }}>QA board wenay-react2</h2>
             <div style={{ display: "flex", gap: 8, margin: "8px 0", flexWrap: "wrap" }}>
-                <a href="#" style={link(section === "active")}>Active checks</a>
+                <a href="#" style={link(section === "active" && !hash)}>Active checks</a>
+                <a href="#floating-window-stack" style={link(hash === "#floating-window-stack")}>Desktop windows</a>
                 <a href="#video-calls" style={link(false)}>Видеозвонки</a>
                 <a href="#archive" style={link(section === "archive")}>Verified archive</a>
             </div>

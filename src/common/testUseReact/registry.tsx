@@ -35,7 +35,7 @@ export const qaCards: QaCard[] = [
     { n: 26, section: 'active', title: 'useReorder - drag blocks in a field (mini dnd)', Component: Card26 },
     { n: 27, section: 'active', title: 'useReorderBoard + useReorder - draggable columns and items', tall: true, Component: Card27 },
     { n: 35, section: 'active', title: 'DragBox - imperative delta drag (adapter over useDraggableApi)', Component: Card35 },
-    { id: 'floating-window-stack', n: 52, section: 'active', title: 'FloatingWindow - desktop stacking, maximize and Snap Layout', tall: true, Component: Card52 },
+    { id: 'floating-window-stack', n: 52, section: 'active', title: 'FloatingWindow - desktop taskbar, sessions, cascade and Snap', tall: true, Component: Card52 },
     { n: 31, section: 'active', title: 'Toolbar over columnState - one config drives toolbar + menu + grid', tall: true, Component: Card31 },
     { n: 32, section: 'active', title: 'createColumnGrid - default grid menu + mobile dots for table/cards', tall: true, Component: Card32 },
     { id: 'grid-chrome', n: 47, section: 'active', title: 'Grid Chrome — compact table commands', Component: Card47 },

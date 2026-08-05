@@ -1,6 +1,6 @@
 import React from "react";
-import {fireEvent, render, screen, within} from "@testing-library/react";
-import {FloatingWindow, FloatingWindowTaskbar, WindowPortal} from "../src/common/src/components/Dnd/FloatingWindow";
+import {act, fireEvent, render, screen, within} from "@testing-library/react";
+import {FloatingWindow, FloatingWindowTaskbar, WindowPortal, floatingWindowMap} from "../src/common/src/components/Dnd/FloatingWindow";
 import {OutsideClickArea} from "../src/common/src/hooks/useOutside";
 
 function rootFor(testId: string) {
@@ -319,6 +319,36 @@ describe("FloatingWindow viewport layer", () => {
         expect(restored.dataset.positionY).toBe("73");
         expect(restored.style.width).toBe("280px");
         expect(restored.style.height).toBe("190px");
+    });
+
+    test("applies persisted session geometry loaded after the window mounts", () => {
+        const persistedKey = "late-layout:late-window";
+        floatingWindowMap.delete(persistedKey);
+        render(
+            <FloatingWindow windowId="late-window" layoutGroup="late-layout" position={{x: 12, y: 14}} size={{width: 160, height: 100}}>
+                <div data-testid="late-persisted">late persisted</div>
+            </FloatingWindow>
+        );
+        const root = rootFor("late-persisted");
+        expect(root.dataset.positionX).toBe("12");
+
+        act(() => {
+            floatingWindowMap.set(persistedKey, {
+                position: {x: 91, y: 73},
+                size: {width: 280, height: 190},
+                snapRegion: "right",
+                freeGeometry: {position: {x: 91, y: 73}, size: {width: 280, height: 190}},
+            });
+        });
+
+        expect(root.dataset.snapRegion).toBe("right");
+        fireEvent.keyDown(root, {key: "ArrowDown", metaKey: true});
+        expect(root.dataset.snapRegion).toBeUndefined();
+        expect(root.dataset.positionX).toBe("91");
+        expect(root.dataset.positionY).toBe("73");
+        expect(root.style.width).toBe("280px");
+        expect(root.style.height).toBe("190px");
+        floatingWindowMap.delete(persistedKey);
     });
 
     test("modern close API reports reasons and beforeClose can veto", () => {

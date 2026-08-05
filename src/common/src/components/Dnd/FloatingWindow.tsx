@@ -236,6 +236,9 @@ export function useFloatingWindowController({
     if (ks) {
         map = floatingWindowMap.get(ks) ?? floatingWindowMap.set(ks, { size: sizeDef, position: positionDef }).get(ks);
     }
+    const persistedMapRef = useRef<tRND | undefined>(map);
+    persistedMapRef.current = map;
+    const appliedMapRef = useRef<tRND | undefined>(map);
     const savedPosition = map?.position ?? positionDef;
     const savedSize = map?.size ?? sizeDef;
 
@@ -295,8 +298,8 @@ export function useFloatingWindowController({
     };
     const changeSnapRegion = (next: FloatingWindowSnapRegion | null) => {
         setSnapRegion(next);
-        if (map) {
-            map.snapRegion = next;
+        if (persistedMapRef.current) {
+            persistedMapRef.current.snapRegion = next;
             if (ks) floatingWindowMap.touch(ks);
         }
         callbacksRef.current.onSnapChange?.(next);
@@ -327,7 +330,7 @@ export function useFloatingWindowController({
         if (!snappable || typeof window == "undefined") return;
         if (!snapRegion && mode == "normal") {
             unsnappedGeometry.current = {position: {x, y}, size: {width, height}};
-            if (map) map.freeGeometry = {
+            if (persistedMapRef.current) persistedMapRef.current.freeGeometry = {
                 position: {...unsnappedGeometry.current.position},
                 size: {...unsnappedGeometry.current.size},
             };
@@ -338,6 +341,47 @@ export function useFloatingWindowController({
         changeSnapRegion(region);
         hideSnapLayout();
     };
+
+    // The application loads storage after mount, so a window can render once with
+    // defaults before memoryCache replaces its entry. Object identity separates that
+    // hydration from this controller's own in-place geometry edits.
+    useEffect(() => {
+        if (!ks) return;
+        const applyPersistedEntry = (changedKey?: string) => {
+            if (changedKey !== undefined && changedKey !== ks) return;
+            const next = floatingWindowMap.get(ks);
+            if (!next || next === appliedMapRef.current) return;
+            appliedMapRef.current = next;
+            persistedMapRef.current = next;
+            const free = next.freeGeometry ?? next;
+            unsnappedGeometry.current = {
+                position: {...free.position},
+                size: {...free.size},
+            };
+            restoreGeometry.current = {
+                position: {...next.position},
+                size: {...next.size},
+            };
+            const nextSnap = next.snapRegion ?? null;
+            setSnapRegion(nextSnap);
+            callbacksRef.current.onSnapChange?.(nextSnap);
+            if (nextSnap && snappable && typeof window !== "undefined") {
+                const geometry = snapGeometry(nextSnap);
+                setX(geometry.position.x);
+                setY(geometry.position.y);
+                setWidth(geometry.size.width);
+                setHeight(geometry.size.height);
+            } else {
+                setX(next.position.x);
+                setY(next.position.y);
+                setWidth(next.size.width);
+                setHeight(next.size.height);
+            }
+        };
+        applyPersistedEntry();
+        return floatingWindowMap.onChange(applyPersistedEntry);
+    }, [ks, snappable]);
+
     const maximize = () => {
         if (!maximizable || mode == "maximized" || typeof window == "undefined") return;
         restoreGeometry.current = {position: {x, y}, size: {width, height}};
@@ -667,6 +711,7 @@ export function useFloatingWindowController({
                 y: y + (e.key == "ArrowDown" ? delta : e.key == "ArrowUp" ? -delta : 0),
             });
         }
+        if (ks) floatingWindowMap.touch(ks);
     };
 
     const onResizeStop: RndResizeCallback = (e, dir, elementRef, delta, { x: nx, y: ny }) => {

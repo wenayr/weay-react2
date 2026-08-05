@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useReorder, useReorderBoard, renderBy, updateBy, type BoardColumn } from "../../api";
+import { useReorder, useReorderBoard, renderBy, updateBy, useCacheMapPersistence, memoryCache, type BoardColumn } from "../../api";
 import { Button } from "../../src/hooks";
 import { FloatingWindow, FloatingWindowTaskbar, WindowPortal, type FloatingWindowMode, type FloatingWindowSnapRegion } from "../../src/components";
 import { DragBox } from "../../src/components/Dnd/FloatingWindow";
@@ -56,6 +56,7 @@ function WindowABody() {
 }
 
 function FloatingWindowStackDemo() {
+    useCacheMapPersistence(memoryCache);
     const [firstOpen, setFirstOpen] = useState(false);
     const [secondOpen, setSecondOpen] = useState(false);
     const [firstActive, setFirstActive] = useState(false);
@@ -66,6 +67,15 @@ function FloatingWindowStackDemo() {
         setFirstOpen(true);
         setSecondOpen(true);
     };
+
+    useEffect(() => {
+        const openDirectDemo = () => {
+            if (location.hash === "#floating-window-stack") openBoth();
+        };
+        openDirectDemo();
+        window.addEventListener("hashchange", openDirectDemo);
+        return () => window.removeEventListener("hashchange", openDirectDemo);
+    }, []);
 
     return <div style={{
         position: "relative",
@@ -79,9 +89,14 @@ function FloatingWindowStackDemo() {
         background: "#f6f8fa",
     }}>
         <div style={{display: "flex", gap: 8, flexWrap: "wrap"}}>
-            <button onClick={openBoth}>open both windows</button>
+            <button onClick={openBoth} style={{fontWeight: 700, padding: "6px 10px"}}>launch desktop demo</button>
             <button onClick={() => setFirstOpen(value => !value)}>{firstOpen ? "close A" : "open A"}</button>
             <button onClick={() => setSecondOpen(value => !value)}>{secondOpen ? "close B (no x)" : "open B"}</button>
+        </div>
+        <div style={{display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10}}>
+            {["shared taskbar", "session Snap", "cascade", "Win/Meta + Arrow"].map(label =>
+                <span key={label} style={{padding: "3px 7px", borderRadius: 999, color: "#0550ae", background: "#ddf4ff", fontSize: 11, fontWeight: 650}}>{label}</span>
+            )}
         </div>
         <p style={{margin: "10px 0 0", color: "#57606a", fontSize: 12}}>
             Double-click/double-tap a title bar to maximize/restore. Drag it to the top centre, then choose a Snap Layout target.
@@ -93,9 +108,8 @@ function FloatingWindowStackDemo() {
         {firstOpen && <FloatingWindow
             windowId="qa-window-a"
             stackGroup="qa-desktop"
-            layoutGroup="qa-desktop-layout"
+            layoutGroup="qa-desktop-layout-v2"
             taskbarLabel="Window A"
-            position={{x: 110, y: 110}}
             size={{width: 340, height: 220}}
             moveOnlyHeader
             minimizable
@@ -112,9 +126,8 @@ function FloatingWindowStackDemo() {
         {secondOpen && <FloatingWindow
             windowId="qa-window-b"
             stackGroup="qa-desktop"
-            layoutGroup="qa-desktop-layout"
+            layoutGroup="qa-desktop-layout-v2"
             taskbarLabel="Window B"
-            position={{x: 300, y: 200}}
             size={{width: 340, height: 220}}
             moveOnlyHeader
             minimizable
@@ -445,7 +458,7 @@ export function Card35() {
 
 export function Card52() {
     return (
-        <Check n={52} title="FloatingWindow - desktop stacking, maximize and Snap Layout"
+        <Check id="floating-window-stack" n={52} title="FloatingWindow - desktop taskbar, sessions, cascade and Snap"
                do="Open both windows. Raise A/B, minimize each with the title-bar line button, and restore it from the common bottom panel. Test double-click/two taps and the top-centre Snap Layout. Reload/remount after snapping to confirm the group layout returns. Also try Win+Left/Right/Up/Down while a window root is focused."
                expect="Only one visible window is active. Minimized windows disappear but stay in the common panel; restoring raises the whole isolated layer including scoped popups. Snap/free geometry returns from the saved layout group. Windows without an explicit/saved position cascade instead of opening exactly on top of each other."
                note="FloatingDesktop is a small optional manager separate from FloatingWindow. FloatingWindowTaskbar can be replaced through renderItem or omitted in favour of useFloatingWindowManager. Keyboard fallback remains: Alt+Enter maximize; Alt+Arrow move; Alt+Ctrl+Arrow resize."
