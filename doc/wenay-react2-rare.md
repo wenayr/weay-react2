@@ -90,17 +90,20 @@ escape hatch. `OutsideClickArea` marks logically nested React portal events as i
 so the canonical outside-click wrapper still works across the DOM boundary. QA card 52
 is the active two-window acceptance scenario; `__test/floatingWindow.test.tsx` pins the
 portal, focus, isolation, optional close button, and outside-click contracts.
-Title bars support double-click and two-tap maximize/restore, and the accessible maximize button
-provides the same action. While a free window is dragged to the top-centre activation zone, a
-Windows 11-style Snap Layout picker exposes left/right halves and four quarters; release over a
-cell applies it, and dragging a snapped window restores its previous free size. `WindowPortal`
+Title bars support double-click and two-tap maximize/restore. The maximize button is deliberately
+hidden by default; set `maximizeButton` only when explicit chrome is useful. While a free window is
+dragged to the top-centre activation zone, a Windows 11-style Snap Layout picker presents four
+coherent presets: two halves, left plus two right quarters, two left quarters plus right, and a
+true 2x2 four-corner layout. Release over a cell applies it, and dragging a snapped window restores
+its previous free size. `WindowPortal`
 keeps menus/tooltips in the owning window's isolated layer. `useFloatingWindowManager(group)`
 exposes group order and programmatic bring-to-front. `beforeClose` plus `onClose(reason)` cover
 vetoable close flows; the legacy `onClickClose` remains supported.
 Desktop additions stay in the small sibling module `FloatingDesktop.tsx`, not in the geometry/
 drag implementation: `FloatingWindowTaskbar` is an optional common panel, while
 `useFloatingWindowManager` is its headless replacement (`windows`, minimize/restore/bringToFront).
-Set `minimizable` only when one of those restore surfaces exists. `layoutGroup + windowId`
+Set `minimizable` only when one of those restore surfaces exists; `minimizeButton={false}` keeps
+taskbar/keyboard/controller minimization while removing the title-bar control. `layoutGroup + windowId`
 derives a stable persisted key for each group member and stores both its Snap region and previous
 free geometry in the existing `floatingWindowMap`; no second persistence system is involved.
 Unpositioned viewport windows cascade in eight small slots (`cascade={false}` opts out).

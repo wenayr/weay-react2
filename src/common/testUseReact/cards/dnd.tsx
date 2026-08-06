@@ -131,6 +131,7 @@ function FloatingWindowStackDemo() {
             size={{width: 340, height: 220}}
             moveOnlyHeader
             minimizable
+            minimizeButton={false}
             overflow={false}
             header={<div style={{...stackWindowHeader, background: "#1e3a8a"}}>Window B · intentionally no x</div>}
         >
@@ -459,9 +460,9 @@ export function Card35() {
 export function Card52() {
     return (
         <Check id="floating-window-stack" n={52} title="FloatingWindow - desktop taskbar, sessions, cascade and Snap"
-               do="Open both windows. Raise A/B, minimize each with the title-bar line button, and restore it from the common bottom panel. Test double-click/two taps and the top-centre Snap Layout. Reload/remount after snapping to confirm the group layout returns. Also try Win+Left/Right/Up/Down while a window root is focused."
-               expect="Only one visible window is active. Minimized windows disappear but stay in the common panel; restoring raises the whole isolated layer including scoped popups. Snap/free geometry returns from the saved layout group. Windows without an explicit/saved position cascade instead of opening exactly on top of each other."
-               note="FloatingDesktop is a small optional manager separate from FloatingWindow. FloatingWindowTaskbar can be replaced through renderItem or omitted in favour of useFloatingWindowManager. Keyboard fallback remains: Alt+Enter maximize; Alt+Arrow move; Alt+Ctrl+Arrow resize."
+               do="Open both windows. A has a title-bar minimize button; B intentionally hides it—focus B and use Win/Meta+Down instead. Restore either window from the common bottom panel. Double-click/tap a title twice to maximize and restore: there is intentionally no maximize button. Drag to the top centre and inspect all four Snap presets; the last must be a complete 2x2 with four clickable corners. Reload after snapping to confirm the group layout returns."
+               expect="Only one visible window is active. Exactly one title-bar Minimize button is rendered, while both windows remain minimizable through external surfaces. Restoring raises the whole isolated layer including scoped popups. The Snap picker contains 2, 3, 3 and 4 zones—never two detached bottom cells. Snap/free geometry returns after reload; new windows cascade."
+               note="FloatingDesktop is a small optional manager separate from FloatingWindow. FloatingWindowTaskbar can be replaced through renderItem or omitted in favour of useFloatingWindowManager. Chrome is consumer policy: minimizable enables the behavior, minimizeButton can hide its control, and maximizeButton is opt-in; double-click/two taps remain."
                tall>
             <FloatingWindowStackDemo />
         </Check>

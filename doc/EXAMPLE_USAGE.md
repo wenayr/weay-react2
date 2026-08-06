@@ -759,6 +759,8 @@ export function ToolbarSettingsWindow({ open, close }: { open: boolean; close: (
                 size={{ width: 360, height: 420 }}
                 title="Toolbar"
                 minimizable
+                // Optional: hide its title-bar control while keeping taskbar/keyboard minimize.
+                // minimizeButton={false}
                 closable
                 closeOnEscape
                 beforeClose={() => confirm("Discard unsaved changes?")}
@@ -785,6 +787,8 @@ Why:
 
 - `toolbar.Settings` is presentation-agnostic.
 - `FloatingWindow` owns drag/position/close chrome.
+- Maximize/restore stays on double-click/two taps by default; `maximizeButton`
+  opts into the extra title-bar button.
 - `FloatingWindow` portals a fixed viewport host to `document.body` by default,
   positions the window absolutely inside that host,
   and raises its complete stacking context when pressed.

@@ -473,7 +473,17 @@ body {
   right: var(--wnd-maximize-right, 20px);
 }
 .wenayWndMinimize {
+  right: var(--wnd-maximize-right, 20px);
+}
+.wenayWnd:has(.wenayWndMaximize) .wenayWndMinimize {
   right: var(--wnd-minimize-right, 52px);
+}
+.wenayWnd:not(:has(.wenayWndClose)) .wenayWndMaximize,
+.wenayWnd:not(:has(.wenayWndClose)):not(:has(.wenayWndMaximize)) .wenayWndMinimize {
+  right: var(--wnd-close-right, -12px);
+}
+.wenayWnd:not(:has(.wenayWndClose)):has(.wenayWndMaximize) .wenayWndMinimize {
+  right: var(--wnd-maximize-right, 20px);
 }
 .wenayWndMinimize > span {
   width: 10px;
@@ -499,8 +509,8 @@ body {
   top: 8px;
   left: 50%;
   display: grid;
-  grid-template-columns: repeat(6, 42px);
-  gap: 6px;
+  grid-template-columns: repeat(4, 78px);
+  gap: 8px;
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--wnd-border, #8c959f) 70%, transparent);
   border-radius: 10px;
@@ -510,48 +520,34 @@ body {
   transform: translateX(-50%);
   backdrop-filter: blur(14px);
 }
-.wenaySnapLayoutOption {
-  width: 42px;
-  height: 38px;
+.wenaySnapLayoutPreset {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 3px;
+  width: 78px;
+  height: 48px;
   padding: 5px;
-  border: 0;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, currentColor 26%, transparent);
   border-radius: 6px;
+}
+.wenaySnapLayoutZone {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, currentColor 52%, transparent);
+  border-radius: 3px;
   color: currentColor;
-  background: transparent;
+  background: color-mix(in srgb, currentColor 5%, transparent);
   cursor: pointer;
 }
-.wenaySnapLayoutOption:hover,
-.wenaySnapLayoutOption:focus-visible,
-.wenaySnapLayoutOption[data-preview="true"] {
+.wenaySnapLayoutZone:hover,
+.wenaySnapLayoutZone:focus-visible,
+.wenaySnapLayoutZone[data-preview="true"] {
   outline: none;
   background: color-mix(in srgb, var(--menu-outline-color, #0078d4) 22%, transparent);
-}
-.wenaySnapLayoutGlyph {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border: 1px solid currentColor;
-  border-radius: 2px;
-  opacity: .78;
-  box-sizing: border-box;
-}
-.wenaySnapLayoutGlyph_left {
-  clip-path: inset(0 50% 0 0);
-}
-.wenaySnapLayoutGlyph_right {
-  clip-path: inset(0 0 0 50%);
-}
-.wenaySnapLayoutGlyph_top-left {
-  clip-path: inset(0 50% 50% 0);
-}
-.wenaySnapLayoutGlyph_top-right {
-  clip-path: inset(0 0 50% 50%);
-}
-.wenaySnapLayoutGlyph_bottom-left {
-  clip-path: inset(50% 50% 0 0);
-}
-.wenaySnapLayoutGlyph_bottom-right {
-  clip-path: inset(50% 0 0 50%);
+  border-color: var(--menu-outline-color, #0078d4);
 }
 .wenaySnapPreview {
   position: absolute;

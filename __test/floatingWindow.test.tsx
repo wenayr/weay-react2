@@ -120,7 +120,7 @@ describe("FloatingWindow viewport layer", () => {
         expect(screen.queryByRole("button", {name: "Close"})).toBeNull();
     });
 
-    test("double click and the title-bar control maximize and restore geometry", () => {
+    test("double click maximizes and restores without showing a maximize button by default", () => {
         const onModeChange = jest.fn();
         render(
             <FloatingWindow
@@ -136,20 +136,33 @@ describe("FloatingWindow viewport layer", () => {
 
         const root = rootFor("zoom-content");
         const header = root.querySelector(".wenayWndHeader") as HTMLElement;
+        expect(screen.queryByRole("button", {name: "Maximize"})).toBeNull();
         fireEvent.doubleClick(header);
         expect(root.dataset.mode).toBe("maximized");
         expect(root.dataset.positionX).toBe("0");
         expect(root.dataset.positionY).toBe("0");
         expect(root.style.width).toBe(`${window.innerWidth}px`);
-        expect(screen.getByRole("button", {name: "Restore"}).getAttribute("aria-pressed")).toBe("true");
 
-        fireEvent.click(screen.getByRole("button", {name: "Restore"}));
+        fireEvent.doubleClick(header);
         expect(root.dataset.mode).toBe("normal");
         expect(root.dataset.positionX).toBe("40");
         expect(root.dataset.positionY).toBe("50");
         expect(root.style.width).toBe("320px");
         expect(onModeChange).toHaveBeenNthCalledWith(1, "maximized");
         expect(onModeChange).toHaveBeenNthCalledWith(2, "normal");
+    });
+
+    test("maximize control is an explicit opt-in", () => {
+        render(
+            <FloatingWindow title="Button zoom" maximizeButton position={{x: 20, y: 30}} size={{width: 240, height: 150}}>
+                <div data-testid="button-zoom-content">button zoom</div>
+            </FloatingWindow>
+        );
+        const root = rootFor("button-zoom-content");
+        fireEvent.click(screen.getByRole("button", {name: "Maximize"}));
+        expect(root.dataset.mode).toBe("maximized");
+        fireEvent.click(screen.getByRole("button", {name: "Restore"}));
+        expect(root.dataset.mode).toBe("normal");
     });
 
     test("two taps on the title bar toggle maximize without a mouse", () => {
@@ -188,15 +201,20 @@ describe("FloatingWindow viewport layer", () => {
         fireEvent.mouseDown(header, {clientX: 120, clientY: 100, buttons: 1});
         fireEvent.mouseMove(document, {clientX: window.innerWidth / 2, clientY: 10, buttons: 1});
         expect(screen.getByRole("toolbar", {name: "Snap layouts"})).not.toBeNull();
+        expect(within(screen.getByRole("group", {name: "Two columns"})).getAllByRole("button")).toHaveLength(2);
+        expect(within(screen.getByRole("group", {name: "Left and stacked right"})).getAllByRole("button")).toHaveLength(3);
+        expect(within(screen.getByRole("group", {name: "Stacked left and right"})).getAllByRole("button")).toHaveLength(3);
+        const quarters = screen.getByRole("group", {name: "Four quarters"});
+        expect(within(quarters).getAllByRole("button")).toHaveLength(4);
 
-        fireEvent.mouseEnter(screen.getByRole("button", {name: "Snap left"}));
+        fireEvent.mouseEnter(within(quarters).getByRole("button", {name: "Four quarters: bottom right"}));
         fireEvent.mouseUp(document);
-        expect(root.dataset.snapRegion).toBe("left");
-        expect(root.dataset.positionX).toBe("0");
-        expect(root.dataset.positionY).toBe("0");
+        expect(root.dataset.snapRegion).toBe("bottom-right");
+        expect(root.dataset.positionX).toBe(`${Math.floor(window.innerWidth / 2)}`);
+        expect(root.dataset.positionY).toBe(`${Math.floor(window.innerHeight / 2)}`);
         expect(root.style.width).toBe(`${Math.floor(window.innerWidth / 2)}px`);
-        expect(root.style.height).toBe(`${window.innerHeight}px`);
-        expect(onSnapChange).toHaveBeenLastCalledWith("left");
+        expect(root.style.height).toBe(`${window.innerHeight - Math.floor(window.innerHeight / 2)}px`);
+        expect(onSnapChange).toHaveBeenLastCalledWith("bottom-right");
         expect(screen.queryByRole("toolbar", {name: "Snap layouts"})).toBeNull();
 
         fireEvent.mouseDown(header, {clientX: 100, clientY: 10, buttons: 1});
@@ -260,6 +278,19 @@ describe("FloatingWindow viewport layer", () => {
         expect(first.dataset.minimized).toBe("false");
         expect(first.style.display).toBe("");
         expect(first.dataset.active).toBe("true");
+    });
+
+    test("window chrome can hide minimize while keeping external minimize behavior", () => {
+        render(
+            <FloatingWindow title="Headless controls" minimizable minimizeButton={false} size={{width: 220, height: 140}}>
+                <div data-testid="headless-controls-content">headless controls</div>
+            </FloatingWindow>
+        );
+        const root = rootFor("headless-controls-content");
+        expect(screen.queryByRole("button", {name: "Minimize"})).toBeNull();
+        expect(screen.queryByRole("button", {name: "Maximize"})).toBeNull();
+        fireEvent.keyDown(root, {key: "ArrowDown", metaKey: true});
+        expect(root.dataset.minimized).toBe("true");
     });
 
     test("windows without an explicit or saved position cascade", () => {

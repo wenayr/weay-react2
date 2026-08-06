@@ -130,8 +130,8 @@ Use these when the UI problem is generic: outside-click closing, draggable
 position, ordered drag-and-drop, or a persistent floating window. `FloatingWindow`
 uses a fixed body-portal host and an absolute window in viewport coordinates by default, keeps its root inside
 the viewport, and raises the entire isolated window stacking context when pressed.
-It also provides title-bar/button maximize and restore, mouse/touch double activation,
-keyboard move/resize, Windows 11-like half/quarter Snap Layouts, vetoable close reasons,
+It also provides title-bar double-click/two-tap maximize and restore (with an opt-in button),
+keyboard move/resize, Windows 11-like grouped Snap Layouts including a true four-corner preset, vetoable close reasons,
 and window-scoped portals for menus/tooltips. Scrim overlays independently arbitrate
 Escape/outside clicks to the top dialog and trap/restore focus.
 The optional sibling desktop layer adds minimize/restore, a replaceable common taskbar,

@@ -51,8 +51,14 @@ export type FloatingWindowProps = {
     title?: ReactNode;
     taskbarLabel?: ReactNode;
     ariaLabel?: string;
+    /** Enable maximize/restore behavior (double-click, two taps, keyboard and controller). */
     maximizable?: boolean;
+    /** Render the maximize control. The behavior remains available when this is hidden. @default false */
+    maximizeButton?: boolean;
+    /** Enable minimize behavior through the button, keyboard, taskbar and controller. */
     minimizable?: boolean;
+    /** Render the minimize control when minimizable. @default true */
+    minimizeButton?: boolean;
     /** Enable the Windows 11-like layout picker while dragging near the top centre. */
     snappable?: boolean;
     defaultMaximized?: boolean;
@@ -96,7 +102,7 @@ export type FloatingWindowProps = {
 };
 export type FloatingWindowControllerOptions = Omit<
     FloatingWindowProps,
-    "children" | "className" | "header" | "moveOnlyHeader" | "overflow" | "onCLickClose" | "onClickClose" | "onClose" | "beforeClose" | "closable" | "closeOnEscape" | "portal" | "portalContainer" | "title" | "ariaLabel"
+    "children" | "className" | "header" | "moveOnlyHeader" | "overflow" | "onCLickClose" | "onClickClose" | "onClose" | "beforeClose" | "closable" | "closeOnEscape" | "portal" | "portalContainer" | "title" | "ariaLabel" | "maximizeButton" | "minimizeButton"
 >;
 
 export type FloatingWindowController = {
@@ -162,13 +168,58 @@ export function WindowPortal({children, className, style}: {
     );
 }
 
-const snapOptions: Array<{region: FloatingWindowSnapRegion; label: string}> = [
-    {region: "left", label: "Snap left"},
-    {region: "right", label: "Snap right"},
-    {region: "top-left", label: "Snap top left"},
-    {region: "top-right", label: "Snap top right"},
-    {region: "bottom-left", label: "Snap bottom left"},
-    {region: "bottom-right", label: "Snap bottom right"},
+const snapRegionLabels: Record<FloatingWindowSnapRegion, string> = {
+    left: "left",
+    right: "right",
+    "top-left": "top left",
+    "top-right": "top right",
+    "bottom-left": "bottom left",
+    "bottom-right": "bottom right",
+};
+
+type FloatingWindowSnapLayout = {
+    id: string;
+    label: string;
+    zones: Array<{region: FloatingWindowSnapRegion; gridArea: string}>;
+};
+
+const snapLayouts: FloatingWindowSnapLayout[] = [
+    {
+        id: "halves",
+        label: "Two columns",
+        zones: [
+            {region: "left", gridArea: "1 / 1 / 3 / 2"},
+            {region: "right", gridArea: "1 / 2 / 3 / 3"},
+        ],
+    },
+    {
+        id: "left-stack",
+        label: "Left and stacked right",
+        zones: [
+            {region: "left", gridArea: "1 / 1 / 3 / 2"},
+            {region: "top-right", gridArea: "1 / 2 / 2 / 3"},
+            {region: "bottom-right", gridArea: "2 / 2 / 3 / 3"},
+        ],
+    },
+    {
+        id: "right-stack",
+        label: "Stacked left and right",
+        zones: [
+            {region: "top-left", gridArea: "1 / 1 / 2 / 2"},
+            {region: "bottom-left", gridArea: "2 / 1 / 3 / 2"},
+            {region: "right", gridArea: "1 / 2 / 3 / 3"},
+        ],
+    },
+    {
+        id: "quarters",
+        label: "Four quarters",
+        zones: [
+            {region: "top-left", gridArea: "1 / 1 / 2 / 2"},
+            {region: "top-right", gridArea: "1 / 2 / 2 / 3"},
+            {region: "bottom-left", gridArea: "2 / 1 / 3 / 2"},
+            {region: "bottom-right", gridArea: "2 / 2 / 3 / 3"},
+        ],
+    },
 ];
 
 function snapPreviewStyle(region: FloatingWindowSnapRegion): React.CSSProperties {
@@ -780,7 +831,9 @@ export function FloatingWindowBase({
                                 taskbarLabel,
                                 ariaLabel,
                                 maximizable,
+                                maximizeButton,
                                 minimizable,
+                                minimizeButton,
                                 snappable,
                                 defaultMaximized = false,
                                 defaultMinimized = false,
@@ -815,6 +868,8 @@ export function FloatingWindowBase({
     const canMaximize = maximizable ?? portalEnabled;
     const canMinimize = minimizable ?? false;
     const canSnap = snappable ?? portalEnabled;
+    const showMaximizeButton = canMaximize && (maximizeButton ?? false);
+    const showMinimizeButton = canMinimize && (minimizeButton ?? true);
     // `limit` remains coordinate-system-relative. The default portal uses viewport
     // coordinates; an embedded portal={false} window uses its positioned parent.
     // The sizeByWindow clamp independently keeps the whole window in the viewport.
@@ -961,7 +1016,7 @@ export function FloatingWindowBase({
                     )}
                     {typeof children === "function" ? children(controller.update) : children}
                 </div>
-                {showHeader && canMinimize && (
+                {showHeader && showMinimizeButton && (
                     <button
                         type="button"
                         className="wenayWndControl wenayWndMinimize"
@@ -974,7 +1029,7 @@ export function FloatingWindowBase({
                         <span aria-hidden="true" />
                     </button>
                 )}
-                {showHeader && canMaximize && (
+                {showHeader && showMaximizeButton && (
                     <button
                         type="button"
                         className="wenayWndControl wenayWndMaximize"
@@ -1018,21 +1073,24 @@ export function FloatingWindowBase({
         <>
             {controller.snapPreview && <div className="wenaySnapPreview" style={snapPreviewStyle(controller.snapPreview)} aria-hidden="true" />}
             <div className="wenaySnapLayout" role="toolbar" aria-label="Snap layouts">
-                {snapOptions.map(option => (
-                    <button
-                        type="button"
-                        key={option.region}
-                        className="wenaySnapLayoutOption"
-                        data-wenay-snap-region={option.region}
-                        data-preview={controller.snapPreview == option.region ? "true" : "false"}
-                        aria-label={option.label}
-                        onPointerEnter={() => controller.previewSnap(option.region)}
-                        onMouseEnter={() => controller.previewSnap(option.region)}
-                        onFocus={() => controller.previewSnap(option.region)}
-                        onClick={() => controller.snapTo(option.region)}
-                    >
-                        <span className={`wenaySnapLayoutGlyph wenaySnapLayoutGlyph_${option.region}`} aria-hidden="true" />
-                    </button>
+                {snapLayouts.map(layout => (
+                    <div key={layout.id} className="wenaySnapLayoutPreset" role="group" aria-label={layout.label} data-layout={layout.id}>
+                        {layout.zones.map(zone => (
+                            <button
+                                type="button"
+                                key={zone.region}
+                                className="wenaySnapLayoutZone"
+                                style={{gridArea: zone.gridArea}}
+                                data-wenay-snap-region={zone.region}
+                                data-preview={controller.snapPreview == zone.region ? "true" : "false"}
+                                aria-label={`${layout.label}: ${snapRegionLabels[zone.region]}`}
+                                onPointerEnter={() => controller.previewSnap(zone.region)}
+                                onMouseEnter={() => controller.previewSnap(zone.region)}
+                                onFocus={() => controller.previewSnap(zone.region)}
+                                onClick={() => controller.snapTo(zone.region)}
+                            />
+                        ))}
+                    </div>
                 ))}
             </div>
         </>

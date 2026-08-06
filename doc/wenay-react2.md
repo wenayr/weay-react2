@@ -131,10 +131,12 @@ b.over                                                                      // {
     <Panel />
 </FloatingWindow>
 // Default: fixed body-portal host + absolute window in viewport coordinates, click-to-front.
-// Title double-click/two taps: maximize/restore. Top-centre drag: half/quarter Snap Layout.
+// Title double-click/two taps: maximize/restore; no maximize button unless maximizeButton is set.
+// Top-centre drag: coherent half/stacked/true-2x2 Snap Layout presets.
 // WindowPortal keeps a menu/tooltip in the owning window's isolated layer.
 // Optional desktop surface: <FloatingWindowTaskbar stackGroup="tools" />.
 // Add minimizable + stackGroup="tools" + layoutGroup="saved-tools" + stable windowId to members.
+// Set minimizeButton={false} to keep taskbar/keyboard minimization without title-bar chrome.
 // Win/Meta+Left/Right snaps, Up maximizes, Down restores and then minimizes.
 // Rare embedded/parent-relative case: <FloatingWindow portal={false} ... />
 
