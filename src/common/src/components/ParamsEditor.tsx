@@ -1,8 +1,12 @@
 import React, {ReactElement, useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {const_Date, deepCloneMutable, isDate, Params, TF, timeLocalToStr_yyyymmdd, timeLocalToStr_yyyymmdd_hhmm, timeLocalToStr_yyyymmdd_hhmmss, timeLocalToStr_yyyymmdd_hhmmss_ms} from "wenay-common2";
+import {const_Date, deepCloneMutable, isDate, Params, TF, timeLocalToStr_yyyymmdd, timeLocalToStr_yyyymmdd_hhmm, timeLocalToStr_yyyymmdd_hhmmss, timeLocalToStr_yyyymmdd_hhmmss_ms} from "wenay-common2/client";
 import {setResizeableElement, removeResizeableElement} from "./MyResizeObserver";
 import {ParamRow, ParamToggleLabel} from "./Parameters";
 import {setAutoStepForElement} from "../utils";
+
+function isDateValue(value: unknown): value is const_Date {
+    return isDate(value as const_Date);
+}
 
 function timeToStr(time: number | string | const_Date, step?: number) {
     function getTimeStep(time: number) {
@@ -438,7 +442,7 @@ function ParamsEditorBase<TParams extends Params.IParamsExpandableReadonly = Par
                 const nameT = <p className={"toPTextIndicator"}>{name}</p>
 
                 const set = (a: typeof value) => {
-                    const aa = param.value instanceof Date ? new Date(a as any) : a;
+                    const aa = param.value instanceof Date ? new Date((a as const_Date).valueOf()) : a;
                     param.value = aa;
                     onSetValue(aa, param.enabled ?? true);
                 }
@@ -469,8 +473,7 @@ function ParamsEditorBase<TParams extends Params.IParamsExpandableReadonly = Par
                 const nestedMarginLeft = 20;
 
 
-                // @ts-ignore
-                if (isDate(value)) {
+                if (isDateValue(value)) {
                     param.type = "time";
                 }
                 else if (typeof(value)=="object") {

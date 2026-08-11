@@ -1,4 +1,4 @@
-import {Params} from "wenay-common2";
+import {Params} from "wenay-common2/client";
 import {ParamsEditor} from "../src/components";
 
 const getParams = () => {

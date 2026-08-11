@@ -10,7 +10,7 @@
 // same mechanics as createToolbar: the caller supplies one string key.
 import type {ReactNode} from 'react'
 import type {ColumnState as AgColumnState, GridApi} from 'ag-grid-community'
-import {listen as createListen} from 'wenay-common2'
+import {listen as createListen} from 'wenay-common2/client'
 import {createUpdateApi} from '../../../updateBy'
 import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
 import {pinFixedOrder} from '../../utils/fixedOrder'

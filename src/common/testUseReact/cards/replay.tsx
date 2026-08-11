@@ -1,7 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, useAiRunClient, useFileJobClient, useContractSlot } from "../../api";
-import { listen as createListen, Observe, Contract } from "wenay-common2";
-import type { Ai, Resource } from "wenay-common2";
+import { listen as createListen } from "wenay-common2/client";
+import * as Contract from "wenay-common2/contract";
+import * as Observe from "wenay-common2/observe";
+import type * as Ai from "wenay-common2/ai";
+import type * as Resource from "wenay-common2/resource";
 import { ReplayVideoDemo, ReplayRouteDemo, ReplayStoreDemo, ReplayStoreEachDemo } from "../replayVideo";
 import { Check, ShowcasePanel, ExampleCode, DemoHint } from "../standKit";
 
@@ -26,34 +29,37 @@ const AiRunClientDemo = () => {
     const ai = useAiRunClient(qaAiClient);
     const files = useFileJobClient(qaFileClient);
     const run = ai.runs["qa-ai"];
-    function start() {
+    async function start() {
+        const now = Date.now();
         qaAiStore.state.runs["qa-ai"] = {
             id: "qa-ai", owner: "qa", requestId: "qa-request", kind: "assistant", resourceIds: [],
-            state: "running", progress: 20, message: "Собираю ответ", artifacts: [], createdAt: Date.now(), updatedAt: Date.now(),
+            state: "running", progress: 20, message: "Собираю ответ", artifacts: [], createdAt: now, updatedAt: now,
         };
-        void Observe.flushReactive(qaAiStore.state);
+        await Observe.flushReactive(qaAiStore.state);
         emitQaAiEvent({type: "started", runId: "qa-ai"});
     }
-    function finish() {
-        if (!run) return;
-        run.state = "completed";
-        run.progress = 100;
-        run.result = {summary: "Готово"};
-        run.updatedAt = Date.now();
-        void Observe.flushReactive(qaAiStore.state);
-        emitQaAiEvent({type: "completed", runId: "qa-ai", result: run.result});
+    async function finish() {
+        const liveRun = qaAiStore.state.runs["qa-ai"];
+        if (!liveRun) return;
+        liveRun.state = "completed";
+        liveRun.progress = 100;
+        liveRun.result = {summary: "Готово"};
+        liveRun.updatedAt = Date.now();
+        await Observe.flushReactive(qaAiStore.state);
+        emitQaAiEvent({type: "completed", runId: "qa-ai", result: liveRun.result});
     }
-    function completeFileJob() {
-        qaFileStore.state.files["qa-file"] = {id: "qa-file", owner: "qa", name: "report.csv", size: 2048, mime: "text/csv", state: "uploaded", createdAt: Date.now(), updatedAt: Date.now()};
-        qaFileStore.state.jobs["qa-job"] = {id: "qa-job", fileId: "qa-file", owner: "qa", state: "ready", progress: 100, createdAt: Date.now(), updatedAt: Date.now()};
-        void Observe.flushReactive(qaFileStore.state);
+    async function completeFileJob() {
+        const now = Date.now();
+        qaFileStore.state.files["qa-file"] = {id: "qa-file", owner: "qa", name: "report.csv", size: 2048, mime: "text/csv", state: "uploaded", createdAt: now, updatedAt: now};
+        qaFileStore.state.jobs["qa-job"] = {id: "qa-job", fileId: "qa-file", owner: "qa", state: "ready", progress: 100, createdAt: now, updatedAt: now};
+        await Observe.flushReactive(qaFileStore.state);
     }
     return <div className="wenayQaShowcaseGrid">
         <ShowcasePanel eyebrow="LIVE STATE" title="React показывает уже созданный workflow-клиент" tone="green">
             <DemoHint>Сценарий имитирует локальный Store и semantic Replay; реальный runner и RPC остаются за границей React.</DemoHint>
             <div className="wenayQaActionRow">
                 <button onClick={start}>1. Начать AI-run</button>
-                <button onClick={finish} disabled={!run || run.state == "completed"}>2. Завершить AI-run</button>
+                <button onClick={finish} disabled={!run || run.state === "completed"}>2. Завершить AI-run</button>
             </div>
             <div className="wenayQaMetricGrid">
                 <span>ready <b>{String(ai.ready)}</b></span><span>state <b>{run?.state ?? "idle"}</b></span>
@@ -509,7 +515,7 @@ export function Card48() {
     <Check id="ai-run-client" n={48} title="common2 AI run — React Store/Replay adapter"
                        do="Start run, then complete run. Watch durable state/progress and the last semantic event. Then complete the file job below."
                        expect="React renders the local account-filtered client Stores and can react to AI semantic Replay events. The hooks do not create hosts, send prompts, own RPC, retry provider calls, or store raw input: common2 and the application keep those responsibilities."
-                       note="useAiRunClient and useFileJobClient are the React-facing adoption of common2 1.0.78. Apps supply their own storage, runner, ACL and presentation.">
+                       note="useAiRunClient and useFileJobClient are the React-facing adapters for the common2 AI and resource clients. Apps supply their own storage, runner, ACL and presentation.">
                     <AiRunClientDemo />
                 </Check>
     );

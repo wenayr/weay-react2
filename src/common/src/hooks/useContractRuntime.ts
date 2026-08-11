@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useState} from 'react'
-import type {Contract} from 'wenay-common2'
+import type * as Contract from 'wenay-common2/contract'
 
 function idleSlot(slotId: string): Contract.ContractSlotStatus {
     return {

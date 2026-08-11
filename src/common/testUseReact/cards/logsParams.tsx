@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, useKeyboard, keyboard, useResizeObserver, useElementSize } from "../../api";
-import { Params } from "wenay-common2";
+import { Params } from "wenay-common2/client";
 import { OutsideClickArea } from "../../src/hooks";
 import { TestParams } from "../testParams";
 import { Check } from "../standKit";

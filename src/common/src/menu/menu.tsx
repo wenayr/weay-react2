@@ -6,7 +6,7 @@ import React, {
     useRef,
     useState,
 } from 'react';
-import { promiseProgress, sleepAsync } from "wenay-common2";
+import { promiseProgress, sleepAsync } from "wenay-common2/client";
 
 /*******************************************************
  * Menu data types
@@ -45,6 +45,11 @@ export type MenuActionHandler = (event: MenuActionEvent) => void;
  * Helper type
  *******************************************************/
 type MenuProgressCounters = { ok?: number; error?: number; count?: number };
+
+function isPromiseLike<T>(value: unknown): value is PromiseLike<T> {
+    return !!value && (typeof value === "object" || typeof value === "function") &&
+        typeof (value as PromiseLike<T>).then === "function";
+}
 
 /*******************************************************
  * Displays counter/progress with animation and ok/error counts
@@ -100,10 +105,12 @@ function MenuElement({
 }): ReactElement {
     const unsubOk = useRef<null | (() => any)>(null);
     const unsubErr = useRef<null | (() => any)>(null);
+    const operation = useRef(0);
 
     useEffect(() => {
         // Unsubscribe on unmount
         return () => {
+            operation.current++;
             unsubOk.current?.();
             unsubErr.current?.();
             unsubOk.current = null;
@@ -123,6 +130,12 @@ function MenuElement({
             style={{ float: toLeft ? "left" : "right" }}
             onClick={() => {
                 if (!item.onClick) return;
+                const currentOperation = ++operation.current;
+                const isCurrent = () => operation.current === currentOperation;
+                unsubOk.current?.();
+                unsubErr.current?.();
+                unsubOk.current = null;
+                unsubErr.current = null;
                 const actionKey = item.actionKey ?? undefined;
                 onActionEvent?.({type: "click", item: item as MenuItemStrict, actionKey});
                 let result;
@@ -130,7 +143,7 @@ function MenuElement({
                     result = item.onClick(item);
                 } catch (error) {
                     onActionEvent?.({type: "error", item: item as MenuItemStrict, actionKey, error});
-                    throw error;
+                    return;
                 }
                 if (!result) {
                     onActionEvent?.({type: "ok", item: item as MenuItemStrict, actionKey});
@@ -145,11 +158,10 @@ function MenuElement({
                         )[];
                     const pa = promiseProgress(tasks);
                     setProgress({});
-                    unsubOk.current?.();
-                    unsubErr.current?.();
                     // clear progress when all tasks settle, same as the single-promise path;
                     // previously the counter (and its 30ms interval) lived until unmount
                     const onTick = async (countOk: number, countError: number, count: number) => {
+                        if (!isCurrent()) return;
                         setProgress({ ok: countOk, error: countError, count });
                         if (countOk + countError >= count) {
                             unsubOk.current?.();
@@ -157,7 +169,7 @@ function MenuElement({
                             unsubOk.current = null;
                             unsubErr.current = null;
                             await sleepAsync(500);
-                            setProgress(null);
+                            if (isCurrent()) setProgress(null);
                         }
                     };
 
@@ -176,10 +188,11 @@ function MenuElement({
                     void pa.allSettled();
                 }
                 // If this is a single promise
-                else if (result instanceof Promise) {
+                else if (isPromiseLike(result)) {
                     setProgress({});
-                    result
+                    Promise.resolve(result)
                         .then(async (val) => {
+                            if (!isCurrent()) return;
                             onActionEvent?.({type: "ok", item: item as MenuItemStrict, actionKey});
                             if (Array.isArray(val) && val.length) {
                                 // If an array from Promise.allSettled was returned
@@ -198,12 +211,12 @@ function MenuElement({
                             }
                         })
                         .catch((error) => {
+                            if (!isCurrent()) return;
                             onActionEvent?.({type: "error", item: item as MenuItemStrict, actionKey, error});
-                            throw error;
                         })
                         .finally(async () => {
                             await sleepAsync(500);
-                            setProgress(null);
+                            if (isCurrent()) setProgress(null);
                         });
                 } else {
                     onActionEvent?.({type: "ok", item: item as MenuItemStrict, actionKey});
@@ -238,6 +251,77 @@ type MenuItemWrapperProps = {
     onActionEvent?: MenuActionHandler;
 };
 
+const EMPTY_MENU_ITEMS: MenuItemStrict[] = [];
+
+type AsyncMenuEventType = Extract<
+    MenuActionEventType,
+    "submenuOpen" | "submenuOk" | "submenuError" |
+    "funcOpen" | "funcOk" | "funcError" |
+    "focusOpen" | "focusOk" | "focusError"
+>;
+
+/** One lifecycle for all lazy menu resources. Rejections are reported through
+ * onActionEvent and stale completions are ignored; internal promise chains must
+ * never turn a handled menu error into an unhandled rejection. */
+function useAsyncMenuValue<T>({
+    open,
+    load,
+    empty,
+    normalize,
+    item,
+    events,
+    onActionEvent,
+}: {
+    open: boolean;
+    load?: (() => T | Promise<T>) | null;
+    empty: T;
+    normalize: (value: T) => T;
+    item: MenuItemStrict;
+    events: readonly [AsyncMenuEventType, AsyncMenuEventType, AsyncMenuEventType];
+    onActionEvent?: MenuActionHandler;
+}) {
+    const [value, setValue] = useState<T>(empty);
+
+    useEffect(() => {
+        if (!open || !load) {
+            setValue(empty);
+            return;
+        }
+
+        let alive = true;
+        const actionKey = item.actionKey ?? undefined;
+        onActionEvent?.({type: events[0], item, actionKey});
+        const succeed = (next: T) => {
+            if (!alive) return;
+            setValue(normalize(next));
+            onActionEvent?.({type: events[1], item, actionKey});
+        };
+        const fail = (error: unknown) => {
+            if (!alive) return;
+            setValue(empty);
+            onActionEvent?.({type: events[2], item, actionKey, error});
+        };
+
+        try {
+            const result = load();
+            if (isPromiseLike<T>(result)) void Promise.resolve(result).then(succeed, fail);
+            else succeed(result);
+        } catch (error) {
+            fail(error);
+        }
+
+        return () => { alive = false; };
+    }, [open, load, empty, normalize, item, events, onActionEvent]);
+
+    return value;
+}
+
+const normalizeMenuItems = (items: MenuItem[]) => items.filter(Boolean) as MenuItemStrict[];
+const normalizeMenuElement = (element: React.ReactElement) => element;
+const SUBMENU_EVENTS = ["submenuOpen", "submenuOk", "submenuError"] as const;
+const FUNC_EVENTS = ["funcOpen", "funcOk", "funcError"] as const;
+const FOCUS_EVENTS = ["focusOpen", "focusOk", "focusError"] as const;
+
 const MenuItemWrapper = ({
                              item,
                              index,
@@ -250,99 +334,19 @@ const MenuItemWrapper = ({
                              setOpenIndex,
                               onActionEvent,
                          }: MenuItemWrapperProps): ReactElement => {
-    const [childMenu, setChildMenu] = useState<MenuItemStrict[]>([]);
-    const [asyncFuncElement, setAsyncFuncElement] = useState<React.ReactElement | null>(null);
-    const [onFocusMenu, setOnFocusMenu] = useState<MenuItemStrict[]>([]);
-
-    useEffect(() => {
-        if (open && item.next) {
-            const actionKey = item.actionKey ?? undefined;
-            onActionEvent?.({type: "submenuOpen", item, actionKey});
-            let alive = true; // guard: do not set state after unmount or item change
-            let result;
-            try {
-                result = item.next();
-            } catch (error) {
-                onActionEvent?.({type: "submenuError", item, actionKey, error});
-                throw error;
-            }
-            if (result instanceof Promise) {
-                result.then((val) => {
-                    if (alive) setChildMenu(val.filter(Boolean) as MenuItemStrict[]);
-                    onActionEvent?.({type: "submenuOk", item, actionKey});
-                }).catch((error) => {
-                    onActionEvent?.({type: "submenuError", item, actionKey, error});
-                    throw error;
-                });
-            } else {
-                setChildMenu(result.filter(Boolean) as MenuItemStrict[]);
-                onActionEvent?.({type: "submenuOk", item, actionKey});
-            }
-            return () => { alive = false; };
-        } else {
-            setChildMenu([]);
-        }
-    }, [open, item, item.next, onActionEvent]);
-
-    useEffect(() => {
-        if (open && item.func) {
-            const actionKey = item.actionKey ?? undefined;
-            onActionEvent?.({type: "funcOpen", item, actionKey});
-            let alive = true;
-            let result;
-            try {
-                result = item.func();
-            } catch (error) {
-                onActionEvent?.({type: "funcError", item, actionKey, error});
-                throw error;
-            }
-            if (result instanceof Promise) {
-                result.then((val) => {
-                    if (alive) setAsyncFuncElement(val);
-                    onActionEvent?.({type: "funcOk", item, actionKey});
-                }).catch((error) => {
-                    onActionEvent?.({type: "funcError", item, actionKey, error});
-                    throw error;
-                });
-            } else {
-                setAsyncFuncElement(result);
-                onActionEvent?.({type: "funcOk", item, actionKey});
-            }
-            return () => { alive = false; };
-        } else {
-            setAsyncFuncElement(null);
-        }
-    }, [open, item, item.func, onActionEvent]);
-
-    useEffect(() => {
-        if (open && item.onFocus) {
-            const actionKey = item.actionKey ?? undefined;
-            onActionEvent?.({type: "focusOpen", item, actionKey});
-            let alive = true;
-            let result;
-            try {
-                result = item.onFocus();
-            } catch (error) {
-                onActionEvent?.({type: "focusError", item, actionKey, error});
-                throw error;
-            }
-            if (result instanceof Promise) {
-                result.then((val) => {
-                    if (alive) setOnFocusMenu(val.filter(Boolean) as MenuItemStrict[]);
-                    onActionEvent?.({type: "focusOk", item, actionKey});
-                }).catch((error) => {
-                    onActionEvent?.({type: "focusError", item, actionKey, error});
-                    throw error;
-                });
-            } else {
-                setOnFocusMenu(result.filter(Boolean) as MenuItemStrict[]);
-                onActionEvent?.({type: "focusOk", item, actionKey});
-            }
-            return () => { alive = false; };
-        } else {
-            setOnFocusMenu([]);
-        }
-    }, [open, item, item.onFocus, onActionEvent]);
+    const childMenu = useAsyncMenuValue<MenuItemStrict[]>({
+        open, load: item.next as (() => MenuItemStrict[] | Promise<MenuItemStrict[]>) | null | undefined,
+        empty: EMPTY_MENU_ITEMS, normalize: normalizeMenuItems, item, events: SUBMENU_EVENTS, onActionEvent,
+    });
+    const asyncFuncElement = useAsyncMenuValue<React.ReactElement | null>({
+        open, load: item.func, empty: null,
+        normalize: normalizeMenuElement as (element: React.ReactElement | null) => React.ReactElement | null,
+        item, events: FUNC_EVENTS, onActionEvent,
+    });
+    const onFocusMenu = useAsyncMenuValue<MenuItemStrict[]>({
+        open, load: item.onFocus as (() => MenuItemStrict[] | Promise<MenuItemStrict[]>) | null | undefined,
+        empty: EMPTY_MENU_ITEMS, normalize: normalizeMenuItems, item, events: FOCUS_EVENTS, onActionEvent,
+    });
 
     const onMouseEnter = () => {
         if (open) return;

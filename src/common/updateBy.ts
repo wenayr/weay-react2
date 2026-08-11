@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
-import { listen as createListen, waitRun } from "wenay-common2";
+import { listen as createListen, waitRun } from "wenay-common2/client";
 
 // изоморфный layout-эффект: на сервере (SSR) useLayoutEffect шумит предупреждением,
 // поэтому там падаем на useEffect
@@ -152,7 +152,10 @@ export function useUpdateBy<T extends object>(a: T, f?: UpdateCallback<T>) {
     useSyncExternalStore(
         subscribe,
         // getSnapshot must be pure: only read the version, subscribe creates the state
-        () => (hasF ? 0 : (map3.get(a)?.version ?? 0))
+        () => (hasF ? 0 : (map3.get(a)?.version ?? 0)),
+        // The hook returns no snapshot-derived value, so one stable server version is
+        // sufficient and lets bundler-based SSR render subscribers without throwing.
+        () => 0,
     );
 
     useIsoLayoutEffect(() => {

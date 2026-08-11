@@ -1,5 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
-import type {Ai, Observe, Resource} from 'wenay-common2'
+import type * as Ai from 'wenay-common2/ai'
+import type * as Observe from 'wenay-common2/observe'
+import type * as Resource from 'wenay-common2/resource'
 
 type AiRunClient = Ai.AiRunClient
 type AiRunEvent = Ai.AiRunEvent
@@ -26,28 +28,45 @@ export type ClientStoreController<T extends object> = {
  */
 export function useClientStore<T extends object>(client: StoreBackedClient<T> | null | undefined): ClientStoreController<T> {
     const [version, setVersion] = useState(0)
-    const [ready, setReady] = useState(false)
-    const [error, setError] = useState<unknown>(null)
+    const [lifecycle, setLifecycle] = useState<{
+        client: StoreBackedClient<T> | null
+        ready: boolean
+        error: unknown
+    }>({client: null, ready: false, error: null})
     const generation = useRef(0)
+    const activeClient = client ?? null
 
     useEffect(() => {
-        setReady(false)
-        setError(null)
-        if (!client) return
         const current = ++generation.current
-        const off = client.store.node.on(() => setVersion(value => value + 1))
+        setLifecycle({client: activeClient, ready: false, error: null})
+        if (!client) return
+
+        // `current: true` closes the render-to-effect window: if the Store changed
+        // before this subscription was installed, the immediate current delivery
+        // schedules a fresh snapshot instead of waiting for a later mutation.
+        const off = client.store.node.on(() => setVersion(value => value + 1), {current: true})
         const readyPromise = client.ready ?? Promise.resolve()
         readyPromise.then(
-            () => { if (generation.current == current) setReady(true) },
-            nextError => { if (generation.current == current) setError(nextError) },
+            () => {
+                if (generation.current == current)
+                    setLifecycle({client, ready: true, error: null})
+            },
+            nextError => {
+                if (generation.current == current)
+                    setLifecycle({client, ready: false, error: nextError})
+            },
         )
         return () => {
             ++generation.current
             off()
         }
-    }, [client])
+    }, [activeClient])
 
     const state = useMemo(() => client ? client.store.node.snapshot() : null, [client, version])
+    // Effects run after render. Never pair a newly supplied client with lifecycle
+    // state that was produced by the previous client, even for that first render.
+    const ready = lifecycle.client === activeClient && lifecycle.ready
+    const error = lifecycle.client === activeClient ? lifecycle.error : null
     return useMemo(() => ({client: client ?? null, state, ready, error}), [client, state, ready, error])
 }
 
@@ -62,16 +81,21 @@ export type AiRunClientController = ClientStoreController<AiRunStore> & {
 /** React view over an existing `Ai.createAiRunClient` resource. */
 export function useAiRunClient(client: AiRunClient | null | undefined): AiRunClientController {
     const state = useClientStore(client)
-    const [lastEvent, setLastEvent] = useState<AiRunEvent | null>(null)
+    const activeClient = client ?? null
+    const [eventState, setEventState] = useState<{
+        client: AiRunClient | null
+        event: AiRunEvent | null
+    }>({client: null, event: null})
 
     useEffect(() => {
-        setLastEvent(null)
+        setEventState({client: activeClient, event: null})
         if (!client) return
-        return client.events.on(event => setLastEvent(event))
-    }, [client])
+        return client.events.on(event => setEventState({client, event}))
+    }, [activeClient])
 
     const empty: AiRunStore = {runs: {}, approvals: {}, inputs: {}}
     const value = state.state ?? empty
+    const lastEvent = eventState.client === activeClient ? eventState.event : null
     return useMemo(() => ({
         ...state,
         client: client ?? null,

@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from "react";
-import {Params, PromiseResult} from "wenay-common2";
+import {Params} from "wenay-common2/client";
 import {ParamsEditor} from "./ParamsEditor";
 
 export function ParamsEdit<TParams extends Params.IParamsExpandableReadonly = Params.IParamsExpandableReadonly>({onSave, params: paramsDef}: {
@@ -15,11 +15,11 @@ export function ParamsEdit<TParams extends Params.IParamsExpandableReadonly = Pa
 
     return <div className={"maxSize"}>
         {paramsD && <ParamsEditor params={paramsD} onChange={e => params.current = e}/>}
-        {onSave && <div className={"msTradeActive msTradeAlt"} onClick={async () => {
+        {onSave && <button type="button" style={{border: 0, font: "inherit"}} className={"msTradeActive msTradeAlt"} onClick={async () => {
             const t = params.current || paramsD
             if (t) onSave(t)
         }}>save
-        </div>}
+        </button>}
     </div>
 }
 
@@ -31,16 +31,16 @@ export function ParamsArrayEdit<TParams extends Params.IParamsExpandableReadonly
         paramsDef().then(e=> {
             setParams(e)})
     }, []);
-    const [params, setParams] = useState<PromiseResult<ReturnType<typeof paramsDef>>|null>(null)
+    const [params, setParams] = useState<Awaited<ReturnType<typeof paramsDef>>|null>(null)
     return <div className={"maxSize"}>
         {params && params.map((z, i)=><ParamsEditor key={i} params={z} onChange={e => {
             params[i] = e
             setParams(params)
         }}/>)}
-        {onSave && <div className={"msTradeActive msTradeAlt"} onClick={async () => {
+        {onSave && <button type="button" style={{border: 0, font: "inherit"}} className={"msTradeActive msTradeAlt"} onClick={async () => {
             if (params) onSave(params)
         }}>save
-        </div>}
+        </button>}
     </div>
 }
 

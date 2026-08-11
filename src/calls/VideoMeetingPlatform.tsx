@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {io} from "socket.io-client";
-import {createRpcClientHub, Media} from "wenay-common2";
+import {createRpcClientHub} from "wenay-common2/client";
+import * as Media from "wenay-common2/media";
 import {
     VideoCall,
     type VideoCallMessage,

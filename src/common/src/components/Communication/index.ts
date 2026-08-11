@@ -1,3 +1,23 @@
 import "../../../../style/style.css";
 
-export * from "./VideoCall";
+export {VideoCall, useVideoCallController} from "./VideoCall";
+export type {
+    UseVideoCallControllerOptions,
+    VideoCallAssistant,
+    VideoCallController,
+    VideoCallFocusMode,
+    VideoCallLayout,
+    VideoCallMediaState,
+    VideoCallMeeting,
+    VideoCallMessage,
+    VideoCallPanel,
+    VideoCallParticipant,
+    VideoCallPhase,
+    VideoCallPoll,
+    VideoCallProps,
+    VideoCallRecording,
+    VideoCallRecordingState,
+    VideoCallRoom,
+    VideoCallScreenState,
+    VideoCallTone,
+} from "./VideoCall";

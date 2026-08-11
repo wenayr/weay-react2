@@ -25,6 +25,30 @@ const entries = {
         import {AgGridTable} from './src/index.ts'
         console.log(AgGridTable)
     `,
+    canonicalCore: `
+        import {structEqual} from './src/core/index.ts'
+        console.log(structEqual)
+    `,
+    canonicalReact: `
+        import {createUpdateApi} from './src/react/index.ts'
+        console.log(createUpdateApi)
+    `,
+    canonicalGrid: `
+        import {createGridBuffer} from './src/grid/index.ts'
+        console.log(createGridBuffer)
+    `,
+    canonicalWindows: `
+        import {FloatingWindow} from './src/windows/index.ts'
+        console.log(FloatingWindow)
+    `,
+    canonicalLogs: `
+        import {createLogsController} from './src/logs/index.ts'
+        console.log(createLogsController)
+    `,
+    canonicalCommunication: `
+        import {VideoCall} from './src/communication/index.ts'
+        console.log(VideoCall)
+    `,
 }
 
 async function bundle(name, nodeEnv, minify = true) {
@@ -57,9 +81,19 @@ const rootUtility = await bundle('rootUtility', 'production')
 const wrapper = await bundle('wrapper', 'production')
 const productionReadable = await bundle('wrapper', 'production', false)
 const developmentReadable = await bundle('wrapper', 'development', false)
+const canonical = {
+    core: await bundle('canonicalCore', 'production'),
+    react: await bundle('canonicalReact', 'production'),
+    grid: await bundle('canonicalGrid', 'production'),
+    windows: await bundle('canonicalWindows', 'production'),
+    logs: await bundle('canonicalLogs', 'production'),
+    communication: await bundle('canonicalCommunication', 'production'),
+}
 
 for (const [name, value] of Object.entries({allCommunity, targeted, rootUtility, wrapper}))
     console.log(`${name}: ${value.bytes} raw / ${value.gzip} gzip`)
+for (const [name, value] of Object.entries(canonical))
+    console.log(`canonical/${name}: ${value.bytes} raw / ${value.gzip} gzip`)
 
 if (targeted.bytes >= allCommunity.bytes || targeted.gzip >= allCommunity.gzip)
     throw new Error('Targeted AG Grid bundle must be smaller than AllCommunityModule')
@@ -78,4 +112,45 @@ if (productionReadable.text.includes('function enableDevValidations'))
 if (!developmentReadable.text.includes('function enableDevValidations'))
     throw new Error('Development wrapper bundle is missing AG Grid validation')
 
-console.log('checks: targeted smaller; root utility AG Grid-free; validation development-only')
+function emittedInputBytes(probe, pattern) {
+    return Object.values(probe.result.metafile.outputs)
+        .flatMap(output => Object.entries(output.inputs ?? {}))
+        .filter(([input]) => pattern.test(input.replaceAll('\\', '/')))
+        .reduce((sum, [, value]) => sum + value.bytesInOutput, 0)
+}
+
+function assertBoundary(name, patterns) {
+    for (const pattern of patterns) {
+        const bytes = emittedInputBytes(canonical[name], pattern)
+        if (bytes != 0) throw new Error(`Canonical ${name} entry contains ${bytes} bytes matching ${pattern}`)
+    }
+}
+
+assertBoundary('core', [
+    /node_modules\/(?:react|ag-grid-|react-rnd|re-resizable)/,
+    /src\/common\/src\/(?:components|grid|hooks|logs|myChart)\//,
+])
+assertBoundary('react', [
+    /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
+    /src\/common\/src\/(?:components\/Communication|grid|logs|myChart)\//,
+])
+assertBoundary('grid', [
+    /src\/common\/(?:demo|testUseReact)\//,
+    /src\/common\/src\/(?:components\/Dnd|components\/Communication|logs|myChart)\//,
+])
+assertBoundary('windows', [
+    /node_modules\/ag-grid-/,
+    /src\/common\/(?:demo|testUseReact)\//,
+    /src\/common\/src\/(?:components\/Communication|grid|logs|myChart)\//,
+])
+assertBoundary('logs', [
+    /src\/common\/(?:demo|testUseReact)\//,
+    /src\/common\/src\/(?:components\/Dnd|components\/Communication|myChart)\//,
+])
+assertBoundary('communication', [
+    /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
+    /src\/common\/(?:demo|testUseReact)\//,
+    /src\/common\/src\/(?:components\/Dnd|grid|logs|myChart)\//,
+])
+
+console.log('checks: targeted smaller; root utility AG Grid-free; validation development-only; canonical boundaries isolated')

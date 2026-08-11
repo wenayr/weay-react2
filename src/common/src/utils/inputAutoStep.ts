@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-import {decimals, round} from "wenay-common2";
+import {decimals, round} from "wenay-common2/client";
 
 interface StepInputElement extends HTMLElement {
     value: string;

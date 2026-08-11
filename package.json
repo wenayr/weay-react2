@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "1.0.80",
+  "version": "1.0.81",
   "description": "Common react",
   "strict": true,
   "main": "lib/index.js",
@@ -12,17 +12,19 @@
     "update": "pnpm update --latest",
     "typecheck": "tsc -p tsconfig.qa-check.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "build & watch": "npm run _clearDir  &&  npm run _copyTypeSupport  &&  tsc --watch",
-    "build": "npm run _clearDir  &&  tsc --build --verbose  &&  npm run _copyTypeSupport  &&  npm run _checkGeneratedTypes  &&  npm run _afterBuild  && npm run _copyStyle",
+    "build": "npm run _clearDir  &&  tsc --build --verbose  &&  npm run _copyTypeSupport  &&  npm run _checkGeneratedTypes  &&  npm run _afterBuild  && npm run _copyStyle  &&  npm run package:probe  &&  npm run package:consumer",
     "types:generate": "tsc -p tsconfig.json --emitDeclarationOnly  &&  npm run _copyTypeSupport  &&  npm run _checkGeneratedTypes",
     "types:watch": "npm run _copyTypeSupport  &&  tsc -p tsconfig.json --emitDeclarationOnly --watch",
     "types:check": "npm run _copyTypeSupport  &&  npm run _checkGeneratedTypes",
     "bundle:probe": "node scripts/ag-grid-bundle-probe.mjs",
+    "package:probe": "node scripts/package-entrypoint-probe.mjs",
+    "package:consumer": "node scripts/packed-consumer-probe.mjs",
     "pack": "npm run build  &&  npm pack .\\dist",
     "testReact": "vite",
     "_publish": "npm publish .\\dist",
     "_afterBuild": "node copyCompiledFiles.mjs .\\dist  &&  cd dist  &&  npm pkg delete scripts devDependencies private",
     "_copyTypeSupport": "node copyTypeSupport.mjs",
-    "_checkGeneratedTypes": "tsc --ignoreConfig --noEmit --target ESNext --module ESNext --moduleResolution Bundler --jsx react-jsx --strict --skipLibCheck false lib/index.d.ts lib/native/index.d.ts",
+    "_checkGeneratedTypes": "tsc --ignoreConfig --noEmit --target ESNext --module ESNext --moduleResolution Bundler --jsx react-jsx --strict --skipLibCheck false lib/index.d.ts lib/native/index.d.ts lib/core/index.d.ts lib/react/index.d.ts lib/grid/index.d.ts lib/windows/index.d.ts lib/logs/index.d.ts lib/communication/index.d.ts",
     "_copyStyle": "xcopy /Y /S \".\\src\\style\\*.*\" \".\\dist\\lib\\style\\\"\n",
     "publish": "npm run _afterBuild && npm run _copyStyle &&  npm run _publish",
     "build & publish": "npm run build  &&  npm run _publish",
@@ -90,13 +92,66 @@
     ]
   },
   "exports": {
-    ".": "./lib/index.js",
-    "./lib/common/api.js": "./lib/common/api.js",
-    "./native": "./lib/native/index.js",
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js",
+      "default": "./lib/index.js"
+    },
+    "./lib/common/api.js": {
+      "types": "./lib/common/api.d.ts",
+      "import": "./lib/common/api.js",
+      "default": "./lib/common/api.js"
+    },
+    "./core": {
+      "types": "./lib/core/index.d.ts",
+      "import": "./lib/core/index.js",
+      "default": "./lib/core/index.js"
+    },
+    "./react": {
+      "types": "./lib/react/index.d.ts",
+      "import": "./lib/react/index.js",
+      "default": "./lib/react/index.js"
+    },
+    "./grid": {
+      "types": "./lib/grid/index.d.ts",
+      "import": "./lib/grid/index.js",
+      "default": "./lib/grid/index.js"
+    },
+    "./windows": {
+      "types": "./lib/windows/index.d.ts",
+      "import": "./lib/windows/index.js",
+      "default": "./lib/windows/index.js"
+    },
+    "./logs": {
+      "types": "./lib/logs/index.d.ts",
+      "import": "./lib/logs/index.js",
+      "default": "./lib/logs/index.js"
+    },
+    "./native": {
+      "types": "./lib/native/index.d.ts",
+      "import": "./lib/native/index.js",
+      "default": "./lib/native/index.js"
+    },
     "./package.json": "./package.json",
-    "./communication": "./lib/common/src/components/Communication/index.js",
-    "./demo/peer-media": "./lib/common/demo/peerMedia.js",
-    "./demo/peer-conference": "./lib/common/demo/peerConference.js",
-    "./demo/stand": "./lib/common/testUseReact/qa.js"
+    "./communication": {
+      "types": "./lib/communication/index.d.ts",
+      "import": "./lib/communication/index.js",
+      "default": "./lib/communication/index.js"
+    },
+    "./demo/peer-media": {
+      "types": "./lib/common/demo/peerMedia.d.ts",
+      "import": "./lib/common/demo/peerMedia.js",
+      "default": "./lib/common/demo/peerMedia.js"
+    },
+    "./demo/peer-conference": {
+      "types": "./lib/common/demo/peerConference.d.ts",
+      "import": "./lib/common/demo/peerConference.js",
+      "default": "./lib/common/demo/peerConference.js"
+    },
+    "./demo/stand": {
+      "types": "./lib/common/testUseReact/qa.d.ts",
+      "import": "./lib/common/testUseReact/qa.js",
+      "default": "./lib/common/testUseReact/qa.js"
+    }
   }
 }

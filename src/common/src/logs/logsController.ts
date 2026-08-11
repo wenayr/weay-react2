@@ -1,4 +1,4 @@
-import {Params} from "wenay-common2";
+import {Params} from "wenay-common2/client";
 
 export type LogInput<T extends object = {}> = T & {id: string, var?: number, time: Date, txt: string};
 export type LogEntry<T extends object = {}> = LogInput<T> & {num: number};

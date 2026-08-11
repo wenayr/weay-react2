@@ -1,5 +1,5 @@
 import React, {useLayoutEffect, useRef, useState} from 'react'
-import {listen as createListen} from 'wenay-common2'
+import {listen as createListen} from 'wenay-common2/client'
 import {createUpdateApi} from '../../../updateBy'
 import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
 import {pinFixedOrder, movedOrderWithFixed} from '../../utils/fixedOrder'

@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {Observe} from "wenay-common2";
+import * as Observe from "wenay-common2/observe";
 
 type StoreChange = Observe.StoreChange;
 type StoreEachCtx = Observe.StoreEachCtx;

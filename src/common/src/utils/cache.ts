@@ -64,17 +64,23 @@ export class BrowserCacheStorage implements CacheStorage{
 
 }
 
-export class LocalStorageCache  implements CacheStorage{
+export class LocalStorageCache implements CacheStorage {
+    /** Keys explicitly accessed through this storage instance. `deleteAll()` must never
+     * clear unrelated application state from the shared browser localStorage. */
+    private readonly keys = new Set<string>()
+
     async set(key: string, value: object) : Promise<boolean>  {
         if (typeof localStorage != "undefined") {
-            await localStorage.setItem(key,JSON.stringify(value))
+            localStorage.setItem(key, JSON.stringify(value))
+            this.keys.add(key)
             return true
         }
         return false
     }
     async get<T extends object>(key: string) : Promise<T|null> {
         if (typeof localStorage != "undefined") {
-            const st = await localStorage.getItem(key)
+            this.keys.add(key)
+            const st = localStorage.getItem(key)
             if (st) { try { return JSON.parse(st) } catch { return null } }
         }
         return null
@@ -82,14 +88,17 @@ export class LocalStorageCache  implements CacheStorage{
     async delete<T extends object>(key: string) : Promise<boolean> {
         if (typeof localStorage != "undefined") {
             localStorage.removeItem(key)
+            this.keys.delete(key)
             return true
         }
         return false
     }
 
+    /** Compatibility helper: clear only keys owned by this instance. */
     async deleteAll() : Promise<boolean> {
         if (typeof localStorage != "undefined") {
-            await localStorage.clear()
+            for (const key of this.keys) localStorage.removeItem(key)
+            this.keys.clear()
             return true
         }
         return false

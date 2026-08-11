@@ -47,6 +47,143 @@ test("usePeerPresence reads snapshot and online/offline edges from the host", as
     view.unmount();
     await act(async () => { a.close(); host.close(); });
 });
+
+test("usePeerPresence reconciles edges received before a slow list snapshot", async () => {
+    let emit!: (edge: {account: string, online: boolean}) => void;
+    let resolveList!: (accounts: string[]) => void;
+    const changes = {
+        on(listener: typeof emit) {
+            emit = listener;
+            return () => { emit = () => {}; };
+        },
+    };
+    const list = new Promise<string[]>(resolve => { resolveList = resolve; });
+    const presence = {changes, list: () => list} as any;
+
+    function Probe() {
+        return <output data-testid="slow-presence">{usePeerPresence(presence).accounts.join(",")}</output>;
+    }
+
+    const view = render(<Probe/>);
+    act(() => {
+        emit({account: "stale-online", online: false});
+        emit({account: "new-online", online: true});
+    });
+    await act(async () => resolveList(["stale-online", "snapshot-only"]));
+
+    await waitFor(() => expect(screen.getByTestId("slow-presence").textContent)
+        .toBe("new-online,snapshot-only"));
+    view.unmount();
+});
+
+function deferred<T>() {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((nextResolve, nextReject) => {
+        resolve = nextResolve;
+        reject = nextReject;
+    });
+    return {promise, resolve, reject};
+}
+
+function fakeListen<T extends unknown[]>() {
+    let listener: ((...args: T) => void) | null = null;
+    let subscriptions = 0;
+    return {
+        listen: {
+            on(next: (...args: T) => void) {
+                listener = next;
+                subscriptions++;
+                return () => {
+                    if (listener === next) listener = null;
+                    subscriptions--;
+                };
+            },
+        },
+        emit(...args: T) { listener?.(...args); },
+        count() { return subscriptions; },
+    };
+}
+
+test("usePeerCalls owns incoming and outgoing subscriptions and derives ready only from manager.ready", async () => {
+    const readyA = deferred<void>();
+    const readyB = deferred<void>();
+    const endedA = deferred<void>();
+    const endedB = deferred<void>();
+    const ringsA = fakeListen<[any]>();
+    const ringsB = fakeListen<[any]>();
+    const changedA = fakeListen<[]>();
+    const changedB = fakeListen<[]>();
+    const handleA = {
+        id: "same-id",
+        changed: changedA.listen,
+        ended: endedA.promise,
+        state: () => "ringing",
+    } as any;
+    const handleB = {
+        id: "same-id",
+        changed: changedB.listen,
+        ended: endedB.promise,
+        state: () => "ringing",
+    } as any;
+    const managerA = {
+        ready: readyA.promise,
+        rings: ringsA.listen,
+        active: () => null,
+        call: jest.fn(() => handleA),
+    } as any;
+    const managerB = {
+        ready: readyB.promise,
+        rings: ringsB.listen,
+        active: () => null,
+        call: jest.fn(() => handleB),
+    } as any;
+
+    const renderedReadiness: Array<{manager: any, ready: boolean}> = [];
+    function Probe({manager}: {manager: any}) {
+        const controller = usePeerCalls(manager);
+        renderedReadiness.push({manager, ready: controller.ready});
+        return <>
+            <output data-testid="calls-ready">{String(controller.ready)}</output>
+            <output data-testid="calls-count">{controller.calls.length}</output>
+            <button onClick={() => controller.call("other")}>mock call</button>
+        </>;
+    }
+
+    const view = render(<Probe manager={managerA}/>);
+    fireEvent.click(screen.getByText("mock call"));
+    await waitFor(() => expect(screen.getByTestId("calls-count").textContent).toBe("1"));
+    expect(screen.getByTestId("calls-ready").textContent).toBe("false");
+    expect(changedA.count()).toBe(1);
+
+    await act(async () => readyA.resolve());
+    await waitFor(() => expect(screen.getByTestId("calls-ready").textContent).toBe("true"));
+
+    view.rerender(<Probe manager={managerB}/>);
+    expect(renderedReadiness.find(entry => entry.manager === managerB)?.ready).toBe(false);
+    await waitFor(() => expect(screen.getByTestId("calls-count").textContent).toBe("0"));
+    expect(screen.getByTestId("calls-ready").textContent).toBe("false");
+    expect(changedA.count()).toBe(0);
+    expect(ringsA.count()).toBe(0);
+    expect(ringsB.count()).toBe(1);
+
+    fireEvent.click(screen.getByText("mock call"));
+    await waitFor(() => expect(screen.getByTestId("calls-count").textContent).toBe("1"));
+    expect(changedB.count()).toBe(1);
+
+    // A rejected old lifecycle is consumed and cannot remove a replacement handle
+    // that happens to reuse the same public id.
+    await act(async () => endedA.reject(new Error("old call ended with transport error")));
+    expect(screen.getByTestId("calls-count").textContent).toBe("1");
+    expect(changedB.count()).toBe(1);
+    await act(async () => readyB.reject(new Error("manager failed to initialize")));
+    expect(screen.getByTestId("calls-ready").textContent).toBe("false");
+
+    view.unmount();
+    expect(ringsB.count()).toBe(0);
+    expect(changedB.count()).toBe(0);
+    await act(async () => endedB.reject(new Error("settled after unmount")));
+});
 test("media relay filters an already-open viewer after ACL revocation", () => {
     let permitted = true;
     const relay = Peer.createMediaRelay({lines: {cam: "video"}, canWatch: () => permitted});

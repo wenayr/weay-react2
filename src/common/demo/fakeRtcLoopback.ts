@@ -5,7 +5,7 @@
  * injected exactly like a browser would inject `() => new RTCPeerConnection(cfg)`,
  * so the demo can run where real WebRTC is unavailable (jsdom, sandboxed panes).
  */
-import {Replay} from "wenay-common2";
+import * as Replay from "wenay-common2/replay";
 
 type PendingDc = {attach: (a: Replay.RtcDataChannel | null) => void, fireOpen: () => void};
 type FakePc = {

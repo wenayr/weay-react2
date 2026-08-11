@@ -11,20 +11,24 @@ import {createPortal} from "react-dom";
 import {floatingWindowMap} from "../../utils/persistedMaps";
 import {useDraggableApi} from "../../hooks/useDraggable";
 import {cascadeWindowPosition, useFloatingDesktopWindow} from "./FloatingDesktop";
+import type {
+    FloatingWindowCloseReason,
+    FloatingWindowMode,
+    FloatingWindowPosition,
+    FloatingWindowSavedGeometry,
+    FloatingWindowSize,
+    FloatingWindowSnapRegion,
+} from "./FloatingWindowTypes";
 export {FloatingWindowTaskbar, useFloatingWindowManager} from "./FloatingDesktop";
 export type {FloatingDesktopWindow, FloatingWindowManager, FloatingWindowTaskbarProps} from "./FloatingDesktop";
-
-export type FloatingWindowPosition = { x: number; y: number };
-export type FloatingWindowSize = { height: number | string; width: number | string };
-export type FloatingWindowSavedGeometry = {
-    position: FloatingWindowPosition;
-    size: FloatingWindowSize;
-    snapRegion?: FloatingWindowSnapRegion | null;
-    freeGeometry?: {position: FloatingWindowPosition; size: FloatingWindowSize};
-};
-export type FloatingWindowMode = "normal" | "maximized";
-export type FloatingWindowSnapRegion = "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
-export type FloatingWindowCloseReason = "close-button" | "escape" | "programmatic";
+export type {
+    FloatingWindowCloseReason,
+    FloatingWindowMode,
+    FloatingWindowPosition,
+    FloatingWindowSavedGeometry,
+    FloatingWindowSize,
+    FloatingWindowSnapRegion,
+} from "./FloatingWindowTypes";
 type tPosition = FloatingWindowPosition;
 type tSize = FloatingWindowSize;
 type tRND = FloatingWindowSavedGeometry;

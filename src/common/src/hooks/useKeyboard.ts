@@ -1,6 +1,6 @@
 import {useEffect, useRef} from "react";
 import {createUpdateApi} from "../../updateBy";
-import {listen as createListen} from "wenay-common2";
+import {listen as createListen} from "wenay-common2/client";
 
 export const keyboardState = {
     key: "" as string
@@ -18,6 +18,48 @@ export type KeyboardApi = {
 }
 
 const [emitKeyDown, keyboardListen] = createListen<[string, KeyboardEvent | undefined]>();
+
+type KeyboardTarget = Document | HTMLElement;
+type TargetListener = (key: string, event: KeyboardEvent) => void;
+type TargetBinding = {
+    listeners: Set<TargetListener>;
+    handler: EventListener;
+};
+
+const targetBindings = new WeakMap<KeyboardTarget, TargetBinding>();
+const emittedEvents = new WeakSet<KeyboardEvent>();
+
+/** Many hook consumers on the same DOM target share one native listener and one
+ * global keyboard event. Per-hook callbacks remain independent. */
+function subscribeKeyboardTarget(target: KeyboardTarget, listener: TargetListener) {
+    let binding = targetBindings.get(target);
+    if (!binding) {
+        const listeners = new Set<TargetListener>();
+        const handler: EventListener = event => {
+            if (!(event instanceof KeyboardEvent)) return;
+            if (!emittedEvents.has(event)) {
+                emittedEvents.add(event);
+                keyboardState.key = event.key;
+                keyboardStateApi.render();
+                emitKeyDown(event.key, event);
+            }
+            for (const current of [...listeners]) current(event.key, event);
+        };
+        binding = {listeners, handler};
+        targetBindings.set(target, binding);
+        target.addEventListener("keydown", handler);
+    }
+
+    binding.listeners.add(listener);
+    return () => {
+        const current = targetBindings.get(target);
+        if (!current) return;
+        current.listeners.delete(listener);
+        if (current.listeners.size) return;
+        target.removeEventListener("keydown", current.handler);
+        targetBindings.delete(target);
+    };
+}
 
 export const keyboard: KeyboardApi = {
     get key() { return keyboardState.key; },
@@ -52,17 +94,9 @@ export function useKeyboard(options: {
         if (!enabled) return;
         const currentTarget = target ?? (typeof document !== "undefined" ? document : null);
         if (!currentTarget) return;
-        const func: EventListener = (event) => {
-            if (!(event instanceof KeyboardEvent)) return;
-            keyboardState.key = event.key;
-            keyboardStateApi.render();
-            emitKeyDown(event.key, event);
-            onKeyDownRef.current?.(event.key, event);
-        };
-        currentTarget.addEventListener("keydown", func);
-        return () => {
-            currentTarget.removeEventListener("keydown", func);
-        };
+        return subscribeKeyboardTarget(currentTarget, (key, event) => {
+            onKeyDownRef.current?.(key, event);
+        });
     }, [enabled, target]);
 
     return keyboard;

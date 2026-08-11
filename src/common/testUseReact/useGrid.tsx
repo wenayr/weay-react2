@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState} from "react";
 
 import {ColDef, GridReadyEvent} from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
-import {sleepAsync} from "wenay-common2";
+import {sleepAsync} from "wenay-common2/client";
 import {updateBy} from "../updateBy";
 import {contextMenu} from "../src/menu/menuMouse";
 import {ensureAgGridModules} from "../src/grid/agGrid4";

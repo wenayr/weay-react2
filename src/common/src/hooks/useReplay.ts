@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {Observe, Replay} from "wenay-common2";
+import * as Observe from "wenay-common2/observe";
+import * as Replay from "wenay-common2/replay";
 import {useStoreEach} from "./useObserveStore";
 
 type StoreDrain = Observe.StoreDrain;

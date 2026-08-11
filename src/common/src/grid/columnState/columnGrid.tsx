@@ -1,4 +1,4 @@
-import React, {useState} from 'react'
+import React, {useEffect, useRef, useState} from 'react'
 import type {ColDef, ColGroupDef, GridApi, GridPreDestroyedEvent, GridReadyEvent} from 'ag-grid-community'
 import type {AgGridReactProps} from 'ag-grid-react'
 import {AgGridTable, type AgGridTableProps} from '../agGrid4'
@@ -360,5 +360,17 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
 
 export function useColumnGrid<T extends object>(opts: ColumnGridOptions<T>): ColumnGridController<T> {
     const [grid] = useState(() => createColumnGrid<T>(opts))
+    const lifecycle = useRef(0)
+    useEffect(() => {
+        const generation = ++lifecycle.current
+        return () => {
+            // React StrictMode immediately replays effect setup after its development-only
+            // cleanup. Defer disposal by one microtask so that replay can retain the owned
+            // controller, while a real unmount still releases every factory subscription.
+            queueMicrotask(() => {
+                if (lifecycle.current == generation) grid.dispose()
+            })
+        }
+    }, [grid])
     return grid
 }

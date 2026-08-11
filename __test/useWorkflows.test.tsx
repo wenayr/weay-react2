@@ -1,8 +1,10 @@
-import React from 'react'
+import React, {useLayoutEffect} from 'react'
 import {act, render, screen, waitFor} from '@testing-library/react'
-import {listen, Observe} from 'wenay-common2'
-import type {Ai, Resource} from 'wenay-common2'
-import {useAiRunClient, useFileJobClient} from '../src/common/src/hooks/useWorkflows'
+import {listen} from 'wenay-common2/client'
+import * as Observe from 'wenay-common2/observe'
+import type * as Ai from 'wenay-common2/ai'
+import type * as Resource from 'wenay-common2/resource'
+import {useAiRunClient, useFileJobClient} from '../src/react'
 
 function aiStore(): Ai.AiRunStore {
     return {runs: {run: {
@@ -95,4 +97,80 @@ test('a late ready from a replaced client cannot mark the current client ready',
     view.unmount()
     expect(firstStore.count()).toBe(0)
     expect(secondStore.count()).toBe(0)
+})
+
+test('a Store mutation between render and effect is not missed', async () => {
+    const store = Observe.createStore(aiStore())
+    const [, events] = listen<[Ai.AiRunEvent]>()
+    const client = {store, events, ready: Promise.resolve()} as unknown as Ai.AiRunClient
+
+    function MutateBeforePassiveSubscriptions() {
+        useLayoutEffect(() => {
+            store.state.runs.run.state = 'running'
+        }, [])
+        return null
+    }
+
+    function Probe() {
+        return <output data-testid="race-state">{useAiRunClient(client).runs.run?.state}</output>
+    }
+
+    const view = render(<><Probe/><MutateBeforePassiveSubscriptions/></>)
+    await waitFor(() => expect(screen.getByTestId('race-state').textContent).toBe('running'))
+    view.unmount()
+    expect(store.count()).toBe(0)
+    expect(events.count()).toBe(0)
+})
+
+test('a replacement client never renders lifecycle or events from the previous identity', async () => {
+    const firstStore = Observe.createStore(aiStore())
+    const secondStore = Observe.createStore(aiStore())
+    const [emitFirst, firstEvents] = listen<[Ai.AiRunEvent]>()
+    const [, secondEvents] = listen<[Ai.AiRunEvent]>()
+    let rejectFirst!: (error: unknown) => void
+    let resolveSecond!: () => void
+    const first = {
+        store: firstStore,
+        events: firstEvents,
+        ready: new Promise<void>((_, reject) => { rejectFirst = reject }),
+    } as unknown as Ai.AiRunClient
+    const second = {
+        store: secondStore,
+        events: secondEvents,
+        ready: new Promise<void>(resolve => { resolveSecond = resolve }),
+    } as unknown as Ai.AiRunClient
+    const firstError = new Error('first failed')
+    const secondRenders: Array<{ready: boolean, error: unknown, event: string}> = []
+
+    function Probe({client}: {client: Ai.AiRunClient}) {
+        const ai = useAiRunClient(client)
+        if (client === second) {
+            secondRenders.push({
+                ready: ai.ready,
+                error: ai.error,
+                event: ai.lastEvent?.type ?? 'none',
+            })
+        }
+        return <output data-testid="identity-state">
+            {String(ai.ready)}|{ai.error instanceof Error ? ai.error.message : 'none'}|{ai.lastEvent?.type ?? 'none'}
+        </output>
+    }
+
+    const view = render(<Probe client={first}/>)
+    await act(async () => rejectFirst(firstError))
+    await waitFor(() => expect(screen.getByTestId('identity-state').textContent).toContain('first failed'))
+    act(() => emitFirst({type: 'started', runId: 'run'}))
+    expect(screen.getByTestId('identity-state').textContent).toContain('started')
+
+    view.rerender(<Probe client={second}/>)
+    expect(secondRenders[0]).toEqual({ready: false, error: null, event: 'none'})
+    expect(screen.getByTestId('identity-state').textContent).toBe('false|none|none')
+
+    await act(async () => resolveSecond())
+    await waitFor(() => expect(screen.getByTestId('identity-state').textContent).toBe('true|none|none'))
+    view.unmount()
+    expect(firstStore.count()).toBe(0)
+    expect(secondStore.count()).toBe(0)
+    expect(firstEvents.count()).toBe(0)
+    expect(secondEvents.count()).toBe(0)
 })

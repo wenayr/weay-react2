@@ -1,7 +1,7 @@
 import React, {ReactNode, useEffect, useRef} from "react";
 import {createPortal} from "react-dom";
 import {createUpdateApi} from "../../../updateBy";
-import type {FloatingWindowMode, FloatingWindowSnapRegion} from "./FloatingWindow";
+import type {FloatingWindowMode, FloatingWindowSnapRegion} from "./FloatingWindowTypes";
 
 export type FloatingDesktopWindow = {
     id: string;

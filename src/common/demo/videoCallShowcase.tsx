@@ -1,6 +1,7 @@
 /** Canonical full-feature adapter for the public VideoCall communication UI. */
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {Media, Peer} from "wenay-common2";
+import * as Media from "wenay-common2/media";
+import * as Peer from "wenay-common2/peer";
 import {
     VideoCall,
     type VideoCallAssistant,
@@ -13,6 +14,37 @@ import {
 } from "../src/components/Communication";
 import {useMediaSource} from "../src/hooks/useMedia";
 import {usePeerCalls} from "../src/hooks/usePeerCall";
+
+type BrowserSpeechResultEvent = {
+    results?: Record<number, Record<number, {transcript?: string}> | undefined>;
+};
+type BrowserSpeechErrorEvent = {error?: string};
+type BrowserSpeechRecognition = {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    onresult: ((event: BrowserSpeechResultEvent) => void) | null;
+    onerror: ((event: BrowserSpeechErrorEvent) => void) | null;
+    onend: (() => void) | null;
+    start(): void;
+    stop(): void;
+    abort?(): void;
+};
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+type BrowserSpeechWindow = Window & {
+    SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+};
+
+function detachSpeechHandlers(recognition: BrowserSpeechRecognition) {
+    recognition.onresult = null;
+    recognition.onerror = null;
+    recognition.onend = null;
+}
+
+function errorText(error: unknown) {
+    return error instanceof Error ? error.message : String(error);
+}
 
 const initialParticipants: VideoCallParticipant[] = [
     {id: "you", initials: "В", name: "Вы", tone: "violet", moderator: true},
@@ -74,7 +106,7 @@ export function VideoCallShowcaseDemo() {
     }, [active, video.listen]);
     useEffect(() => {
         if (!active || !canvasRef.current) return;
-        const watcher: any = relay.watchOf("qa-studio-b");
+        const watcher = relay.watchOf("qa-studio-b");
         const view = Media.attachVideoCanvas(watcher["qa-studio-a"].camera, canvasRef.current, {onError: error => setActionError(String(error))});
         const player = Media.attachAudioPlayer(watcher["qa-studio-a"].microphone, {maxBacklogSec: .35, onError: error => setActionError(String(error))});
         playerRef.current = player;
@@ -109,9 +141,9 @@ export function VideoCallShowcaseDemo() {
             screenStreamRef.current = stream;
             stream.getVideoTracks()[0]?.addEventListener("ended", stopScreenShare, {once: true});
             setScreenShareState("active");
-        } catch (error: any) {
+        } catch (error: unknown) {
             setScreenShareState("idle");
-            if (error?.name !== "NotAllowedError") setActionError(String(error?.message ?? error));
+            if (!(error instanceof Error && error.name === "NotAllowedError")) setActionError(errorText(error));
         }
     }, [screenShareState, stopScreenShare]);
     useEffect(() => {
@@ -205,38 +237,75 @@ export function VideoCallShowcaseDemo() {
         if (recorderRef.current?.state === "recording") recorderRef.current.stop();
     }, [caller.active, callee.active, video, audio, stopScreenShare]);
 
-    const speechCtor = typeof window !== "undefined" ? (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition : undefined;
-    const recognitionRef = useRef<any>(null);
+    const speechWindow = typeof window !== "undefined" ? window as BrowserSpeechWindow : undefined;
+    const speechCtor = speechWindow?.SpeechRecognition ?? speechWindow?.webkitSpeechRecognition;
+    const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
     const [assistant, setAssistant] = useState<VideoCallAssistant>({supported: Boolean(speechCtor), listening: false, status: "Команды выполняются локально"});
+    const {setFocusMode, setPanel, setLayout} = ui;
     const executeAssistantCommand = useCallback((command: string) => {
         const value = command.toLocaleLowerCase("ru-RU");
         setAssistant(current => ({...current, transcript: command, status: "Команда выполнена"}));
-        if (value.includes("фокус")) { ui.setFocusMode("video"); ui.setPanel("none"); }
-        else if (value.includes("чат")) ui.setPanel("chat");
-        else if (value.includes("комнат")) ui.setPanel("rooms");
-        else if (value.includes("участ")) ui.setPanel("people");
-        else if (value.includes("сетк")) { ui.setLayout("grid"); ui.setPanel("none"); }
-        else if (value.includes("мульти")) { ui.setLayout("multi"); ui.setPanel("none"); }
+        if (value.includes("фокус")) { setFocusMode("video"); setPanel("none"); }
+        else if (value.includes("чат")) setPanel("chat");
+        else if (value.includes("комнат")) setPanel("rooms");
+        else if (value.includes("участ")) setPanel("people");
+        else if (value.includes("сетк")) { setLayout("grid"); setPanel("none"); }
+        else if (value.includes("мульти")) { setLayout("multi"); setPanel("none"); }
         else if (value.includes("запис")) toggleRecording();
         else if (value.includes("экран")) void toggleScreenShare();
         else if (value.includes("заверш")) hangup();
         else setAssistant(current => ({...current, status: "Команда не распознана"}));
-    }, [ui, toggleRecording, toggleScreenShare, hangup]);
+    }, [setFocusMode, setPanel, setLayout, toggleRecording, toggleScreenShare, hangup]);
+    const executeAssistantCommandRef = useRef(executeAssistantCommand);
+    executeAssistantCommandRef.current = executeAssistantCommand;
     const toggleAssistant = useCallback(() => {
-        if (recognitionRef.current) { recognitionRef.current.stop(); return; }
+        if (recognitionRef.current) {
+            const recognition = recognitionRef.current;
+            try {
+                recognition.stop();
+            } catch (error) {
+                recognitionRef.current = null;
+                detachSpeechHandlers(recognition);
+                setAssistant(current => ({...current, listening: false, status: `Распознавание: ${errorText(error)}`}));
+            }
+            return;
+        }
         if (!speechCtor) { setAssistant(current => ({...current, status: "Web Speech API недоступен — используйте текстовую команду"})); return; }
-        const recognition = new speechCtor();
-        recognition.lang = "ru-RU";
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.onresult = (event: any) => executeAssistantCommand(String(event.results?.[0]?.[0]?.transcript ?? ""));
-        recognition.onerror = (event: any) => setAssistant(current => ({...current, listening: false, status: `Распознавание: ${event.error ?? "ошибка"}`}));
-        recognition.onend = () => { recognitionRef.current = null; setAssistant(current => ({...current, listening: false})); };
-        recognitionRef.current = recognition;
-        setAssistant(current => ({...current, listening: true, status: "Говорите команду"}));
-        recognition.start();
-    }, [speechCtor, executeAssistantCommand]);
-    useEffect(() => () => recognitionRef.current?.stop(), []);
+        let recognition: BrowserSpeechRecognition | null = null;
+        try {
+            recognition = new speechCtor();
+            recognition.lang = "ru-RU";
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.onresult = event => executeAssistantCommandRef.current(String(event.results?.[0]?.[0]?.transcript ?? ""));
+            recognition.onerror = event => setAssistant(current => ({...current, listening: false, status: `Распознавание: ${event.error ?? "ошибка"}`}));
+            recognition.onend = () => {
+                if (recognitionRef.current === recognition) recognitionRef.current = null;
+                if (recognition) detachSpeechHandlers(recognition);
+                setAssistant(current => ({...current, listening: false}));
+            };
+            recognitionRef.current = recognition;
+            setAssistant(current => ({...current, listening: true, status: "Говорите команду"}));
+            recognition.start();
+        } catch (error) {
+            if (recognitionRef.current === recognition) recognitionRef.current = null;
+            if (recognition) {
+                detachSpeechHandlers(recognition);
+                try { recognition.abort?.(); } catch { /* the recognition is already inactive */ }
+            }
+            setAssistant(current => ({...current, listening: false, status: `Распознавание: ${errorText(error)}`}));
+        }
+    }, [speechCtor]);
+    useEffect(() => () => {
+        const recognition = recognitionRef.current;
+        recognitionRef.current = null;
+        if (!recognition) return;
+        detachSpeechHandlers(recognition);
+        try {
+            if (recognition.abort) recognition.abort();
+            else recognition.stop();
+        } catch { /* cleanup must remain safe when the browser already ended it */ }
+    }, []);
 
     return <VideoCall
         controller={ui} phase={phase}

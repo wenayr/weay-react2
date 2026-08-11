@@ -3,7 +3,7 @@ import {GridExample, tt} from "./useGrid";
 import {MyChartEngine} from "../src/myChart/chartEngine/chartEngineReact";
 import {TestParams} from "./testParams";
 import {createContext, Suspense, use, useContext, useEffect, useMemo, useState} from "react";
-import {sleepAsync} from "wenay-common2";
+import {sleepAsync} from "wenay-common2/client";
 import {Button, HoverButton} from "../src/hooks";
 import {FloatingWindow} from "../src/components";
 

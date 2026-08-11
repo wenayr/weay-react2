@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from "react";
-import {Replay} from "wenay-common2";
+import * as Replay from "wenay-common2/replay";
 
 export type RouteLogEntry = {at: number, from: Replay.tRouteState, to: Replay.tRouteState, reason?: unknown};
 

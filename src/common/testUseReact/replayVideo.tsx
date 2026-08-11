@@ -8,7 +8,9 @@
  */
 
 import React, {StrictMode, useEffect, useMemo, useRef, useState} from "react";
-import {createRpcClientHub, Observe, Replay} from "wenay-common2";
+import {createRpcClientHub} from "wenay-common2/client";
+import * as Observe from "wenay-common2/observe";
+import * as Replay from "wenay-common2/replay";
 import {io} from "socket.io-client";
 import {useReplaySubscribe, useReplayRouteSubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreReplayEach, useStoreNode, useStoreKeys} from "../src/hooks";
 

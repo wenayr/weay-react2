@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {copyToClipboard, Params, timeLocalToStr_hhmmss} from "wenay-common2";
+import {copyToClipboard, Params, timeLocalToStr_hhmmss} from "wenay-common2/client";
 import {renderBy, updateBy} from "../../updateBy";
 import {ColDef, ColGroupDef, GridReadyEvent} from "ag-grid-community";
 import {contextMenu} from "../menu/menuMouse";

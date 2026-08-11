@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {Media} from "wenay-common2";
+import * as Media from "wenay-common2/media";
 
 export type UseMediaSourceController = {
     source: Media.MediaSource;

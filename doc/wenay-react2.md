@@ -18,6 +18,25 @@ Library primitives never know app-specific terms, domain objects, or group polic
 Put app-specific layout/build rules in an app wrapper above the primitive.
 ```
 
+## Package entrypoints
+
+The root import remains the backwards-compatible `1.x` facade. New code can use
+the smaller canonical feature surfaces; they intentionally omit demos and legacy
+compatibility wrappers:
+
+```ts
+import {structEqual, tokens} from "wenay-react2/core"
+import {createUpdateApi, useStoreNode} from "wenay-react2/react"
+import {createColumnState, createGridBuffer} from "wenay-react2/grid"
+import {FloatingWindow, useFloatingWindowManager} from "wenay-react2/windows"
+import {createLogsController, MiniLogsTable} from "wenay-react2/logs"
+import {VideoCall, useMediaSource, usePeerCalls} from "wenay-react2/communication"
+```
+
+`wenay-react2/native` remains the DOM/CSS/ag-grid-free React Native entrypoint.
+Every public subpath publishes an explicit declaration target through the package
+`types` condition.
+
 ## Render Memory
 ```
 updateBy(obj) / useUpdateBy(obj)                 // subscribe current component to renderBy(obj)
@@ -488,12 +507,13 @@ The hook does not choose transport. `remoteStore` needs `{ get(mask?), changed }
 
 ### common2 Resource and AI clients
 
-`wenay-common2@1.0.77` adds account-filtered file/job clients; `1.0.78` adds
-provider-neutral AI-run clients. Create and own the common2 client at the RPC
-boundary, then hand that already-created resource to React:
+common2 provides account-filtered file/job clients and provider-neutral AI-run
+clients. Create and own the common2 client at the RPC boundary, then hand that
+already-created resource to React:
 
 ```tsx
-import {Ai, Resource} from "wenay-common2"
+import * as Ai from "wenay-common2/ai"
+import * as Resource from "wenay-common2/resource"
 import {useAiRunClient, useFileJobClient} from "wenay-react2"
 
 const aiClient = Ai.createAiRunClient({remote: rpc.func.ai})
@@ -503,7 +523,7 @@ function AssistantPanel() {
     const ai = useAiRunClient(aiClient)
     const files = useFileJobClient(fileClient)
     // ai.runs / approvals / inputs are durable Store state.
-    // ai.lastEvent is the latest replayed semantic event (delta, progress, completion...).
+    // ai.lastEvent is the latest semantic event observed while this hook is mounted.
     // files.files / files.jobs are the account-filtered Resource Store state.
 }
 ```

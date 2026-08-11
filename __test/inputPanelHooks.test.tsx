@@ -7,10 +7,12 @@ test("TextInputPanel submits the latest text through useTextInputPanel", () => {
 
     const {container} = render(<TextInputPanel callback={callback} name="Name" txt="start" />);
     const input = container.querySelector("input[type='text']") as HTMLInputElement;
+    const submit = screen.getByRole("button", {name: "send"});
 
     expect(input.value).toBe("start");
+    expect(submit.getAttribute("type")).toBe("button");
     fireEvent.change(input, {target: {value: "updated"}});
-    fireEvent.click(screen.getByText("send"));
+    fireEvent.click(submit);
 
     expect(callback).toHaveBeenCalledWith("updated");
 });
@@ -21,9 +23,11 @@ test("FileInputPanel submits the latest file through useFileInputPanel", () => {
 
     const filePanel = render(<FileInputPanel callback={callback} name="File" />);
     const input = filePanel.container.querySelector("input[type='file']") as HTMLInputElement;
+    const submit = screen.getByRole("button", {name: "send"});
     Object.defineProperty(input, "files", {value: [file], configurable: true});
     fireEvent.change(input);
-    fireEvent.click(screen.getByText("send"));
+    expect(submit.getAttribute("type")).toBe("button");
+    fireEvent.click(submit);
 
     expect(callback).toHaveBeenCalledWith(file);
 });

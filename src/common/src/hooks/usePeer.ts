@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from "react";
-import {Peer} from "wenay-common2";
+import * as Peer from "wenay-common2/peer";
 
 /** Thin React view over common2 Peer SDK. The SDK keeps route/repair ownership;
  * consumers use `store` with useStoreNode/useStoreKeys as usual. */

@@ -1,4 +1,4 @@
-import { deepClone } from "wenay-common2";
+import { deepClone } from "wenay-common2/client";
 import { renderBy } from "../../updateBy";
 import { floatingWindowMap, mapResiReact, mapRightMenu } from "./persistedMaps";
 import {createCacheMap} from "./cache";

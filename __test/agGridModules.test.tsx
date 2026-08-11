@@ -32,6 +32,7 @@ test('default AG Grid modules are targeted and register only once', () => {
         'EventApi',
         'RenderApi',
         'RowApi',
+        'RowAutoHeight',
         'ScrollApi',
         'RowSelection',
         'CellStyle',

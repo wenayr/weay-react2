@@ -6,7 +6,7 @@ import React, {
     useRef,
     useState
 } from 'react';
-import { sleepAsync } from 'wenay-common2';
+import { sleepAsync } from 'wenay-common2/client';
 import {type Position, useDraggable} from "../../hooks/useDraggable";
 import {OutsideClickArea} from "../../hooks/useOutside";
 import { OutlineDragDemo } from "../Dnd/OutlineDragDemo";

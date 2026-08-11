@@ -878,6 +878,11 @@ Recently normalized: mouse context-menu item colors through `--menu-*`, `--menu-
 
 ## Cleanup Inventory
 
+Resolved in v1.0.81: the non-exported `chartEngine.ts` reference copy was
+removed, leaving `chartEngineReact.tsx` as the single maintained implementation.
+Floating-window persistence now imports data-only geometry contracts rather than
+component/controller modules.
+
 Do not delete a public export just because it looks unused inside this repo. External apps may import it. For cleanup, first move an item into this inventory, then decide in a separate breaking version whether it remains public, moves to a demo namespace, or is removed.
 
 Suspicious but still public:
@@ -885,7 +890,6 @@ Suspicious but still public:
 - `StickerMenu` - exported from `components/Menu`; visually app-specific and should probably become an app wrapper or be documented as an example component.
 - `logsApi` global logger and the context logger (`LogsProvider`, `LogsTable`, `LogsNotifications`, `LogsSettings`, `MainPage`) overlap. Keep both for now; document one as the short integration path and the other as the larger UI surface.
 - Chart engine primitives (`DataSet`, `Panel`, `Renderer`, `Interaction`, `ChartEngine`, etc.) are very low-level. They are public through `chartEngineReact.tsx`; product apps should wrap them before use.
-- `src/common/src/myChart/chartEngine/chartEngine.ts` is a reference copy next to the public React engine. It is not exported from root; treat it as suspicious maintenance debt, not as public API.
 - `StyleCSSHeadGridEdit` and `StyleCSSHeadGrid` mutate `<head>` directly. They are exported and can have consumers, but new grid styling should prefer ag-grid theme params and tokens.
 
 Added by the 2026-07-09 architecture audit (evidence in the audit report / `doc/target/my.md`):

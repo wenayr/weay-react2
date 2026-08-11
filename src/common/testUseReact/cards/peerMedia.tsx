@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useMediaSource, usePeer, useStoreNode } from "../../api";
-import { Media, Peer, listen as createListen } from "wenay-common2";
+import { listen as createListen } from "wenay-common2/client";
+import * as Media from "wenay-common2/media";
+import * as Peer from "wenay-common2/peer";
 import { PeerCallDemo, PeerPresenceDemo, MediaRelayAclDemo, MediaRelayAudioDemo, PeerCallVideoAudioDemo } from "../../demo/peerMedia";
 import { ConferenceCallDemo } from "../../demo/peerConference";
 import { Check, btn } from "../standKit";

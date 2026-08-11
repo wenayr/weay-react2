@@ -1,4 +1,4 @@
-import {BrowserCacheStorage} from "../src/common/src/utils/cache";
+import {BrowserCacheStorage, LocalStorageCache} from "../src/common/src/utils/cache";
 
 type CacheEntryMap = Map<string, Response>;
 
@@ -90,4 +90,18 @@ test("BrowserCacheStorage migrates the legacy full-location entry", async () => 
     expect(cache.delete).toHaveBeenCalledWith(legacyKey);
     expect(entries.has(legacyKey)).toBe(false);
     expect(entries.has(stableKey)).toBe(true);
+});
+
+test("LocalStorageCache deleteAll preserves unrelated application keys", async () => {
+    localStorage.clear();
+    const storage = new LocalStorageCache();
+
+    localStorage.setItem("app.session", "keep");
+    await storage.set("wenay.settings", {theme: "dark"});
+    await storage.set("wenay.columns", {order: ["name"]});
+
+    await expect(storage.deleteAll()).resolves.toBe(true);
+    expect(localStorage.getItem("app.session")).toBe("keep");
+    expect(localStorage.getItem("wenay.settings")).toBeNull();
+    expect(localStorage.getItem("wenay.columns")).toBeNull();
 });

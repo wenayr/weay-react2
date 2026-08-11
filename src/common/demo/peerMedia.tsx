@@ -4,7 +4,8 @@
  * They use an in-process host intentionally, so no server credentials are needed.
  */
 import React, {useEffect, useMemo, useRef, useState} from "react";
-import {Media, Peer} from "wenay-common2";
+import * as Media from "wenay-common2/media";
+import * as Peer from "wenay-common2/peer";
 import {useMediaSource} from "../src/hooks/useMedia";
 import {usePeerCalls, usePeerPresence} from "../src/hooks/usePeerCall";
 /* ---------- 41/42. Peer calls and host presence ---------- */

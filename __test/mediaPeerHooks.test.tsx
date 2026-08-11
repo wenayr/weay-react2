@@ -1,11 +1,13 @@
 import React from "react";
 
-jest.mock("wenay-common2", () => {
-    const actual = jest.requireActual("wenay-common2");
-    return {...actual, Media: {...actual.Media, createVideoSource: jest.fn()}};
+jest.mock("wenay-common2/media", () => {
+    const actual = jest.requireActual("wenay-common2/media");
+    return {...actual, createVideoSource: jest.fn()};
 });
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
-import {Media, Observe, Peer} from "wenay-common2";
+import * as Media from "wenay-common2/media";
+import * as Observe from "wenay-common2/observe";
+import * as Peer from "wenay-common2/peer";
 import {useMediaSource} from "../src/common/src/hooks/useMedia";
 import {usePeer} from "../src/common/src/hooks/usePeer";
 

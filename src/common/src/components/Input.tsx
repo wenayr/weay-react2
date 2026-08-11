@@ -55,7 +55,7 @@ export function TextInputPanel({callback, name = "", txt = ""}: TextInputPanelPr
     return <div className={"maxSize"} style={{padding: 20,}}>
         <label>{name}</label>
         <input type={"text"} style={{width:"100%"}} {...input.inputProps}/>
-        <div style={{marginTop: 20}} className={"msTradeAlt msTradeActive"} onClick={input.submit}>send</div>
+        <button type="button" style={{marginTop: 20, border: 0, font: "inherit"}} className={"msTradeAlt msTradeActive"} onClick={input.submit}>send</button>
     </div>
 }
 export function TextInputModal({callback, name, outClick, keyForSave = "TextInputModal", txt}: TextInputPanelProps & {outClick: ()=>any, keyForSave?: string}) {
@@ -97,7 +97,7 @@ export function FileInputPanel({callback, name = ""}: FileInputPanelProps) {
     return <div className={"maxSize"} style={{padding: 20,}}>
         <label>{name}</label>
         <input type={"file"} style={{width:"100%"}} {...input.inputProps}/>
-        <div style={{marginTop: 20}} className={"msTradeAlt msTradeActive"} onClick={input.submit}>send</div>
+        <button type="button" style={{marginTop: 20, border: 0, font: "inherit"}} className={"msTradeAlt msTradeActive"} onClick={input.submit}>send</button>
     </div>
 }
 export function FreeModal({outClick, children, zIndex, size = {height: 150, width: 300}, keyForSave = "FreeModal"}: {zIndex?: number, outClick: ()=>any, children: React.JSX.Element, size?: {height: number, width: number}, keyForSave?: string}) {

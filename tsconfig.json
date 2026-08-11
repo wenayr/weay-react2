@@ -22,6 +22,12 @@
   "files": [
     "src/index.ts",
     "src/native/index.ts",
+    "src/core/index.ts",
+    "src/react/index.ts",
+    "src/grid/index.ts",
+    "src/windows/index.ts",
+    "src/logs/index.ts",
+    "src/communication/index.ts",
     "src/common/demo/peerMedia.tsx",
     "src/common/testUseReact/qa.tsx"
   ]
