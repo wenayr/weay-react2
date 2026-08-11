@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "1.0.81",
+  "version": "1.0.82",
   "description": "Common react",
   "strict": true,
   "main": "lib/index.js",
@@ -50,7 +50,7 @@
     "ag-grid-react": "^36.0.2",
     "re-resizable": "^6.11.2",
     "react-rnd": "^10.5.3",
-    "wenay-common2": "^2.9.0"
+    "wenay-common2": "^2.10.0"
   },
   "peerDependencies": {
     "react": "^19.2.0",
@@ -79,7 +79,7 @@
     "vite": "^8.1.5"
   },
   "engines": {
-    "node": ">=18",
+    "node": ">=20",
     "vscode": "^1.22.0"
   },
   "browserslist": {
