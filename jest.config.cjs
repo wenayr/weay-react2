@@ -10,7 +10,10 @@ const jestConfig = {
   // testRegex: '^.+\\test\\.(t|j)sx?$', // Pattern for finding test files
   testRegex: '^.+\\.test\\.(t|j)sx?$',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  moduleNameMapper: {'^(\\.{1,2}/.*)\\.js$': '$1'},
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    '\\.css$': '<rootDir>/__test/cssStub.js',
+  },
   transform: {
     '^.+\\.[jt]sx?$': ['@swc/jest', {
       jsc: {

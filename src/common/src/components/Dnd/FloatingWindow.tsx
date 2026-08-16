@@ -226,6 +226,18 @@ const snapLayouts: FloatingWindowSnapLayout[] = [
     },
 ];
 
+type FloatingWindowLimit = NonNullable<FloatingWindowProps["limit"]>;
+
+/** Shared by the mouse and touch drag loops, which clamp identically. */
+function clampToLimit(x: number, y: number, lim: FloatingWindowLimit | undefined): FloatingWindowPosition {
+    if (!lim) return {x, y};
+    if (lim.x?.min !== undefined && lim.x.min > x) x = lim.x.min;
+    if (lim.x?.max !== undefined && lim.x.max < x) x = lim.x.max;
+    if (lim.y?.min !== undefined && lim.y.min > y) y = lim.y.min;
+    if (lim.y?.max !== undefined && lim.y.max < y) y = lim.y.max;
+    return {x, y};
+}
+
 function snapPreviewStyle(region: FloatingWindowSnapRegion): React.CSSProperties {
     // Every region is either left- or right-hand, so the left/top ternaries only ever
     // needed their right/bottom branch; width is half of the viewport for all six.
@@ -524,18 +536,8 @@ export function useFloatingWindowController({
             if (lastC.current == null) return;
             const data = lastC.current;
             if (e.buttons === 1) {
-                let newX = e.clientX + data.x;
-                let newY = e.clientY + data.y;
                 updateSnapPicker(e.clientX, e.clientY);
-                const lim = limitRef.current;
-                if (lim) {
-                    if (lim.x?.min !== undefined && lim.x.min > newX) newX = lim.x.min;
-                    if (lim.x?.max !== undefined && lim.x.max < newX) newX = lim.x.max;
-
-                    if (lim.y?.min !== undefined && lim.y.min > newY) newY = lim.y.min;
-                    if (lim.y?.max !== undefined && lim.y.max < newY) newY = lim.y.max;
-                }
-                commitPosition({x: newX, y: newY});
+                commitPosition(clampToLimit(e.clientX + data.x, e.clientY + data.y, limitRef.current));
             } else {
                 mouseUpHandler();
             }
@@ -568,17 +570,7 @@ export function useFloatingWindowController({
                 touchTap.current.moved = true;
             }
 
-            let newX = t.clientX + data.x;
-            let newY = t.clientY + data.y;
-            const lim = limitRef.current;
-            if (lim) {
-                if (lim.x?.min !== undefined && lim.x.min > newX) newX = lim.x.min;
-                if (lim.x?.max !== undefined && lim.x.max < newX) newX = lim.x.max;
-
-                if (lim.y?.min !== undefined && lim.y.min > newY) newY = lim.y.min;
-                if (lim.y?.max !== undefined && lim.y.max < newY) newY = lim.y.max;
-            }
-            commitPosition({x: newX, y: newY});
+            commitPosition(clampToLimit(t.clientX + data.x, t.clientY + data.y, limitRef.current));
         };
         const touchEndHandler = (e: TouchEvent) => {
             const data = lastT.current;
