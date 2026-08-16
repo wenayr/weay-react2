@@ -247,10 +247,12 @@ const MemoChild = React.memo(
 );
 
 export const FloatingWindow: typeof FloatingWindowBase = (a) => {
-    const isFunc = typeof a.children === "function";
-    const renderChild = (update: number): React.ReactElement =>
-        typeof a.children === "function" ? a.children(update) : (a.children as React.ReactElement);
-    const ff = (update: number) => <MemoChild update={isFunc ? update : 0} render={renderChild} />;
+    // Only the render-prop form is frozen between `update` bumps. A plain element child is
+    // re-created by the caller on every parent render, so wrapping it in MemoChild (whose
+    // `update` would be pinned to 0) froze the subtree at its first render for good.
+    const render = a.children;
+    if (typeof render !== "function") return <FloatingWindowBase {...a} />;
+    const ff = (update: number) => <MemoChild update={update} render={render} />;
 
     return <FloatingWindowBase {...a} children={ff} />;
 };

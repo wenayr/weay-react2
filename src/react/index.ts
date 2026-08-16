@@ -2,6 +2,7 @@ export {
     createUpdateApi,
     renderBy,
     renderByLast,
+    renderByRevers,
     useUpdateBy,
     useUpdateByApi,
 } from "../common/updateBy";

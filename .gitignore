@@ -20,5 +20,10 @@ yarn-error.log*
 /.npmrc
 .vite-*.log
 
+# release scratch: unpacked tarballs, smoke runs and stand logs.
+# The checked-in prompt notes stay visible.
+/target/*
+!/target/*.md
+
 # machine-specific Claude Code launch config
 /.claude
