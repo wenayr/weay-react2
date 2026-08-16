@@ -19,7 +19,11 @@ export type MenuRightSavedState = {
     offset: {x: number; y: number};
 };
 
+/** Open/closed state of a keyForSave-tagged Button. */
+export type ButtonSavedState = { open: boolean }
+
 // observable - memoryCache marks itself dirty on their mutations
 export const floatingWindowMap = new ObservableMap<string, FloatingWindowSavedGeometry>();
+export const buttonStatusMap = new ObservableMap<string, ButtonSavedState>();
 export const mapResiReact = new ObservableMap<string, ResizableSavedSize>();
 export const mapRightMenu = new ObservableMap<string, MenuRightSavedState>();

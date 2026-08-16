@@ -1,6 +1,6 @@
 import { deepClone } from "wenay-common2/client";
 import { renderBy } from "../../updateBy";
-import { floatingWindowMap, mapResiReact, mapRightMenu } from "./persistedMaps";
+import { buttonStatusMap, floatingWindowMap, mapResiReact, mapRightMenu } from "./persistedMaps";
 import {createCacheMap} from "./cache";
 import { ObservableMap } from "./observableMap";
 
@@ -89,6 +89,7 @@ export const memoryCache = createCacheMap(
         ["mapResiReact", mapResiReact],
         ["floatingWindowMap", floatingWindowMap],
         ["mapRightMenu", mapRightMenu],
+        ["buttonStatusMap", buttonStatusMap],
         ["memoryProps", memoryProps]
     ]
 )
@@ -97,5 +98,6 @@ export const memoryMaps = {
     rnd: floatingWindowMap,
     resize: mapResiReact,
     rightMenu: mapRightMenu,
+    button: buttonStatusMap,
     other: memoryProps
 }

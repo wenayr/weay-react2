@@ -1,4 +1,5 @@
 import React, {HTMLAttributes, ReactElement, useEffect, useMemo, useRef, useState} from "react";
+import {buttonStatusMap} from "../utils/persistedMaps";
 
 export const StyleOtherRow: React.CSSProperties = {display: "flex", flexDirection: "row", flex: "auto 1 1"}
 export const StyleOtherColumn: React.CSSProperties = {display: "flex", flexDirection: "column", flex: "auto 0 1"}
@@ -168,15 +169,32 @@ function ButtonBase({children, button, style = {}, className = "", state: [a, se
     </div>
 }
 
-const saveStatus: {[key: string]: boolean} = {}
 export function Button({keyForSave, keySave, statusDef, outClick, ...data}: ButtonProps) {
-    keySave = keyForSave ?? keySave
-    if (keySave && saveStatus[keySave] != null) statusDef = saveStatus[keySave]
-    const [status, setStatusRaw] = useState(statusDef ?? false)
+    // keyForSave means the same thing here as on FloatingWindow and FResizableReact: the state
+    // rides an ObservableMap registered in memoryCache, and the APP decides when storage is
+    // written. This used to be a private module object instead - a second, undeclared
+    // persistence path that PROJECT_FUNCTIONALITY lists under Non-Goals ("a hidden persistence
+    // service"), and one that made keyForSave mean "until reload" on this component only.
+    const saveKey = keyForSave ?? keySave
+    const [status, setStatusRaw] = useState(() =>
+        (saveKey ? buttonStatusMap.get(saveKey)?.open : undefined) ?? statusDef ?? false)
+
+    // Storage is loaded after mount, so the saved entry can land later than the first render.
+    useEffect(() => {
+        if (!saveKey) return
+        const apply = (changed?: string) => {
+            if (changed !== undefined && changed !== saveKey) return
+            const saved = buttonStatusMap.get(saveKey)
+            if (saved) setStatusRaw(saved.open)
+        }
+        apply()
+        return buttonStatusMap.onChange(apply)
+    }, [saveKey])
+
     const setStatus: typeof setStatusRaw = (v) => {
         setStatusRaw(prev => {
             const next = typeof v === "function" ? (v as (p: boolean) => boolean)(prev) : v
-            if (keySave) saveStatus[keySave] = next
+            if (saveKey && buttonStatusMap.get(saveKey)?.open !== next) buttonStatusMap.set(saveKey, {open: next})
             return next
         })
     }
