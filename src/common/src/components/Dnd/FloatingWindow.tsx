@@ -227,15 +227,16 @@ const snapLayouts: FloatingWindowSnapLayout[] = [
 ];
 
 function snapPreviewStyle(region: FloatingWindowSnapRegion): React.CSSProperties {
-    const left = region == "left" || region.endsWith("-left");
+    // Every region is either left- or right-hand, so the left/top ternaries only ever
+    // needed their right/bottom branch; width is half of the viewport for all six.
     const right = region == "right" || region.endsWith("-right");
-    const top = region.startsWith("top-");
     const bottom = region.startsWith("bottom-");
+    const fullHeight = region == "left" || region == "right";
     return {
-        left: left ? 6 : right ? "50%" : 6,
-        top: top ? 6 : bottom ? "50%" : 6,
-        width: region == "left" || region == "right" ? "calc(50% - 9px)" : "calc(50% - 9px)",
-        height: region == "left" || region == "right" ? "calc(100% - 12px)" : "calc(50% - 9px)",
+        left: right ? "50%" : 6,
+        top: bottom ? "50%" : 6,
+        width: "calc(50% - 9px)",
+        height: fullHeight ? "calc(100% - 12px)" : "calc(50% - 9px)",
     };
 }
 

@@ -92,6 +92,9 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
     }, []);
 
     const bind = useMemo<UseDraggableReturn["dragProps"]>(() => ({
+        // onDragStart pairs with onDragEnd, so it fires where the drag actually begins:
+        // immediately without a hold, and from the hold timer with one. Announcing it on
+        // pointer-down left every plain click with a start and no matching end.
         onMouseDown(e) {
             e.preventDefault();
             offsetMouse.current = { x: e.clientX, y: e.clientY };
@@ -100,12 +103,13 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
                     holdTimerMouse.current = null;
                     document.removeEventListener("mouseup", cancelMouseHold);
                     setDraggingMouse(true);
+                    onDragStartRef.current?.();
                 }, holdMsRef.current);
                 document.addEventListener("mouseup", cancelMouseHold);
             } else {
                 setDraggingMouse(true);
+                onDragStartRef.current?.();
             }
-            onDragStartRef.current?.();
         },
         onTouchStart(e) {
             const touch = e.changedTouches[0];
@@ -116,12 +120,13 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
                     holdTimerTouch.current = null;
                     document.removeEventListener("touchend", cancelTouchHold);
                     setDraggingTouch(true);
+                    onDragStartRef.current?.();
                 }, holdMsRef.current);
                 document.addEventListener("touchend", cancelTouchHold);
             } else {
                 setDraggingTouch(true);
+                onDragStartRef.current?.();
             }
-            onDragStartRef.current?.();
         },
     }), [cancelMouseHold, cancelTouchHold]);
 

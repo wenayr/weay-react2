@@ -130,6 +130,9 @@ drag.resetPosition()
 drag.cancelDrag()
 // imperative path: onMove(p) fires per move tick (through a ref); trackState:false stops
 // per-tick re-renders - position lives only in drag.positionRef/onMove (DragBox is this shape)
+// onDragStart/onDragEnd are a pair: with holdMs > 0 neither fires until the hold elapses,
+// so a plain click announces nothing; with holdMs 0 the drag starts on pointer-down
+// (pinned by __test/useDraggableHold.test.tsx)
 
 const r = useReorder({order, commit, move?, canDrag?, preview?, holdMs?})   // mini reorder-by-drag
 <div ref={r.listRef}>{order.map(k => {                                      // children 1:1 with order
