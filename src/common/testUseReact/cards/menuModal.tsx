@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { FloatingWindow } from "../../src/components/index.js";
 import { Menu, contextMenu, ModalProvider, useModal, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useCacheMapPersistence, memoryCache, useListenEffect, updateBy, renderBy, type ToolbarItem, type ToolbarConfig } from "../../api.js";
 import { HoverButton } from "../../src/hooks/index.js";
 import { Check } from "../standKit.js";
@@ -339,6 +340,74 @@ export function Card4() {
                                  { name: "submenu ▶", actionKey: "qa4.submenu", next: () => [{ name: "nested", actionKey: "qa4.nested", onClick: () => alert("nested") }] },
                              ])}>right-click here</div>
                     </contextMenu.Layer>
+                </Check>
+    );
+}
+
+/* ---------- 53. Context menu at the viewport edge, inside a window, and by long press ---------- */
+const edgeRows = ["EURUSD", "GBPUSD", "USDJPY", "AUDCAD"];
+
+const edgeRowStyle: React.CSSProperties = {
+    padding: "6px 10px",
+    borderTop: "1px solid #d0d7de",
+    fontSize: 13,
+    cursor: "context-menu",
+    userSelect: "none",
+};
+
+/** One provider for both pointers: it reads the row from the gesture target, so the touch path
+ *  no longer has to preload contextMenu.map before the press. */
+function rowItemsFor(target: Element | null) {
+    const row = target?.closest<HTMLElement>("[data-row]")?.dataset.row;
+    if (!row) return [{name: "no row under the pointer"}];
+    return [
+        {name: `open ${row}`, actionKey: "qa53.open", onClick: () => alert(`open ${row}`)},
+        {name: `close ${row}`, actionKey: "qa53.close", onClick: () => alert(`close ${row}`)},
+        {name: "details ▶", actionKey: "qa53.details", next: () => [{name: row, actionKey: "qa53.detail"}]},
+    ];
+}
+
+const EdgeMenuDemo = () => {
+    const [open, setOpen] = useState(false);
+    return (
+        <contextMenu.Layer zIndex={40} other={gesture => ({items: rowItemsFor(gesture.target), source: "qa53-rows"})}>
+            <div style={{display: "flex", flexDirection: "column", gap: 10}}>
+                <div style={{display: "flex", justifyContent: "space-between", gap: 12}}>
+                    <div style={{border: "1px solid #d0d7de", borderRadius: 8, minWidth: 200}}>
+                        {edgeRows.map(row => (
+                            <div key={row} data-row={row} style={edgeRowStyle}>{row}</div>
+                        ))}
+                    </div>
+                    <button onClick={() => setOpen(v => !v)}>{open ? "close window" : "open window"}</button>
+                </div>
+                <div
+                    data-row="EDGE"
+                    style={{...edgeRowStyle, border: "1px dashed #8c959f", borderRadius: 8, textAlign: "right"}}
+                >
+                    drag this card to the right/bottom edge of the viewport and right-click here
+                </div>
+                {open && (
+                    <FloatingWindow title="Window rows" size={{width: 300, height: 190}} position={{x: 120, y: 120}} onClickClose={() => setOpen(false)}>
+                        <div style={{padding: 4}}>
+                            {edgeRows.map(row => (
+                                <div key={row} data-row={`W:${row}`} style={edgeRowStyle}>{row}</div>
+                            ))}
+                        </div>
+                    </FloatingWindow>
+                )}
+            </div>
+        </contextMenu.Layer>
+    );
+};
+
+export function Card53() {
+    return (
+    <Check id="context-menu-edges" n={53} title="Context menu - viewport edge, FloatingWindow, touch long press"
+                       do="Right-click a row within 20 px of the right and bottom edge of the viewport (scroll the card there). Open the window and right-click a row inside it, including one at its lower-right corner. On touch, long-press a row for ~300 ms."
+                       expect="The menu is always fully visible: at the right edge it slides back inside instead of running off. A menu opened from the window renders above the window and is not cut off by the window body. Long press yields the SAME items as the right click on that row, with contextMenu.map never written."
+                       note="The horizontal clamp is the twin of the vertical one and no longer needs coordinate.left (which only submenus pass). Window presses portal into the window's own isolated layer. The item provider receives the gesture (point, target, pointer), so one provider serves mouse and touch."
+                       tall>
+                    <EdgeMenuDemo />
                 </Check>
     );
 }

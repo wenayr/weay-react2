@@ -496,11 +496,14 @@ export function Menu({
     const [menuWidth, setMenuWidth] = useState(0);
     const [isLeftAligned, setIsLeftAligned] = useState(!!coordinate.toLeft);
     const [xOffset, setXOffset] = useState(0);
+    const [xShift, setXShift] = useState(0);
 
     // Mirror of applied top: vertical snap is recalculated from the base coordinate.y,
     // not from prev; the setTop(prev + ...) delta formula accumulated between runs and drifted.
     const appliedTop = useRef(top);
     appliedTop.current = top;
+    const appliedShift = useRef(xShift);
+    appliedShift.current = xShift;
 
     useLayoutEffect(() => {
         if (!refMenu.current) return;
@@ -523,6 +526,15 @@ export function Menu({
         if (coordinate.toLeft) {
             setXOffset((coordinate.left ?? 0) - rect.x - 4);
         }
+        // The flip above is a submenu manoeuvre: it needs the parent's left edge to know
+        // there is room on the other side, and a root menu passes no `left` (Layer and MenuR
+        // hand over x/y only), so `rect.width < 0` made it dead code and a right-click near
+        // the right edge simply ran off the viewport. This clamp is the horizontal twin of
+        // the vertical snap above - measured from the unshifted base so it stays idempotent,
+        // and never pulled so far that the left edge leaves the viewport instead.
+        const baseLeft = rect.left - appliedShift.current;
+        const overflowRight = w - (rect.right - appliedShift.current);
+        setXShift(overflowRight < 8 ? Math.max(overflowRight, -baseLeft) : 0);
     }, [coordinate.x, coordinate.y, coordinate.toLeft, coordinate.left]);
 
     const alignStyle: React.CSSProperties = isLeftAligned
@@ -536,7 +548,7 @@ export function Menu({
                 position: "absolute",
                 zIndex,
                 paddingLeft: 3,
-                left: (isLeftAligned ? -1 * (menuWidth + 3 + xOffset) : coordinate.x) - 3,
+                left: (isLeftAligned ? -1 * (menuWidth + 3 + xOffset) : coordinate.x + xShift) - 3,
                 top,
                 ...alignStyle,
             }}

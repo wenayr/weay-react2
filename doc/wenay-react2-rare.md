@@ -578,11 +578,12 @@ MenuItemStrict / MenuItem
 contextMenu.openAt(eventOrPoint, items, {source?, layerId?}) -> boolean
 contextMenu.openAtPoint({x, y}, items, {source?, layerId?}) -> boolean
 contextMenu.close()
-contextMenu.getState() -> {open, items, point, source?, layerId?, seq}
+contextMenu.getState() -> {open, items, point, source?, layerId?, windowPortal?, seq}
 contextMenu.stats.getSnapshot() -> {openAt, openAtPoint, legacyLayer, close, replace, empty, sources, layers, actionTotals, actions}
 contextMenu.stats.reset()
 contextMenu.stats.onChange(cb) -> off
 <contextMenu.Layer zIndex? statusOn? other? className?>...</contextMenu.Layer>
+other: (gesture) => items | {items, source?}   // gesture: {x, y, target, pointer: "mouse"|"touch"}
 contextMenu.map                         // legacy queue consumed by Layer; prefer openAt
 createContextMenu({name?})              // custom isolated instance with its own state and stats
 createRightClickMenu()                  // lower-level legacy right-click factory
@@ -596,7 +597,11 @@ MenuRightTrigger / MenuRightClassNames / MenuRightStyles / RightMenuController
 StickerMenu                          // components/Menu re-export
 ```
 
-Prefer `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, and stays supported through `1.x`; it should not be the primary API in new code. `contextMenu.stats` is local in-memory diagnostics, not hidden analytics: it counts direct `openAt`, `openAtPoint`, legacy Layer queued opens, empty opens, close/replace, source/layer usage, aggregate action outcomes, and keyed action outcomes. It deliberately does not persist, send network requests, or store arbitrary item labels. Per-action stats require explicit `MenuItemStrict.actionKey`; unkeyed actions update `actionTotals` only.
+Prefer `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, and stays supported through `1.x`; it should not be the primary API in new code — touch no longer needs it either: the Layer's `other` provider is called WITH the gesture (`{x, y, target, pointer}`) at the moment the long press fires, so one provider builds the same items for a right click and a hold on the row under the finger, and it may return `{items, source}` to get the same `source` accounting `openAt` gives. `MenuR`'s `other` receives the same gesture. A zero-argument provider still type-checks, so existing callers are unaffected.
+
+Placement is viewport-clamped on both axes. The horizontal flip (`isLeftAligned`) stays a submenu manoeuvre — it needs the parent's left edge through `coordinate.left`, which only submenus pass — so a root menu near the right edge is instead pulled back by the twin of the vertical snap, measured from the unshifted base and never dragged past the left edge.
+
+A press inside a viewport `FloatingWindow` has no Layer among its DOM ancestors (the window portals to body), so the menu used to open in the page's root Layer underneath the window; nesting a Layer in the window instead got the menu clipped by the window body's `overflow: auto`. The serving Layer now portals the menu into the source window's own portal root — the fixed isolated layer the window itself lives in — positioned in client coordinates and above the window chrome. `getState().windowPortal` exposes which window layer is hosting it, and a window that closes under an open menu falls back to inline rendering. QA card 53 pins all three: edge clamp, window-hosted menu, long-press parity. `contextMenu.stats` is local in-memory diagnostics, not hidden analytics: it counts direct `openAt`, `openAtPoint`, legacy Layer queued opens, empty opens, close/replace, source/layer usage, aggregate action outcomes, and keyed action outcomes. It deliberately does not persist, send network requests, or store arbitrary item labels. Per-action stats require explicit `MenuItemStrict.actionKey`; unkeyed actions update `actionTotals` only.
 
 `createRightClickMenu().MenuR` keeps wrapper-only right-click handling by default. Its additive `captureGlobal` prop installs document-level right-click listeners for portal or floating-window content; it is opt-in and removes the listeners on unmount.
 

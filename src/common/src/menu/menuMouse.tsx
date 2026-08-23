@@ -1,10 +1,15 @@
 import React, {useEffect, useRef, useState} from "react";
+import {createPortal} from "react-dom";
 import {Menu, MenuActionEvent, MenuItem, MenuItemStrict} from "./menu.js";
 import {OutsideClickArea} from "../hooks/useOutside.js";
 
 /** Movement in CSS px that turns a long press into a scroll. Duplicated in menuR.tsx, which
  *  carries its own copy of this gesture block - keep the two values in step. */
 const TOUCH_SLOP = 10;
+
+/** Inside the window's own isolate, so it only has to clear the window's chrome. Same value
+ *  WindowPortal uses for the popups it hosts. */
+const WINDOW_MENU_Z_INDEX = 2147483646;
 
 export type ContextMenuPoint = {x: number; y: number};
 export type ContextMenuAnchor = ContextMenuPoint | {
@@ -20,12 +25,30 @@ export type ContextMenuState = {
     point: ContextMenuPoint;
     source?: string;
     layerId?: string;
+    /** Isolated stacking layer of the FloatingWindow the press came from, when it came from
+     *  one. The serving Layer portals the menu in there instead of rendering it inline. */
+    windowPortal?: Element | null;
     seq: number;
 };
+
+/** What produced the menu, handed to the Layer's item provider so it can build items for
+ *  whatever sits under the pointer - the reason a touch long press no longer has to preload
+ *  `contextMenu.map` before the gesture. */
+export type ContextMenuGesture = {
+    x: number;
+    y: number;
+    target: Element | null;
+    pointer: "mouse" | "touch";
+};
+
+/** A provider may return plain items, or items plus the `source` label it wants recorded -
+ *  the latter puts the Layer path on a par with openAt for stats. */
+export type ContextMenuProvided = MenuItem[] | {items: MenuItem[]; source?: string};
+
 export type ContextMenuLayerProps = {
     children: React.ReactElement;
     zIndex?: number;
-    other?: () => MenuItem[];
+    other?: (gesture: ContextMenuGesture) => ContextMenuProvided;
     statusOn?: boolean;
     onUnClick?: (e: boolean) => void;
     onConsume?: () => void;
@@ -106,11 +129,22 @@ function anchorPoint(anchor: ContextMenuAnchor): ContextMenuPoint {
     return anchor;
 }
 
-function anchorLayerId(anchor: ContextMenuAnchor) {
+function anchorTarget(anchor: ContextMenuAnchor) {
     const target = "clientX" in anchor ? anchor.target : undefined;
-    return target instanceof Element
-        ? target.closest("[data-wenay-menu-layer-id]")?.getAttribute("data-wenay-menu-layer-id") ?? undefined
-        : undefined;
+    return target instanceof Element ? target : null;
+}
+
+function anchorLayerId(anchor: ContextMenuAnchor) {
+    return anchorTarget(anchor)?.closest("[data-wenay-menu-layer-id]")?.getAttribute("data-wenay-menu-layer-id") ?? undefined;
+}
+
+/** A viewport FloatingWindow portals to body, so a press inside it has no Layer among its DOM
+ *  ancestors: the menu used to land in the page's root Layer, underneath the window. It also
+ *  has no way out of the window body's `overflow: auto`, which is why nesting a Layer in the
+ *  window clipped the menu. Both go away by portalling the menu into the window's own portal
+ *  root - the fixed, isolated layer the window itself lives in, above its content. */
+function anchorWindowPortal(anchor: ContextMenuAnchor) {
+    return anchorTarget(anchor)?.closest("[data-wenay-window-portal-root]") ?? null;
 }
 
 function preventNative(anchor: ContextMenuAnchor) {
@@ -224,7 +258,7 @@ export function createContextMenu(data?: {name?: string}) {
         return normalizeItems(items);
     }
 
-    function hasQueuedItems(other?: () => MenuItem[]) {
+    function hasQueuedItems(other?: ContextMenuLayerProps["other"]) {
         return !!other || map.size > 0;
     }
 
@@ -234,6 +268,7 @@ export function createContextMenu(data?: {name?: string}) {
         state.open = false;
         state.items = [];
         state.layerId = undefined;
+        state.windowPortal = null;
         emit();
     }
 
@@ -252,6 +287,7 @@ export function createContextMenu(data?: {name?: string}) {
         state.point = anchorPoint(anchor);
         state.source = opts.source;
         state.layerId = opts.layerId ?? anchorLayerId(anchor) ?? [...layers][0];
+        state.windowPortal = anchorWindowPortal(anchor);
         bumpMapStat(statsState.sources, state.source);
         bumpMapStat(statsState.layers, state.layerId);
         emitStats();
@@ -274,6 +310,7 @@ export function createContextMenu(data?: {name?: string}) {
             point: {...state.point},
             source: state.source,
             layerId: state.layerId,
+            windowPortal: state.windowPortal,
             seq: state.seq,
         };
     }
@@ -310,12 +347,14 @@ export function createContextMenu(data?: {name?: string}) {
 
         useEffect(() => subscribe(() => forceRender(v => v + 1)), []);
 
-        function queuedItems() {
-            return other ? normalizeItems(other()) : legacyItems();
-        }
-
-        function openQueued(anchor: ContextMenuAnchor) {
-            const opened = openMenu(anchor, queuedItems(), {source: "layer", layerId}, "legacyLayer");
+        function openQueued(anchor: ContextMenuAnchor, pointer: ContextMenuGesture["pointer"]) {
+            const point = anchorPoint(anchor);
+            const provided = other?.({x: point.x, y: point.y, target: anchorTarget(anchor), pointer});
+            const items = provided == undefined
+                ? legacyItems()
+                : normalizeItems(Array.isArray(provided) ? provided : provided.items);
+            const source = provided != undefined && !Array.isArray(provided) ? provided.source : undefined;
+            const opened = openMenu(anchor, items, {source: source ?? "layer", layerId}, "legacyLayer");
             if (opened) {
                 map.clear();
                 onConsume?.();
@@ -337,6 +376,19 @@ export function createContextMenu(data?: {name?: string}) {
             };
         }
 
+        /** The window's portal root is `position: fixed; inset: 0`, so a point inside it is the
+         *  client point unshifted, and its `pointer-events: none` has to be undone for the menu.
+         *  A window that closed while its menu was open leaves a detached node behind - fall
+         *  back to the inline layer rather than portalling into nothing. */
+        function windowPortalTarget() {
+            const target = state.windowPortal;
+            return target && target.isConnected ? target : null;
+        }
+
+        function menuView(coordinate: ContextMenuPoint) {
+            return <Menu className={className} data={state.items} coordinate={coordinate} zIndex={zIndex} onActionEvent={recordMenuAction}/>;
+        }
+
         return <div
             data-wenay-menu-layer="root"
             data-wenay-menu-layer-id={layerId}
@@ -347,7 +399,7 @@ export function createContextMenu(data?: {name?: string}) {
                 if (!enabled) return;
                 e.preventDefault();
                 e.stopPropagation();
-                if (!state.open || hasQueuedItems(other)) openQueued(e);
+                if (!state.open || hasQueuedItems(other)) openQueued(e, "mouse");
             }}
             onTouchStart={e => {
                 // unconditionally: the old `if (x == 0)` guard only reset on a SUCCESSFUL
@@ -373,7 +425,7 @@ export function createContextMenu(data?: {name?: string}) {
                     touchTime.current = null;
                     touchXY.current.x = touchXY.current.y = 0;
                     if (!state.open || hasQueuedItems(other)) {
-                        openQueued({clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY, target: e.target, preventDefault: () => e.preventDefault(), stopPropagation: () => e.stopPropagation()});
+                        openQueued({clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY, target: e.target, preventDefault: () => e.preventDefault(), stopPropagation: () => e.stopPropagation()}, "touch");
                     }
                 }
             }}
@@ -383,13 +435,25 @@ export function createContextMenu(data?: {name?: string}) {
             onMouseUp={event => {
                 if (!enabled) return;
                 if (event.button == 2 || Date.now() - timeEvent.current < 300) {
-                    if (!state.open || hasQueuedItems(other)) openQueued(event);
+                    if (!state.open || hasQueuedItems(other)) openQueued(event, "mouse");
                 }
             }}
         >
             {children}
             {state.open && enabled && state.layerId == layerId && <OutsideClickArea outsideClick={handleClose}>
-                <Menu className={className} data={state.items} coordinate={relativePoint()} zIndex={zIndex} onActionEvent={recordMenuAction}/>
+                {(target => target
+                    // Still a child of this OutsideClickArea in the React tree, so a click in the
+                    // portalled menu is recognised as inside exactly like the inline one.
+                    ? createPortal(
+                        <div
+                            data-wenay-menu-window-layer={layerId}
+                            style={{position: "absolute", left: 0, top: 0, zIndex: WINDOW_MENU_Z_INDEX, pointerEvents: "auto"}}
+                        >
+                            {menuView(state.point)}
+                        </div>,
+                        target,
+                    )
+                    : menuView(relativePoint()))(windowPortalTarget())}
             </OutsideClickArea>}
         </div>;
     }

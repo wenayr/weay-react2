@@ -1,5 +1,6 @@
 import React, {useEffect, useRef} from "react";
 import {Menu, MenuItem, MenuItemStrict} from "./menu.js";
+import type {ContextMenuGesture} from "./menuMouse.js";
 import {OutsideClickArea} from "../hooks/useOutside.js";
 
 /** Movement in CSS px that turns a long press into a scroll. Same value as menuMouse.tsx,
@@ -14,7 +15,7 @@ export function createRightClickMenu(){
     function MenuR({children, other = () => [], statusOn = true, onUnClick, onConsume, zIndex, className, captureGlobal = false}: {
         children: React.ReactElement,                        // Child component
         zIndex?: number,                                     // Context menu z-index value
-        other?: () => (MenuItem)[],                        // Additional menu items
+        other?: (gesture: ContextMenuGesture) => (MenuItem)[], // Items, built from the gesture that asked for them
         statusOn?: boolean,                                  // Enable or disable the menu
         onUnClick?: (e: boolean) => void,                    // Callback when the menu closes
         onConsume?: () => void,                              // Called on open after snapshotting items
@@ -39,11 +40,11 @@ export function createRightClickMenu(){
         const touchXY = useRef({x: 0, y: 0}); // Current touch coordinates (ref: survives rerenders mid-gesture)
         const touchTime = useRef<null | number>(null); // Touch start time
 
-        function openAt(clientX: number, clientY: number) {
+        function openAt(clientX: number, clientY: number, gesture: Omit<ContextMenuGesture, "x" | "y">) {
             if (bb) return; // Menu is already active
             bb = true;
             const rect = rootRef.current?.getBoundingClientRect();
-            const menu = other().filter(el => el) as MenuItemStrict[];
+            const menu = other({x: clientX, y: clientY, ...gesture}).filter(el => el) as MenuItemStrict[];
             onConsume?.();
             setShow({
                 status: true,
@@ -55,10 +56,10 @@ export function createRightClickMenu(){
             });
         }
 
-        function onMouseUp(event: {button: number, clientX: number, clientY: number}) {
+        function onMouseUp(event: {button: number, clientX: number, clientY: number, target?: EventTarget | null}) {
             if (!statusOn) return;
             if (event.button == 2 || Date.now() - timeEvent.current < 300) {
-                openAt(event.clientX, event.clientY);
+                openAt(event.clientX, event.clientY, {target: event.target instanceof Element ? event.target : null, pointer: "mouse"});
             }
         }
 
@@ -117,7 +118,7 @@ export function createRightClickMenu(){
                              // More than 300 ms counts as a long press
                              touchTime.current = null;
                              touchXY.current.x = touchXY.current.y = 0;
-                            openAt(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+                            openAt(e.changedTouches[0].clientX, e.changedTouches[0].clientY, {target: e.target instanceof Element ? e.target : null, pointer: "touch"});
                          }
                      }
                  }}

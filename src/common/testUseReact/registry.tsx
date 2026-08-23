@@ -2,7 +2,7 @@ import type { QaCard } from "./standKit.js";
 import { Card49, Card6 } from "./cards/chart.js";
 import { Card51, Card38, Card39, Card40, Card41, Card42, Card43, Card44, Card45, Card46 } from "./cards/peerMedia.js";
 import { Card18, Card17, Card23, Card24, Card33, Card34, Card48, Card50 } from "./cards/replay.js";
-import { Card13, Card20, Card21, Card22, Card25, Card3, Card4 } from "./cards/menuModal.js";
+import { Card13, Card20, Card21, Card22, Card25, Card3, Card4, Card53 } from "./cards/menuModal.js";
 import { Card26, Card27, Card35, Card52, Card2 } from "./cards/dnd.js";
 import { Card31, Card32, Card47, Card30, Card29, Card28 } from "./cards/columns.js";
 import { Card8, Card1, Card14, Card7, Card19, Card9, Card10, Card11 } from "./cards/logsParams.js";
@@ -36,6 +36,7 @@ export const qaCards: QaCard[] = [
     { n: 27, section: 'active', title: 'useReorderBoard + useReorder - draggable columns and items', tall: true, Component: Card27 },
     { n: 35, section: 'active', title: 'DragBox - imperative delta drag (adapter over useDraggableApi)', Component: Card35 },
     { id: 'floating-window-stack', n: 52, section: 'active', title: 'FloatingWindow - desktop taskbar, sessions, cascade and Snap', tall: true, Component: Card52 },
+    { id: 'context-menu-edges', n: 53, section: 'active', title: 'Context menu - viewport edge, FloatingWindow, touch long press', tall: true, Component: Card53 },
     { n: 31, section: 'active', title: 'Toolbar over columnState - one config drives toolbar + menu + grid', tall: true, Component: Card31 },
     { n: 32, section: 'active', title: 'createColumnGrid - default grid menu + mobile dots for table/cards', tall: true, Component: Card32 },
     { id: 'grid-chrome', n: 47, section: 'active', title: 'Grid Chrome — compact table commands', Component: Card47 },
