@@ -509,7 +509,8 @@ body {
   top: 8px;
   left: 50%;
   display: grid;
-  grid-template-columns: repeat(4, 78px);
+  grid-auto-flow: column;
+  grid-auto-columns: 78px;
   gap: 8px;
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--wnd-border, #8c959f) 70%, transparent);

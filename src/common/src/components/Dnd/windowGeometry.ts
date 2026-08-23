@@ -24,6 +24,8 @@ export type FloatingWindowSnapLayout = {
 export const snapRegionLabels: Record<FloatingWindowSnapRegion, string> = {
     left: "left",
     right: "right",
+    top: "top",
+    bottom: "bottom",
     "top-left": "top left",
     "top-right": "top right",
     "bottom-left": "bottom left",
@@ -40,21 +42,11 @@ export const snapLayouts: FloatingWindowSnapLayout[] = [
         ],
     },
     {
-        id: "left-stack",
-        label: "Left and stacked right",
+        id: "rows",
+        label: "Two rows",
         zones: [
-            {region: "left", gridArea: "1 / 1 / 3 / 2"},
-            {region: "top-right", gridArea: "1 / 2 / 2 / 3"},
-            {region: "bottom-right", gridArea: "2 / 2 / 3 / 3"},
-        ],
-    },
-    {
-        id: "right-stack",
-        label: "Stacked left and right",
-        zones: [
-            {region: "top-left", gridArea: "1 / 1 / 2 / 2"},
-            {region: "bottom-left", gridArea: "2 / 1 / 3 / 2"},
-            {region: "right", gridArea: "1 / 2 / 3 / 3"},
+            {region: "top", gridArea: "1 / 1 / 2 / 3"},
+            {region: "bottom", gridArea: "2 / 1 / 3 / 3"},
         ],
     },
     {
@@ -80,15 +72,16 @@ export function clampToLimit(x: number, y: number, lim: FloatingWindowLimit | un
 }
 
 export function snapPreviewStyle(region: FloatingWindowSnapRegion): React.CSSProperties {
-    // Every region is either left- or right-hand, so the left/top ternaries only ever
-    // needed their right/bottom branch; width is half of the viewport for all six.
+    // A region occupies half the viewport on the axes it names and all of the other one:
+    // the column halves are full height, the row halves full width, quarters neither.
     const right = region == "right" || region.endsWith("-right");
-    const bottom = region.startsWith("bottom-");
+    const bottom = region == "bottom" || region.startsWith("bottom-");
     const fullHeight = region == "left" || region == "right";
+    const fullWidth = region == "top" || region == "bottom";
     return {
         left: right ? "50%" : 6,
         top: bottom ? "50%" : 6,
-        width: "calc(50% - 9px)",
+        width: fullWidth ? "calc(100% - 12px)" : "calc(50% - 9px)",
         height: fullHeight ? "calc(100% - 12px)" : "calc(50% - 9px)",
     };
 }
@@ -103,6 +96,8 @@ export function snapGeometry(region: FloatingWindowSnapRegion): FloatingWindowSa
     switch (region) {
         case "left": return {position: {x: 0, y: 0}, size: {width: halfWidth, height: viewportHeight}};
         case "right": return {position: {x: halfWidth, y: 0}, size: {width: viewportWidth - halfWidth, height: viewportHeight}};
+        case "top": return {position: {x: 0, y: 0}, size: {width: viewportWidth, height: halfHeight}};
+        case "bottom": return {position: {x: 0, y: halfHeight}, size: {width: viewportWidth, height: viewportHeight - halfHeight}};
         case "top-left": return {position: {x: 0, y: 0}, size: {width: halfWidth, height: halfHeight}};
         case "top-right": return {position: {x: halfWidth, y: 0}, size: {width: viewportWidth - halfWidth, height: halfHeight}};
         case "bottom-left": return {position: {x: 0, y: halfHeight}, size: {width: halfWidth, height: viewportHeight - halfHeight}};

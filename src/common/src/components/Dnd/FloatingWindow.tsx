@@ -405,9 +405,9 @@ export function useFloatingWindowController({
         changeSnapRegion(null);
     };
 
-    const detachSnappedForDrag = (clientX: number, clientY: number) => {
-        if (!snapRegion) return {x, y};
-        const restored = unsnappedGeometry.current;
+    /** Shrink back to `restored` and hang the window under the pointer, Windows-style: the title
+     *  bar keeps the cursor near its middle so the drag continues from a sane grab point. */
+    const detachTo = (restored: FloatingWindowSavedGeometry, clientX: number, clientY: number) => {
         const restoredWidth = typeof restored.size.width == "number" ? restored.size.width : 320;
         const next = {
             x: Math.max(0, Math.min(clientX - restoredWidth / 2, Math.max(0, window.innerWidth - restoredWidth))),
@@ -415,8 +415,46 @@ export function useFloatingWindowController({
         };
         commitSize({...restored.size});
         commitPosition(next);
+        return next;
+    };
+
+    /** Tear a maximized or snapped window off the viewport edge. Deferred until the pointer has
+     *  really travelled (see pendingDetach): a press that turns out to be a double click must
+     *  leave the geometry alone, or the restore would race the maximize it toggles. */
+    const detachForDrag = (clientX: number, clientY: number) => {
+        if (typeof window == "undefined") return {x, y};
+        if (mode == "maximized") {
+            const next = detachTo(restoreGeometry.current, clientX, clientY);
+            // The window is a free one from here on, so this is also the geometry a later snap
+            // has to remember - the drag loop's own closure still reads the pre-detach mode.
+            unsnappedGeometry.current = {position: {...next}, size: {...restoreGeometry.current.size}};
+            changeMode("normal");
+            return next;
+        }
+        if (!snapRegion) return {x, y};
+        const next = detachTo(unsnappedGeometry.current, clientX, clientY);
         changeSnapRegion(null);
         return next;
+    };
+
+    /** Pointer origin of a press on a window that is still maximized/snapped, plus the offset the
+     *  drag loop must adopt once the detach fires. Null while a plain free window is dragged. */
+    const pendingDetach = useRef<{x: number; y: number} | null>(null);
+    const detachThreshold = 8;
+    const armDetach = (clientX: number, clientY: number) => {
+        const attached = mode == "maximized" || snapRegion != null;
+        pendingDetach.current = attached ? {x: clientX, y: clientY} : null;
+        return attached;
+    };
+    /** Returns the drag offset to use, or null while the press has not travelled far enough
+     *  for the window to leave the edge (the caller then holds the window still). */
+    const resolveDetach = (clientX: number, clientY: number) => {
+        const start = pendingDetach.current;
+        if (!start) return undefined;
+        if (Math.abs(clientX - start.x) <= detachThreshold && Math.abs(clientY - start.y) <= detachThreshold) return null;
+        pendingDetach.current = null;
+        const next = detachForDrag(clientX, clientY);
+        return {x: next.x - clientX, y: next.y - clientY};
     };
 
     const announcedActive = useRef<boolean | null>(null);
@@ -435,19 +473,20 @@ export function useFloatingWindowController({
         const mouseMoveHandler = (e: MouseEvent) => {
             e.stopPropagation();
             if (lastC.current == null) return;
+            if (e.buttons !== 1) return mouseUpHandler();
+            const detached = resolveDetach(e.clientX, e.clientY);
+            if (detached === null) return;              // still parked on the edge
+            if (detached) lastC.current = detached;
             const data = lastC.current;
-            if (e.buttons === 1) {
-                updateSnapPicker(e.clientX, e.clientY);
-                commitPosition(clampToLimit(e.clientX + data.x, e.clientY + data.y, limitRef.current));
-            } else {
-                mouseUpHandler();
-            }
+            updateSnapPicker(e.clientX, e.clientY);
+            commitPosition(clampToLimit(e.clientX + data.x, e.clientY + data.y, limitRef.current));
         };
         const mouseUpHandler = () => {
             const target = snapPreviewRef.current;
             document.removeEventListener("mouseup", mouseUpHandler);
             document.removeEventListener("mousemove", mouseMoveHandler);
             lastC.current = null;
+            pendingDetach.current = null;
             setA(false);
             if (target) snapTo(target);
             else hideSnapLayout();
@@ -464,14 +503,18 @@ export function useFloatingWindowController({
                 if (zz.identifier === data.id) t = zz;
             }
             if (!t) return;
-            updateSnapPicker(t.clientX, t.clientY);
 
             const tapStart = touchTap.current.start;
             if (tapStart && (Math.abs(t.clientX - tapStart.x) > 8 || Math.abs(t.clientY - tapStart.y) > 8)) {
                 touchTap.current.moved = true;
             }
 
-            commitPosition(clampToLimit(t.clientX + data.x, t.clientY + data.y, limitRef.current));
+            const detached = resolveDetach(t.clientX, t.clientY);
+            if (detached === null) return;              // still parked on the edge
+            if (detached) lastT.current = {...data, ...detached};
+            const offset = lastT.current ?? data;
+            updateSnapPicker(t.clientX, t.clientY);
+            commitPosition(clampToLimit(t.clientX + offset.x, t.clientY + offset.y, limitRef.current));
         };
         const touchEndHandler = (e: TouchEvent) => {
             const data = lastT.current;
@@ -487,6 +530,7 @@ export function useFloatingWindowController({
                 const target = snapPreviewRef.current;
                 document.removeEventListener("touchend", touchEndHandler);
                 document.removeEventListener("touchmove", touchMoveHandler);
+                pendingDetach.current = null;
                 setB(false);
                 if (target) snapTo(target);
                 else hideSnapLayout();
@@ -579,12 +623,12 @@ export function useFloatingWindowController({
     const onHeaderTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
         const t = e.changedTouches[0];
         if (t) touchTap.current = {...touchTap.current, start: {x: t.clientX, y: t.clientY}, moved: false};
-        if (mode == "maximized" || disableDraggingRef.current?.()) return;
+        if (disableDraggingRef.current?.()) return;
         if (t) {
-            const startPosition = detachSnappedForDrag(t.clientX, t.clientY);
+            armDetach(t.clientX, t.clientY);
             lastT.current = {
-                x: startPosition.x - t.clientX,
-                y: startPosition.y - t.clientY,
+                x: x - t.clientX,
+                y: y - t.clientY,
                 id: t.identifier
             };
         }
@@ -611,11 +655,11 @@ export function useFloatingWindowController({
     };
 
     const onHeaderMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
-        if (mode == "maximized" || disableDraggingRef.current?.()) return;
-        const startPosition = detachSnappedForDrag(e.clientX, e.clientY);
+        if (disableDraggingRef.current?.()) return;
+        armDetach(e.clientX, e.clientY);
         lastC.current = {
-            x: startPosition.x - e.clientX,
-            y: startPosition.y - e.clientY
+            x: x - e.clientX,
+            y: y - e.clientY
         };
         setA(true);
     };

@@ -201,9 +201,9 @@ describe("FloatingWindow viewport layer", () => {
         fireEvent.mouseDown(header, {clientX: 120, clientY: 100, buttons: 1});
         fireEvent.mouseMove(document, {clientX: window.innerWidth / 2, clientY: 10, buttons: 1});
         expect(screen.getByRole("toolbar", {name: "Snap layouts"})).not.toBeNull();
+        expect(screen.getAllByRole("group")).toHaveLength(3);
         expect(within(screen.getByRole("group", {name: "Two columns"})).getAllByRole("button")).toHaveLength(2);
-        expect(within(screen.getByRole("group", {name: "Left and stacked right"})).getAllByRole("button")).toHaveLength(3);
-        expect(within(screen.getByRole("group", {name: "Stacked left and right"})).getAllByRole("button")).toHaveLength(3);
+        expect(within(screen.getByRole("group", {name: "Two rows"})).getAllByRole("button")).toHaveLength(2);
         const quarters = screen.getByRole("group", {name: "Four quarters"});
         expect(within(quarters).getAllByRole("button")).toHaveLength(4);
 
@@ -217,11 +217,69 @@ describe("FloatingWindow viewport layer", () => {
         expect(onSnapChange).toHaveBeenLastCalledWith("bottom-right");
         expect(screen.queryByRole("toolbar", {name: "Snap layouts"})).toBeNull();
 
-        fireEvent.mouseDown(header, {clientX: 100, clientY: 10, buttons: 1});
+        fireEvent.mouseDown(header, {clientX: 100, clientY: 300, buttons: 1});
+        expect(root.dataset.snapRegion).toBe("bottom-right");   // a press alone must not tear it off
+        fireEvent.mouseMove(document, {clientX: 140, clientY: 340, buttons: 1});
         expect(root.dataset.snapRegion).toBeUndefined();
         expect(root.style.width).toBe("300px");
         expect(onSnapChange).toHaveBeenLastCalledWith(null);
         fireEvent.mouseUp(document);
+    });
+
+    test("the two-rows preset snaps to horizontal halves", () => {
+        render(
+            <FloatingWindow title="Rows" position={{x: 80, y: 90}} size={{width: 300, height: 200}}>
+                <div data-testid="rows-content">rows</div>
+            </FloatingWindow>
+        );
+        const root = rootFor("rows-content");
+        const header = root.querySelector(".wenayWndHeader") as HTMLElement;
+
+        fireEvent.mouseDown(header, {clientX: 120, clientY: 100, buttons: 1});
+        fireEvent.mouseMove(document, {clientX: window.innerWidth / 2, clientY: 10, buttons: 1});
+        const rows = screen.getByRole("group", {name: "Two rows"});
+        fireEvent.click(within(rows).getByRole("button", {name: "Two rows: bottom"}));
+
+        expect(root.dataset.snapRegion).toBe("bottom");
+        expect(root.dataset.positionX).toBe("0");
+        expect(root.dataset.positionY).toBe(`${Math.floor(window.innerHeight / 2)}`);
+        expect(root.style.width).toBe(`${window.innerWidth}px`);
+        expect(root.style.height).toBe(`${window.innerHeight - Math.floor(window.innerHeight / 2)}px`);
+        fireEvent.mouseUp(document);
+    });
+
+    test("dragging a maximized window off the edge restores its previous size", () => {
+        const onModeChange = jest.fn();
+        render(
+            <FloatingWindow title="Tear off" position={{x: 40, y: 50}} size={{width: 320, height: 220}} onModeChange={onModeChange}>
+                <div data-testid="tear-content">tear</div>
+            </FloatingWindow>
+        );
+        const root = rootFor("tear-content");
+        const header = root.querySelector(".wenayWndHeader") as HTMLElement;
+
+        fireEvent.doubleClick(header);
+        expect(root.dataset.mode).toBe("maximized");
+
+        // A press that never travels leaves the window maximized, so a double click still toggles.
+        fireEvent.mouseDown(header, {clientX: 400, clientY: 12, buttons: 1});
+        expect(root.dataset.mode).toBe("maximized");
+        fireEvent.mouseMove(document, {clientX: 404, clientY: 16, buttons: 1});
+        expect(root.dataset.mode).toBe("maximized");
+
+        fireEvent.mouseMove(document, {clientX: 420, clientY: 120, buttons: 1});
+        expect(root.dataset.mode).toBe("normal");
+        expect(root.style.width).toBe("320px");
+        expect(root.style.height).toBe("220px");
+        expect(root.dataset.positionX).toBe(`${420 - 160}`);
+        expect(root.dataset.positionY).toBe(`${120 - 12}`);
+
+        // From here the window follows the pointer with the grab offset taken at the tear-off.
+        fireEvent.mouseMove(document, {clientX: 430, clientY: 140, buttons: 1});
+        expect(root.dataset.positionX).toBe(`${430 - 160}`);
+        expect(root.dataset.positionY).toBe(`${140 - 12}`);
+        fireEvent.mouseUp(document);
+        expect(onModeChange).toHaveBeenLastCalledWith("normal");
     });
 
     test("keyboard moves, resizes and toggles a focused window", () => {

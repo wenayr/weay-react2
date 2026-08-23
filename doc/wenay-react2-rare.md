@@ -92,10 +92,13 @@ is the active two-window acceptance scenario; `__test/floatingWindow.test.tsx` p
 portal, focus, isolation, optional close button, and outside-click contracts.
 Title bars support double-click and two-tap maximize/restore. The maximize button is deliberately
 hidden by default; set `maximizeButton` only when explicit chrome is useful. While a free window is
-dragged to the top-centre activation zone, a Windows 11-style Snap Layout picker presents four
-coherent presets: two halves, left plus two right quarters, two left quarters plus right, and a
-true 2x2 four-corner layout. Release over a cell applies it, and dragging a snapped window restores
-its previous free size. `WindowPortal`
+dragged to the top-centre activation zone, a Windows 11-style Snap Layout picker presents three
+presets: two columns, two rows, and a true 2x2 four-corner layout (the two mixed column+stack
+presets were dropped - they only recombined regions the other three already offer). Release over a
+cell applies it. Dragging a snapped OR maximized window by its title bar tears it off the edge and
+restores its previous free size, then continues the drag with the pointer near the middle of the
+title bar; the tear-off waits for 8px of travel so a double click still toggles maximize instead of
+racing it. `WindowPortal`
 keeps menus/tooltips in the owning window's isolated layer. `useFloatingWindowManager(group)`
 exposes group order and programmatic bring-to-front. `beforeClose` plus `onClose(reason)` cover
 vetoable close flows; the legacy `onClickClose` remains supported.

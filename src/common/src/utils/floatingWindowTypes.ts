@@ -13,6 +13,8 @@ export type FloatingWindowMode = "normal" | "maximized";
 export type FloatingWindowSnapRegion =
     | "left"
     | "right"
+    | "top"
+    | "bottom"
     | "top-left"
     | "top-right"
     | "bottom-left"
