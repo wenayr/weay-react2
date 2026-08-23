@@ -1,5 +1,5 @@
 import React, {HTMLAttributes, ReactElement, useEffect, useMemo, useRef, useState} from "react";
-import {buttonStatusMap} from "../utils/persistedMaps";
+import {buttonStatusMap} from "../utils/persistedMaps.js";
 
 export const StyleOtherRow: React.CSSProperties = {display: "flex", flexDirection: "row", flex: "auto 1 1"}
 export const StyleOtherColumn: React.CSSProperties = {display: "flex", flexDirection: "column", flex: "auto 0 1"}
@@ -38,27 +38,22 @@ export function useOutsideApi<T extends HTMLElement = HTMLDivElement>(options: U
     isInsideEventRef.current = isInsideEvent;
     enabledRef.current = enabled;
 
+    // The `status` prop wins: any change to it overwrites an imperative enable()/disable().
+    // Use one or the other for a given instance - api.disable() on a status-driven hook is
+    // undone by the next render in which status changes.
     useEffect(() => {
         setEnabled(status);
     }, [status]);
 
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent | TouchEvent) {
-            if (!enabledRef.current) return;
-            if (
-                r.current &&
-                event.target instanceof Node &&
-                !r.current.contains(event.target) &&
-                !isInsideEventRef.current?.(event)
-            ) outsideClickRef.current?.();
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        document.addEventListener("touchstart", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-            document.removeEventListener("touchstart", handleClickOutside);
-        }
-    }, [r]);
+    useEffect(() => subscribeOutsidePress(event => {
+        if (!enabledRef.current) return;
+        if (
+            r.current &&
+            event.target instanceof Node &&
+            !r.current.contains(event.target) &&
+            !isInsideEventRef.current?.(event)
+        ) outsideClickRef.current?.();
+    }), [r]);
 
     const props = useMemo(() => ({ref: r as React.Ref<T>}), [r]);
     return useMemo(() => {
@@ -80,6 +75,33 @@ export function useOutsideApi<T extends HTMLElement = HTMLDivElement>(options: U
         });
         return api;
     }, [props, r]);
+}
+
+/** Every open overlay, popover and outClick Button used to add its own mousedown+touchstart
+ *  pair to `document` - two listeners per instance, live even while disabled. useKeyboard
+ *  already solved this with one native listener plus a Set of subscribers; this is the same
+ *  pattern. Callbacks stay fully independent; the copy on dispatch keeps an unsubscribe from
+ *  inside a callback from skipping the rest. */
+type OutsidePressListener = (event: MouseEvent | TouchEvent) => void;
+const outsidePressListeners = new Set<OutsidePressListener>();
+let outsidePressHandler: ((event: Event) => void) | null = null;
+
+function subscribeOutsidePress(listener: OutsidePressListener) {
+    if (!outsidePressHandler) {
+        outsidePressHandler = event => {
+            for (const current of [...outsidePressListeners]) current(event as MouseEvent | TouchEvent);
+        };
+        document.addEventListener("mousedown", outsidePressHandler);
+        document.addEventListener("touchstart", outsidePressHandler);
+    }
+    outsidePressListeners.add(listener);
+    return () => {
+        outsidePressListeners.delete(listener);
+        if (outsidePressListeners.size || !outsidePressHandler) return;
+        document.removeEventListener("mousedown", outsidePressHandler);
+        document.removeEventListener("touchstart", outsidePressHandler);
+        outsidePressHandler = null;
+    };
 }
 
 export function useOutside<T extends HTMLElement = HTMLDivElement>(options: UseOutsideOptions<T>) {
@@ -191,12 +213,17 @@ export function Button({keyForSave, keySave, statusDef, outClick, ...data}: Butt
         return buttonStatusMap.onChange(apply)
     }, [saveKey])
 
+    // The persist write must stay OUT of the state updater: buttonStatusMap.set notifies its
+    // subscribers synchronously, so a second Button sharing this keyForSave used to setState
+    // while this one was still rendering. The ref keeps successive calls in one tick correct,
+    // which is what the functional form was there for.
+    const statusRef = useRef(status)
+    statusRef.current = status
     const setStatus: typeof setStatusRaw = (v) => {
-        setStatusRaw(prev => {
-            const next = typeof v === "function" ? (v as (p: boolean) => boolean)(prev) : v
-            if (saveKey && buttonStatusMap.get(saveKey)?.open !== next) buttonStatusMap.set(saveKey, {open: next})
-            return next
-        })
+        const next = typeof v === "function" ? (v as (p: boolean) => boolean)(statusRef.current) : v
+        statusRef.current = next
+        setStatusRaw(next)
+        if (saveKey && buttonStatusMap.get(saveKey)?.open !== next) buttonStatusMap.set(saveKey, {open: next})
     }
     const state: [boolean, typeof setStatusRaw] = [status, setStatus]
 
@@ -227,7 +254,9 @@ export function HoverButton(props: ButtonBaseProps){
         }</div>
 }
 
-export const OutsideButton: typeof Button = ({outClick = true, ...a}) => Button({...a, outClick})
+// JSX, not a bare Button(...) call: called as a function its hooks are attributed to this
+// component, and Button disappears from the React tree (DevTools, memo, future lazy wrappers).
+export const OutsideButton: typeof Button = ({outClick = true, ...a}) => <Button {...a} outClick={outClick}/>
 
 export function AbsoluteButton(props: Parameters<typeof Button>[0]) {
     const children: typeof props.children = (api) =>

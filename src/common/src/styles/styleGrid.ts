@@ -7,18 +7,23 @@ import {
     provideGlobalGridOptions,
     themeAlpine
 } from "ag-grid-community";
-import {tokens} from "./tokens";
+import {tokensVar} from "./tokens.js";
 
 
 
 // import 'ag-grid-community/styles/ag-grid.css';
 // import 'ag-grid-community/styles/ag-theme-alpine.css';
 
+/** Legacy global-theme entry. Builds the same theme as `buildAgTheme('dark')`
+ *  (agGrid4/theme.ts) with ONE deliberate difference: no `browserColorScheme` param, which
+ *  changes how form controls and scrollbars inside the grid render. Kept separate for that
+ *  reason - collapsing the two needs a visual check on the stand first. Unlike buildAgTheme
+ *  this one also has a global side effect (provideGlobalGridOptions). */
 export function GridStyleDefault(){
     const theme:  Theme<ThemeDefaultParams> = themeAlpine
         .withPart(colorSchemeDarkBlue)
         .withPart(iconSetMaterial)
-        .withParams({...tokens.grid});
+        .withParams({...tokensVar.grid});
 // Mark all grids as using legacy themes
     provideGlobalGridOptions({ theme: theme});
     return {theme, provideGlobalGridOptions};

@@ -20,9 +20,21 @@ function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
 
+// Asset subpaths (./styles*) are plain string targets: a stylesheet has no types and no
+// import/require split. Without these keys a consumer of ./core or ./react cannot reach the
+// CSS at all - a defined "exports" field blocks every unlisted subpath.
+function isAssetSubpath(subpath) {
+    return subpath === "./package.json" || subpath === "./styles" || subpath.startsWith("./styles/");
+}
+
 function validateExportConditions(manifest, label) {
     for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
         if (subpath === "./package.json") continue;
+        if (isAssetSubpath(subpath)) {
+            assert(typeof target === "string" && target.endsWith(".css"),
+                `${label}: ${subpath} must point straight at a .css file`);
+            continue;
+        }
         assert(target && typeof target === "object" && !Array.isArray(target),
             `${label}: ${subpath} must use conditional exports`);
         assert(Object.keys(target)[0] === "types", `${label}: ${subpath} must put the types condition first`);
@@ -56,10 +68,12 @@ assert(JSON.stringify(distManifest.exports) === JSON.stringify(sourceManifest.ex
 
 for (const [subpath, target] of Object.entries(distManifest.exports)) {
     if (subpath === "./package.json") continue;
-    for (const condition of ["types", "import", "default"]) {
-        const file = path.resolve(distRoot, target[condition]);
+    for (const [condition, value] of typeof target === "string"
+        ? [["asset", target]]
+        : ["types", "import", "default"].map(condition => [condition, target[condition]])) {
+        const file = path.resolve(distRoot, value);
         assert(file.startsWith(distRoot + path.sep), `${subpath}/${condition} escapes dist`);
-        assert(fs.existsSync(file), `${subpath}/${condition} target is missing: ${target[condition]}`);
+        assert(fs.existsSync(file), `${subpath}/${condition} target is missing: ${value}`);
     }
 }
 

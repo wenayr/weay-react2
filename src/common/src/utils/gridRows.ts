@@ -14,7 +14,9 @@ type GridRowsCoreParams<T> = {
     grid: GridReadyEvent<T, any> | null | undefined,
     newData: (Partial<T>)[],
     remove?: (Partial<T>)[],
-    getId: (...a: any[]) => string,
+    /** `...rest: never[]` keeps existing call sites that pass a second argument compiling,
+     *  while the row itself is properly typed instead of `any`. */
+    getId: (row: Partial<T>, ...rest: never[]) => string,
     bufTable: { [id: string]: Partial<T> },
     option?: GridRowsOptions
 }

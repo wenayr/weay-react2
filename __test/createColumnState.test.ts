@@ -109,3 +109,34 @@ test("preview order is runtime-only and exposed through the shared list source",
     cs.api.setPreviewOrder(null);
     expect(cs.api.listSource.getConfig().order).toEqual(base);
 });
+// detach() used to clearTimeout the debounced readFromGrid without flushing it:
+// a resize followed by a route change inside saveMs was simply lost.
+test("detach flushes a pending grid read instead of dropping it", () => {
+    const cs = createColumnState({
+        key: "test.columnState.detachFlush",
+        columns: [{key: "a", title: "A"}, {key: "b", title: "B"}],
+        saveMs: 5000,
+    });
+    const grid = createFakeGrid(["a", "b"]);
+    cs.grid.attach(grid as any);
+
+    grid.userResize("a", 321);
+    expect(cs.api.getConfig().width.a).not.toBe(321);
+
+    cs.grid.detach();
+    expect(cs.api.getConfig().width.a).toBe(321);
+});
+
+test("detach without a pending read leaves the config untouched", () => {
+    const cs = createColumnState({
+        key: "test.columnState.detachNoop",
+        columns: [{key: "a", title: "A"}],
+        saveMs: 5000,
+    });
+    const grid = createFakeGrid(["a"]);
+    cs.grid.attach(grid as any);
+
+    const before = cs.api.getConfig();
+    cs.grid.detach();
+    expect(cs.api.getConfig()).toEqual(before);
+});

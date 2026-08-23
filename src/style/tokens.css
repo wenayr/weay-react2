@@ -177,6 +177,17 @@
   --cols-card-label-color: #57606a;
   --cols-card-label-min-width: 72px;
 
+  /* ag-grid theme params. Mirror of tokens.grid / tokensVar.grid: the TS side feeds these into
+     the Theming API, so overriding them here (or on :root[data-theme=...]) re-skins the grid the
+     same way --wnd-* / --logs-* re-skin windows and logs. Previously the grid params were passed
+     as literals and stayed dark no matter what the application themed. */
+  --grid-font-family: Roboto;
+  --grid-text-color: rgba(214,214,214,0.9);
+  --grid-tab-text-color: rgba(227,227,227,0.9);
+  --grid-font-size: 10px;
+  --grid-spacing: 3px;
+  --grid-background-color: rgb(19,24,33);
+
   /* Grid Chrome: a reserved command slot next to a table, themed without
      knowing the application's table/header implementation. */
   --grid-chrome-gap: 4px;

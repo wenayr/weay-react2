@@ -10,8 +10,8 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { VideoMeetingPlatform } from "../../calls/VideoMeetingPlatform";
-import { qaCards } from "./registry";
+import { VideoMeetingPlatform } from "../../calls/VideoMeetingPlatform.js";
+import { qaCards } from "./registry.js";
 
 export function QABoard() {
     const [hash, setHash] = useState(typeof location !== "undefined" ? location.hash : "");

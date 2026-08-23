@@ -1,5 +1,5 @@
 import React from "react";
-import { Button } from "../../hooks/useOutside";
+import { Button } from "../../hooks/useOutside.js";
 
 export function MiniButton({name, arr, get, onClick, style}: { name: string, arr: (string | number)[], get: () => { [k: string]: boolean }, onClick: (index: number) => void, style?: React.CSSProperties | undefined }) {
     const data = get()

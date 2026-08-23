@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, useKeyboard, keyboard, useResizeObserver, useElementSize } from "../../api";
+import { renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, useKeyboard, keyboard, useResizeObserver, useElementSize } from "../../api.js";
 import { Params } from "wenay-common2/client";
-import { OutsideClickArea } from "../../src/hooks";
-import { TestParams } from "../testParams";
-import { Check } from "../standKit";
+import { OutsideClickArea } from "../../src/hooks/index.js";
+import { TestParams } from "../testParams.js";
+import { Check } from "../standKit.js";
 
 
 /* ---------- 1. Reactivity: updateBy / renderBy ---------- */

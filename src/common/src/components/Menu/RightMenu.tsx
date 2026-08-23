@@ -7,16 +7,17 @@ import React, {
     useState
 } from 'react';
 import { sleepAsync } from 'wenay-common2/client';
-import {type Position, useDraggable} from "../../hooks/useDraggable";
-import {OutsideClickArea} from "../../hooks/useOutside";
-import { OutlineDragDemo } from "../Dnd/OutlineDragDemo";
-import { createModalRenderStore } from "../Modal/Modal";
+import {type Position, useDraggable} from "../../hooks/useDraggable.js";
+import {OutsideClickArea} from "../../hooks/useOutside.js";
+import { OutlineDragDemo } from "../Dnd/OutlineDragDemo.js";
+import { createModalRenderStore } from "../Modal/Modal.js";
 import {
     mapRightMenu,
     type MenuRightPosition,
     type MenuRightVerticalPosition,
     type MenuRightSavedState
-} from "./RightMenuStore";
+} from "./RightMenuStore.js";
+import {cx} from "../../utils/cx.js";
 
 export type MenuElement = {
     label: string;
@@ -40,10 +41,6 @@ export type MenuRightStyles = Partial<Record<
     'container' | 'trigger' | 'flyout' | 'list' | 'item' | 'submenu',
     React.CSSProperties
 >>;
-
-function cx(...parts: (string | false | null | undefined)[]) {
-    return parts.filter(Boolean).join(' ');
-}
 
 function renderTrigger(trigger: MenuRightTrigger, state: MenuRightTriggerState) {
     return typeof trigger == 'function' ? trigger(state) : trigger;
@@ -106,13 +103,14 @@ export function useRightMenuController({
             offset: { x: 0, y: 0 }
         };
         if (!keyForSave) return fallback;
-
-        const saved = mapRightMenu.get(keyForSave);
-        if (saved) return saved;
-
-        mapRightMenu.set(keyForSave, fallback);
-        return fallback;
+        return mapRightMenu.get(keyForSave) ?? fallback;
     });
+    // Seeding the map moved OUT of the useState initializer: a set() there is a write to the
+    // persisted store (and a dirty event) during render, which StrictMode runs twice.
+    useEffect(() => {
+        if (!keyForSave || mapRightMenu.has(keyForSave)) return;
+        mapRightMenu.set(keyForSave, initialState);
+    }, [keyForSave]);
     const [isOpen, setIsOpen] = useState(false);
     const [isFixed, setIsFixed] = useState(false);
     const [select, setSelect] = useState<number | null>(null);

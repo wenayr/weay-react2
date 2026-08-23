@@ -1,5 +1,5 @@
 import {Params} from "wenay-common2/client";
-import {ParamsEditor} from "../src/components";
+import {ParamsEditor} from "../src/components/index.js";
 
 const getParams = () => {
     return new class testParams extends Params.CParams{

@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import * as Observe from "wenay-common2/observe";
+import {structEqual} from "../utils/structEqual.js";
 
 type StoreChange = Observe.StoreChange;
 type StoreEachCtx = Observe.StoreEachCtx;
@@ -70,15 +71,11 @@ function useLatestRef<T>(value: T) {
 
 // Значение читается в рендере, подписка ставится в эффекте — изменение стора в этом окне
 // теряется. Сравниваем то, что отрендерили, с актуальным на момент установки подписки;
-// Object.is отсекает общий случай без затрат (та же ссылка / примитив), сериализация —
-// запасной структурный путь для snapshot/selection (свежий объект на каждый вызов).
+// Object.is отсекает общий случай без затрат (та же ссылка / примитив), structEqual —
+// запасной структурный путь для snapshot/selection (свежий объект на каждый вызов):
+// без сериализации, с ранним выходом и без ложных «изменилось» от порядка ключей.
 function sameRenderedValue(a: unknown, b: unknown) {
-    if (Object.is(a, b)) return true;
-    try {
-        return JSON.stringify(a) === JSON.stringify(b);
-    } catch {
-        return false;
-    }
+    return Object.is(a, b) || structEqual(a, b);
 }
 
 export function useStoreNode<T>(node: StoreNode<T>, options: UseStoreNodeOptions<T> = {}): StoreNodeController<T> {
@@ -353,11 +350,19 @@ export function useListenEffect<TArgs extends readonly unknown[]>(
     cbRef.current = cb;
     const key = opts?.key;
     const current = opts?.current;
+    // `current` may be a function, and an inline one is a new identity every render. Keeping it
+    // in the deps resubscribed on each render; together with current-delivery and
+    // useListenArgs' setValue(new array) that is a self-sustaining render loop. Only whether it
+    // is a function (and the boolean value otherwise) is a real dependency - the function itself
+    // is read through a ref, and `on` consumes it at subscribe time anyway.
+    const currentRef = useRef(current);
+    currentRef.current = current;
+    const currentDep = typeof current == "function" ? "fn" : current;
 
     useEffect(() => {
         if (!listen) return;
-        return listen.on((...args) => cbRef.current(...args), {key, current});
-    }, [listen, key, current]);
+        return listen.on((...args) => cbRef.current(...args), {key, current: currentRef.current});
+    }, [listen, key, currentDep]);
 }
 
 export type StoreChangedPathsController = {

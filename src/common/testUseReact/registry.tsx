@@ -1,12 +1,12 @@
-import type { QaCard } from "./standKit";
-import { Card49, Card6 } from "./cards/chart";
-import { Card51, Card38, Card39, Card40, Card41, Card42, Card43, Card44, Card45, Card46 } from "./cards/peerMedia";
-import { Card18, Card17, Card23, Card24, Card33, Card34, Card48, Card50 } from "./cards/replay";
-import { Card13, Card20, Card21, Card22, Card25, Card3, Card4 } from "./cards/menuModal";
-import { Card26, Card27, Card35, Card52, Card2 } from "./cards/dnd";
-import { Card31, Card32, Card47, Card30, Card29, Card28 } from "./cards/columns";
-import { Card8, Card1, Card14, Card7, Card19, Card9, Card10, Card11 } from "./cards/logsParams";
-import { Card5, Card12, Card15, Card16 } from "./cards/grid";
+import type { QaCard } from "./standKit.js";
+import { Card49, Card6 } from "./cards/chart.js";
+import { Card51, Card38, Card39, Card40, Card41, Card42, Card43, Card44, Card45, Card46 } from "./cards/peerMedia.js";
+import { Card18, Card17, Card23, Card24, Card33, Card34, Card48, Card50 } from "./cards/replay.js";
+import { Card13, Card20, Card21, Card22, Card25, Card3, Card4 } from "./cards/menuModal.js";
+import { Card26, Card27, Card35, Card52, Card2 } from "./cards/dnd.js";
+import { Card31, Card32, Card47, Card30, Card29, Card28 } from "./cards/columns.js";
+import { Card8, Card1, Card14, Card7, Card19, Card9, Card10, Card11 } from "./cards/logsParams.js";
+import { Card5, Card12, Card15, Card16 } from "./cards/grid.js";
 
 export const qaCards: QaCard[] = [
     { id: 'param-commentary-hover', n: 7, section: 'active', title: 'Parameters - sliders and stable commentary hover', tall: true, Component: Card7 },

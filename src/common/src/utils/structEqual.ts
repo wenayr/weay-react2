@@ -7,12 +7,19 @@
  *  - `NaN` equals `NaN` (JSON serializes both to `null`);
  *  - no serialization cost, early exit on first difference.
  *
- *  Not for class instances / Maps / Sets / cycles - data that would not survive
+ *  `Date` compares by time - the cache revives dates on load, so they reach these trees.
+ *
+ *  Not for other class instances / Maps / Sets / cycles - data that would not survive
  *  JSON round-tripping did not work with the stringify idiom either. */
 export function structEqual(a: unknown, b: unknown): boolean {
     if (a === b) return true
     if (typeof a == 'number' && typeof b == 'number') return Number.isNaN(a) && Number.isNaN(b)
     if (typeof a != 'object' || typeof b != 'object' || a == null || b == null) return false
+    if (a instanceof Date || b instanceof Date) {
+        if (!(a instanceof Date) || !(b instanceof Date)) return false
+        const ta = a.getTime(), tb = b.getTime()
+        return ta == tb || (Number.isNaN(ta) && Number.isNaN(tb))
+    }
     const aArr = Array.isArray(a)
     if (aArr != Array.isArray(b)) return false
     if (aArr) {

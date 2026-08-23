@@ -1,7 +1,7 @@
 import React from "react";
-import {createUpdateApi} from "../../../updateBy";
-import {TextInputModal} from "../Input";
-import type {ModalApi} from "./ModalContextProvider";
+import {createUpdateApi} from "../../../updateBy.js";
+import {TextInputModal} from "../Input.js";
+import type {ModalApi} from "./ModalContextProvider.js";
 
 type ModalSetter = (jsx: React.ReactNode | null) => void;
 type ModalTarget = ModalSetter | ModalApi;

@@ -1,3 +1,3 @@
-export { default as StickerMenu } from './StickerMenu';
-export * from './RightMenu';
-export * from './RightMenuStore';
+export { default as StickerMenu } from './StickerMenu.js';
+export * from './RightMenu.js';
+export * from './RightMenuStore.js';

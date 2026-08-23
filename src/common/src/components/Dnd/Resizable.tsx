@@ -1,6 +1,6 @@
 import React from "react";
 import {Resizable, ResizableProps} from "re-resizable";
-import {mapResiReact, type ResizableSavedSize} from "../../utils/persistedMaps";
+import {mapResiReact, type ResizableSavedSize} from "../../utils/persistedMaps.js";
 
 type tSaveMap = ResizableSavedSize
 // Memory for all column sizes; declared in utils/persistedMaps (memoryCache registry must not

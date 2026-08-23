@@ -6,8 +6,8 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import * as Media from "wenay-common2/media";
 import * as Peer from "wenay-common2/peer";
-import {useMediaSource} from "../src/hooks/useMedia";
-import {usePeerCalls, usePeerPresence} from "../src/hooks/usePeerCall";
+import {useMediaSource} from "../src/hooks/useMedia.js";
+import {usePeerCalls, usePeerPresence} from "../src/hooks/usePeerCall.js";
 /* ---------- 41/42. Peer calls and host presence ---------- */
 export const PeerCallDemo = () => {
     const pair = useMemo(() => {

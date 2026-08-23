@@ -8,8 +8,8 @@ import {
     type VideoCallParticipant,
     type VideoCallRecording,
     useVideoCallController,
-} from "../common/src/components/Communication";
-import {useMediaSource} from "../common/src/hooks/useMedia";
+} from "../common/src/components/Communication/index.js";
+import {useMediaSource} from "../common/src/hooks/useMedia.js";
 
 type MeetingMember = {
     id: string;

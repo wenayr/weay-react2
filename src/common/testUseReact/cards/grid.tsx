@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, renderBy, type BufferTable } from "../../api";
+import { useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, renderBy, type BufferTable } from "../../api.js";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
-import { GridExample, tt } from "../useGrid";
-import { Check } from "../standKit";
+import { GridExample, tt } from "../useGrid.js";
+import { Check } from "../standKit.js";
 
 
 /* ---------- 12. agGrid4: controller + external buffer ---------- */

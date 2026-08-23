@@ -1,31 +1,5 @@
-/** Data-only contracts shared by the window controller, desktop manager, and
- * persisted-state registry. Keeping them in a leaf module prevents those
- * layers from importing one another merely to name persisted geometry. */
-export type FloatingWindowPosition = { x: number; y: number };
-
-export type FloatingWindowSize = {
-    height: number | string;
-    width: number | string;
-};
-
-export type FloatingWindowMode = "normal" | "maximized";
-
-export type FloatingWindowSnapRegion =
-    | "left"
-    | "right"
-    | "top-left"
-    | "top-right"
-    | "bottom-left"
-    | "bottom-right";
-
-export type FloatingWindowCloseReason = "close-button" | "escape" | "programmatic";
-
-export type FloatingWindowSavedGeometry = {
-    position: FloatingWindowPosition;
-    size: FloatingWindowSize;
-    snapRegion?: FloatingWindowSnapRegion | null;
-    freeGeometry?: {
-        position: FloatingWindowPosition;
-        size: FloatingWindowSize;
-    };
-};
+/** Moved to utils/floatingWindowTypes.ts so the persisted-state registry (a utils leaf) no
+ *  longer has to reach up into the component layer for a type - the one edge that contradicted
+ *  the "utils never looks up" note in persistedMaps.ts. This path is kept as a re-export
+ *  because it is not public API but is imported across the Dnd folder. */
+export type * from "../../utils/floatingWindowTypes.js";

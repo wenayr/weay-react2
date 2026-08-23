@@ -1,3 +1,3 @@
-import {TestReact} from "./testReact";
+import {TestReact} from "./testReact.js";
 
 TestReact()

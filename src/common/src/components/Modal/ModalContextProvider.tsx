@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo, useState, ReactNode } from 'react';
-import {tokens} from "../../styles/tokens";
-import {Overlay} from "../Overlay";
+import {tokens} from "../../styles/tokens.js";
+import {Overlay} from "../Overlay.js";
 
 export type ModalApi = {
     show(node: ReactNode): void;

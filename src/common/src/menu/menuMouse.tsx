@@ -1,6 +1,10 @@
 import React, {useEffect, useRef, useState} from "react";
-import {Menu, MenuActionEvent, MenuItem, MenuItemStrict} from "./menu";
-import {OutsideClickArea} from "../hooks/useOutside";
+import {Menu, MenuActionEvent, MenuItem, MenuItemStrict} from "./menu.js";
+import {OutsideClickArea} from "../hooks/useOutside.js";
+
+/** Movement in CSS px that turns a long press into a scroll. Duplicated in menuR.tsx, which
+ *  carries its own copy of this gesture block - keep the two values in step. */
+const TOUCH_SLOP = 10;
 
 export type ContextMenuPoint = {x: number; y: number};
 export type ContextMenuAnchor = ContextMenuPoint | {
@@ -291,7 +295,7 @@ export function createContextMenu(data?: {name?: string}) {
         const [, forceRender] = useState(0);
         const [layerId] = useState(() => `${name}-${++layerSeq}`);
         const layerRef = useRef<HTMLDivElement | null>(null);
-        const timeEvent = useRef(Date.now());
+        const timeEvent = useRef(0);
         const touchXY = useRef({x: 0, y: 0});
         const touchTime = useRef<null | number>(null);
         const enabled = statusOn ?? menuMouse.value.status;
@@ -346,16 +350,20 @@ export function createContextMenu(data?: {name?: string}) {
                 if (!state.open || hasQueuedItems(other)) openQueued(e);
             }}
             onTouchStart={e => {
-                if (touchXY.current.x == 0) touchXY.current.x = e.touches[0].screenX;
-                if (touchXY.current.y == 0) touchXY.current.y = e.touches[0].screenY;
+                // unconditionally: the old `if (x == 0)` guard only reset on a SUCCESSFUL
+                // long press, so an aborted gesture left the previous touch's coordinates and
+                // the next one measured its movement against them (and a touch at screenX 0
+                // was never recorded at all)
+                touchXY.current.x = e.touches[0].screenX;
+                touchXY.current.y = e.touches[0].screenY;
                 touchTime.current = Date.now();
             }}
             onTouchMove={e => {
                 const x2 = e.touches[0].screenX;
                 const y2 = e.touches[0].screenY;
-                const pX = Math.max(1, Math.abs(e.touches[0].pageX));
-                const pY = Math.max(1, Math.abs(e.touches[0].pageY));
-                if ((Math.abs(x2 - touchXY.current.x) / pX > 0.05) || (Math.abs(y2 - touchXY.current.y) / pY > 0.05)) {
+                // pixels, not a fraction of pageX: the old form made the scroll threshold
+                // depend on where on the page you happened to touch
+                if (Math.abs(x2 - touchXY.current.x) > TOUCH_SLOP || Math.abs(y2 - touchXY.current.y) > TOUCH_SLOP) {
                     touchTime.current = null;
                 }
             }}

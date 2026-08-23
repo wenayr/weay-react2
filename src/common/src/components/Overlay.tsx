@@ -1,7 +1,7 @@
 import React, { ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { OutsideClickArea } from '../hooks/useOutside';
-import {createUpdateApi} from '../../updateBy';
+import { OutsideClickArea } from '../hooks/useOutside.js';
+import {createUpdateApi} from '../../updateBy.js';
 
 let overlayKey = 0;
 const overlayStack = {entries: [] as Array<{key: number}>};
@@ -118,10 +118,13 @@ export function Overlay({
             }
             const first = focusable[0];
             const last = focusable[focusable.length - 1];
-            if (e.shiftKey && (document.activeElement == first || !root.contains(document.activeElement))) {
+            const inside = root.contains(document.activeElement);
+            if (e.shiftKey && (document.activeElement == first || !inside)) {
                 e.preventDefault();
                 last.focus();
-            } else if (!e.shiftKey && document.activeElement == last) {
+            } else if (!e.shiftKey && (document.activeElement == last || !inside)) {
+                // !inside covers a plain Tab while focus sits outside the trap (the user
+                // clicked the scrim): without it the focus walked out of the overlay
                 e.preventDefault();
                 first.focus();
             }
@@ -129,6 +132,10 @@ export function Overlay({
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
     }, [hasEscape, top, trapFocus]);
+
+    // The overlay is client-only: document is read straight in render, so a server pass would
+    // throw rather than render nothing. Renders null on the server instead.
+    if (!container && typeof document == "undefined") return null;
 
     return createPortal(
         <div className={scrimClassName} style={scrimStyle}>

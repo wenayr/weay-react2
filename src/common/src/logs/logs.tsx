@@ -1,12 +1,12 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {copyToClipboard, Params, timeLocalToStr_hhmmss} from "wenay-common2/client";
-import {renderBy, updateBy} from "../../updateBy";
+import {renderBy, updateBy} from "../../updateBy.js";
 import {ColDef, ColGroupDef, GridReadyEvent} from "ag-grid-community";
-import {contextMenu} from "../menu/menuMouse";
-import { memoryGetOrCreate } from "../utils/memoryStore";
-import { ParamsEditor } from "../components/ParamsEditor";
-import {logDividerGradient, logSeverityBackground, logStyleTokens} from "./logStyles";
-import {AgGridTable, colDefCentered} from "../grid/agGrid4";
+import {contextMenu} from "../menu/menuMouse.js";
+import { memoryGetOrCreate } from "../utils/memoryStore.js";
+import { ParamsEditor } from "../components/ParamsEditor.js";
+import {logDividerGradient, logSeverityBackground, logStyleTokens} from "./logStyles.js";
+import {AgGridTable, colDefCentered} from "../grid/agGrid4/index.js";
 import {
     createLogsController,
     createLogsControllerState,
@@ -17,13 +17,13 @@ import {
     type LogsFullState,
     type LogsMiniState,
     type LogsSettingsState,
-} from "./logsController";
+} from "./logsController.js";
 
 export {
     createLogsController,
     createLogsControllerState,
     getSettingLogs,
-} from "./logsController";
+} from "./logsController.js";
 export type {
     CreateLogsControllerOptions,
     LogsApiOptions,
@@ -31,7 +31,7 @@ export type {
     LogsControllerState,
     LogsFullState,
     LogsMiniState,
-} from "./logsController";
+} from "./logsController.js";
 
 const cashLogs = new Map<string, LogEntry<any>[]>()
 

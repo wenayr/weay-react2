@@ -1,13 +1,21 @@
+import {tokens} from '../styles/tokens.js';
+
+/** The `var(--logs-*, fallback)` form of tokens.logs. The fallbacks used to be a second,
+ *  hand-written copy of the same nine colours - editing tokens.logs recoloured the objects
+ *  exported from tokens but not what the logs actually painted. They are derived now, so the
+ *  values live in exactly one place; the rendered strings are unchanged. */
+const withVar = (name: string, fallback: string) => `var(${name}, ${fallback})`;
+
 export const logStyleTokens = {
-    text: 'var(--logs-notification-text, #fff)',
-    accent: 'var(--logs-notification-accent, #5D9FFA)',
-    toggleBg: 'var(--logs-toggle-bg, rgb(58, 58, 58))',
-    toggleOffBg: 'var(--logs-toggle-off-bg, rgb(144, 60, 60))',
-    divider: 'var(--logs-divider, rgba(255, 255, 255, 1))',
-    tabNavBg: 'var(--logs-tab-nav-bg, #333)',
-    tabBg: 'var(--logs-tab-bg, #444)',
-    tabActiveBg: 'var(--logs-tab-active-bg, #666)',
-    tabText: 'var(--logs-tab-text, #fff)',
+    text: withVar('--logs-notification-text', tokens.logs.notificationText),
+    accent: withVar('--logs-notification-accent', tokens.logs.notificationAccent),
+    toggleBg: withVar('--logs-toggle-bg', tokens.logs.toggleBg),
+    toggleOffBg: withVar('--logs-toggle-off-bg', tokens.logs.toggleOffBg),
+    divider: withVar('--logs-divider', tokens.logs.divider),
+    tabNavBg: withVar('--logs-tab-nav-bg', tokens.logs.tabNavBg),
+    tabBg: withVar('--logs-tab-bg', tokens.logs.tabBg),
+    tabActiveBg: withVar('--logs-tab-active-bg', tokens.logs.tabActiveBg),
+    tabText: withVar('--logs-tab-text', tokens.logs.tabText),
 } as const;
 
 export function logSeverityBackground(importance = 0) {

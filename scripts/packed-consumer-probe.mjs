@@ -97,7 +97,26 @@ try {
         write: false,
     });
 
-    console.log("checks: packed tarball; TypeScript subpath types; esbuild runtime resolution");
+    // Node's own loader, on the packed artifact. The three probes above all read the package
+    // through a bundler (tsc with moduleResolution Bundler, esbuild), so none of them can see
+    // an emit Node cannot parse - extensionless relative imports, or ESM under a manifest with
+    // no "type". That blind spot is exactly how the format bug survived several reviews.
+    //
+    // Only the CSS-free entrypoints are checked: ./grid, ./windows, ./logs, ./communication and
+    // the root barrel import style.css as a side effect, which no Node loader can resolve. That
+    // is a deliberate, documented boundary - those surfaces require a bundler.
+    const NODE_LOADABLE = ["core", "react", "native"];
+    const selfLink = path.join(projectRoot, "node_modules", "wenay-react2");
+    if (fs.existsSync(selfLink)) throw new Error("node_modules/wenay-react2 already exists; refusing to overwrite it");
+    fs.cpSync(installedPackage, selfLink, {recursive: true});
+    try {
+        const script = NODE_LOADABLE.map(name => `await import("wenay-react2/${name}");`).join("");
+        run("node", ["--input-type=module", "-e", script], {cwd: projectRoot});
+    } finally {
+        fs.rmSync(selfLink, {recursive: true, force: true});
+    }
+
+    console.log(`checks: packed tarball; TypeScript subpath types; esbuild runtime resolution; Node ESM (${NODE_LOADABLE.join(", ")})`);
 } finally {
     const tempBase = path.resolve(os.tmpdir());
     const relative = path.relative(tempBase, tempRoot);

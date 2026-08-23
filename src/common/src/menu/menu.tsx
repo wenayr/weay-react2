@@ -282,24 +282,33 @@ function useAsyncMenuValue<T>({
 }) {
     const [value, setValue] = useState<T>(empty);
 
+    // item/events/onActionEvent/empty/normalize are routinely inline at the call site, so
+    // keeping them in the deps tore down and restarted the load on every parent render:
+    // submenu flicker plus duplicate submenuOpen entries in the menu statistics. Only
+    // open/load really gate the subscription; the rest are read through a ref, and the
+    // handlers at the moment they fire.
+    const latest = useRef({empty, normalize, item, events, onActionEvent});
+    latest.current = {empty, normalize, item, events, onActionEvent};
+
     useEffect(() => {
         if (!open || !load) {
-            setValue(empty);
+            setValue(latest.current.empty);
             return;
         }
 
         let alive = true;
+        const {item, events} = latest.current;
         const actionKey = item.actionKey ?? undefined;
-        onActionEvent?.({type: events[0], item, actionKey});
+        latest.current.onActionEvent?.({type: events[0], item, actionKey});
         const succeed = (next: T) => {
             if (!alive) return;
-            setValue(normalize(next));
-            onActionEvent?.({type: events[1], item, actionKey});
+            setValue(latest.current.normalize(next));
+            latest.current.onActionEvent?.({type: events[1], item, actionKey});
         };
         const fail = (error: unknown) => {
             if (!alive) return;
-            setValue(empty);
-            onActionEvent?.({type: events[2], item, actionKey, error});
+            setValue(latest.current.empty);
+            latest.current.onActionEvent?.({type: events[2], item, actionKey, error});
         };
 
         try {
@@ -311,7 +320,7 @@ function useAsyncMenuValue<T>({
         }
 
         return () => { alive = false; };
-    }, [open, load, empty, normalize, item, events, onActionEvent]);
+    }, [open, load]);
 
     return value;
 }

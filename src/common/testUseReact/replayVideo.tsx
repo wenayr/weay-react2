@@ -12,7 +12,7 @@ import {createRpcClientHub} from "wenay-common2/client";
 import * as Observe from "wenay-common2/observe";
 import * as Replay from "wenay-common2/replay";
 import {io} from "socket.io-client";
-import {useReplaySubscribe, useReplayRouteSubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreReplayEach, useStoreNode, useStoreKeys} from "../src/hooks";
+import {useReplaySubscribe, useReplayRouteSubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreReplayEach, useStoreNode, useStoreKeys} from "../src/hooks/index.js";
 
 type tFrame = {n: number, w: number, h: number, ts: number, jpeg: string};
 type tFrameRemote = Replay.ReplayRemote<[tFrame]>;
@@ -442,7 +442,15 @@ export const ReplayRpcReconnectDemo = () => {
         const offDisconnect = hub.disconnectListen(() => { if (alive) { setConnected(false); void refresh(); } });
         void hub.setToken(null).then(clients => {
             if (!alive) return;
-            const next = clients.qaReplay.func.events as Replay.ReplayRemote<[number]>;
+            // Cast through unknown because of a TYPE-level defect in wenay-common2 2.12.0, not
+            // because the object is wrong at runtime (the RPC server exposes both the plain
+            // listen and the replay surface under one key - doc/wenay-common2-rare.md, "rpc (full)").
+            // createRpcClientHub composes ClientAPIAll<DeepSocketListenSmart<T>>: the inner pass
+            // correctly yields ReplaySocketListen, whose method is named `since`, and the outer
+            // pass re-runs IsReplayMember, which looks for the SERVER-side name `getSince`. The
+            // second pass therefore misses and degrades the member to SocketListenMember, dropping
+            // line/since/keyframe from the type. Drop the cast once common2 detects either name.
+            const next = clients.qaReplay.func.events as unknown as Replay.ReplayRemote<[number]>;
             firstRemote.current ??= next;
             setRemote(next);
             setConnected(true);

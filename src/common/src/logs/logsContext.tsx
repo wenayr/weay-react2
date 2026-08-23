@@ -7,9 +7,9 @@ import React, {
     useRef,
     useState
 } from 'react';
-import { ColDef, GridReadyEvent } from 'ag-grid-community';
-import {AgGridTable, colDefCentered} from '../grid/agGrid4';
-import {logDividerGradient, logSeverityBackground, logStyleTokens} from './logStyles';
+import { ColDef, GetRowIdParams, GridReadyEvent } from 'ag-grid-community';
+import {AgGridTable, colDefCentered} from '../grid/agGrid4/index.js';
+import {logDividerGradient, logSeverityBackground, logStyleTokens} from './logStyles.js';
 
 // Uncomment AG Grid styles if needed:
 // import 'ag-grid-community/styles/ag-grid.css';
@@ -20,6 +20,10 @@ import {logDividerGradient, logSeverityBackground, logStyleTokens} from './logSt
  *  1. Log types
  * -----------------------------
  */
+/** @deprecated Name collision: the root barrel resolves `LogInput` to THIS loose shape, while
+ *  `wenay-react2/logs` resolves it to the strict `LogInput` of logsController.ts. Migrating an
+ *  import from the root to the subpath silently changes the type. Prefer the logsController
+ *  version; this one will be renamed in a major. */
 export interface LogInput<T extends object = {}> {
     id: string;
     var?: number;
@@ -28,16 +32,18 @@ export interface LogInput<T extends object = {}> {
     [key: string]: any; // any additional fields
 }
 
+/** @deprecated Same collision as {@link LogInput}: the root barrel exposes this shape,
+ *  `wenay-react2/logs` exposes logsController's `LogEntry`. */
 export interface LogEntry<T extends object = {}> extends LogInput<T> {
     num: number;
 }
 
 /** -----------------------------
- *  2. memoryGetOrCreate function -
+ *  2. readLocalSettings function -
  *     loads and saves data in localStorage.
  * -----------------------------
  */
-function memoryGetOrCreate<T>(key: string, defaultValue: T): T {
+function readLocalSettings<T>(key: string, defaultValue: T): T {
     try {
         const stored = localStorage.getItem(key);
         // If localStorage has no value, write defaultValue
@@ -88,7 +94,7 @@ const LogsContext = createContext<LogsContextValue | null>(null);
 
 export function LogsProvider({ children }: { children: React.ReactNode }) {
     // 4.1. Load settings from localStorage once (lazy init: the provider rerenders on every addLog)
-    const [savedSettings] = useState(() => memoryGetOrCreate("logSettings", {
+    const [savedSettings] = useState(() => readLocalSettings("logSettings", {
         minVarLogs: 0,
         minVarMessage: 0,
         timeShow: 2,
@@ -100,7 +106,7 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const counterRef = useRef(0);
 
-    // 4.3. Settings themselves, initialized from memoryGetOrCreate output
+    // 4.3. Settings themselves, initialized from readLocalSettings output
     const [minVarLogs, setMinVarLogs] = useState(savedSettings.minVarLogs);
     const [minVarMessage, setMinVarMessage] = useState(savedSettings.minVarMessage);
     const [timeShow, setTimeShow] = useState(savedSettings.timeShow);
@@ -129,21 +135,24 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     // 4.6. Return the context provider
+    // memoised: a fresh object literal here re-rendered every consumer of the context on each
+    // addLog, not just the ones reading `logs`. useState setters are stable, so they stay out
+    // of the dependency list.
+    const value = useMemo(() => ({
+        logs,
+        addLog,
+        minVarLogs,
+        setMinVarLogs,
+        minVarMessage,
+        setMinVarMessage,
+        timeShow,
+        setTimeShow,
+        showMessages,
+        setShowMessages,
+    }), [logs, addLog, minVarLogs, minVarMessage, timeShow, showMessages]);
+
     return (
-        <LogsContext.Provider
-            value={{
-                logs,
-                addLog,
-                minVarLogs,
-                setMinVarLogs,
-                minVarMessage,
-                setMinVarMessage,
-                timeShow,
-                setTimeShow,
-                showMessages,
-                setShowMessages,
-            }}
-        >
+        <LogsContext.Provider value={value}>
             {children}
         </LogsContext.Provider>
     );
@@ -231,6 +240,9 @@ export function useLogsTableController(): LogsTableController {
     return {logs, minVarLogs, gridRef, columnDefs, defaultColDef, onGridReady};
 }
 
+// module const: an inline arrow would be a new prop identity on every render
+const logRowId = (params: GetRowIdParams<LogEntry>) => String(params.data.num);
+
 export function LogsTable() {
     const table = useLogsTableController();
 
@@ -242,6 +254,9 @@ export function LogsTable() {
                 rowData={table.logs}
                 columnDefs={table.columnDefs}
                 defaultColDef={table.defaultColDef}
+                // without a stable row id ag-grid identifies rows by index, so prepending one
+                // log rebuilt all 500 autoHeight rows instead of inserting a single one
+                getRowId={logRowId}
                 headerHeight={30}
                 rowHeight={26}
             />
@@ -386,6 +401,10 @@ export function LogsNotifications() {
  *     (InputSettingLogs equivalent)
  * -----------------------------
  */
+/** @deprecated Hard name collision: in the root barrel `LogsSettings` is THIS React component,
+ *  in `wenay-react2/logs` it is a TYPE (logsController's `Params.SimpleParams<...>`). Nothing
+ *  breaks today - the two never meet in one import - but the name will be changed in a major.
+ *  Import it from the root barrel explicitly if you need the component. */
 export function LogsSettings() {
     const {
         minVarLogs,

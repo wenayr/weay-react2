@@ -1,11 +1,11 @@
-import {Menu, contextMenu, renderBy, MenuItem, updateBy} from "../api";
-import {GridExample, tt} from "./useGrid";
-import {MyChartEngine} from "../src/myChart/chartEngine/chartEngineReact";
-import {TestParams} from "./testParams";
+import {Menu, contextMenu, renderBy, MenuItem, updateBy} from "../api.js";
+import {GridExample, tt} from "./useGrid.js";
+import {MyChartEngine} from "../src/myChart/chartEngine/chartEngineReact.js";
+import {TestParams} from "./testParams.js";
 import {createContext, Suspense, use, useContext, useEffect, useMemo, useState} from "react";
 import {sleepAsync} from "wenay-common2/client";
-import {Button, HoverButton} from "../src/hooks";
-import {FloatingWindow} from "../src/components";
+import {Button, HoverButton} from "../src/hooks/index.js";
+import {FloatingWindow} from "../src/components/index.js";
 
 const a = {}
 const b = {}

@@ -1,10 +1,11 @@
 import React, {useLayoutEffect, useRef, useState} from 'react'
 import {listen as createListen} from 'wenay-common2/client'
-import {createUpdateApi} from '../../../updateBy'
-import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
-import {pinFixedOrder, movedOrderWithFixed} from '../../utils/fixedOrder'
-import {OutsideClickArea} from '../../hooks/useOutside'
-import {useReorder} from '../../hooks/useReorder'
+import {createUpdateApi} from '../../../updateBy.js'
+import {memoryMarkDirty} from '../../utils/memoryStore.js'
+import {createPersistedController} from '../../utils/persistedController.js'
+import {pinFixedOrder, movedOrderWithFixed} from '../../utils/fixedOrder.js'
+import {OutsideClickArea} from '../../hooks/useOutside.js'
+import {useReorder} from '../../hooks/useReorder.js'
 
 /** createToolbar - a customizable, self-describing toolbar primitive.
  *  Three decoupled layers: config (plain serializable data, persisted via
@@ -212,8 +213,9 @@ export function createToolbar(opts: {
         visible: opts.def?.visible ? {...opts.def.visible} : Object.fromEntries(opts.items.map(i => [i.key, i.defaultVisible != false])),
         density: opts.def?.density ?? densities.list[0].key,
     })
-    const st = memoryGetOrCreate<ToolbarConfig>(opts.key, defConfig())
-    const stApi = createUpdateApi(st)
+    const persisted = createPersistedController<ToolbarConfig>({key: opts.key, def: defConfig()})
+    const st = persisted.state
+    const stApi = persisted.api
     const [emitChange, onChange] = createListen<[ToolbarConfig]>()
     // ext is fixed for the controller's lifetime, so hook call order inside
     // useConfig/Bar/Settings never changes for a given toolbar instance

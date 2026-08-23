@@ -1,8 +1,10 @@
 import React, {ReactElement, useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {const_Date, deepCloneMutable, isDate, Params, TF, timeLocalToStr_yyyymmdd, timeLocalToStr_yyyymmdd_hhmm, timeLocalToStr_yyyymmdd_hhmmss, timeLocalToStr_yyyymmdd_hhmmss_ms} from "wenay-common2/client";
-import {setResizeableElement, removeResizeableElement} from "./MyResizeObserver";
-import {ParamRow, ParamToggleLabel} from "./Parameters";
-import {setAutoStepForElement} from "../utils";
+import {setResizeableElement, removeResizeableElement} from "./MyResizeObserver.js";
+import {ParamRow, ParamToggleLabel} from "./Parameters.js";
+// the module, not the ../utils barrel: through the barrel every consumer of ParamsEditor
+// (and so of ./logs) pulled in cache, memoryStore and searchHistory as well
+import {setAutoStepForElement} from "../utils/inputAutoStep.js";
 
 function isDateValue(value: unknown): value is const_Date {
     return isDate(value as const_Date);
@@ -597,7 +599,7 @@ function ParamsEditorBase<TParams extends Params.IParamsExpandableReadonly = Par
                         </CButton>;
                     }
                 }
-                return simpleParameter(Param(set, value, undefined, range, (param as Params.IParamEnum).labels));
+                return simpleParameter(Param(set, value, param.type, range, (param as Params.IParamEnum).labels));
             }
             return null;
         })

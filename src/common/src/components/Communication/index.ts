@@ -1,6 +1,6 @@
 import "../../../../style/style.css";
 
-export {VideoCall, useVideoCallController} from "./VideoCall";
+export {VideoCall, useVideoCallController} from "./VideoCall.js";
 export type {
     UseVideoCallControllerOptions,
     VideoCallAssistant,
@@ -20,4 +20,4 @@ export type {
     VideoCallRoom,
     VideoCallScreenState,
     VideoCallTone,
-} from "./VideoCall";
+} from "./VideoCall.js";

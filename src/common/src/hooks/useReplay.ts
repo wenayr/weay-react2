@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import * as Observe from "wenay-common2/observe";
 import * as Replay from "wenay-common2/replay";
-import {useStoreEach} from "./useObserveStore";
+import {useStoreEach} from "./useObserveStore.js";
 
 type StoreDrain = Observe.StoreDrain;
 type StoreEachCtx = Observe.StoreEachCtx;
@@ -38,12 +38,218 @@ type StoreReplayRouteHandle = (() => void) & {ready: Promise<void>, switch: (nex
  *
  * Server-side parts of the stack (conflateReplay, archiveReplay, createRpcServerAuto replayOpts)
  * are per-connection/per-process and intentionally have no hooks here.
+ *
+ * Internally, useReplaySubscribe/useStoreReplaySync share the seq-based subscribe shell
+ * (useReplayLifecycle) and useReplayRouteSubscribe/useStoreReplayRouteSync share the
+ * route-replaceable shell (useRouteLifecycle); the mirror-store hooks share useMirrorStore.
+ * Only the actual wenay-common2 call and its option wiring stay per-hook.
  */
 
 function useLatestRef<T>(value: T) {
     const ref = useRef(value);
     ref.current = value;
     return ref;
+}
+
+/** Local mirror store recreated only when `remote`'s identity changes — shared by every *Mirror hook below. */
+function useMirrorStore<T extends object, R>(remote: R, create: () => Observe.Store<T>): Observe.Store<T> {
+    const storeRef = useRef<{remote: R, store: Observe.Store<T>} | null>(null);
+    if (!storeRef.current || storeRef.current.remote !== remote) {
+        storeRef.current = {remote, store: create()};
+    }
+    return storeRef.current.store;
+}
+
+type SeqSubHandle = (() => void) & {ready: Promise<void>, seq: () => number, lastTs: () => number, isStale: () => boolean};
+
+type ReplayLifecycleCtx = {
+    seqRef: {current: number | undefined};
+    markFailed: () => void;
+    setReady: (v: boolean) => void;
+    setError: (e: unknown) => void;
+    setStale: (v: boolean) => void;
+};
+
+/**
+ * Shared shell for the seq-based subscribe lifecycle (useReplaySubscribe / useStoreReplaySync):
+ * identity-reset on a new remote, alive-gated state, off()+keepSeq cleanup, seq/lastTs/restart.
+ * `attach` makes the actual wenay-common2 call and wires its onSeq/onError/onStale into `ctx`
+ * plus the caller's own hooks; `deps` are the extra effect deps (enabled, store, policy, ...) —
+ * remote/epoch/staleMs are already covered by the shell.
+ */
+function useReplayLifecycle<TRemote, TSub extends SeqSubHandle>(params: {
+    remote: TRemote | null | undefined;
+    guard: boolean;
+    since: number | undefined;
+    keepSeq: boolean;
+    staleMs: number | undefined;
+    validate?: () => unknown;
+    attach: (ctx: ReplayLifecycleCtx) => TSub;
+    deps: readonly unknown[];
+}): {ready: boolean, error: unknown, stale: boolean, seq: () => number, lastTs: () => number, restart: (since?: number) => void} {
+    const {remote, guard, since, keepSeq, staleMs, validate, attach, deps} = params;
+    const seqRef = useRef<number | undefined>(since);
+    const subRef = useRef<TSub | null>(null);
+    const lastRemoteRef = useRef<TRemote | null | undefined>(undefined);
+    const [ready, setReady] = useState(false);
+    const [error, setError] = useState<unknown>(null);
+    const [stale, setStale] = useState(false);
+    const [epoch, setEpoch] = useState(0);
+
+    useEffect(() => {
+        if (!guard) return;
+        const invalid = validate?.();
+        if (invalid) {
+            setReady(false);
+            setError(invalid);
+            return;
+        }
+        if (lastRemoteRef.current !== undefined && lastRemoteRef.current !== remote) seqRef.current = undefined; // a different line — old seq is meaningless
+        lastRemoteRef.current = remote;
+
+        let alive = true;
+        let failed = false;
+        setReady(false);
+        setError(null);
+        // stale is NOT reset here: it re-syncs from common2 after the first delivery (a stale
+        // keyframe must show stale from the start, not flicker through false on resubscribe)
+        if (staleMs === undefined) setStale(false);
+
+        const off = attach({
+            seqRef,
+            markFailed: () => { failed = true; },
+            setReady: v => { if (alive) setReady(v); },
+            setError: e => { if (alive) setError(e); },
+            setStale: v => { if (alive) setStale(v); },
+        });
+        subRef.current = off;
+        off.ready.then(
+            () => {
+                if (!alive || failed) return;
+                setReady(true);
+                if (staleMs !== undefined) setStale(off.isStale()); // fresh line after a stale one: no edge from common2, sync by hand
+            },
+            e => { if (alive) setError(e); },
+        );
+        return () => {
+            alive = false;
+            subRef.current = null;
+            off();
+            if (!keepSeq) seqRef.current = since;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [remote, epoch, staleMs, ...deps]);
+
+    const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
+    const lastTs = useCallback(() => subRef.current?.lastTs() ?? 0, []);
+    const restart = useCallback((at?: number) => {
+        if (at !== undefined) seqRef.current = at;
+        setEpoch(v => v + 1);
+    }, []);
+
+    return useMemo(() => ({ready, error, stale, seq, lastTs, restart}), [ready, error, stale, seq, lastTs, restart]);
+}
+
+type RouteSubHandle = (() => void) & {ready: Promise<void>, seq: () => number, label: () => string | undefined, active: () => boolean, switch: (nextRemote: any, nextOpts?: ReplayRouteSwitchOptions) => Promise<void>};
+
+type RouteLifecycleCtx = {
+    seqRef: {current: number | undefined};
+    setError: (e: unknown) => void;
+    onRoute: (ev: ReplayRouteEvent) => void;
+};
+
+/**
+ * Shared shell for the route-replaceable lifecycle (useReplayRouteSubscribe / useStoreReplayRouteSync).
+ * No restart()/epoch here — route changes go through switchRoute(), not a resubscribe; that
+ * asymmetry with useReplayLifecycle is intentional (existing API shape), not an oversight.
+ */
+function useRouteLifecycle<TRemote, TSub extends RouteSubHandle>(params: {
+    remote: TRemote | null | undefined;
+    guard: boolean;
+    since: number | undefined;
+    keepSeq: boolean;
+    label: string | undefined;
+    attach: (ctx: RouteLifecycleCtx) => TSub;
+    deps: readonly unknown[];
+}) {
+    const {remote, guard, since, keepSeq, label, attach, deps} = params;
+    const seqRef = useRef<number | undefined>(since);
+    const labelRef = useRef<string | undefined>(label);
+    const activeRef = useRef(false);
+    const subRef = useRef<TSub | null>(null);
+    const lastRemoteRef = useRef<TRemote | null | undefined>(undefined);
+    const [ready, setReady] = useState(false);
+    const [error, setError] = useState<unknown>(null);
+    const [route, setRoute] = useState<ReplayRouteEvent | null>(null);
+    const [switching, setSwitching] = useState(false);
+
+    useEffect(() => {
+        if (!guard) return;
+        if (lastRemoteRef.current !== undefined && lastRemoteRef.current !== remote) seqRef.current = undefined;
+        lastRemoteRef.current = remote;
+
+        let alive = true;
+        setReady(false);
+        setError(null);
+        setRoute(null);
+        setSwitching(false);
+        labelRef.current = label;
+        activeRef.current = false;
+
+        const off = attach({
+            seqRef,
+            setError: e => { if (alive) setError(e); },
+            onRoute: ev => {
+                if (!alive) return;
+                setRoute(ev);
+                setSwitching(ev.phase == 'switching');
+                if (ev.phase == 'switching') setReady(false);
+                if (ev.phase == 'ready') {
+                    labelRef.current = ev.to;
+                    activeRef.current = true;
+                    setReady(true);
+                }
+                if (ev.phase == 'closed') {
+                    activeRef.current = false;
+                    setReady(false);
+                }
+                if (ev.phase == 'error') {
+                    activeRef.current = subRef.current?.active() ?? false;
+                    setReady(activeRef.current);
+                }
+            },
+        });
+        subRef.current = off;
+        off.ready.then(
+            () => {
+                if (!alive) return;
+                activeRef.current = off.active();
+                labelRef.current = off.label();
+                setReady(true);
+                setSwitching(false);
+            },
+            e => {
+                if (!alive) return;
+                setError(e);
+                setReady(false);
+                setSwitching(false);
+            },
+        );
+        return () => {
+            alive = false;
+            subRef.current = null;
+            activeRef.current = false;
+            off();
+            if (!keepSeq) seqRef.current = since;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [remote, ...deps]);
+
+    const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
+    const currentLabel = useCallback(() => subRef.current?.label() ?? labelRef.current, []);
+    const activeGetter = useCallback(() => subRef.current?.active() ?? activeRef.current, []);
+
+    return {ready, error, route, switching, seq, label: currentLabel, active: activeGetter, subRef, setError};
 }
 
 export type UseReplaySubscribeOptions = {
@@ -113,86 +319,43 @@ export function useReplaySubscribe<Z extends any[]>(
     const cbRef = useLatestRef(cb);
     const hooksRef = useLatestRef({onSeq, onError, onStale});
     const hintRef = useLatestRef(hint);
-    const seqRef = useRef<number | undefined>(since);
-    const subRef = useRef<(() => void) & {seq: () => number, lastTs: () => number} | null>(null);
-    const lastRemoteRef = useRef<ReplayRemote<Z> | null | undefined>(undefined);
-    const [ready, setReady] = useState(false);
-    const [error, setError] = useState<unknown>(null);
-    const [stale, setStale] = useState(false);
-    const [epoch, setEpoch] = useState(0);
 
-    useEffect(() => {
-        if (!remote || !enabled) return;
-        if (!remote.line || typeof remote.line.on != 'function') {
-            const error = new Error('Replay remote is missing its line surface')
-            setReady(false)
-            setError(error)
-            hooksRef.current.onError?.(error)
-            return
-        }
-        if (lastRemoteRef.current !== undefined && lastRemoteRef.current !== remote) seqRef.current = undefined; // a different line — old seq is meaningless
-        lastRemoteRef.current = remote;
-
-        let alive = true;
-        let failed = false;
-        setReady(false);
-        setError(null);
-        // stale is NOT reset here: it re-syncs from common2 after the first delivery (a stale
-        // keyframe must show stale from the start, not flicker through false on resubscribe)
-        if (staleMs === undefined) setStale(false);
-        const off = Replay.replaySubscribe<Z>(remote, (...event) => cbRef.current(...event), {
-            since: seqRef.current,
+    return useReplayLifecycle({
+        remote,
+        guard: !!remote && enabled,
+        since,
+        keepSeq,
+        staleMs,
+        validate: () => {
+            if (remote!.line && typeof remote!.line.on == 'function') return null;
+            const error = new Error('Replay remote is missing its line surface');
+            hooksRef.current.onError?.(error);
+            return error;
+        },
+        attach: ctx => Replay.replaySubscribe<Z>(remote!, (...event) => cbRef.current(...event), {
+            since: ctx.seqRef.current,
             policy,
             hint: hintRef.current,
             onSeq: seq => {
-                seqRef.current = seq;
+                ctx.seqRef.current = seq;
                 hooksRef.current.onSeq?.(seq);
             },
             onError: e => {
-                failed = true;
-                if (alive) {
-                    setError(e);
-                    setReady(false);
-                }
+                ctx.markFailed();
+                ctx.setError(e);
+                ctx.setReady(false);
                 hooksRef.current.onError?.(e);
             },
             ...(staleMs !== undefined ? {
                 staleMs,
                 onStale: (info: StaleInfo) => {
-                    if (alive) setStale(info.stale);
+                    ctx.setStale(info.stale);
                     hooksRef.current.onStale?.(info);
                 },
             } : null),
-        });
-        subRef.current = off;
-        off.ready.then(
-            () => {
-                if (!alive || failed) return;
-                setReady(true);
-                if (staleMs !== undefined) setStale(off.isStale()); // fresh line after a stale one: no edge from common2, sync by hand
-            },
-            e => { if (alive) setError(e); },
-        );
-        return () => {
-            alive = false;
-            subRef.current = null;
-            off();
-            if (!keepSeq) seqRef.current = since;
-        };
-        // keepSeq/since are start-position config, not subscription identity — no resubscribe on change;
-        // staleMs is subscribe-time config in common2, so changing it resubscribes;
-        // policy picks the wire surface (line vs frameLine), so it resubscribes too; hint rides a ref
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [remote, enabled, epoch, staleMs, policy]);
-
-    const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
-    const lastTs = useCallback(() => subRef.current?.lastTs() ?? 0, []);
-    const restart = useCallback((at?: number) => {
-        if (at !== undefined) seqRef.current = at;
-        setEpoch(v => v + 1);
-    }, []);
-
-    return useMemo(() => ({ready, error, stale, seq, lastTs, restart}), [ready, error, stale, seq, lastTs, restart]);
+        }),
+        deps: [enabled, policy],
+    });
 }
 
 export type UseReplayRouteSubscribeOptions = {
@@ -245,94 +408,34 @@ export function useReplayRouteSubscribe<Z extends any[]>(
     const cbRef = useLatestRef(cb);
     const hooksRef = useLatestRef({onSeq, onError, onRoute});
     const hintRef = useLatestRef(hint);
-    const seqRef = useRef<number | undefined>(since);
-    const labelRef = useRef<string | undefined>(label);
-    const activeRef = useRef(false);
-    const subRef = useRef<ReplayRouteHandle<Z> | null>(null);
-    const lastRemoteRef = useRef<ReplayRemote<Z> | null | undefined>(undefined);
-    const [ready, setReady] = useState(false);
-    const [error, setError] = useState<unknown>(null);
-    const [route, setRoute] = useState<ReplayRouteEvent | null>(null);
-    const [switching, setSwitching] = useState(false);
 
-    useEffect(() => {
-        if (!remote || !enabled) return;
-        if (lastRemoteRef.current !== undefined && lastRemoteRef.current !== remote) seqRef.current = undefined;
-        lastRemoteRef.current = remote;
-
-        let alive = true;
-        setReady(false);
-        setError(null);
-        setRoute(null);
-        setSwitching(false);
-        labelRef.current = label;
-        activeRef.current = false;
-
-        const off = Replay.replayRouteSubscribe<Z>(remote, (...event) => cbRef.current(...event), {
-            since: seqRef.current,
+    const {ready, error, route, switching, seq, label: currentLabel, active, subRef, setError} = useRouteLifecycle<ReplayRemote<Z>, ReplayRouteHandle<Z>>({
+        remote,
+        guard: !!remote && enabled,
+        since,
+        keepSeq,
+        label,
+        attach: ctx => Replay.replayRouteSubscribe<Z>(remote!, (...event) => cbRef.current(...event), {
+            since: ctx.seqRef.current,
             label,
             policy,
             hint: hintRef.current,
             onSeq: seq => {
-                seqRef.current = seq;
+                ctx.seqRef.current = seq;
                 hooksRef.current.onSeq?.(seq);
             },
             onError: e => {
-                if (alive) setError(e);
+                ctx.setError(e);
                 hooksRef.current.onError?.(e);
             },
             onRoute: ev => {
-                if (alive) {
-                    setRoute(ev);
-                    setSwitching(ev.phase == 'switching');
-                    if (ev.phase == 'switching') setReady(false);
-                    if (ev.phase == 'ready') {
-                        labelRef.current = ev.to;
-                        activeRef.current = true;
-                        setReady(true);
-                    }
-                    if (ev.phase == 'closed') {
-                        activeRef.current = false;
-                        setReady(false);
-                    }
-                    if (ev.phase == 'error') {
-                        activeRef.current = subRef.current?.active() ?? false;
-                        setReady(activeRef.current);
-                    }
-                }
+                ctx.onRoute(ev);
                 hooksRef.current.onRoute?.(ev);
             },
-        });
-        subRef.current = off;
-        off.ready.then(
-            () => {
-                if (!alive) return;
-                activeRef.current = off.active();
-                labelRef.current = off.label();
-                setReady(true);
-                setSwitching(false);
-            },
-            e => {
-                if (!alive) return;
-                setError(e);
-                setReady(false);
-                setSwitching(false);
-            },
-        );
-        return () => {
-            alive = false;
-            subRef.current = null;
-            activeRef.current = false;
-            off();
-            if (!keepSeq) seqRef.current = since;
-        };
-        // label/since/keepSeq are start-position metadata; route changes go through switchRoute(). hint rides a ref.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [remote, enabled, policy]);
+        }),
+        deps: [enabled, policy],
+    });
 
-    const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
-    const currentLabel = useCallback(() => subRef.current?.label() ?? labelRef.current, []);
-    const active = useCallback(() => subRef.current?.active() ?? activeRef.current, []);
     const switchRoute = useCallback((nextRemote: ReplayRemote<Z>, switchOptions?: ReplayRouteSwitchOptions) => {
         const sub = subRef.current;
         if (!sub) return Promise.reject(new Error("useReplayRouteSubscribe: no active route subscription"));
@@ -371,71 +474,37 @@ export function useStoreReplaySync<T extends object>(
     const hooksRef = useLatestRef({onSeq, onError, onStale});
     const batchHooksRef = useLatestRef({onBatch, validateBatch});
     const hintRef = useLatestRef(hint);
-    const seqRef = useRef<number | undefined>(since);
-    const subRef = useRef<(() => void) & {seq: () => number, lastTs: () => number} | null>(null);
-    const lastRemoteRef = useRef<StoreReplayRemote | null | undefined>(undefined);
-    const [ready, setReady] = useState(false);
-    const [error, setError] = useState<unknown>(null);
-    const [stale, setStale] = useState(false);
-    const [epoch, setEpoch] = useState(0);
 
-    useEffect(() => {
-        if (!store || !remote || !enabled) return;
-        if (lastRemoteRef.current !== undefined && lastRemoteRef.current !== remote) seqRef.current = undefined;
-        lastRemoteRef.current = remote;
-
-        let alive = true;
-        setReady(false);
-        setError(null);
-        if (staleMs === undefined) setStale(false); // see useReplaySubscribe: stale re-syncs from common2, no reset-to-false flicker
-        const off = Observe.syncStoreReplay(store, remote, {
-            since: seqRef.current,
+    return useReplayLifecycle({
+        remote,
+        guard: !!store && !!remote && enabled,
+        since,
+        keepSeq,
+        staleMs,
+        attach: ctx => Observe.syncStoreReplay(store!, remote!, {
+            since: ctx.seqRef.current,
             policy,
             hint: hintRef.current,
             onBatch: (patches, currentStore) => batchHooksRef.current.onBatch?.(patches, currentStore),
             validateBatch: (patches, currentStore) => batchHooksRef.current.validateBatch?.(patches, currentStore),
             onSeq: seq => {
-                seqRef.current = seq;
+                ctx.seqRef.current = seq;
                 hooksRef.current.onSeq?.(seq);
             },
             onError: e => {
-                if (alive) setError(e);
+                ctx.setError(e);
                 hooksRef.current.onError?.(e);
             },
             ...(staleMs !== undefined ? {
                 staleMs,
                 onStale: (info: StaleInfo) => {
-                    if (alive) setStale(info.stale);
+                    ctx.setStale(info.stale);
                     hooksRef.current.onStale?.(info);
                 },
             } : null),
-        });
-        subRef.current = off;
-        off.ready.then(
-            () => {
-                if (!alive) return;
-                setReady(true);
-                if (staleMs !== undefined) setStale(off.isStale());
-            },
-            e => { if (alive) setError(e); },
-        );
-        return () => {
-            alive = false;
-            subRef.current = null;
-            off();
-            if (!keepSeq) seqRef.current = since;
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [store, remote, enabled, epoch, staleMs, policy]);
-
-    const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
-    const lastTs = useCallback(() => subRef.current?.lastTs() ?? 0, []);
-    const restart = useCallback((at?: number) => {
-        if (at !== undefined) seqRef.current = at;
-        setEpoch(v => v + 1);
-    }, []);
-
-    return useMemo(() => ({ready, error, stale, seq, lastTs, restart}), [ready, error, stale, seq, lastTs, restart]);
+        }),
+        deps: [store, enabled, policy],
+    });
 }
 
 export type UseStoreReplayRouteSyncOptions<T extends object = any> = UseReplayRouteSubscribeOptions & {
@@ -472,95 +541,36 @@ export function useStoreReplayRouteSync<T extends object>(
     const hooksRef = useLatestRef({onSeq, onError, onRoute});
     const batchHooksRef = useLatestRef({onBatch, validateBatch});
     const hintRef = useLatestRef(hint);
-    const seqRef = useRef<number | undefined>(since);
-    const labelRef = useRef<string | undefined>(label);
-    const activeRef = useRef(false);
-    const subRef = useRef<StoreReplayRouteHandle | null>(null);
-    const lastRemoteRef = useRef<StoreReplayRemote | null | undefined>(undefined);
-    const [ready, setReady] = useState(false);
-    const [error, setError] = useState<unknown>(null);
-    const [route, setRoute] = useState<ReplayRouteEvent | null>(null);
-    const [switching, setSwitching] = useState(false);
 
-    useEffect(() => {
-        if (!store || !remote || !enabled) return;
-        if (lastRemoteRef.current !== undefined && lastRemoteRef.current !== remote) seqRef.current = undefined;
-        lastRemoteRef.current = remote;
-
-        let alive = true;
-        setReady(false);
-        setError(null);
-        setRoute(null);
-        setSwitching(false);
-        labelRef.current = label;
-        activeRef.current = false;
-
-        const off = Observe.syncStoreReplayRoute(store, remote, {
-            since: seqRef.current,
+    const {ready, error, route, switching, seq, label: currentLabel, active, subRef, setError} = useRouteLifecycle<StoreReplayRemote, StoreReplayRouteHandle>({
+        remote,
+        guard: !!store && !!remote && enabled,
+        since,
+        keepSeq,
+        label,
+        attach: ctx => Observe.syncStoreReplayRoute(store!, remote!, {
+            since: ctx.seqRef.current,
             label,
             policy,
             hint: hintRef.current,
             onBatch: (patches, currentStore) => batchHooksRef.current.onBatch?.(patches, currentStore),
             validateBatch: (patches, currentStore) => batchHooksRef.current.validateBatch?.(patches, currentStore),
             onSeq: seq => {
-                seqRef.current = seq;
+                ctx.seqRef.current = seq;
                 hooksRef.current.onSeq?.(seq);
             },
             onError: e => {
-                if (alive) setError(e);
+                ctx.setError(e);
                 hooksRef.current.onError?.(e);
             },
             onRoute: ev => {
-                if (alive) {
-                    setRoute(ev);
-                    setSwitching(ev.phase == 'switching');
-                    if (ev.phase == 'switching') setReady(false);
-                    if (ev.phase == 'ready') {
-                        labelRef.current = ev.to;
-                        activeRef.current = true;
-                        setReady(true);
-                    }
-                    if (ev.phase == 'closed') {
-                        activeRef.current = false;
-                        setReady(false);
-                    }
-                    if (ev.phase == 'error') {
-                        activeRef.current = subRef.current?.active() ?? false;
-                        setReady(activeRef.current);
-                    }
-                }
+                ctx.onRoute(ev);
                 hooksRef.current.onRoute?.(ev);
             },
-        });
-        subRef.current = off;
-        off.ready.then(
-            () => {
-                if (!alive) return;
-                activeRef.current = off.active();
-                labelRef.current = off.label();
-                setReady(true);
-                setSwitching(false);
-            },
-            e => {
-                if (!alive) return;
-                setError(e);
-                setReady(false);
-                setSwitching(false);
-            },
-        );
-        return () => {
-            alive = false;
-            subRef.current = null;
-            activeRef.current = false;
-            off();
-            if (!keepSeq) seqRef.current = since;
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [store, remote, enabled, policy]);
+        }),
+        deps: [store, enabled, policy],
+    });
 
-    const seq = useCallback(() => subRef.current?.seq() ?? seqRef.current ?? -1, []);
-    const currentLabel = useCallback(() => subRef.current?.label() ?? labelRef.current, []);
-    const active = useCallback(() => subRef.current?.active() ?? activeRef.current, []);
     const switchRoute = useCallback((nextRemote: StoreReplayRemote, switchOptions?: ReplayRouteSwitchOptions) => {
         const sub = subRef.current;
         if (!sub) return Promise.reject(new Error("useStoreReplayRouteSync: no active route subscription"));
@@ -581,11 +591,7 @@ export function useStoreReplayRouteMirror<T extends object>(
     initial: T,
     options: UseStoreReplayRouteSyncOptions<T> = {},
 ): StoreReplayRouteMirrorController<T> {
-    const storeRef = useRef<{remote: typeof remote, store: Observe.Store<T>} | null>(null);
-    if (!storeRef.current || storeRef.current.remote !== remote) {
-        storeRef.current = {remote, store: Observe.createStore<T>(initial)};
-    }
-    const store = storeRef.current.store;
+    const store = useMirrorStore(remote, () => Observe.createStore<T>(initial));
     const sync = useStoreReplayRouteSync(store, remote, options);
     return useMemo(() => ({...sync, store}), [sync, store]);
 }
@@ -603,11 +609,7 @@ export function useStoreReplayMirror<T extends object>(
     initial: T,
     options: UseStoreReplaySyncOptions<T> = {},
 ): StoreReplayMirrorController<T> {
-    const storeRef = useRef<{remote: typeof remote, store: Observe.Store<T>} | null>(null);
-    if (!storeRef.current || storeRef.current.remote !== remote) {
-        storeRef.current = {remote, store: Observe.createStore<T>(initial)};
-    }
-    const store = storeRef.current.store;
+    const store = useMirrorStore(remote, () => Observe.createStore<T>(initial));
     const sync = useStoreReplaySync(store, remote, options);
     return useMemo(() => ({...sync, store}), [sync, store]);
 }
@@ -723,14 +725,7 @@ export function useStoreLazyLineMirror<T extends object>(
     options: UseStoreLazyLineSyncOptions & {drain?: StoreDrain} = {},
 ): StoreLazyLineMirrorController<T> {
     const {drain, ...syncOptions} = options;
-    const storeRef = useRef<{remote: typeof remote, store: Observe.Store<T>} | null>(null);
-    if (!storeRef.current || storeRef.current.remote !== remote) {
-        storeRef.current = {
-            remote,
-            store: Observe.createStore<T>(initial, drain !== undefined ? {drain} : undefined),
-        };
-    }
-    const store = storeRef.current.store;
+    const store = useMirrorStore(remote, () => Observe.createStore<T>(initial, drain !== undefined ? {drain} : undefined));
     const sync = useStoreLazyLineSync(store, remote, syncOptions);
     return useMemo(() => ({...sync, store}), [sync, store]);
 }
@@ -757,7 +752,7 @@ export type UseStoreReplayEachOptions<T extends object> = UseStoreReplaySyncOpti
  * Unlike the library one-call (a fresh store per call), the mirror here lives in a ref: within
  * one mounted component every resubscribe (StrictMode double-effect, restart(), enabled toggling,
  * staleMs/policy change) reconnects by tail ON TOP of the kept state — no snapshot/initial dance.
- * A new `remote` identity recreates the store (fresh keyframe). Direct reads / extra
+ * A new `remote` identity recreates the store. Direct reads / extra
  * subscriptions: controller.store (useStoreNode/useStoreKeys work on it as usual).
  */
 export function useStoreReplayEach<T extends object>(
@@ -766,11 +761,7 @@ export function useStoreReplayEach<T extends object>(
     options: UseStoreReplayEachOptions<T> = {},
 ): StoreReplayMirrorController<T> {
     const {initial, drain, ...syncOptions} = options;
-    const storeRef = useRef<{remote: typeof remote, store: Observe.Store<T>} | null>(null);
-    if (!storeRef.current || storeRef.current.remote !== remote) {
-        storeRef.current = {remote, store: Observe.createStore<T>((initial ?? {}) as T, drain !== undefined ? {drain} : undefined)};
-    }
-    const store = storeRef.current.store;
+    const store = useMirrorStore(remote, () => Observe.createStore<T>((initial ?? {}) as T, drain !== undefined ? {drain} : undefined));
     // each BEFORE sync: effects run in hook-call order, so the per-key subscriber already exists
     // when the keyframe applies to the store (the expansion is not missed)
     useStoreEach(store, cb, {enabled: syncOptions.enabled});

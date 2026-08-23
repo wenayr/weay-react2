@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useReorder, useReorderBoard, renderBy, updateBy, useCacheMapPersistence, memoryCache, type BoardColumn } from "../../api";
-import { Button } from "../../src/hooks";
-import { FloatingWindow, FloatingWindowTaskbar, WindowPortal, type FloatingWindowMode, type FloatingWindowSnapRegion } from "../../src/components";
-import { DragBox } from "../../src/components/Dnd/FloatingWindow";
-import { Check } from "../standKit";
+import { useReorder, useReorderBoard, renderBy, updateBy, useCacheMapPersistence, memoryCache, type BoardColumn } from "../../api.js";
+import { Button } from "../../src/hooks/index.js";
+import { FloatingWindow, FloatingWindowTaskbar, WindowPortal, type FloatingWindowMode, type FloatingWindowSnapRegion } from "../../src/components/index.js";
+import { DragBox } from "../../src/components/Dnd/FloatingWindow.js";
+import { Check } from "../standKit.js";
 
 
 /* ---------- 52. FloatingWindow viewport layer + window stacking ---------- */
@@ -32,15 +32,38 @@ const stackWindowHeader: React.CSSProperties = {
 
 function WindowABody() {
     const [popupOpen, setPopupOpen] = useState(false);
+    const [nestedOpen, setNestedOpen] = useState(false);
     return <div style={{...stackWindowBody, background: "#991b1b"}}>
         <b>A starts below B.</b>
         <div>Click any visible part of A to raise its complete layer.</div>
-        <button onClick={() => setPopupOpen(value => !value)} style={{marginTop: 8}}>toggle A popup</button>
+        <div style={{display: "flex", gap: 6, marginTop: 8}}>
+            <button onClick={() => setPopupOpen(value => !value)}>toggle A popup</button>
+            <button onClick={() => setNestedOpen(value => !value)}>toggle A child window</button>
+        </div>
         {popupOpen && <WindowPortal style={{left: 150, top: 72}}>
             <div style={{padding: 10, color: "#172554", background: "#dbeafe", border: "1px solid #60a5fa", borderRadius: 7, boxShadow: "0 8px 24px rgba(0,0,0,.3)"}}>
                 A scoped popup: it rises and falls together with A
             </div>
         </WindowPortal>}
+        {/* A window opened from inside A (clientBacktest: "user strategies" -> "history"/"remote"): a
+            React child of A that portals to body. It must open above A and stay above A while its
+            content is pressed, although its React events still bubble through A. */}
+        {nestedOpen && <FloatingWindow
+            windowId="qa-window-a-child"
+            stackGroup="qa-desktop"
+            taskbarLabel="A child window"
+            position={{x: 120, y: 90}}
+            size={{width: 300, height: 170}}
+            moveOnlyHeader
+            onClickClose={() => setNestedOpen(false)}
+            header={<div style={{...stackWindowHeader, background: "#9a3412"}}>A child window · opened from A</div>}
+        >
+            <div style={{...stackWindowBody, background: "#c2410c"}}>
+                <b>Opened from inside A.</b>
+                <div>Pressing here must keep this window above A; pressing A raises A again.</div>
+                <button style={{marginTop: 8}}>press me</button>
+            </div>
+        </FloatingWindow>}
         <div style={{
             position: "absolute",
             right: 16,
@@ -94,7 +117,7 @@ function FloatingWindowStackDemo() {
             <button onClick={() => setSecondOpen(value => !value)}>{secondOpen ? "close B (no x)" : "open B"}</button>
         </div>
         <div style={{display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10}}>
-            {["shared taskbar", "session Snap", "cascade", "Win/Meta + Arrow"].map(label =>
+            {["shared taskbar", "session Snap", "cascade", "Win/Meta + Arrow", "nested window from A"].map(label =>
                 <span key={label} style={{padding: "3px 7px", borderRadius: 999, color: "#0550ae", background: "#ddf4ff", fontSize: 11, fontWeight: 650}}>{label}</span>
             )}
         </div>

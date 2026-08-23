@@ -1,7 +1,7 @@
 // agGrid4 usage samples. Not included in production.
 import React, { useEffect } from 'react'
 import type { ColDef } from 'ag-grid-community'
-import { useAgGrid, AgGridTable, type BufferTable } from './index'
+import { useAgGrid, AgGridTable, type BufferTable } from './index.js'
 
 type Row = {
     id: string

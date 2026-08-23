@@ -1,6 +1,10 @@
 import React, {useEffect, useRef} from "react";
-import {Menu, MenuItem, MenuItemStrict} from "./menu";
-import {OutsideClickArea} from "../hooks/useOutside";
+import {Menu, MenuItem, MenuItemStrict} from "./menu.js";
+import {OutsideClickArea} from "../hooks/useOutside.js";
+
+/** Movement in CSS px that turns a long press into a scroll. Same value as menuMouse.tsx,
+ *  which carries the other copy of this gesture block. */
+const TOUCH_SLOP = 10;
 
 // Wrapper function for creating MenuR and managing the global `bb` variable.
 export function createRightClickMenu(){
@@ -31,7 +35,7 @@ export function createRightClickMenu(){
             };
         }, []);
 
-        const timeEvent = useRef(Date.now()); // Timestamp for tracking double clicks
+        const timeEvent = useRef(0); // Timestamp for tracking double clicks
         const touchXY = useRef({x: 0, y: 0}); // Current touch coordinates (ref: survives rerenders mid-gesture)
         const touchTime = useRef<null | number>(null); // Touch start time
 
@@ -90,17 +94,19 @@ export function createRightClickMenu(){
                  ref={rootRef}
                 // Store initial touch coordinates
                  onTouchStart={(e) => {
-                     if (touchXY.current.x == 0) touchXY.current.x = e.touches[0].screenX;
-                     if (touchXY.current.y == 0) touchXY.current.y = e.touches[0].screenY;
+                     // unconditionally: the old `if (x == 0)` guard reset only after a
+                     // successful long press, so an aborted gesture left stale coordinates
+                     touchXY.current.x = e.touches[0].screenX;
+                     touchXY.current.y = e.touches[0].screenY;
                      touchTime.current = Date.now();
                  }}
                 // Check for significant movement to avoid showing the menu while scrolling
                  onTouchMove={(e) => {
-                     let x2 = e.touches[0].screenX;
-                     let y2 = e.touches[0].screenY;
-                     let pX = e.touches[0].pageX;
-                     let pY = e.touches[0].pageY;
-                     if ((Math.abs(x2 - touchXY.current.x) / pX > 0.05) || (Math.abs(y2 - touchXY.current.y) / pY > 0.05)) {
+                     const x2 = e.touches[0].screenX;
+                     const y2 = e.touches[0].screenY;
+                     // pixels, not a fraction of pageX (that made the threshold depend on
+                     // where on the page the touch landed)
+                     if (Math.abs(x2 - touchXY.current.x) > TOUCH_SLOP || Math.abs(y2 - touchXY.current.y) > TOUCH_SLOP) {
                          touchTime.current = null; // If movement is too large, disable menu display
                      }
                  }}

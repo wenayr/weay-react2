@@ -52,19 +52,29 @@ function runTriggerPass(obj: object, state: ObserverState, reverse: boolean, las
 
     state.version += 1;
 
+    // один бросивший подписчик не должен обрывать проход: раньше исключение из
+    // императивного колбэка не давало вызвать React-нотификаторы вообще
+    const call = (f: Listener) => {
+        try { f(obj); }
+        catch (e) { console.error("updateBy: подписчик бросил исключение", e); }
+    };
+
     // императивные f-колбэки: всегда все, в порядке подписки
-    Array.from(state.callbacks).forEach(callback => callback(obj));
+    // копия нужна: колбэк может отписаться прямо во время прохода
+    if (state.callbacks.size) for (const callback of [...state.callbacks]) call(callback);
 
-    const listenersArray = Array.from(state.listeners);
-
-    if (lastOnly) {
-        const last = listenersArray.at(-1);
-        if (last) last(obj);
-    } else {
-        if (reverse) {
-            listenersArray.reverse();
+    if (state.listeners.size) {
+        if (lastOnly) {
+            // нужен только хвост - обходим Set без копии массива
+            let last: Listener | undefined;
+            for (const listener of state.listeners) last = listener;
+            if (last) call(last);
+        } else if (reverse) {
+            const listeners = [...state.listeners];
+            for (let i = listeners.length - 1; i >= 0; i--) call(listeners[i]);
+        } else {
+            for (const listener of [...state.listeners]) call(listener);
         }
-        listenersArray.forEach(listener => listener(obj));
     }
 
     listen?.[0](obj);
@@ -76,8 +86,16 @@ let warnedMaxPasses = false;
 function triggerUpdate(obj: object, reverse = false, lastOnly = false) {
     const listen = updateListens.get(obj);
     let state = map3.get(obj);
-    if ((!state || (state.listeners.size === 0 && state.callbacks.size === 0)) && !listen?.[1].count()) return;
+    const idle = (!state || (state.listeners.size === 0 && state.callbacks.size === 0)) && !listen?.[1].count();
     state ??= getObserverState(obj);
+    // The version must move even with nobody subscribed yet. A component that has already
+    // rendered read the version in getSnapshot, and React re-reads it right after subscribing;
+    // a mutation landing in that window would otherwise compare equal and be lost until the
+    // next renderBy. runTriggerPass does the bump for the non-idle path.
+    if (idle) {
+        state.version += 1;
+        return;
+    }
 
     // реентерабельность: синхронный renderBy по тому же объекту изнутри слушателя
     // коалесцируется — помечаем pending и выходим, текущая итерация сделает ещё проход

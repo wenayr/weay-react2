@@ -1,1 +1,1 @@
-export * from './UiSlot';
+export * from './UiSlot.js';

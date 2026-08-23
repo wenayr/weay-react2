@@ -1,8 +1,8 @@
 // Horizontal column helpers: pure, reusable defaults with no app business logic.
 import type { ColDef } from 'ag-grid-community'
-import { StyleGridDefault } from '../../styles/styleGrid'
-export { numericComparator } from './core'
-export type { NumberPair } from './core'
+import { StyleGridDefault } from '../../styles/styleGrid.js'
+export { numericComparator } from './core.js'
+export type { NumberPair } from './core.js'
 
 /** Centered cells + sort/filter defaults for dense data tables. */
 export const colDefCentered = {

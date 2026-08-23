@@ -1,7 +1,8 @@
 {
   "name": "wenay-react2",
-  "version": "1.0.82",
+  "version": "1.1.0",
   "description": "Common react",
+  "type": "module",
   "strict": true,
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -28,7 +29,7 @@
     "_copyStyle": "xcopy /Y /S \".\\src\\style\\*.*\" \".\\dist\\lib\\style\\\"\n",
     "publish": "npm run _afterBuild && npm run _copyStyle &&  npm run _publish",
     "build & publish": "npm run build  &&  npm run _publish",
-    "_clearDir": "IF exist lib (rd /s /q lib)  &&  mkdir lib  &&  copy tsconfig_lib.json lib\\tsconfig.json  &&  echo:"
+    "_clearDir": "IF exist lib (rd /s /q lib)  &&  mkdir lib  &&  echo:"
   },
   "files": [
     "lib/**/*",
@@ -46,28 +47,34 @@
     }
   },
   "dependencies": {
-    "ag-grid-community": "^36.0.2",
-    "ag-grid-react": "^36.0.2",
+    "ag-grid-community": "^36.1.0",
+    "ag-grid-react": "^36.1.0",
     "re-resizable": "^6.11.2",
     "react-rnd": "^10.5.3",
-    "wenay-common2": "^2.10.0"
+    "wenay-common2": "^2.12.0"
+  },
+  "optionalDependencies": {
+    "socket.io-client": "^4.8.3"
   },
   "peerDependencies": {
+    "ag-grid-community": "^36.1.0",
+    "ag-grid-react": "^36.1.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "wenay-common2": "^2.12.0"
   },
   "devDependencies": {
-    "@swc/core": "^1.15.47",
+    "@swc/core": "^1.16.1",
     "@swc/jest": "^0.2.39",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.1.2",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
-    "@vitejs/plugin-react": "^6.0.4",
-    "esbuild": "^0.28.1",
+    "@vitejs/plugin-react": "^6.1.0",
+    "esbuild": "^0.28.2",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.4.1",
     "path-browserify": "^1.0.1",
@@ -76,11 +83,10 @@
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "typescript": "^7.0.2",
-    "vite": "^8.1.5"
+    "vite": "^8.2.2"
   },
   "engines": {
-    "node": ">=20",
-    "vscode": "^1.22.0"
+    "node": ">=20"
   },
   "browserslist": {
     "production": [
@@ -133,6 +139,9 @@
       "default": "./lib/native/index.js"
     },
     "./package.json": "./package.json",
+    "./styles": "./lib/style/style.css",
+    "./styles/tokens": "./lib/style/tokens.css",
+    "./styles/menu-right": "./lib/style/menuRight.css",
     "./communication": {
       "types": "./lib/communication/index.d.ts",
       "import": "./lib/communication/index.js",

@@ -1,3 +1,22 @@
+// One formatter for the whole module plus a label cache: toLocaleTimeString builds Intl
+// structures on every call, and axis labels are repainted on every frame of a drag.
+const timeFormat = new Intl.DateTimeFormat(undefined, {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+const timeLabels = new Map<number, string>();
+const TIME_LABEL_CACHE_MAX = 4096;
+
+function formatAxisTime(time: number): string {
+    let label = timeLabels.get(time);
+    if (label == undefined) {
+        // bounded: a live stream would otherwise grow this map without limit
+        if (timeLabels.size >= TIME_LABEL_CACHE_MAX) timeLabels.clear();
+        label = timeFormat.format(time);
+        timeLabels.set(time, label);
+    }
+    return label;
+}
+
+import {observeElementBox} from "../canvasSurface.js";
+
 // Chart margins and line color (same values, extracted from the render body)
 const CHART_MARGIN_TOP = 20;
 const CHART_MARGIN_BOTTOM = 20;
@@ -74,6 +93,13 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
         state.needsRender = true;
     }
     resizeCanvas();
+
+    // This used to be the ONLY measurement: the size was read once at creation, so a chart in a
+    // resizable panel kept its first bitmap forever. Explicit width/height in the config still
+    // win - only an auto-sized chart follows its container.
+    const offResize = (config.width == undefined || config.height == undefined)
+        ? observeElementBox(config.container, () => resizeCanvas())
+        : () => {};
 
     // ~~~ Rendering ~~~
     function draw() {
@@ -171,7 +197,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
                     const p = state.data[i];
                     const x = toX(i);
                     if (x < 0 || x > state.width) continue;
-                    const dateStr = new Date(p.time).toLocaleTimeString();
+                    const dateStr = formatAxisTime(p.time);
                     ctx.fillText(dateStr, x, state.height - 5);
                     ctx.beginPath();
                     ctx.moveTo(x, state.height - 15);
@@ -240,6 +266,9 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
     // ~~~ API methods ~~~
 
     function appendData(points: IChartPoint | IChartPoint[]) {
+        // after the detach grace period auto-destroys the chart there is no renderer left, but
+        // an external stream holding this API kept pushing - the buffer grew forever
+        if (destroyed) return;
         if (!Array.isArray(points)) points = [points];
         state.data.push(...points);
         state.needsRender = true;
@@ -359,6 +388,7 @@ export function createChartCanvas(config: IChartConfig): IChartCanvas {
     function destroy() {
         if (destroyed) return;
         destroyed = true;
+        offResize();
         canvas.removeEventListener("mousedown", onMouseDown);
         removeDocListeners();
         canvas.removeEventListener("wheel", onWheel);

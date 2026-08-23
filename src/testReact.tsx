@@ -1,8 +1,8 @@
 import {createRoot} from "react-dom/client";
-import "./index"
-import {GridStyleDefault} from "./common/src/styles/styleGrid";
-import {QABoard} from "./common/testUseReact/qa";
-// import {LegacyTestMain} from "./common/testUseReact/use";  // old demo screen - uncomment if needed
+import "./index.js"
+import {GridStyleDefault} from "./common/src/styles/styleGrid.js";
+import {QABoard} from "./common/testUseReact/qa.js";
+// import {LegacyTestMain} from "./common/testUseReact/use.js";  // old demo screen - uncomment if needed
 
 const r = GridStyleDefault()
 export function Test() {

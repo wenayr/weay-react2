@@ -19,9 +19,9 @@ import React, {useEffect, useMemo, useRef, useState} from "react";
 import {listen as createListen} from "wenay-common2/client";
 import * as Peer from "wenay-common2/peer";
 import * as Replay from "wenay-common2/replay";
-import {usePeerCalls} from "../src/hooks/usePeerCall";
-import {useRouteState} from "../src/hooks/useRoute";
-import {createFakeRtcNet} from "./fakeRtcLoopback";
+import {usePeerCalls} from "../src/hooks/usePeerCall.js";
+import {useRouteState} from "../src/hooks/useRoute.js";
+import {createFakeRtcNet} from "./fakeRtcLoopback.js";
 
 export type ConfFrame = {n: number, at: number, image: string};
 export type ConfLine = [ConfFrame, number];

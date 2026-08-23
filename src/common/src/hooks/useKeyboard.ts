@@ -1,5 +1,5 @@
 import {useEffect, useRef} from "react";
-import {createUpdateApi} from "../../updateBy";
+import {createUpdateApi} from "../../updateBy.js";
 import {listen as createListen} from "wenay-common2/client";
 
 export const keyboardState = {

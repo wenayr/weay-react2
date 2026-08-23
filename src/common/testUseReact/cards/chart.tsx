@@ -1,7 +1,7 @@
 import React from "react";
-import { Sparkline } from "../../api";
-import { MyChartEngine } from "../../src/myChart/chartEngine/chartEngineReact";
-import { Check } from "../standKit";
+import { Sparkline } from "../../api.js";
+import { MyChartEngine } from "../../src/myChart/chartEngine/chartEngineReact.js";
+import { Check } from "../standKit.js";
 
 
 const sparklineQaRows = [

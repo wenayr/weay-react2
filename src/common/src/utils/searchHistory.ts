@@ -1,5 +1,4 @@
-import {createUpdateApi} from "../../updateBy";
-import {memoryGetOrCreate, memoryMarkDirty} from "./memoryStore";
+import {createPersistedController} from "./persistedController.js";
 
 export type SearchHistoryState = {
     items: string[];
@@ -13,8 +12,9 @@ function normalizeSearchHistoryItem(value: string) {
 
 export function createSearchHistory(opts: {key: string, max?: number}) {
     const max = Math.max(1, opts.max ?? 8);
-    const st = memoryGetOrCreate<SearchHistoryState>(opts.key, {items: []});
-    const stApi = createUpdateApi(st);
+    const persisted = createPersistedController<SearchHistoryState>({key: opts.key, def: {items: []}});
+    const st = persisted.state;
+    const stApi = persisted.api;
 
     /** Pure derivation - reads must not rewrite the persisted object (a getter that
      *  mutates state silently marks nothing dirty and surprises memoryCache diffing). */
@@ -33,9 +33,8 @@ export function createSearchHistory(opts: {key: string, max?: number}) {
     }
 
     function emit() {
-        st.items = normalized(); // normalization happens on WRITE, announced below
-        stApi.render();
-        memoryMarkDirty(opts.key);
+        // normalization happens on WRITE; commit renders subscribers and marks the cache dirty
+        persisted.commit(cur => { cur.items = normalized() });
     }
 
     return {

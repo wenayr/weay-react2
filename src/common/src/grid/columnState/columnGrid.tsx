@@ -1,13 +1,17 @@
 import React, {useEffect, useRef, useState} from 'react'
 import type {ColDef, ColGroupDef, GridApi, GridPreDestroyedEvent, GridReadyEvent} from 'ag-grid-community'
 import type {AgGridReactProps} from 'ag-grid-react'
-import {AgGridTable, type AgGridTableProps} from '../agGrid4'
-import {createToolbar, type ToolbarConfig, type ToolbarItem, type ToolbarSourceMode} from '../../components/Toolbar'
-import {CardList} from './CardList'
-import {ColumnDots} from './ColumnDots'
-import {ColumnsMenu} from './ColumnsMenu'
-import {createColumnState, type ColumnMeta, type ColumnsConfig, type ColumnStateController} from './columnState'
-import {createGridChrome, type GridChromeController, type GridChromeOptions, type GridChromeProps} from '../gridChrome'
+import {AgGridTable, type AgGridTableProps} from '../agGrid4/index.js'
+import {createToolbar, type ToolbarConfig, type ToolbarItem, type ToolbarSourceMode} from '../../components/Toolbar/index.js'
+import {CardList} from './CardList.js'
+import {ColumnDots} from './ColumnDots.js'
+import {ColumnsMenu} from './ColumnsMenu.js'
+import {createColumnState, type ColumnMeta, type ColumnsConfig, type ColumnStateController} from './columnState.js'
+import {createGridChrome, type GridChromeController, type GridChromeOptions, type GridChromeProps} from '../gridChrome.js'
+import {cx} from "../../utils/cx.js";
+
+// a fresh [] per render would break AgGridTable's memo on rowData
+const EMPTY_ROWS: never[] = []
 
 export type ColumnGridColumnDef<T extends object> = ColDef<T> | ColGroupDef<T>
 
@@ -138,10 +142,6 @@ function resolveColumns<T extends object>(opts: ColumnGridOptions<T>): ColumnMet
         res.push({...patch, key: patch.key, title: patch.title ?? titleFromKey(patch.key)})
     }
     return res
-}
-
-function cx(parts: Array<string | false | null | undefined>) {
-    return parts.filter(Boolean).join(' ')
 }
 
 function mergeClass(a: string | undefined, b: string) {
@@ -290,6 +290,10 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
         return <GridChrome {...props}/>
     }
 
+    /** `mode` is accepted but deliberately unused: 'auto' resolves to 'dots' in both table and
+     *  cards mode. Making it mode-dependent would silently change the control rendered for every
+     *  existing consumer of controls:'auto', so it stays a documented constant until someone
+     *  opts into a different mapping explicitly. */
     function controlKind(mode: ColumnGridViewMode, controls: ColumnGridControls | undefined): Exclude<ColumnGridControls, false | 'auto'> | null {
         if (controls === false) return null
         if (!controls || controls == 'auto') return 'dots'
@@ -307,11 +311,15 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
         const mode = p.mode ?? 'table'
         const kind = controlKind(mode, p.controls)
         const controls = renderControls(kind, p)
-        const data = p.data ?? opts.data ?? []
+        const data = p.data ?? opts.data ?? EMPTY_ROWS
         const getId = p.getId ?? opts.getId
         const bodyStyle: React.CSSProperties = mode == 'table'
             ? {height: p.tableHeight ?? 240, minHeight: 0, ...p.bodyStyle}
             : {...p.bodyStyle}
+        // The grid path has no row index to give, so it passes 0. A getId that actually depends
+        // on the index (`(r, i) => String(i)`) therefore yields the SAME id for every row and
+        // breaks ag-grid's row identity - in the table path getId must depend on the row only.
+        // CardList, which does have an index, keeps the full (row, index) contract.
         const tableGetRowId = p.table?.getRowId ?? (getId
             ? ((params: {data: T}) => getId(params.data, 0))
             : undefined)

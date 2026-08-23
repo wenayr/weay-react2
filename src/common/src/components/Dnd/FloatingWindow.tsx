@@ -6,11 +6,22 @@ import React, {
     useRef,
     useState
 } from "react";
-import { Rnd, type RndResizeCallback } from "react-rnd";
+import { Rnd, type RndResizeCallback, type RndResizeStartCallback } from "react-rnd";
 import {createPortal} from "react-dom";
-import {floatingWindowMap} from "../../utils/persistedMaps";
-import {useDraggableApi} from "../../hooks/useDraggable";
-import {cascadeWindowPosition, useFloatingDesktopWindow} from "./FloatingDesktop";
+import {floatingWindowMap} from "../../utils/persistedMaps.js";
+import {useDraggableApi} from "../../hooks/useDraggable.js";
+import {cascadeWindowPosition, useFloatingDesktopWindow} from "./FloatingDesktop.js";
+import {
+    clampToLimit,
+    snapGeometry,
+    snapLayouts,
+    snapPreviewStyle,
+    snapRegionLabels,
+    type FloatingWindowLimit,
+    type FloatingWindowSnapLayout,
+} from "./windowGeometry.js";
+import {WindowPortalContext} from "./WindowPortal.js";
+import {SnapLayoutOverlay, WindowControls, WindowHeader} from "./WindowChrome.js";
 import type {
     FloatingWindowCloseReason,
     FloatingWindowMode,
@@ -18,9 +29,9 @@ import type {
     FloatingWindowSavedGeometry,
     FloatingWindowSize,
     FloatingWindowSnapRegion,
-} from "./FloatingWindowTypes";
-export {FloatingWindowTaskbar, useFloatingWindowManager} from "./FloatingDesktop";
-export type {FloatingDesktopWindow, FloatingWindowManager, FloatingWindowTaskbarProps} from "./FloatingDesktop";
+} from "./FloatingWindowTypes.js";
+export {FloatingWindowTaskbar, useFloatingWindowManager} from "./FloatingDesktop.js";
+export type {FloatingDesktopWindow, FloatingWindowManager, FloatingWindowTaskbarProps} from "./FloatingDesktop.js";
 export type {
     FloatingWindowCloseReason,
     FloatingWindowMode,
@@ -28,7 +39,7 @@ export type {
     FloatingWindowSavedGeometry,
     FloatingWindowSize,
     FloatingWindowSnapRegion,
-} from "./FloatingWindowTypes";
+} from "./FloatingWindowTypes.js";
 type tPosition = FloatingWindowPosition;
 type tSize = FloatingWindowSize;
 type tRND = FloatingWindowSavedGeometry;
@@ -143,6 +154,7 @@ export type FloatingWindowController = {
     onWindowMouseDown: React.MouseEventHandler<HTMLDivElement>;
     onWindowKeyDown: React.KeyboardEventHandler<HTMLDivElement>;
     onResize: RndResizeCallback;
+    onResizeStart: RndResizeStartCallback;
     onResizeStop: RndResizeCallback;
 };
 
@@ -150,107 +162,10 @@ export type FloatingWindowController = {
 // import the component layer) and re-exported here so the public surface is unchanged
 export { floatingWindowMap };
 
-const WindowPortalContext = React.createContext<Element | null>(null);
+export {WindowPortal, useWindowPortalContainer} from "./WindowPortal.js";
 
-export function useWindowPortalContainer() {
-    return useContext(WindowPortalContext);
-}
-
-/** Portal a popup/menu/tooltip into the stacking context of its owning window. */
-export function WindowPortal({children, className, style}: {
-    children: ReactNode;
-    className?: string;
-    style?: React.CSSProperties;
-}) {
-    const container = useWindowPortalContainer();
-    if (!container) return <>{children}</>;
-    return createPortal(
-        <div className={className} style={{position: "absolute", zIndex: 2147483646, pointerEvents: "auto", ...style}}>
-            {children}
-        </div>,
-        container,
-    );
-}
-
-const snapRegionLabels: Record<FloatingWindowSnapRegion, string> = {
-    left: "left",
-    right: "right",
-    "top-left": "top left",
-    "top-right": "top right",
-    "bottom-left": "bottom left",
-    "bottom-right": "bottom right",
-};
-
-type FloatingWindowSnapLayout = {
-    id: string;
-    label: string;
-    zones: Array<{region: FloatingWindowSnapRegion; gridArea: string}>;
-};
-
-const snapLayouts: FloatingWindowSnapLayout[] = [
-    {
-        id: "halves",
-        label: "Two columns",
-        zones: [
-            {region: "left", gridArea: "1 / 1 / 3 / 2"},
-            {region: "right", gridArea: "1 / 2 / 3 / 3"},
-        ],
-    },
-    {
-        id: "left-stack",
-        label: "Left and stacked right",
-        zones: [
-            {region: "left", gridArea: "1 / 1 / 3 / 2"},
-            {region: "top-right", gridArea: "1 / 2 / 2 / 3"},
-            {region: "bottom-right", gridArea: "2 / 2 / 3 / 3"},
-        ],
-    },
-    {
-        id: "right-stack",
-        label: "Stacked left and right",
-        zones: [
-            {region: "top-left", gridArea: "1 / 1 / 2 / 2"},
-            {region: "bottom-left", gridArea: "2 / 1 / 3 / 2"},
-            {region: "right", gridArea: "1 / 2 / 3 / 3"},
-        ],
-    },
-    {
-        id: "quarters",
-        label: "Four quarters",
-        zones: [
-            {region: "top-left", gridArea: "1 / 1 / 2 / 2"},
-            {region: "top-right", gridArea: "1 / 2 / 2 / 3"},
-            {region: "bottom-left", gridArea: "2 / 1 / 3 / 2"},
-            {region: "bottom-right", gridArea: "2 / 2 / 3 / 3"},
-        ],
-    },
-];
-
-type FloatingWindowLimit = NonNullable<FloatingWindowProps["limit"]>;
-
-/** Shared by the mouse and touch drag loops, which clamp identically. */
-function clampToLimit(x: number, y: number, lim: FloatingWindowLimit | undefined): FloatingWindowPosition {
-    if (!lim) return {x, y};
-    if (lim.x?.min !== undefined && lim.x.min > x) x = lim.x.min;
-    if (lim.x?.max !== undefined && lim.x.max < x) x = lim.x.max;
-    if (lim.y?.min !== undefined && lim.y.min > y) y = lim.y.min;
-    if (lim.y?.max !== undefined && lim.y.max < y) y = lim.y.max;
-    return {x, y};
-}
-
-function snapPreviewStyle(region: FloatingWindowSnapRegion): React.CSSProperties {
-    // Every region is either left- or right-hand, so the left/top ternaries only ever
-    // needed their right/bottom branch; width is half of the viewport for all six.
-    const right = region == "right" || region.endsWith("-right");
-    const bottom = region.startsWith("bottom-");
-    const fullHeight = region == "left" || region == "right";
-    return {
-        left: right ? "50%" : 6,
-        top: bottom ? "50%" : 6,
-        width: "calc(50% - 9px)",
-        height: fullHeight ? "calc(100% - 12px)" : "calc(50% - 9px)",
-    };
-}
+// Native presses already answered by a (nested) window in this event's React path; see raiseOnPress.
+const claimedPresses = new WeakSet<Event>();
 
 // Freezes the subtree until update changes (intentionally ignores render closure changes) -
 // the previous useMemo-in-callback semantics, but without calling a hook from an arbitrary place
@@ -381,20 +296,6 @@ export function useFloatingWindowController({
     const hideSnapLayout = () => {
         setSnapLayoutVisible(false);
         previewSnap(null);
-    };
-    const snapGeometry = (region: FloatingWindowSnapRegion): FloatingWindowSavedGeometry => {
-        const viewportWidth = typeof window == "undefined" ? 0 : window.innerWidth;
-        const viewportHeight = typeof window == "undefined" ? 0 : window.innerHeight;
-        const halfWidth = Math.floor(viewportWidth / 2);
-        const halfHeight = Math.floor(viewportHeight / 2);
-        switch (region) {
-            case "left": return {position: {x: 0, y: 0}, size: {width: halfWidth, height: viewportHeight}};
-            case "right": return {position: {x: halfWidth, y: 0}, size: {width: viewportWidth - halfWidth, height: viewportHeight}};
-            case "top-left": return {position: {x: 0, y: 0}, size: {width: halfWidth, height: halfHeight}};
-            case "top-right": return {position: {x: halfWidth, y: 0}, size: {width: viewportWidth - halfWidth, height: halfHeight}};
-            case "bottom-left": return {position: {x: 0, y: halfHeight}, size: {width: halfWidth, height: viewportHeight - halfHeight}};
-            case "bottom-right": return {position: {x: halfWidth, y: halfHeight}, size: {width: viewportWidth - halfWidth, height: viewportHeight - halfHeight}};
-        }
     };
     const snapTo = (region: FloatingWindowSnapRegion) => {
         if (!snappable || typeof window == "undefined") return;
@@ -725,8 +626,20 @@ export function useFloatingWindowController({
     };
 
     const bringToFront = desktop.bringToFront;
-    const onWindowMouseDown: React.MouseEventHandler<HTMLDivElement> = bringToFront;
-    const onWindowPointerDown: React.PointerEventHandler<HTMLDivElement> = bringToFront;
+    // A window nested in another window's React tree portals to body, so a press inside it is
+    // still delivered to the outer window's handlers (React bubbles through portals) although
+    // the target is not inside the outer window's DOM. Without this check the opener re-raised
+    // itself right after the nested window and always ended up on top of it. The innermost
+    // window claims the native press; an ancestor only raises when the press is really inside
+    // its own DOM (its content, or an embedded portal={false} child, which is visually part of it).
+    const raiseOnPress = (e: React.SyntheticEvent<HTMLElement>) => {
+        const native = e.nativeEvent;
+        if (claimedPresses.has(native) && !e.currentTarget.contains(e.target as Node)) return;
+        claimedPresses.add(native);
+        bringToFront();
+    };
+    const onWindowMouseDown: React.MouseEventHandler<HTMLDivElement> = raiseOnPress;
+    const onWindowPointerDown: React.PointerEventHandler<HTMLDivElement> = raiseOnPress;
 
     const onWindowKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
         const target = e.target as HTMLElement;
@@ -762,6 +675,16 @@ export function useFloatingWindowController({
             });
         }
         if (ks) floatingWindowMap.touch(ks);
+    };
+
+    // The resize handles are Rnd's own children, siblings of .wenayWnd, so a press on them
+    // never reaches the raise handler above. For a window nested in another window's React
+    // tree that press still bubbles through the portal to the opener, which would then raise
+    // itself over the window being resized. Claim the press here first, then raise.
+    const onResizeStart: RndResizeStartCallback = (e) => {
+        const native = (e as React.SyntheticEvent).nativeEvent;
+        if (native) claimedPresses.add(native);
+        bringToFront();
     };
 
     const onResizeStop: RndResizeCallback = (e, dir, elementRef, delta, { x: nx, y: ny }) => {
@@ -810,6 +733,7 @@ export function useFloatingWindowController({
         onWindowMouseDown,
         onWindowKeyDown,
         onResize,
+        onResizeStart,
         onResizeStop,
     };
 }
@@ -926,20 +850,7 @@ export function FloatingWindowBase({
 
     const showHeader = !!(moveOnlyHeader || header || title != null);
 
-    const headerD = (
-        <div
-            ref={controller.headerRef}
-            className="wenayWndHeader"
-            onTouchStart={controller.onHeaderTouchStart}
-            onTouchEnd={controller.onHeaderTouchEnd}
-            onMouseDown={controller.onHeaderMouseDown}
-            onDoubleClick={controller.onHeaderDoubleClick}
-        >
-            {header ?? (title != null
-                ? <div className="wenayWndTitle">{title}</div>
-                : <div className="wenayWndHeaderDef"></div>)}
-        </div>
-    );
+    const headerD = <WindowHeader controller={controller} header={header} title={title}/>;
 
     const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null);
     const [windowRoot, setWindowRoot] = useState<HTMLDivElement | null>(null);
@@ -983,6 +894,7 @@ export function FloatingWindowBase({
             tabIndex={0}
             className={rootClassName}
             onKeyDown={controller.onWindowKeyDown}
+            onResizeStart={controller.onResizeStart}
             onResizeStop={controller.onResizeStop}
             onResize={controller.onResize}
             position={controller.position}
@@ -1015,85 +927,18 @@ export function FloatingWindowBase({
                     )}
                     {typeof children === "function" ? children(controller.update) : children}
                 </div>
-                {showHeader && showMinimizeButton && (
-                    <button
-                        type="button"
-                        className="wenayWndControl wenayWndMinimize"
-                        title="Minimize"
-                        aria-label="Minimize"
-                        onMouseDown={event => event.stopPropagation()}
-                        onPointerDown={event => event.stopPropagation()}
-                        onClick={controller.minimize}
-                    >
-                        <span aria-hidden="true" />
-                    </button>
-                )}
-                {showHeader && showMaximizeButton && (
-                    <button
-                        type="button"
-                        className="wenayWndControl wenayWndMaximize"
-                        title={controller.mode == "maximized" ? "Restore" : "Maximize"}
-                        aria-label={controller.mode == "maximized" ? "Restore" : "Maximize"}
-                        aria-pressed={controller.mode == "maximized"}
-                        onMouseDown={event => event.stopPropagation()}
-                        onPointerDown={event => event.stopPropagation()}
-                        onClick={() => {
-                            controller.bringToFront();
-                            controller.toggleMaximize();
-                        }}
-                    >
-                        <span aria-hidden="true" />
-                    </button>
-                )}
-                {showClose && (
-                    <button
-                        type="button"
-                        key="323"
-                        className="wenayCloseBtn wenayWndClose"
-                        title="Close"
-                        aria-label="Close"
-                        style={{
-                            zIndex: controller.overlayZIndex
-                        }}
-                        onMouseDown={event => event.stopPropagation()}
-                        onPointerDown={event => event.stopPropagation()}
-                        onClick={() => requestClose("close-button")}
-                    >
-                        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-                            <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                        </svg>
-                    </button>
-                )}
+                <WindowControls
+                    controller={controller}
+                    minimize={showHeader && showMinimizeButton}
+                    maximize={showHeader && showMaximizeButton}
+                    close={showClose}
+                    onClose={() => requestClose("close-button")}
+                />
             </div>
         </Rnd>
     );
 
-    const snapLayout = canSnap && controller.snapLayoutVisible ? (
-        <>
-            {controller.snapPreview && <div className="wenaySnapPreview" style={snapPreviewStyle(controller.snapPreview)} aria-hidden="true" />}
-            <div className="wenaySnapLayout" role="toolbar" aria-label="Snap layouts">
-                {snapLayouts.map(layout => (
-                    <div key={layout.id} className="wenaySnapLayoutPreset" role="group" aria-label={layout.label} data-layout={layout.id}>
-                        {layout.zones.map(zone => (
-                            <button
-                                type="button"
-                                key={zone.region}
-                                className="wenaySnapLayoutZone"
-                                style={{gridArea: zone.gridArea}}
-                                data-wenay-snap-region={zone.region}
-                                data-preview={controller.snapPreview == zone.region ? "true" : "false"}
-                                aria-label={`${layout.label}: ${snapRegionLabels[zone.region]}`}
-                                onPointerEnter={() => controller.previewSnap(zone.region)}
-                                onMouseEnter={() => controller.previewSnap(zone.region)}
-                                onFocus={() => controller.previewSnap(zone.region)}
-                                onClick={() => controller.snapTo(zone.region)}
-                            />
-                        ))}
-                    </div>
-                ))}
-            </div>
-        </>
-    ) : null;
+    const snapLayout = canSnap ? <SnapLayoutOverlay controller={controller}/> : null;
 
     if (!portalEnabled) return <WindowPortalContext.Provider value={windowRoot}>{windowNode}</WindowPortalContext.Provider>;
     return createPortal(
@@ -1115,117 +960,5 @@ export function FloatingWindowBase({
     );
 }
 
-// Removed unused demo components Drag3 and DragBig3
-// Use DragBox for functional draggable behavior
-
-export type DragBoxProps = {
-    /** Child element that should be draggable */
-    children: ReactNode;
-
-    /** Callback when the X coordinate changes */
-    onX?: (val: number) => void;
-
-    /** Callback when the Y coordinate changes */
-    onY?: (val: number) => void;
-
-    /** Initial (or controlled) X value */
-    x?: number;
-
-    /** Initial (or controlled) Y value */
-    y?: number;
-    /** Count from the right edge */
-    right?: boolean;
-    /**
-     * External ref for storing coordinates.
-     * If provided, the component updates the ref on each movement.
-     */
-    last?: React.RefObject<{ x: number; y: number }>;
-
-    /** Called when dragging starts (mouse or touch) */
-    onStart?: () => void;
-
-    /** Called when dragging ends (mouse and touch) */
-    onStop?: () => void;
-
-    dragging?: boolean;
-};
-
-
-
-
-
-/**
- * Wrapper component that lets a nested element be dragged
- * with both mouse and touch input.
- *
- * Function only as a hook for parameter changes during movement, although it has its own component (for offset counting).
- * Returns the distance traveled when moving the child element.
- */
-export function DragBox({
-                           children,
-                           onX,
-                           onY,
-                           x = 0,
-                           y = 0,
-                           right = false,
-                           last,
-                           dragging: _dragging, // accepted for compatibility, was never read
-                           onStart,
-                           onStop
-                       }: DragBoxProps) {
-    // Thin adapter over useDraggableApi (A7): same observable contract as the old
-    // bespoke loop - immediate start, per-tick imperative onX/onY with the delta from
-    // the press point, NO re-render per move tick, posRef keeps the last delta after
-    // release (reset happens on the next gesture start inside the hook).
-    const posRef = useRef<{ x: number; y: number }>(last?.current ?? { x, y });
-    const callbacksRef = useRef({ onX, onY, onStart, onStop });
-    callbacksRef.current = { onX, onY, onStart, onStop };
-
-    const api = useDraggableApi({
-        holdMs: 0,
-        trackState: false,
-        onDragStart() {
-            // per-gesture reset - without it repeated drags accumulated offset
-            posRef.current.x = 0;
-            posRef.current.y = 0;
-            callbacksRef.current.onStart?.();
-        },
-        onMove(p) {
-            // mutate in place: `last` shares this object (see layout effect below)
-            posRef.current.x = p.x;
-            posRef.current.y = p.y;
-            callbacksRef.current.onX?.(p.x);
-            callbacksRef.current.onY?.(p.y);
-        },
-        onDragEnd(final) {
-            posRef.current.x = final.x;
-            posRef.current.y = final.y;
-            callbacksRef.current.onStop?.();
-        },
-    });
-
-    useLayoutEffect(() => {
-        posRef.current.x = x;
-        posRef.current.y = y;
-    }, [x, y]);
-
-    useLayoutEffect(() => {
-        if (last) {
-            last.current = posRef.current;
-        }
-    });
-
-    return (
-        <div
-            style={{
-                position: "absolute",
-                left: right ? undefined : 0,
-                right: right ? 0 : undefined,
-                top: 0
-            }}
-            {...api.dragProps}
-        >
-            {children}
-        </div>
-    );
-}
+export {DragBox} from "./DragBox.js";
+export type {DragBoxProps} from "./DragBox.js";

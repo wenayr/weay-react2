@@ -11,9 +11,9 @@ import {
     type VideoCallRoom,
     type VideoCallScreenState,
     useVideoCallController,
-} from "../src/components/Communication";
-import {useMediaSource} from "../src/hooks/useMedia";
-import {usePeerCalls} from "../src/hooks/usePeerCall";
+} from "../src/components/Communication/index.js";
+import {useMediaSource} from "../src/hooks/useMedia.js";
+import {usePeerCalls} from "../src/hooks/usePeerCall.js";
 
 type BrowserSpeechResultEvent = {
     results?: Record<number, Record<number, {transcript?: string}> | undefined>;

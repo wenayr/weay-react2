@@ -1,6 +1,6 @@
 import {useEffect, useMemo} from "react";
-import {renderBy} from "../../updateBy";
-import {ObservableMap} from "./observableMap";
+import {renderBy} from "../../updateBy.js";
+import {ObservableMap} from "./observableMap.js";
 
 export type DirtyListener = (scope?: string, key?: string) => void
 
@@ -167,11 +167,12 @@ export function createCacheMapWithStorage(arr: [k: string, v: Map<string, unknow
                 for (const cb of [...dirtyListeners]) cb(scope, key)
         })
     }
+    const offMaps: Array<() => void> = []
     for (const [scope, map] of arr) {
-        if (map instanceof ObservableMap) map.onChange(key => {
+        if (map instanceof ObservableMap) offMaps.push(map.onChange(key => {
             if (loading) return // load()'s own mutations are not user changes
             markDirty(scope, typeof key == "string" ? key : undefined)
-        })
+        }))
     }
 
     const getPayloads = () => arr.map(([key, map]) => [key, JSON.stringify([...map.entries()])] as const)
@@ -190,6 +191,10 @@ export function createCacheMapWithStorage(arr: [k: string, v: Map<string, unknow
         while (loading) await loading
         // reset at cycle START: a change arriving mid-write must survive for the next save
         dirty = false
+        // Deliberately a full diff, not a scope-filtered one: the docblock above makes the
+        // serialized snapshot the source of truth precisely so a MISSED announcement (an
+        // in-place mutation without touch()) still degrades to "saved later" rather than
+        // "never saved". Scoping the scan would quietly turn that tolerance into data loss.
         for (const [key, payload] of getPayloads()) {
             if (savedPayloadByKey.get(key) === payload) continue
             if (await Save.set(key, JSON.parse(payload) as object)) {
@@ -260,6 +265,15 @@ export function createCacheMapWithStorage(arr: [k: string, v: Map<string, unknow
         },
         /** Cheap hint (e.g. a beforeunload guard); the save diff is the source of truth. */
         isDirty(): boolean { return dirty },
+        /** Release this cache's subscriptions to the maps it was built over. Only needed for
+         *  caches created per route/session over longer-lived maps - the module-level
+         *  memoryCache lives as long as the page. The maps and storage are left untouched. */
+        dispose(): void {
+            cancelDebouncedSave()
+            for (const off of offMaps) off()
+            offMaps.length = 0
+            dirtyListeners.clear()
+        },
         getArr: arr
     }
 }
@@ -276,10 +290,11 @@ export type CacheMap = ReturnType<typeof createCacheMapWithStorage>
  *  imperative needs; `reload` is an explicit alias of `load` (a second load() merges storage
  *  on top of current maps - it is not a reset). */
 export function useCacheMapPersistence(cache: CacheMap, delay = 300) {
-    useEffect(() => {
-        void cache.load()
-        return cache.onDirty(() => cache.saveDebounced(delay))
-    }, [cache, delay])
+    // two effects on purpose: load() merges storage ON TOP of the current maps, so keeping it
+    // in the same effect as the dirty subscription made a changed `delay` re-run the merge and
+    // roll unsaved values back
+    useEffect(() => { void cache.load() }, [cache])
+    useEffect(() => cache.onDirty(() => cache.saveDebounced(delay)), [cache, delay])
     return useMemo(() => ({
         isDirty: () => cache.isDirty(),
         flush: () => cache.flush(),

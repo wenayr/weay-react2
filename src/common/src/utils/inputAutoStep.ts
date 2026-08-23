@@ -61,13 +61,24 @@ export function setAutoStepForElement(element: StepInputElement, params: {minSte
         modeAuto = false;
     else modeAuto ||= (stepCurrent != null && (minStep == null || stepCurrent > minStep));
 
-    const onKeyUp = () => { if (modeAuto) calculateStep(element.value); }
+    // "input" as well as "keyup": a paste from the context menu, a drag-and-drop, or a click on
+    // the spinner changes the value without ever producing a keyup, so the step used to lag
+    // behind the value until the next keypress. The guard keeps the double delivery free.
+    let lastStepValue: string | null = null;
+    const recalcStep = () => {
+        if (!modeAuto) return;
+        if (element.value === lastStepValue) return;
+        lastStepValue = element.value;
+        calculateStep(element.value);
+    }
 
     const onChange = () => {
         const digits = digitsCurrent;
-        if (digits != null) element.value = parseFloat(element.value).toFixed(digits);
+        const parsed = parseFloat(element.value);
+        if (digits != null && !Number.isNaN(parsed)) element.value = parsed.toFixed(digits);
         if (minDefault != null && parseFloat(element.value) < minDefault) {
-            element.step = stepDefault + "";
+            if (stepDefault != null) element.step = stepDefault + "";
+            else element.removeAttribute("step");
             element.value = minDefault + "";
             element.min = minDefault + "";
             digitsCurrent = null;
@@ -75,10 +86,12 @@ export function setAutoStepForElement(element: StepInputElement, params: {minSte
         element.setAttribute("value", element.value);
     }
 
-    element.addEventListener("keyup", onKeyUp);
+    element.addEventListener("keyup", recalcStep);
+    element.addEventListener("input", recalcStep);
     element.addEventListener("change", onChange);
     const dispose = () => {
-        element.removeEventListener("keyup", onKeyUp);
+        element.removeEventListener("keyup", recalcStep);
+        element.removeEventListener("input", recalcStep);
         element.removeEventListener("change", onChange);
         appliedHandlers.delete(element);
     };

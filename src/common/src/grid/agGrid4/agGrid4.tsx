@@ -5,9 +5,9 @@
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { AgGridReact, AgGridReactProps } from 'ag-grid-react'
 import type { GridApi, GetRowIdParams, GridPreDestroyedEvent, GridReadyEvent } from 'ag-grid-community'
-import { createGridBuffer, type BufferTable, type GetId, type GridBufferCore, type GridBufferMode, type PushOptions } from './core'
-import { ensureAgGridModules } from './modules'
-import { useAgGridTheme } from './theme'
+import { createGridBuffer, type BufferTable, type GetId, type GridBufferCore, type GridBufferMode, type PushOptions } from './core.js'
+import { ensureAgGridModules } from './modules.js'
+import { useAgGridTheme } from './theme.js'
 
 export type UseAgGridOptions<T> = {
     /** How to get a row id. Defaults to the `id` field. Captured once (first render). */

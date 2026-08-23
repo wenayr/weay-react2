@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { createChartCanvas, IChartCanvas, IChartPoint} from "./myChart";
+import { createChartCanvas, IChartCanvas, IChartPoint} from "./myChart.js";
 
 export function ChartDemo() {
     const chartRef = useRef<IChartCanvas | null>(null);

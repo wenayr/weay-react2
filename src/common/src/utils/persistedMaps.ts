@@ -1,12 +1,13 @@
-import { ObservableMap } from "./observableMap";
-import type { FloatingWindowSavedGeometry } from "../components/Dnd/FloatingWindowTypes";
+import { ObservableMap } from "./observableMap.js";
+import type { FloatingWindowSavedGeometry } from "./floatingWindowTypes.js";
 
 /** Persisted-state maps live in a utils LEAF so the runtime dependency graph points one way:
  *  owning components import their map from here, and memoryStore assembles the memoryCache
  *  registry without reaching up into the component layer (it used to import FloatingWindow/
  *  Resizable/RightMenuStore, dragging react-rnd and the Menu tree into every utils consumer).
  *  Shared persisted shapes stay data-only so the registry never points back to
- *  a component/controller module, even at declaration-build time. */
+ *  a component/controller module, even at declaration-build time - which is why the window
+ *  geometry contract sits next to this file in utils rather than under components/Dnd. */
 
 /** Saved size of an FResizableReact column/box; the shape the resize layer persists. */
 export type ResizableSavedSize = { height?: number | string, width?: number | string }

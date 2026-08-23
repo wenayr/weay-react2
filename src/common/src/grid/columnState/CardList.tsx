@@ -4,7 +4,8 @@
 // cardRole:'accent' renders as a badge. The sticky sort orders the cards even
 // when its column is hidden. No ag-grid, no storage.
 import React from 'react'
-import type {ColumnStateController} from './columnState'
+import type {ColumnStateController} from './columnState.js'
+import {cx} from "../../utils/cx.js";
 
 function cmpValues(a: unknown, b: unknown): number {
     if (typeof a == 'number' && typeof b == 'number') return a - b
@@ -12,10 +13,6 @@ function cmpValues(a: unknown, b: unknown): number {
     if (a == null) return -1
     if (b == null) return 1
     return String(a).localeCompare(String(b))
-}
-
-function cx(parts: Array<string | false | null | undefined>) {
-    return parts.filter(Boolean).join(' ')
 }
 
 export function CardList<T extends object>(p: {

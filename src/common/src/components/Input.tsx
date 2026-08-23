@@ -1,6 +1,6 @@
 import React, {useRef} from "react";
-import {OutsideClickArea} from "../hooks/useOutside";
-import { FloatingWindow } from "./Dnd/FloatingWindow";
+import {OutsideClickArea} from "../hooks/useOutside.js";
+import { FloatingWindow } from "./Dnd/FloatingWindow.js";
 
 // Unified modal wrapper component
 function ModalWrapper({
@@ -37,6 +37,10 @@ function ModalWrapper({
 
 export type TextInputPanelProps = {callback: (txt: string)=>void, name?: string, txt?: string}
 
+/** Uncontrolled by design: `txt` is the INITIAL value only, captured on mount, and the field
+ *  keeps whatever the user typed. To show a different text in a panel that is not being
+ *  remounted, give it a new React `key` - syncing the ref alone would leave the ref and the
+ *  DOM input disagreeing. */
 export function useTextInputPanel({callback, txt = ""}: Pick<TextInputPanelProps, "callback" | "txt">) {
     const txtName = useRef(txt)
     return {

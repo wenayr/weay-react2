@@ -1,12 +1,16 @@
 import fs from "fs";
 import path from "path";
-import {tokens} from "../src/common/src/styles/tokens";
+import {tokens, tokensVar} from "../src/common/src/styles/tokens";
 
 // tokens.ts is a hand-written mirror of tokens.css (A10: codegen rejected to keep the
 // build pipeline untouched). This test IS the sync guarantee: every CSS custom property
 // in :root must have a TS mirror entry with the same (var()-resolved) value, and every
 // mirrored TS entry must still exist in CSS. Groups without a CSS counterpart
-// (font, grid, zIndex fallbacks) are listed explicitly below.
+// (font, zIndex fallbacks) are listed explicitly below.
+//
+// tokens.grid joined the mirror when the ag-grid theme moved to tokensVar.grid: the params are
+// fed to the Theming API as var(--grid-*, <token>), so the CSS side is now load-bearing and
+// drifting from the TS side would silently change how the grid is painted.
 
 function parseRootVars(css: string): Map<string, string> {
     const root = css.slice(css.indexOf("{") + 1, css.lastIndexOf("}"));
@@ -41,6 +45,8 @@ const GROUPS: Array<[cssPrefix: string, group: Record<string, string | number>]>
     ["--dlg-", tokens.dlg],
     ["--tb-", tokens.tb],
     ["--grid-chrome-", tokens.gridChrome],
+    // must stay AFTER --grid-chrome-: the lookup takes the first matching prefix
+    ["--grid-", tokens.grid],
     ["--logs-", tokens.logs],
 ];
 
@@ -86,5 +92,17 @@ describe("tokens.ts mirrors tokens.css", () => {
             }
         }
         expect(problems).toEqual([]);
+    });
+
+    test("tokensVar.grid is the var() form of tokens.grid, key for key", () => {
+        // The ag-grid theme is built from tokensVar.grid. A key present in one object and not
+        // the other means a param silently stops being themeable (or stops being painted).
+        expect(Object.keys(tokensVar.grid).sort()).toEqual(Object.keys(tokens.grid).sort());
+        for (const [key, value] of Object.entries(tokensVar.grid)) {
+            const cssName = "--grid-" + key.replace(/([A-Z])/g, c => "-" + c.toLowerCase());
+            const fallback = tokens.grid[key as keyof typeof tokens.grid];
+            expect(value).toBe(`var(${cssName}, ${fallback})`);
+            expect(cssVars.has(cssName)).toBe(true);
+        }
     });
 });

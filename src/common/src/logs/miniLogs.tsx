@@ -1,7 +1,7 @@
 import {timeLocalToStr_hhmmss} from "wenay-common2/client";
 import React, {useCallback, useMemo, useRef} from "react";
 import type {CellMouseDownEvent, ColDef, GridApi, GridPreDestroyedEvent, GridReadyEvent} from "ag-grid-community";
-import {AgGridTable, colDefCentered, type AgGridTableProps} from "../grid/agGrid4";
+import {AgGridTable, colDefCentered, type AgGridTableProps} from "../grid/agGrid4/index.js";
 
 export const miniLogsColumnDefs = [
     {

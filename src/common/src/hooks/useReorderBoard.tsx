@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react'
-import {useDraggableApi} from './useDraggable'
-import {ReorderItem} from './useReorder'
+import {useDraggableApi} from './useDraggable.js'
+import {ReorderItem} from './useReorder.js'
 
 /** useReorderBoard - the columns extension of useReorder: keyed blocks live in
  *  VERTICAL columns (plain consumer divs), one block drags between/within them,

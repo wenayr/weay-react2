@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react'
-import {useDraggableApi} from './useDraggable'
+import {useDraggableApi} from './useDraggable.js'
 
 /** useReorder - a deliberately small reorder-by-drag for keyed blocks laid out
  *  by CSS (vertical list, horizontal bar, wrapped grid - the hook never knows
@@ -141,6 +141,10 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
     const preview = from != -1 && dragKey != null ? move(o.order, dragKey, target) : null
     const previewKey = preview?.join("\u0000") ?? ""
     useEffect(() => o.onPreviewChange?.(preview), [previewKey])
+    // unmount mid-drag must not leave the preview order applied in columnState/grid
+    const previewChangeRef = useRef(o.onPreviewChange)
+    previewChangeRef.current = o.onPreviewChange
+    useEffect(() => () => previewChangeRef.current?.(null), [])
 
     function item(key: string): ReorderItem {
         const active = preview != null

@@ -1,8 +1,8 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import {Color, colorGenerator2, ColorString, sleepAsync} from "wenay-common2/client";
-import {createUpdateApi} from "../../../updateBy";
-import {createModalElementStore} from "./Modal";
-import { DragBox } from "../Dnd/FloatingWindow";
+import {createUpdateApi} from "../../../updateBy.js";
+import {createModalElementStore} from "./Modal.js";
+import { DragBox } from "../Dnd/FloatingWindow.js";
 function useViewport() {
     // lazy initializer + guard: window is absent in DOM-less environments (SSR/tests)
     const [width, setWidth] = useState(() => typeof window != 'undefined' ? window.innerWidth : 0);

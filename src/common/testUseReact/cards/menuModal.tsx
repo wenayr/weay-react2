@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Menu, contextMenu, ModalProvider, useModal, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useCacheMapPersistence, memoryCache, useListenEffect, updateBy, renderBy, type ToolbarItem, type ToolbarConfig } from "../../api";
-import { HoverButton } from "../../src/hooks";
-import { Check } from "../standKit";
+import { Menu, contextMenu, ModalProvider, useModal, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useCacheMapPersistence, memoryCache, useListenEffect, updateBy, renderBy, type ToolbarItem, type ToolbarConfig } from "../../api.js";
+import { HoverButton } from "../../src/hooks/index.js";
+import { Check } from "../standKit.js";
 
 
 /* ---------- 13. ModalProvider / useModal ---------- */

@@ -230,3 +230,28 @@ export const tokens = {
 } as const
 
 export type Tokens = typeof tokens
+
+const asVar = (name: string, fallback: string | number) => `var(${name}, ${fallback})`
+
+/** The `var(--x, <token>)` form of the token groups an application is expected to re-skin.
+ *
+ *  `tokens` itself stays literal - it is a published object, pinned by __test/tokens.test.ts,
+ *  and inline styles need real values. But a literal cannot react to a `:root[data-theme=...]`
+ *  override, which is exactly why the ag-grid theme ignored app theming while windows, menus
+ *  and dialogs followed it: the grid params were fed from `tokens.grid` verbatim. Pass
+ *  `tokensVar.grid` to a theme builder instead and the same override reaches the grid too.
+ *
+ *  The CSS counterparts live in src/style/tokens.css; the fallbacks here keep the current look
+ *  when a consumer ships no overrides at all. */
+export const tokensVar = {
+    grid: {
+        fontFamily: asVar('--grid-font-family', tokens.grid.fontFamily),
+        textColor: asVar('--grid-text-color', tokens.grid.textColor),
+        tabTextColor: asVar('--grid-tab-text-color', tokens.grid.tabTextColor),
+        fontSize: asVar('--grid-font-size', tokens.grid.fontSize),
+        spacing: asVar('--grid-spacing', tokens.grid.spacing),
+        backgroundColor: asVar('--grid-background-color', tokens.grid.backgroundColor),
+    },
+} as const
+
+export type TokensVar = typeof tokensVar

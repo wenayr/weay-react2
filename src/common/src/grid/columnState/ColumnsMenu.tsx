@@ -20,9 +20,9 @@
 // standards) keeps its button: it renders 'disabled' (dashed, inert) and
 // comes back to life when the column returns. No ag-grid, no storage here.
 import React, {useRef} from 'react'
-import {useReorder} from '../../hooks/useReorder'
-import {movedOrderWithFixed} from '../../utils/fixedOrder'
-import type {ColumnStateController, ColumnsConfig} from './columnState'
+import {useReorder} from '../../hooks/useReorder.js'
+import {movedOrderWithFixed} from '../../utils/fixedOrder.js'
+import type {ColumnStateController, ColumnsConfig} from './columnState.js'
 
 export type MenuStripItem = {
     /** stable id; reported back on click / in the reorder commit */

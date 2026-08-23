@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useMemo, useState} from 'react'
 import type * as Contract from 'wenay-common2/contract'
+import {structEqual} from '../utils/structEqual.js'
 
 function idleSlot(slotId: string): Contract.ContractSlotStatus {
     return {
@@ -34,14 +35,23 @@ export function useContractSlot(
     runtime: Contract.ContractRuntime | null | undefined,
     slotId: string,
 ): ContractSlotController {
-    const [version, setVersion] = useState(0)
     const [lastEvent, setLastEvent] = useState<Contract.ContractBindingEvent | null>(null)
+    // The status channel fires for the WHOLE runtime, so a version counter re-rendered every
+    // slot consumer on every event and handed each one a freshly snapshotted object. Holding
+    // this slot's status in state and comparing structurally keeps both the render and the
+    // identity stable when nothing about THIS slot changed.
+    const readSlot = () => runtime
+        ? runtime.api.status.node.snapshot().slots[slotId] ?? idleSlot(slotId)
+        : idleSlot(slotId)
+    const [status, setStatus] = useState<Contract.ContractSlotStatus>(readSlot)
 
     useEffect(() => {
         setLastEvent(null)
-        setVersion(value => value + 1)
+        setStatus(prev => { const next = readSlot(); return structEqual(prev, next) ? prev : next })
         if (!runtime) return
-        const offStatus = runtime.api.status.node.on(() => setVersion(value => value + 1))
+        const offStatus = runtime.api.status.node.on(() => {
+            setStatus(prev => { const next = readSlot(); return structEqual(prev, next) ? prev : next })
+        })
         const offChanged = runtime.api.changed.on(event => {
             if (event.slotId == slotId) setLastEvent(event)
         })
@@ -50,11 +60,6 @@ export function useContractSlot(
             offChanged()
         }
     }, [runtime, slotId])
-
-    const status = useMemo(() => {
-        if (!runtime) return idleSlot(slotId)
-        return runtime.api.status.node.snapshot().slots[slotId] ?? idleSlot(slotId)
-    }, [runtime, slotId, version])
 
     const acquire = useCallback(<T extends object>() => {
         if (!runtime) throw new Error(`useContractSlot: runtime is unavailable for ${slotId}`)

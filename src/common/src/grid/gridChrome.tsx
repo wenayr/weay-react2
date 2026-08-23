@@ -1,9 +1,10 @@
 import React, {useEffect, useId, useRef, useState} from 'react'
 import type {GridApi} from 'ag-grid-community'
-import {ColumnsMenu} from './columnState/ColumnsMenu'
-import type {ColumnStateController} from './columnState/columnState'
-import {contextMenu as defaultContextMenu, type ContextMenuAnchor} from '../menu/menuMouse'
-import type {MenuItem} from '../menu/menu'
+import {ColumnsMenu} from './columnState/ColumnsMenu.js'
+import type {ColumnStateController} from './columnState/columnState.js'
+import {contextMenu as defaultContextMenu, type ContextMenuAnchor} from '../menu/menuMouse.js'
+import type {MenuItem} from '../menu/menu.js'
+import {cx as classNames} from "../utils/cx.js";
 
 export type GridChromeGroup = 'columns' | 'size' | 'data' | 'table' | string
 
@@ -91,8 +92,43 @@ export type GridChromeProps = {
     style?: React.CSSProperties
 }
 
-function classNames(parts: Array<string | false | undefined>) {
-    return parts.filter(Boolean).join(' ')
+// Module level on purpose. Nested inside Chrome these were a NEW component type on every
+// render, so React unmounted and remounted the whole popover subtree each time - visible as a
+// lost button focus after any command with closeOnRun:false. useId also sat after an early
+// return (a conditional hook) and only got away with it because the remount reset the hook
+// order on every render.
+function ChromeCommandButtons<T extends object>({commands, disabled, run}: {
+    commands: readonly GridChromeCommand<T>[]
+    disabled: (command: GridChromeCommand<T>) => boolean
+    run: (command: GridChromeCommand<T>) => void
+}) {
+    return <div className="wenayGridChromeCommands">
+        {commands.map(command => <button key={command.key} type="button" className="wenayGridChromeCommand"
+            title={command.title ?? command.name} aria-label={command.ariaLabel ?? command.name}
+            disabled={disabled(command)} onClick={() => run(command)}>{command.name}</button>)}
+    </div>
+}
+
+function ChromeCommandGroup<T extends object>({commands, children, title, collapsible, expanded, onToggle, disabled, run}: {
+    commands: readonly GridChromeCommand<T>[]
+    children?: React.ReactNode
+    title: string
+    collapsible: boolean
+    expanded: boolean
+    onToggle: () => void
+    disabled: (command: GridChromeCommand<T>) => boolean
+    run: (command: GridChromeCommand<T>) => void
+}) {
+    const contentId = useId()
+    if (!commands.length && !children) return null
+    return <section className="wenayGridChromeGroup" aria-label={title}>
+        {collapsible
+            ? <button type="button" className="wenayGridChromeGroupToggle" aria-expanded={expanded} aria-controls={contentId} onClick={onToggle}><span>{title}</span><span className="wenayGridChromeGroupChevron" aria-hidden>⌄</span></button>
+            : <div className="wenayGridChromeGroupTitle">{title}</div>}
+        <div id={contentId} className="wenayGridChromeGroupContent" role="group" aria-label={title} hidden={!expanded}>
+            {children}<ChromeCommandButtons commands={commands} disabled={disabled} run={run}/>
+        </div>
+    </section>
 }
 
 function asAnchor(event?: Event | null): ContextMenuAnchor {
@@ -290,32 +326,16 @@ export function createGridChrome<T extends object>(opts: GridChromeOptions<T>) {
             },
         ] : []
 
-        function CommandButtons({commands}: {commands: readonly GridChromeCommand<T>[]}) {
-            return <div className="wenayGridChromeCommands">
-                {commands.map(command => <button key={command.key} type="button" className="wenayGridChromeCommand"
-                    title={command.title ?? command.name} aria-label={command.ariaLabel ?? command.name}
-                    disabled={disabled(command)} onClick={() => void run(command)}>{command.name}</button>)}
-            </div>
-        }
-
-        function CommandGroup({group, commands, children}: {group: GridChromeGroup, commands: readonly GridChromeCommand<T>[], children?: React.ReactNode}) {
-            if (!commands.length && !children) return null
-            const contentId = useId()
+        const groupProps = (group: GridChromeGroup) => {
             const config = groupConfig(group)
-            const collapsible = config?.collapsible == true
-            const expanded = expandedGroups[String(group)] ?? config?.defaultOpen ?? true
-            const title = groupTitle(group)
-            function toggle() {
-                setExpandedGroups(current => ({...current, [String(group)]: !(current[String(group)] ?? config?.defaultOpen ?? true)}))
+            return {
+                title: groupTitle(group),
+                collapsible: config?.collapsible == true,
+                expanded: expandedGroups[String(group)] ?? config?.defaultOpen ?? true,
+                onToggle: () => setExpandedGroups(current => ({...current, [String(group)]: !(current[String(group)] ?? config?.defaultOpen ?? true)})),
+                disabled,
+                run: (command: GridChromeCommand<T>) => void run(command),
             }
-            return <section className="wenayGridChromeGroup" aria-label={title}>
-                {collapsible
-                    ? <button type="button" className="wenayGridChromeGroupToggle" aria-expanded={expanded} aria-controls={contentId} onClick={toggle}><span>{title}</span><span className="wenayGridChromeGroupChevron" aria-hidden>⌄</span></button>
-                    : <div className="wenayGridChromeGroupTitle">{title}</div>}
-                <div id={contentId} className="wenayGridChromeGroupContent" role="group" aria-label={title} hidden={!expanded}>
-                    {children}<CommandButtons commands={commands}/>
-                </div>
-            </section>
         }
 
         return <div ref={rootRef} className={classNames(['wenayGridChrome', open && 'wenayGridChrome_open', props.className])} style={props.style}>
@@ -327,10 +347,10 @@ export function createGridChrome<T extends object>(opts: GridChromeOptions<T>) {
                     setOpen(v => !v)
                 }}>⋮</button>
             {open && <div className="wenayGridChromePopover" role="dialog" aria-label={labels.trigger}>
-                {opts.columnState && <CommandGroup group="columns" commands={columnCommands}><ColumnsMenu state={opts.columnState} compact /></CommandGroup>}
-                <CommandGroup group="size" commands={sizeCommands}/>
-                <CommandGroup group="data" commands={dataCommands}/>
-                {appGroups.map(group => <CommandGroup key={group} group={group} commands={appCommands.filter(command => command.group == group)}/>) }
+                {opts.columnState && <ChromeCommandGroup {...groupProps('columns')} commands={columnCommands}><ColumnsMenu state={opts.columnState} compact /></ChromeCommandGroup>}
+                <ChromeCommandGroup {...groupProps('size')} commands={sizeCommands}/>
+                <ChromeCommandGroup {...groupProps('data')} commands={dataCommands}/>
+                {appGroups.map(group => <ChromeCommandGroup key={group} {...groupProps(group)} commands={appCommands.filter(command => command.group == group)}/>) }
                 {feedback && <div className={classNames(['wenayGridChromeFeedback', feedback.kind == 'error' && 'wenayGridChromeFeedback_error'])} role="status">{feedback.message}</div>}
             </div>}
             {!open && feedback && <div className={classNames(['wenayGridChromeFeedback', 'wenayGridChromeFeedback_toast', feedback.kind == 'error' && 'wenayGridChromeFeedback_error'])} role="status">{feedback.message}</div>}

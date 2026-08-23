@@ -1,7 +1,7 @@
 import React, {ReactNode, useEffect, useRef} from "react";
 import {createPortal} from "react-dom";
-import {createUpdateApi} from "../../../updateBy";
-import type {FloatingWindowMode, FloatingWindowSnapRegion} from "./FloatingWindowTypes";
+import {createUpdateApi} from "../../../updateBy.js";
+import type {FloatingWindowMode, FloatingWindowSnapRegion} from "./FloatingWindowTypes.js";
 
 export type FloatingDesktopWindow = {
     id: string;
@@ -48,14 +48,26 @@ function resolveStack(entry: FloatingDesktopEntry) {
     return null;
 }
 
+function registerEntry(entry: FloatingDesktopEntry) {
+    // Effects run children-first, so a window nested in another window's React tree (a
+    // FloatingWindow opened by a Button inside a FloatingWindow) registers before its opener; a
+    // plain push would then put the opener on top of it. `key` is handed out during render, i.e.
+    // in document order, so slot the entry below anything created after it. Entries created later
+    // can only be ahead of it inside the same effect flush -- passive effects are drained before
+    // the next render, and bringToFront only runs from events.
+    const later = desktopState.entries.findIndex(candidate => candidate.key > entry.key);
+    if (later >= 0) desktopState.entries.splice(later, 0, entry);
+    else desktopState.entries.push(entry);
+    desktopApi.render();
+}
+
 function bringEntryToFront(entry: FloatingDesktopEntry) {
     const index = desktopState.entries.indexOf(entry);
     if (index < 0) return;
     const last = desktopState.entries.findLastIndex(candidate => candidate.group == entry.group);
-    if (index != last) {
-        desktopState.entries.splice(index, 1);
-        desktopState.entries.push(entry);
-    }
+    if (index == last) return;
+    desktopState.entries.splice(index, 1);
+    desktopState.entries.push(entry);
     desktopApi.render();
 }
 
@@ -94,8 +106,7 @@ export function useFloatingDesktopWindow({windowId, group, baseZIndex, label}: {
 
     desktopApi.use();
     useEffect(() => {
-        desktopState.entries.push(entry);
-        desktopApi.render();
+        registerEntry(entry);
         return () => {
             const index = desktopState.entries.indexOf(entry);
             if (index >= 0) desktopState.entries.splice(index, 1);

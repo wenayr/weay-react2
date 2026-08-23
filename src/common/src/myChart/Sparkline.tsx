@@ -1,4 +1,5 @@
 import React, {useLayoutEffect, useRef, useState} from "react";
+import {currentDevicePixelRatio, observeElementBox} from "./canvasSurface.js";
 
 export interface SparklineSeries {
     key: React.Key;
@@ -37,15 +38,11 @@ function finiteNonNegative(value: number) {
     return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-function currentDpr() {
-    return typeof window == "undefined" ? 1 : Math.max(1, window.devicePixelRatio || 1);
-}
-
 function sizeFromRect(rect: Pick<DOMRectReadOnly, "width" | "height">): SparklineSize {
     return {
         width: finiteNonNegative(rect.width),
         height: finiteNonNegative(rect.height),
-        dpr: currentDpr(),
+        dpr: currentDevicePixelRatio(),
     };
 }
 
@@ -57,13 +54,32 @@ function asSeriesArray(series: SparklineProps["series"]): readonly SparklineSeri
     return Array.isArray(series) ? series : [series as SparklineSeries];
 }
 
+// Scratch view for hashing a float by its exact bits - no rounding, no allocation.
+const revScratch = new Float64Array(1);
+const revBits = new Uint32Array(revScratch.buffer);
+
+/** FNV-1a over the drawing inputs. Replaces a JSON.stringify of every point of every series,
+ *  which ran on each React render (a table of sparklines turned tens of thousands of numbers
+ *  into strings per parent render) even when nothing was going to be redrawn. Same contract:
+ *  a mutated data array changes the value, referential churn with equal values does not. */
 function drawingRevision(series: readonly SparklineSeries[]) {
-    return JSON.stringify(series.map(item => [
-        item.show !== false,
-        item.color ?? null,
-        item.fillColor ?? null,
-        item.data,
-    ]));
+    let h = 0x811c9dc5;
+    const mix = (v: number) => { h = Math.imul(h ^ (v >>> 0), 0x01000193) };
+    const mixNum = (v: number) => { revScratch[0] = v; mix(revBits[0]); mix(revBits[1]) };
+    const mixStr = (s: string | undefined) => {
+        if (s == undefined) { mix(0xffff); return }
+        for (let i = 0; i < s.length; i++) mix(s.charCodeAt(i));
+        mix(s.length);
+    };
+    for (const item of series) {
+        mix(item.show !== false ? 1 : 2);
+        mixStr(item.color);
+        mixStr(item.fillColor);
+        const data = item.data;
+        mix(data.length);
+        for (let i = 0; i < data.length; i++) mixNum(data[i]);
+    }
+    return h >>> 0;
 }
 
 function drawSparkline(
@@ -172,20 +188,14 @@ export function Sparkline({
 
     useLayoutEffect(() => {
         const container = containerRef.current;
-        if (!container || typeof ResizeObserver == "undefined") return;
+        if (!container) return;
 
         const updateSize = (rect: Pick<DOMRectReadOnly, "width" | "height">) => {
             const next = sizeFromRect(rect);
             setSize(previous => sameSize(previous, next) ? previous : next);
         };
         updateSize(container.getBoundingClientRect());
-
-        const observer = new ResizeObserver(entries => {
-            const entry = entries.find(item => item.target === container);
-            if (entry) updateSize(entry.contentRect);
-        });
-        observer.observe(container);
-        return () => observer.disconnect();
+        return observeElementBox(container, updateSize);
     }, []);
 
     const safeLineWidth = Number.isFinite(lineWidth) && lineWidth > 0 ? lineWidth : 1.5;

@@ -103,8 +103,17 @@ export function createDataSet(params: CreateDataSetParams): DataSet {
         }
         let overallMin = Infinity;
         let overallMax = -Infinity;
-        for (const chunk of minMaxChunks) {
-            if (chunk.xEnd < rangeX1 || chunk.xStart > rangeX2) continue;
+        // chunks inherit the data's x order, so the overlapping window is contiguous: binary
+        // search its first chunk instead of scanning all of them. updatePanels calls this per
+        // dataset per panel on every dirty frame, i.e. on every pan/zoom frame.
+        let lo = 0, hi = minMaxChunks.length;
+        while (lo < hi) {
+            const mid = (lo + hi) >> 1;
+            if (minMaxChunks[mid].xEnd < rangeX1) lo = mid + 1; else hi = mid;
+        }
+        for (let i = lo; i < minMaxChunks.length; i++) {
+            const chunk = minMaxChunks[i];
+            if (chunk.xStart > rangeX2) break;
             if (chunk.minY < overallMin) overallMin = chunk.minY;
             if (chunk.maxY > overallMax) overallMax = chunk.maxY;
         }
@@ -320,6 +329,16 @@ export interface Renderer {
         crosshair: { x: number; y: number } | null,
         isYRightAxis: boolean
     ): void;
+    /** Draws ONLY the crosshair layer of a panel, over an already painted data layer.
+     *  Lets the engine answer a pointer move with a blit of the cached data layer instead of
+     *  a full LOD redraw of every dataset. Optional: a custom Renderer without it keeps the
+     *  old single-pass behaviour (drawPanel with the crosshair argument). */
+    drawPanelCrosshair?(
+        ctx: CanvasRenderingContext2D,
+        panel: Panel,
+        transform: Transform,
+        crosshair: { x: number; y: number } | null
+    ): void;
 }
 
 export interface Transform {
@@ -352,6 +371,29 @@ function visibleRange(data: DataPoint[], xMin: number, xMax: number): [number, n
         if (data[mid].x <= xMax) lo = mid + 1; else hi = mid;
     }
     return [start, lo];
+}
+
+/** One gradient object per (top, bottom, colour) instead of a fresh one per dataset per frame.
+ *  During a pan every filled line rebuilt its gradient on every single frame, and the geometry
+ *  only changes when the panel's vertical range does. Bounded so a long session cannot grow it. */
+// keyed BY CONTEXT: a gradient belongs to the context that created it, and a page can hold
+// several charts, so one flat cache would hand canvas B a gradient made on canvas A
+const gradientCache = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasGradient>>();
+const GRADIENT_CACHE_MAX = 64;
+
+function fillGradient(ctx: CanvasRenderingContext2D, yTop: number, yBottom: number, color: string): CanvasGradient {
+    let perContext = gradientCache.get(ctx);
+    if (!perContext) { perContext = new Map(); gradientCache.set(ctx, perContext) }
+    const key = `${Math.round(yTop)}|${Math.round(yBottom)}|${color}`;
+    let grad = perContext.get(key);
+    if (!grad) {
+        if (perContext.size >= GRADIENT_CACHE_MAX) perContext.clear();
+        grad = ctx.createLinearGradient(0, yTop, 0, yBottom);
+        grad.addColorStop(0, color);
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        perContext.set(key, grad);
+    }
+    return grad;
 }
 
 export function createRenderer(): Renderer {
@@ -524,10 +566,7 @@ export function createRenderer(): Renderer {
             const { minY, maxY } = panel.verticalRange;
             const yPixMin = yToPixY(minY, panel, transform);
             const yPixMax = yToPixY(maxY, panel, transform);
-            const grad = ctx.createLinearGradient(0, yPixMin, 0, yPixMax);
-            grad.addColorStop(0, fillColor);
-            grad.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = grad;
+            ctx.fillStyle = fillGradient(ctx, yPixMin, yPixMax, fillColor);
             ctx.fill();
         }
         ctx.restore();
@@ -646,8 +685,32 @@ export function createRenderer(): Renderer {
         ctx.restore();
     }
 
+    // same clip and bounds test as drawPanel's crosshair block, without repainting the data
+    function drawPanelCrosshair(
+        ctx: CanvasRenderingContext2D,
+        panel: Panel,
+        transform: Transform,
+        crosshair: { x: number; y: number } | null
+    ) {
+        if (!crosshair) return;
+        if (
+            crosshair.x < panel.left ||
+            crosshair.x > panel.left + panel.width ||
+            crosshair.y < panel.top ||
+            crosshair.y > panel.top + panel.height
+        ) return;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(panel.left, panel.top, panel.width, panel.height);
+        ctx.clip();
+        drawCrosshair(ctx, panel, crosshair, transform);
+        ctx.restore();
+    }
+
     return {
-        drawPanel
+        drawPanel,
+        drawPanelCrosshair
     };
 }
 
@@ -668,7 +731,10 @@ export function createInteraction(
     onTransformChanged: () => void,
     onToggleAutoFocusY: (panel: Panel) => void,
     panelManager: PanelManager,
-    getContainerSize: () => { width: number; height: number }
+    getContainerSize: () => { width: number; height: number },
+    /** Called instead of onTransformChanged when ONLY the crosshair moved (hover without a
+     *  press). Defaults to onTransformChanged, so existing callers behave exactly as before. */
+    onCrosshairMoved: () => void = onTransformChanged
 ): Interaction {
     let crosshairPos: { x: number; y: number } | null = null;
 
@@ -731,13 +797,16 @@ export function createInteraction(
     }
 
     function onMouseMove(e: MouseEvent) {
+        // Do NOT swap this for e.offsetX/offsetY: the canvas carries a 1px border, so offsetX
+        // is measured from the padding box while rect.left is the border box - measured on the
+        // stand, that shifts the crosshair by exactly one pixel on both axes.
         const rect = canvas.getBoundingClientRect();
         const localX = e.clientX - rect.left;
         const localY = e.clientY - rect.top;
         crosshairPos = { x: localX, y: localY };
 
         if (!isMouseDown) {
-            onTransformChanged();
+            onCrosshairMoved();
             return;
         }
 
@@ -823,11 +892,19 @@ export function createInteraction(
         return null;
     }
 
+    // the pointer left the canvas - drop the crosshair instead of freezing it at the last position
+    function onMouseLeave() {
+        if (!crosshairPos) return;
+        crosshairPos = null;
+        onCrosshairMoved();
+    }
+
     function initEvents(canvasEl: HTMLCanvasElement) {
         if (attached) return;
         attached = true;
         canvasEl.addEventListener('mousedown', onMouseDown);
         canvasEl.addEventListener('mousemove', onMouseMove);
+        canvasEl.addEventListener('mouseleave', onMouseLeave);
         canvasEl.addEventListener('wheel', onWheel, { passive: false });
         canvasEl.addEventListener('dblclick', onDblClick);
         document.addEventListener('mouseup', onGlobalMouseUp);
@@ -842,6 +919,7 @@ export function createInteraction(
         attached = false;
         canvas.removeEventListener('mousedown', onMouseDown);
         canvas.removeEventListener('mousemove', onMouseMove);
+        canvas.removeEventListener('mouseleave', onMouseLeave);
         canvas.removeEventListener('wheel', onWheel);
         canvas.removeEventListener('dblclick', onDblClick);
         document.removeEventListener('mouseup', onGlobalMouseUp);
@@ -897,16 +975,43 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
     // (including crosshair), addData/addPanel/resize; stamp in renderLoop catches direct
     // mutations through dataModel/panelManager (data lengths, panel geometry, canvas size).
     let needsRender = true;
+    // a pointer move without a press changes nothing but the crosshair: answered by blitting
+    // the cached data layer instead of rescanning every dataset
+    let needsCrosshair = false;
+    let layerCanvas: HTMLCanvasElement | null = null;
     let lastStamp = NaN;
     function invalidate() { needsRender = true; }
+    function invalidateCrosshair() { needsCrosshair = true; }
+    // A weighted SUM let compensating changes (+k on one dataset, -k on another) produce the
+    // same stamp and silently skip a frame. Mixing positionally makes that collision class go
+    // away at the same cost. Still polled every frame on purpose: the stamp is the documented
+    // safety net for mutations made straight through dataModel/panelManager, which never call
+    // invalidate().
     function frameStamp() {
         const panels = panelManager.panels;
-        let s = panels.length + canvas.width * 3 + canvas.height * 5;
+        let s = 17;
+        s = (s * 31 + panels.length) | 0;
+        s = (s * 31 + canvas.width) | 0;
+        s = (s * 31 + canvas.height) | 0;
         for (const p of panels) {
-            s += p.top * 7 + p.height * 13 + (p.autoFocusY ? 1 : 0);
-            for (const ds of p.dataSets) s += ds.data.length * 31;
+            s = (s * 31 + p.top) | 0;
+            s = (s * 31 + p.height) | 0;
+            s = (s * 31 + (p.autoFocusY ? 1 : 0)) | 0;
+            for (const ds of p.dataSets) s = (s * 31 + ds.data.length) | 0;
         }
         return s;
+    }
+
+    // snapshot of the freshly painted data layer, reused by crosshair-only frames
+    function captureLayer() {
+        if (canvas.width == 0 || canvas.height == 0) { layerCanvas = null; return; }
+        if (!layerCanvas) layerCanvas = document.createElement('canvas');
+        if (layerCanvas.width != canvas.width) layerCanvas.width = canvas.width;
+        if (layerCanvas.height != canvas.height) layerCanvas.height = canvas.height;
+        const lctx = layerCanvas.getContext('2d');
+        if (!lctx) { layerCanvas = null; return; }
+        lctx.clearRect(0, 0, layerCanvas.width, layerCanvas.height);
+        lctx.drawImage(canvas, 0, 0);
     }
 
     function setTransform(t: Transform) {
@@ -936,7 +1041,8 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
         invalidate,
         (p) => toggleAutoFocusY(p),
         panelManager,
-        getContainerSize
+        getContainerSize,
+        invalidateCrosshair
     );
 
     function updatePanels() {
@@ -972,16 +1078,33 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
             needsRender = true;
         }
 
-        if (needsRender) {
+        const fast = typeof renderer.drawPanelCrosshair == 'function';
+        const layerReady = fast && layerCanvas != null
+            && layerCanvas.width == canvas.width && layerCanvas.height == canvas.height;
+
+        if (needsRender || (needsCrosshair && !layerReady)) {
             needsRender = false;
+            needsCrosshair = false;
             updatePanels();
 
             const [xMin, xMax] = visibleXRange(canvas.width, transform);
             const crosshair = interaction.getCrosshairPos();
 
             for (const p of panelManager.panels) {
-                renderer.drawPanel(ctx, p, transform, { xMin, xMax }, crosshair, true);
+                renderer.drawPanel(ctx, p, transform, { xMin, xMax }, fast ? null : crosshair, true);
             }
+
+            if (fast) {
+                captureLayer();
+                for (const p of panelManager.panels) renderer.drawPanelCrosshair!(ctx, p, transform, crosshair);
+            }
+        }
+        else if (needsCrosshair) {
+            needsCrosshair = false;
+            const crosshair = interaction.getCrosshairPos();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(layerCanvas!, 0, 0);
+            for (const p of panelManager.panels) renderer.drawPanelCrosshair!(ctx, p, transform, crosshair);
         }
 
         animationFrameId = requestAnimationFrame(renderLoop);
@@ -995,6 +1118,7 @@ export function createChartEngine(canvas: HTMLCanvasElement): ChartEngine {
     function destroy() {
         destroyed = true;
         cancelAnimationFrame(animationFrameId);
+        layerCanvas = null;
         interaction.destroy();
         if (resizeObserver) {
             resizeObserver.disconnect();

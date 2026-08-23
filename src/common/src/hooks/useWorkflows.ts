@@ -78,6 +78,9 @@ export type AiRunClientController = ClientStoreController<AiRunStore> & {
     lastEvent: AiRunEvent | null
 }
 
+// module-level: a fresh object per render would make `value` - and the controller memo - unstable
+const EMPTY_AI_RUN_STORE: AiRunStore = {runs: {}, approvals: {}, inputs: {}}
+
 /** React view over an existing `Ai.createAiRunClient` resource. */
 export function useAiRunClient(client: AiRunClient | null | undefined): AiRunClientController {
     const state = useClientStore(client)
@@ -93,8 +96,7 @@ export function useAiRunClient(client: AiRunClient | null | undefined): AiRunCli
         return client.events.on(event => setEventState({client, event}))
     }, [activeClient])
 
-    const empty: AiRunStore = {runs: {}, approvals: {}, inputs: {}}
-    const value = state.state ?? empty
+    const value = state.state ?? EMPTY_AI_RUN_STORE
     const lastEvent = eventState.client === activeClient ? eventState.event : null
     return useMemo(() => ({
         ...state,
@@ -112,11 +114,12 @@ export type FileJobClientController = ClientStoreController<FileJobStore> & {
     jobs: FileJobStore['jobs']
 }
 
+const EMPTY_FILE_JOB_STORE: FileJobStore = {files: {}, jobs: {}}
+
 /** React view over an existing `Resource.createFileJobClient` resource. */
 export function useFileJobClient(client: FileJobClient | null | undefined): FileJobClientController {
     const state = useClientStore(client)
-    const empty: FileJobStore = {files: {}, jobs: {}}
-    const value = state.state ?? empty
+    const value = state.state ?? EMPTY_FILE_JOB_STORE
     return useMemo(() => ({
         ...state,
         client: client ?? null,

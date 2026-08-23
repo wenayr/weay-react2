@@ -11,10 +11,11 @@
 import type {ReactNode} from 'react'
 import type {ColumnState as AgColumnState, GridApi} from 'ag-grid-community'
 import {listen as createListen} from 'wenay-common2/client'
-import {createUpdateApi} from '../../../updateBy'
-import {memoryGetOrCreate, memoryMarkDirty} from '../../utils/memoryStore'
-import {pinFixedOrder} from '../../utils/fixedOrder'
-import {structEqual} from '../../utils/structEqual'
+import {createUpdateApi} from '../../../updateBy.js'
+import {memoryMarkDirty} from '../../utils/memoryStore.js'
+import {createPersistedController} from '../../utils/persistedController.js'
+import {pinFixedOrder} from '../../utils/fixedOrder.js'
+import {structEqual} from '../../utils/structEqual.js'
 
 export type ColumnMeta = {
     /** stable id (persist key; must equal the grid colId) */
@@ -81,8 +82,16 @@ export function createColumnState(opts: {
         filter: opts.def?.filter ? {...opts.def.filter} : {},
         groups: opts.def?.groups ? {...opts.def.groups} : Object.fromEntries(groupKeys.map(g => [g, groupMembers(g)])),
     })
-    const st = memoryGetOrCreate<ColumnsConfig>(opts.key, defConfig())
-    const stApi = createUpdateApi(st)
+    // SCHEMA_V is now enforced through the shared slot: an entry stored by an older schema runs
+    // migrate() once and is stamped, instead of the version silently being overwritten on the
+    // next normalize(). Nothing to migrate yet at v1 - the hook is the point.
+    const persisted = createPersistedController<ColumnsConfig>({
+        key: opts.key,
+        def: defConfig(),
+        version: SCHEMA_V,
+    })
+    const st = persisted.state
+    const stApi = persisted.api
     const [emitChange, onChange] = createListen<[ColumnsConfig]>()
     const previewRt = {order: null as string[] | null}
     const previewApi = createUpdateApi(previewRt)
@@ -96,7 +105,7 @@ export function createColumnState(opts: {
     }
     const rtApi = createUpdateApi(rt)
     const keyMap = (keys: string[] | null) => keys ? Object.fromEntries(keys.map(k => [k, true as const])) : null
-    const sameMap = (a: null | {[key: string]: true}, b: null | {[key: string]: true}) => JSON.stringify(a) == JSON.stringify(b)
+    const sameMap = (a: null | {[key: string]: true}, b: null | {[key: string]: true}) => structEqual(a, b)
     function combinedPresent() {
         if (!rt.present && !rt.presentGate) return null
         const res: {[key: string]: true} = {}
@@ -204,7 +213,7 @@ export function createColumnState(opts: {
         const cfg = normalize()
         const known = new Set(cfg.order)
         const next = order ? pinFixedOrder(order.filter(k => known.has(k)), opts.columns) : null
-        if (JSON.stringify(next) == JSON.stringify(previewRt.order)) return
+        if (structEqual(next, previewRt.order)) return
         previewRt.order = next
         previewApi.render()
         if (!gridApi || gridApi.isDestroyed?.()) return
@@ -396,6 +405,7 @@ export function createColumnState(opts: {
     /** Call from onGridPreDestroyed. The config survives the grid (columnBuffer
      *  pattern): remount + attach restores the same layout. */
     function detach() {
+        if (saveTimer != undefined) readFromGrid()
         clearTimeout(saveTimer)
         saveTimer = undefined
         if (gridApi && !gridApi.isDestroyed?.()) {

@@ -1,9 +1,9 @@
 import React, { useState, useRef, useLayoutEffect, useEffect } from "react";
-import { createColumnState, createColumnGrid, createToolbar, ColumnsMenu, ColumnDots, CardList, AgGridTable, contextMenu, renderBy, updateBy } from "../../api";
+import { createColumnState, createColumnGrid, createToolbar, ColumnsMenu, ColumnDots, CardList, AgGridTable, contextMenu, renderBy, updateBy } from "../../api.js";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
-import { FloatingWindow } from "../../src/components";
-import { OutsideClickArea } from "../../src/hooks";
-import { Check, ShowcasePanel, ExampleCode, DemoHint, btn } from "../standKit";
+import { FloatingWindow } from "../../src/components/index.js";
+import { OutsideClickArea } from "../../src/hooks/index.js";
+import { Check, ShowcasePanel, ExampleCode, DemoHint, btn } from "../standKit.js";
 
 
 /* ---------- 28. columnState: persisted column layout, external layer over a live grid ---------- */

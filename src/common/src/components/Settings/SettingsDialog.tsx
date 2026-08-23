@@ -1,9 +1,11 @@
-import React, {useEffect, useRef, useState} from "react";
-import {createUpdateApi, renderBy} from "../../../updateBy";
-import {FloatingWindowBase} from "../Dnd/FloatingWindow";
-import {Overlay} from "../Overlay";
-import {createSearchHistory} from "../../utils/searchHistory";
-import {memoryGetOrCreate, memoryMarkDirty} from "../../utils/memoryStore";
+import React, {useEffect, useMemo, useRef, useState} from "react";
+import {createUpdateApi, renderBy} from "../../../updateBy.js";
+import {FloatingWindowBase} from "../Dnd/FloatingWindow.js";
+import {Overlay} from "../Overlay.js";
+import {createSearchHistory} from "../../utils/searchHistory.js";
+import {memoryMarkDirty} from "../../utils/memoryStore.js";
+import {createPersistedController} from "../../utils/persistedController.js";
+import {cx as classNames} from "../../utils/cx.js";
 
 export type SettingsSearchSource = React.ReactNode | readonly React.ReactNode[] | (() => React.ReactNode | readonly React.ReactNode[])
 
@@ -59,7 +61,11 @@ const settingsDialogNav = {min: 160, def: 220, max: 360}
 const registry = {list: [] as SettingsSection[]}
 const registryApi = createUpdateApi(registry)
 const settingsSearchHistory = createSearchHistory({key: "SettingsDialog.searchHistory", max: 8})
-const settingsDialogLayout = memoryGetOrCreate<SettingsDialogLayoutState>("SettingsDialog.layout", {navWidth: settingsDialogNav.def})
+const settingsDialogSlot = createPersistedController<SettingsDialogLayoutState>({
+    key: "SettingsDialog.layout",
+    def: {navWidth: settingsDialogNav.def},
+})
+const settingsDialogLayout = settingsDialogSlot.state
 
 /** Register an external section. Re-register with the same key replaces the previous one.
  *  The returned function removes exactly this registration (a no-op if it was replaced). */
@@ -80,10 +86,6 @@ export function registerSettingsSection(s: SettingsSection): () => void {
 /** Current external sections (static props sections are not included). */
 export function getSettingsSections(): readonly SettingsSection[] {
     return registry.list
-}
-
-function classNames(parts: Array<string | false | null | undefined>) {
-    return parts.filter(Boolean).join(" ")
 }
 
 function clampSettingsNavWidth(value: number) {
@@ -328,6 +330,8 @@ export type SettingsDialogController = {
     onTriggerKeyDown(e: React.KeyboardEvent<HTMLSpanElement>): void
     toggleExpanded(key: string): void
     commitSearch(value?: string): void
+    /** Applies a search-history entry. Not a hook despite the name - kept as-is because this
+     *  is the published controller shape; internally it is `applyHistoryItem`. */
     useHistoryItem(value: string): void
     clearHistory(): void
     commitNavWidth(value: number): void
@@ -360,7 +364,13 @@ export function useSettingsDialogController(props: SettingsDialogProps): Setting
     const treeSignature = getTreeSignature(tree.ordered)
     const branchKeys = getBranchKeys(tree.ordered)
     const searchTerms = getSearchTerms(search)
-    const filtered = filterSettingsTree(tree.roots, searchTerms)
+    // While a search is active this walks section.render() for EVERY section; unmemoised it
+    // re-ran on renders that had nothing to do with the query - notably setNavWidth on each
+    // pointermove of the splitter drag. treeSignature covers the structure, search the query.
+    const filtered = useMemo(
+        () => filterSettingsTree(tree.roots, searchTerms),
+        [treeSignature, search],
+    )
     const activeNode = active == null ? undefined : tree.byKey.get(active)
     const defaultNode = props.defaultSection == null ? undefined : tree.byKey.get(props.defaultSection)
     const firstVisibleNode = tree.ordered.find(node => filtered.visibleKeys.has(node.section.key))
@@ -534,7 +544,9 @@ export function useSettingsDialogController(props: SettingsDialogProps): Setting
         }
     }
 
-    function useHistoryItem(value: string) {
+    // NOT a hook - it is called from event handlers. Named applyHistoryItem so react-hooks
+    // lint stops flagging those call sites; the controller field keeps its public name.
+    function applyHistoryItem(value: string) {
         setSearch(value)
         settingsSearchHistory.add(value)
         setHistoryOpen(false)
@@ -593,7 +605,7 @@ export function useSettingsDialogController(props: SettingsDialogProps): Setting
         onTriggerKeyDown,
         toggleExpanded,
         commitSearch,
-        useHistoryItem,
+        useHistoryItem: applyHistoryItem,
         clearHistory,
         commitNavWidth,
         beginNavResize,
@@ -635,7 +647,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
         onTriggerKeyDown,
         toggleExpanded,
         commitSearch,
-        useHistoryItem,
+        useHistoryItem: applyHistoryItem,
         clearHistory,
         commitNavWidth,
         beginNavResize,
@@ -744,7 +756,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
                                         if (e.key == "Enter") commitSearch()
                                         if (e.key == "ArrowDown" && searchHistory[0]) {
                                             e.preventDefault()
-                                            useHistoryItem(searchHistory[0])
+                                            applyHistoryItem(searchHistory[0])
                                         }
                                     }}
                                 />
@@ -784,7 +796,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
                                         type="button"
                                         className="wenayDlgSearchHistoryItem"
                                         onMouseDown={e => e.preventDefault()}
-                                        onClick={() => useHistoryItem(item)}
+                                        onClick={() => applyHistoryItem(item)}
                                     >{item}</button>)}
                                     <button
                                         type="button"

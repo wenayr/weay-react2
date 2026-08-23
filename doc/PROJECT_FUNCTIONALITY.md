@@ -130,6 +130,9 @@ Use these when the UI problem is generic: outside-click closing, draggable
 position, ordered drag-and-drop, or a persistent floating window. `FloatingWindow`
 uses a fixed body-portal host and an absolute window in viewport coordinates by default, keeps its root inside
 the viewport, and raises the entire isolated window stacking context when pressed.
+A window opened from inside another window (a `Button` child of a window's content) is an
+ordinary member of the same stack: it mounts above its opener and a press inside it raises only
+it, even though its React events still bubble through the opener.
 It also provides title-bar double-click/two-tap maximize and restore (with an opt-in button),
 keyboard move/resize, Windows 11-like grouped Snap Layouts including a true four-corner preset, vetoable close reasons,
 and window-scoped portals for menus/tooltips. Scrim overlays independently arbitrate

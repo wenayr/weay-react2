@@ -1,7 +1,7 @@
 // ag-grid theme. Pure builder + hook. Self-contained (no ThemeProvider in this project yet;
 // when one appears, useAgGridTheme will start reading mode from it without a signature change).
 import { colorSchemeDarkBlue, colorSchemeLight, iconSetMaterial, themeAlpine } from 'ag-grid-community'
-import { tokens } from '../../styles/tokens'
+import { tokensVar } from '../../styles/tokens.js'
 
 export type ThemeMode = 'light' | 'dark'
 
@@ -14,7 +14,10 @@ export function buildAgTheme(mode: ThemeMode) {
     return themeCache[mode] ??= themeAlpine
         .withPart(mode == 'dark' ? colorSchemeDarkBlue : colorSchemeLight)
         .withPart(iconSetMaterial)
-        .withParams({ ...tokens.grid, browserColorScheme: mode })
+        // tokensVar.grid, not tokens.grid: the var() form makes the grid follow a
+        // :root[data-theme=...] override like the rest of the library, and falls back to the
+        // very same literals when the consumer ships no overrides.
+        .withParams({ ...tokensVar.grid, browserColorScheme: mode })
 }
 
 /** Application theme; default is dark, as in production. */

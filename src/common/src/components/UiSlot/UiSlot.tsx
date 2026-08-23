@@ -1,6 +1,5 @@
 import React from "react";
-import {createUpdateApi} from "../../../updateBy";
-import {memoryGetOrCreate, memoryMarkDirty} from "../../utils/memoryStore";
+import {createPersistedController} from "../../utils/persistedController.js";
 
 /** One UI block shown in exactly one of several mount points; the point is a persisted setting.
  *  Persistence rides the existing memoryProps -> memoryCache mechanics: memoryProps is observable,
@@ -15,17 +14,16 @@ export function createUiSlot<Places extends string>(opts: {
     // Places = typeof def and rejects the other keys in places
     def: NoInfer<Places>
 }) {
-    const st = memoryGetOrCreate<{place: Places}>(opts.key, {place: opts.def})
-    const stApi = createUpdateApi(st)
+    const persisted = createPersistedController<{place: Places}>({key: opts.key, def: {place: opts.def}})
+    const st = persisted.state
+    const stApi = persisted.api
     // a stored place may no longer exist after an app update - fall back to def
     const isPlace = (p: unknown): p is Places => typeof p == "string" && p in opts.places
 
     const getPlace = (): Places => isPlace(st.place) ? st.place : opts.def
     const setPlace = (p: Places) => {
         if (st.place == p) return
-        st.place = p
-        stApi.render()
-        memoryMarkDirty(opts.key)
+        persisted.commit(cur => { cur.place = p })
     }
 
     function Slot(p: {place: Places, children: React.ReactNode}): React.JSX.Element | null {

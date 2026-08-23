@@ -49,3 +49,26 @@ describe("structEqual", () => {
         expect(structEqual(cfg, {...cfg, width: {a: 101}})).toBe(false);
     });
 });
+
+// The cache revives ISO strings into Date on load (restoreDates), so dates do reach
+// these trees. Two Dates have no own keys, so the plain object branch used to call
+// any two of them equal - a silent "nothing changed" on a real change.
+describe("structEqual dates", () => {
+    test("dates compare by time, not by their (empty) key set", () => {
+        expect(structEqual(new Date(0), new Date(0))).toBe(true);
+        expect(structEqual(new Date(0), new Date(1))).toBe(false);
+        expect(structEqual({at: new Date("2026-01-01")}, {at: new Date("2026-01-01")})).toBe(true);
+        expect(structEqual({at: new Date("2026-01-01")}, {at: new Date("2026-01-02")})).toBe(false);
+    });
+
+    test("a date never equals a plain object or a primitive", () => {
+        expect(structEqual(new Date(0), {})).toBe(false);
+        expect(structEqual({}, new Date(0))).toBe(false);
+        expect(structEqual(new Date(0), 0)).toBe(false);
+    });
+
+    test("an invalid date equals only another invalid date", () => {
+        expect(structEqual(new Date(NaN), new Date(NaN))).toBe(true);
+        expect(structEqual(new Date(NaN), new Date(0))).toBe(false);
+    });
+});

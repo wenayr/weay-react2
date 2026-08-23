@@ -16,7 +16,8 @@
 //                                  point at a hidden column.
 // No ag-grid, no storage - only the columnState config.
 import React, {useRef, useState} from 'react'
-import type {ColumnStateController} from './columnState'
+import type {ColumnStateController} from './columnState.js'
+import {cx} from "../../utils/cx.js";
 
 /** Dominant-axis thresholds: a gesture is a REMOVE only when it is clearly
  *  vertical and clearly upward - a horizontal drag or a page scroll never is. */
@@ -24,10 +25,6 @@ const REMOVE_DY = 32
 const MOVE_SLOP = 4
 
 type tDrag = {key: string, dx: number, dy: number, to: number, off: boolean, shown: string}
-
-function cx(parts: Array<string | false | null | undefined>) {
-    return parts.filter(Boolean).join(' ')
-}
 
 export function ColumnDots(p: {
     state: ColumnStateController

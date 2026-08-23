@@ -12,7 +12,7 @@ export {
     numericComparator,
     useAgGrid,
     useAgGridTheme,
-} from "../common/src/grid/agGrid4";
+} from "../common/src/grid/agGrid4/index.js";
 export type {
     AgGridController,
     AgGridTableProps,
@@ -33,20 +33,20 @@ export type {
     ThemeMode,
     UpdateArgs,
     UseAgGridOptions,
-} from "../common/src/grid/agGrid4";
+} from "../common/src/grid/agGrid4/index.js";
 
-export {createColumnState} from "../common/src/grid/columnState/columnState";
+export {createColumnState} from "../common/src/grid/columnState/columnState.js";
 export type {
     ColumnMeta,
     ColumnsConfig,
     ColumnsSort,
     ColumnStateController,
-} from "../common/src/grid/columnState/columnState";
-export {ColumnsMenu, MenuStrip} from "../common/src/grid/columnState/ColumnsMenu";
-export type {MenuStripItem} from "../common/src/grid/columnState/ColumnsMenu";
-export {ColumnDots} from "../common/src/grid/columnState/ColumnDots";
-export {CardList} from "../common/src/grid/columnState/CardList";
-export {createColumnGrid, useColumnGrid} from "../common/src/grid/columnState/columnGrid";
+} from "../common/src/grid/columnState/columnState.js";
+export {ColumnsMenu, MenuStrip} from "../common/src/grid/columnState/ColumnsMenu.js";
+export type {MenuStripItem} from "../common/src/grid/columnState/ColumnsMenu.js";
+export {ColumnDots} from "../common/src/grid/columnState/ColumnDots.js";
+export {CardList} from "../common/src/grid/columnState/CardList.js";
+export {createColumnGrid, useColumnGrid} from "../common/src/grid/columnState/columnGrid.js";
 export type {
     ColumnGridCardsProps,
     ColumnGridChromeProps,
@@ -64,12 +64,12 @@ export type {
     ColumnGridToolbarSettingsProps,
     ColumnGridViewMode,
     ColumnGridViewProps,
-} from "../common/src/grid/columnState/columnGrid";
+} from "../common/src/grid/columnState/columnGrid.js";
 export {
     appendGridChromeMenuItem,
     createGridChrome,
     selectGridChromeContextRow,
-} from "../common/src/grid/gridChrome";
+} from "../common/src/grid/gridChrome.js";
 export type {
     GridChromeCellContext,
     GridChromeCommand,
@@ -82,4 +82,4 @@ export type {
     GridChromeOptions,
     GridChromeProps,
     GridChromeRowNode,
-} from "../common/src/grid/gridChrome";
+} from "../common/src/grid/gridChrome.js";

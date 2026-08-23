@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, useAiRunClient, useFileJobClient, useContractSlot } from "../../api";
+import { useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, useAiRunClient, useFileJobClient, useContractSlot } from "../../api.js";
 import { listen as createListen } from "wenay-common2/client";
 import * as Contract from "wenay-common2/contract";
 import * as Observe from "wenay-common2/observe";
 import type * as Ai from "wenay-common2/ai";
 import type * as Resource from "wenay-common2/resource";
-import { ReplayVideoDemo, ReplayRouteDemo, ReplayStoreDemo, ReplayStoreEachDemo } from "../replayVideo";
-import { Check, ShowcasePanel, ExampleCode, DemoHint } from "../standKit";
+import { ReplayVideoDemo, ReplayRouteDemo, ReplayStoreDemo, ReplayStoreEachDemo } from "../replayVideo.js";
+import { Check, ShowcasePanel, ExampleCode, DemoHint } from "../standKit.js";
 
 
 /* ---------- 48. common2 AI run client: React observes Store + semantic Replay ---------- */
