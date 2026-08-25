@@ -1,6 +1,14 @@
-import React from "react";
+import React, {useEffect, useRef} from "react";
 import {Resizable, ResizableProps} from "re-resizable";
 import {mapResiReact, type ResizableSavedSize} from "../../utils/persistedMaps.js";
+import {isUsableDimension} from "./windowGeometry.js";
+
+/** What re-resizable itself refuses to shrink below when the caller declares no minimum
+ *  (its computedMinWidth/computedMinHeight). A stored number under the floor in force can
+ *  therefore not have come from a drag - it is damage, and it outranks the size prop for good. */
+const RESIZABLE_MIN = 10;
+
+const floorFor = (min: number | string | undefined) => typeof min == "number" ? min : RESIZABLE_MIN;
 
 type tSaveMap = ResizableSavedSize
 // Memory for all column sizes; declared in utils/persistedMaps (memoryCache registry must not
@@ -22,12 +30,30 @@ export function FResizableReact(
         moveHeight?: boolean,
     }) {
 
+    const floorW = floorFor(minWidth), floorH = floorFor(minHeight)
+    const repaired = useRef(false)
     let obj : tSaveMap = size
     if (keyForSave) {
         let b = mapResiReact.get(keyForSave)
-        if (b) obj = b
+        if (b) {
+            // The stored size wins over the prop - so a stored 0 (a parent that renders
+            // size={{width: 0}} on its first, pre-measurement pass) would win forever, and a
+            // box collapsed to nothing has no handle left to drag back out. Repair it in
+            // place from the current prop: the map holds this very object and every write
+            // below mutates it, so replacing the reference would silently stop persisting.
+            if (!isUsableDimension(b.width, floorW)) { b.width = size.width; repaired.current = true }
+            if (!isUsableDimension(b.height, floorH)) { b.height = size.height; repaired.current = true }
+            obj = b
+        }
         else mapResiReact.set(keyForSave, obj)
     }
+    // Announce a repair out of the render phase, so the damaged record is rewritten once
+    // instead of being healed again on every mount.
+    useEffect(() => {
+        if (!keyForSave || !repaired.current) return
+        repaired.current = false
+        mapResiReact.touch(keyForSave)
+    })
     return <Resizable style = {style}
                       onResize = {(event, direction, elementRef, delta)=> {
                           onResize?.(obj)
@@ -36,11 +62,13 @@ export function FResizableReact(
                       }}
                       enable = {enable}
                       onResizeStop = {(e, dir, elementRef, delta) => {
+                          // Accumulated deltas, so the floor is applied here too rather than
+                          // trusted from the drag: what gets stored has to stay grabbable.
                           if (delta.width && moveWith)
-                              if (typeof obj.width == "number") obj.width += delta.width;
+                              if (typeof obj.width == "number") obj.width = Math.max(floorW, obj.width + delta.width);
                               else {obj.width = elementRef.style.width}
                           if (delta.height && moveHeight)
-                              if (typeof obj.height == "number") obj.height += delta.height;
+                              if (typeof obj.height == "number") obj.height = Math.max(floorH, obj.height + delta.height);
                               else {obj.height = elementRef.style.height}
                           // onResize?.(size)
                           // obj is mutated in place - invisible to the map, so announce it

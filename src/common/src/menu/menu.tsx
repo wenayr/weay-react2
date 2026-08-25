@@ -511,9 +511,14 @@ export function Menu({
         const w = window.innerWidth,
             h = window.innerHeight;
 
-        // Vertical: same bottom snap to viewport edge, but idempotently from the base.
+        // Vertical: same bottom snap to viewport edge, but idempotently from the base, and
+        // never pulled past the top edge - a menu taller than the viewport used to be pushed
+        // up by its whole overflow, putting its first items above y=0 with no way to scroll
+        // to them. Floored the same way the horizontal clamp below is.
+        const baseTop = rect.top - (appliedTop.current - coordinate.y);
         const baseBottom = rect.bottom - (appliedTop.current - coordinate.y);
-        setTop(h - baseBottom < 8 ? coordinate.y + (h - baseBottom) : coordinate.y);
+        const overflowBottom = h - baseBottom;
+        setTop(coordinate.y + (overflowBottom < 8 ? Math.max(overflowBottom, -baseTop) : 0));
 
         setLeftPos(rect.x);
         setMenuWidth(rect.width);

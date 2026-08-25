@@ -194,3 +194,43 @@ describe("touch long press", () => {
         expect(menu.map.size).toBe(0);
     });
 });
+
+describe("context menu vertical placement", () => {
+    test("a root menu at the bottom edge is lifted into the viewport", () => {
+        const restore = stubMenuRect({width: 200, height: 120});
+        try {
+            render(<Menu data={[{name: "Item"}]} coordinate={{x: 40, y: window.innerHeight - 40}}/>);
+            const top = parseFloat(menuRoot().style.top);
+            expect(top).toBe(window.innerHeight - 120);
+            expect(top + 120).toBeLessThanOrEqual(window.innerHeight);
+        } finally {
+            restore();
+        }
+    });
+
+    test("a menu taller than the viewport stops at the top edge instead of overshooting", () => {
+        // The twin of the "wider than the viewport" case: the whole overflow would put the
+        // first items above y=0, where a context menu offers no way to scroll back to them.
+        const restore = stubMenuRect({width: 200, height: window.innerHeight + 200});
+        try {
+            render(<Menu data={[{name: "Item"}]} coordinate={{x: 40, y: 40}}/>);
+            expect(parseFloat(menuRoot().style.top)).toBe(0);
+        } finally {
+            restore();
+        }
+    });
+
+    test("the vertical clamp is idempotent across coordinate changes", () => {
+        const restore = stubMenuRect({width: 200, height: 120});
+        try {
+            const view = render(<Menu data={[{name: "Item"}]} coordinate={{x: 40, y: window.innerHeight - 40}}/>);
+            const first = parseFloat(menuRoot().style.top);
+            view.rerender(<Menu data={[{name: "Item"}]} coordinate={{x: 40, y: window.innerHeight - 40}}/>);
+            expect(parseFloat(menuRoot().style.top)).toBe(first);
+            view.rerender(<Menu data={[{name: "Item"}]} coordinate={{x: 40, y: 30}}/>);
+            expect(parseFloat(menuRoot().style.top)).toBe(30);
+        } finally {
+            restore();
+        }
+    });
+});

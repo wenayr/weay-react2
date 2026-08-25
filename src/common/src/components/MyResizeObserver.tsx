@@ -132,6 +132,11 @@ export function setResizeableElement(el: HTMLElement) {
         state.resizing = true;
         try {
             applyWidth(el, state, state.defaultWidth);
+            // An element wired up while hidden measures 0, and a defaultWidth of 0 disables
+            // the shrink for this node for good: applyWidth then always takes the "already
+            // wide enough" branch. The line above has just restored the natural width, so
+            // this is the moment to capture it on the first observation that has a layout.
+            if (!state.defaultWidth) state.defaultWidth = getWidth(el);
             let rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentParent.getBoundingClientRect().right);
             if (rangeDelta <= 0) return;
 

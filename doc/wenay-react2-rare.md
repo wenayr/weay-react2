@@ -117,6 +117,17 @@ into the map, and a stored one is treated as damage: the entry is repaired in pl
 prop at mount and on late hydration, then announced once so the record is rewritten rather than
 re-healed forever. Without this a single render at `innerWidth == 0` left a permanent 2x2 window
 that stored geometry kept resurrecting over the `size` prop, unrecoverable from the UI.
+
+The same rule is applied wherever stored state outranks a prop. `FResizableReact` judges a
+stored size against the caller's own `minWidth`/`minHeight` (or re-resizable's implicit 10px
+floor): below it the value cannot have come from a drag, so the entry is repaired from the
+`size` prop instead of collapsing the box to a handle nobody can grab, and accumulated resize
+deltas are floored on the way in. A minimized window skips the viewport clamp - it is
+`display:none`, so every rect reads zero - and `minimized` is in the effect's deps precisely so
+the clamp runs on restore: a window persisted offscreen used to come back from the taskbar
+still offscreen. `isUsableDimension` also rejects NaN, which compares false against every
+bound and therefore survives an unguarded clamp; `resizePanel` refuses a zero container height
+for the same reason, since `deltaPx / 0` poisoned `heightPct` for the life of the chart.
 Unpositioned viewport windows cascade in eight small slots (`cascade={false}` opts out).
 Focused window roots accept Win/Meta+Left/Right (Snap), Up (maximize), and Down
 (restore Snap/maximize, then minimize); the existing Alt keyboard fallback remains available.

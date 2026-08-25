@@ -13,14 +13,24 @@ import type {
  *  Any smaller number is treated as damage rather than as a size somebody chose. */
 export const MIN_WINDOW_SIZE = 24;
 
-/** A size worth storing and worth restoring. String sizes ("50%", "auto") are the caller's
- *  business and always pass; only numbers are judged. A window mounted at a zero viewport
- *  (hidden tab, prerender, offscreen iframe) gets clamped to 0x0, and that is exactly what
- *  must never reach - or come back out of - the persisted map. */
-export function isUsableSize(size: FloatingWindowSize | undefined | null): boolean {
+/** One dimension worth storing and worth restoring. String sizes ("50%", "auto") and absent
+ *  ones are the caller's business and always pass; only numbers are judged, NaN included -
+ *  it compares false against every bound, so an unguarded clamp lets it through. */
+export function isUsableDimension(value: number | string | undefined, min: number = MIN_WINDOW_SIZE): boolean {
+    if (typeof value != "number") return true;
+    return Number.isFinite(value) && value >= min;
+}
+
+/** A size worth storing and worth restoring. A window mounted at a zero viewport (hidden tab,
+ *  prerender, offscreen iframe) gets clamped to 0x0, and that is exactly what must never reach
+ *  - or come back out of - a persisted map. `min` lets a caller judge against its own floor
+ *  rather than a window's title bar. */
+export function isUsableSize(
+    size: {width?: number | string; height?: number | string} | undefined | null,
+    min: number = MIN_WINDOW_SIZE,
+): boolean {
     if (!size) return false;
-    const usable = (value: number | string) => typeof value != "number" || value >= MIN_WINDOW_SIZE;
-    return usable(size.width) && usable(size.height);
+    return isUsableDimension(size.width, min) && isUsableDimension(size.height, min);
 }
 
 /** True when the viewport itself is degenerate, i.e. there is nothing to fit a window into and

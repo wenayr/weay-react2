@@ -291,6 +291,12 @@ export function createPanelManager(): PanelManager {
     function resizePanel(panelId: string, deltaPx: number, containerHeight: number) {
         const idx = panels.findIndex((p) => p.id === panelId);
         if (idx < 0) return;
+        // A container that reports no height yet (the ResizeObserver has not fired, or the
+        // chart collapsed mid-drag) turns the conversion below into Infinity, or NaN when
+        // deltaPx is 0 - and NaN compares false against both clamps, so it would be written
+        // to heightPct and then spread through every layoutPanels() pass for the life of the
+        // chart. There is no percentage to compute against; skip the frame.
+        if (!(containerHeight > 0)) return;
         const p = panels[idx];
 
         // Current percent

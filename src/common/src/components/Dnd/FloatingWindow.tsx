@@ -360,7 +360,7 @@ export function useFloatingWindowController({
             const nextSnap = next.snapRegion ?? null;
             setSnapRegion(nextSnap);
             callbacksRef.current.onSnapChange?.(nextSnap);
-            if (nextSnap && snappable && typeof window !== "undefined") {
+            if (nextSnap && snappable && !viewportUnusable()) {
                 const geometry = snapGeometry(nextSnap);
                 setX(geometry.position.x);
                 setY(geometry.position.y);
@@ -618,6 +618,11 @@ export function useFloatingWindowController({
     useLayoutEffect(() => {
         const el = windowRef.current;
         if (!el || !sizeByWindow || viewportUnusable()) return;
+        // A minimized window is display:none, so every rect below reads zero and no branch
+        // fires. Skipping explicitly (with `minimized` in the deps) is what makes the clamp
+        // run on restore instead: a window persisted offscreen and minimized at load used to
+        // come back from the taskbar still offscreen, with nothing to correct it.
+        if (minimized) return;
         const rect = el.getBoundingClientRect();
         const outer = Array.from(el.querySelectorAll<HTMLElement>(".wenayWndClose, .wenayWndControl"))
             .map(node => node.getBoundingClientRect())
@@ -649,7 +654,7 @@ export function useFloatingWindowController({
         if (typeof height === "number" && height > maxWindowHeight) {
             commitSize({width: typeof width == "number" && width > maxWindowWidth ? maxWindowWidth : width, height: maxWindowHeight});
         }
-    }, [x, y, width, height, sizeByWindow, viewportRevision, mode]);
+    }, [x, y, width, height, sizeByWindow, viewportRevision, mode, minimized]);
 
     const onHeaderTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
         const t = e.changedTouches[0];

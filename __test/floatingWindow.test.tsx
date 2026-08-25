@@ -584,3 +584,81 @@ describe("FloatingWindow degenerate geometry", () => {
         }
     });
 });
+
+describe("FloatingWindow offscreen recovery", () => {
+    /** jsdom measures everything as a zero rect, which is exactly what a display:none window
+     *  reports in a real browser too - so the clamp needs a window that reports a real box at
+     *  its applied position, and nothing while it is minimized. */
+    const rect = (left: number, top: number, width: number, height: number) =>
+        ({x: left, y: top, left, top, right: left + width, bottom: top + height, width, height, toJSON: () => ({})}) as DOMRect;
+
+    function stubWindowRect() {
+        const original = Element.prototype.getBoundingClientRect;
+        Element.prototype.getBoundingClientRect = function () {
+            const el = this as HTMLElement;
+            const root = el.closest?.("[data-wenay-window]") as HTMLElement | null;
+            // display:none reports a zero box in a real browser too - that is the whole point
+            // of the minimized case below.
+            if (!root || root.style.display == "none") return rect(0, 0, 0, 0);
+            const left = Number(root.dataset.positionX ?? 0);
+            const top = Number(root.dataset.positionY ?? 0);
+            const width = parseFloat(root.style.width || "0");
+            const height = parseFloat(root.style.height || "0");
+            // The clamp measures the window body and widens it by the chrome that overhangs it.
+            if (el.classList.contains("wenayWnd")) return rect(left, top, width, height);
+            if (el.classList.contains("wenayWndControl") || el.classList.contains("wenayWndClose")) {
+                return rect(left + width - 24, top, 24, 24);
+            }
+            return rect(0, 0, 0, 0);
+        };
+        return () => { Element.prototype.getBoundingClientRect = original; };
+    }
+
+    test("a window persisted offscreen is pulled back on mount", () => {
+        const persistedKey = "offscreen:panel";
+        const restore = stubWindowRect();
+        // Dragged to x=2400 on a wide monitor, reopened on this viewport.
+        floatingWindowMap.set(persistedKey, {position: {x: 2400, y: 40}, size: {width: 300, height: 200}});
+        try {
+            render(
+                <FloatingWindow windowId="panel" layoutGroup="offscreen" size={{width: 300, height: 200}}>
+                    <div data-testid="offscreen-content">offscreen</div>
+                </FloatingWindow>
+            );
+            const root = rootFor("offscreen-content");
+            expect(Number(root.dataset.positionX)).toBe(window.innerWidth - 300);
+        } finally {
+            restore();
+            floatingWindowMap.delete(persistedKey);
+        }
+    });
+
+    test("a window minimized at mount is pulled back when the taskbar restores it", () => {
+        const persistedKey = "offscreen-min:panel";
+        const restore = stubWindowRect();
+        floatingWindowMap.set(persistedKey, {position: {x: 2400, y: 40}, size: {width: 300, height: 200}});
+        try {
+            render(<>
+                <FloatingWindow
+                    windowId="panel" layoutGroup="offscreen-min" stackGroup="offscreen-min"
+                    title="Stranded" minimizable defaultMinimized size={{width: 300, height: 200}}
+                >
+                    <div data-testid="offscreen-min-content">stranded</div>
+                </FloatingWindow>
+                <FloatingWindowTaskbar stackGroup="offscreen-min" portal={false}/>
+            </>);
+            const root = rootFor("offscreen-min-content");
+            // Hidden, so nothing could measure it: the stale position is still in place.
+            expect(root.dataset.minimized).toBe("true");
+            expect(Number(root.dataset.positionX)).toBe(2400);
+
+            fireEvent.click(screen.getByRole("button", {name: "Stranded"}));
+            expect(root.dataset.minimized).toBe("false");
+            // Restoring has to bring it back where it can be seen and grabbed.
+            expect(Number(root.dataset.positionX)).toBe(window.innerWidth - 300);
+        } finally {
+            restore();
+            floatingWindowMap.delete(persistedKey);
+        }
+    });
+});
