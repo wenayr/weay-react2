@@ -482,3 +482,105 @@ describe("FloatingWindow viewport layer", () => {
         expect(popup.parentElement?.style.zIndex).toBe("2147483646");
     });
 });
+
+describe("FloatingWindow degenerate geometry", () => {
+    function setViewport(width: number, height: number) {
+        Object.defineProperty(window, "innerWidth", {value: width, configurable: true, writable: true});
+        Object.defineProperty(window, "innerHeight", {value: height, configurable: true, writable: true});
+    }
+
+    const realWidth = window.innerWidth;
+    const realHeight = window.innerHeight;
+    afterEach(() => setViewport(realWidth, realHeight));
+
+    test("a mount at a zero viewport does not persist a 0x0 size", () => {
+        const persistedKey = "zero-viewport:panic";
+        floatingWindowMap.delete(persistedKey);
+        try {
+            // A hidden tab, a prerender or an offscreen iframe reports no viewport at all.
+            setViewport(0, 0);
+            const first = render(
+                <FloatingWindow windowId="panic" layoutGroup="zero-viewport" position={{x: 14, y: 10}} size={{width: 400, height: 500}}>
+                    <div data-testid="zero-content">panic</div>
+                </FloatingWindow>
+            );
+            expect(floatingWindowMap.get(persistedKey)?.size).toEqual({width: 400, height: 500});
+            first.unmount();
+
+            // Back to a real viewport: the window must not have been shrunk away for good.
+            setViewport(1280, 720);
+            render(
+                <FloatingWindow windowId="panic" layoutGroup="zero-viewport" position={{x: 14, y: 10}} size={{width: 400, height: 500}}>
+                    <div data-testid="zero-content">panic</div>
+                </FloatingWindow>
+            );
+            const root = rootFor("zero-content");
+            expect(root.style.width).toBe("400px");
+            expect(root.style.height).toBe("500px");
+        } finally {
+            floatingWindowMap.delete(persistedKey);
+        }
+    });
+
+    test("a persisted degenerate size is ignored in favour of the size prop", () => {
+        const persistedKey = "healed:panel";
+        // Exactly the entry a pre-fix session left behind in localStorage.
+        floatingWindowMap.set(persistedKey, {position: {x: 14, y: 10}, size: {width: 0, height: 0}});
+        try {
+            render(
+                <FloatingWindow windowId="panel" layoutGroup="healed" size={{width: 400, height: 500}}>
+                    <div data-testid="healed-content">healed</div>
+                </FloatingWindow>
+            );
+            const root = rootFor("healed-content");
+            expect(root.style.width).toBe("400px");
+            expect(root.style.height).toBe("500px");
+            // The saved position is a separate axis and stays authoritative.
+            expect(root.dataset.positionX).toBe("14");
+            expect(root.dataset.positionY).toBe("10");
+            // and the damaged record itself is rewritten, so it stops coming back every load.
+            expect(floatingWindowMap.get(persistedKey)?.size).toEqual({width: 400, height: 500});
+        } finally {
+            floatingWindowMap.delete(persistedKey);
+        }
+    });
+
+    test("a degenerate entry arriving after mount is ignored too", () => {
+        const persistedKey = "healed-late:panel";
+        floatingWindowMap.delete(persistedKey);
+        try {
+            render(
+                <FloatingWindow windowId="panel" layoutGroup="healed-late" size={{width: 320, height: 240}}>
+                    <div data-testid="healed-late-content">late</div>
+                </FloatingWindow>
+            );
+            act(() => {
+                floatingWindowMap.set(persistedKey, {position: {x: 20, y: 30}, size: {width: 0, height: 0}});
+            });
+            const root = rootFor("healed-late-content");
+            expect(root.style.width).toBe("320px");
+            expect(root.style.height).toBe("240px");
+            expect(root.dataset.positionX).toBe("20");
+        } finally {
+            floatingWindowMap.delete(persistedKey);
+        }
+    });
+
+    test("a real resize is still persisted", () => {
+        const persistedKey = "kept:panel";
+        floatingWindowMap.delete(persistedKey);
+        try {
+            render(
+                <FloatingWindow windowId="panel" layoutGroup="kept" size={{width: 300, height: 200}}>
+                    <div data-testid="kept-content">kept</div>
+                </FloatingWindow>
+            );
+            const root = rootFor("kept-content");
+            fireEvent.keyDown(root, {key: "ArrowRight", altKey: true, ctrlKey: true});
+            expect(root.style.width).toBe("310px");
+            expect(floatingWindowMap.get(persistedKey)?.size).toEqual({width: 310, height: 200});
+        } finally {
+            floatingWindowMap.delete(persistedKey);
+        }
+    });
+});

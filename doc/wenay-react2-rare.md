@@ -109,6 +109,14 @@ Set `minimizable` only when one of those restore surfaces exists; `minimizeButto
 taskbar/keyboard/controller minimization while removing the title-bar control. `layoutGroup + windowId`
 derives a stable persisted key for each group member and stores both its Snap region and previous
 free geometry in the existing `floatingWindowMap`; no second persistence system is involved.
+Persistence stores sizes, not adaptations: a window mounted at a zero viewport (hidden tab,
+prerender, offscreen iframe) is no longer clamped at all — `viewportUnusable()` short-circuits both
+the fit-to-viewport and the maximize/snap effects, which is redone on the resize that arrives when
+the tab is shown. A size below `MIN_WINDOW_SIZE` (24px, less than a title bar) is never mirrored
+into the map, and a stored one is treated as damage: the entry is repaired in place from the `size`
+prop at mount and on late hydration, then announced once so the record is rewritten rather than
+re-healed forever. Without this a single render at `innerWidth == 0` left a permanent 2x2 window
+that stored geometry kept resurrecting over the `size` prop, unrecoverable from the UI.
 Unpositioned viewport windows cascade in eight small slots (`cascade={false}` opts out).
 Focused window roots accept Win/Meta+Left/Right (Snap), Up (maximize), and Down
 (restore Snap/maximize, then minimize); the existing Alt keyboard fallback remains available.

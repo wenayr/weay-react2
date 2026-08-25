@@ -5,8 +5,29 @@
 import type {
     FloatingWindowPosition,
     FloatingWindowSavedGeometry,
+    FloatingWindowSize,
     FloatingWindowSnapRegion,
 } from "./FloatingWindowTypes.js";
+
+/** Below this a window has no title bar left to grab, so it can never be recovered from the UI.
+ *  Any smaller number is treated as damage rather than as a size somebody chose. */
+export const MIN_WINDOW_SIZE = 24;
+
+/** A size worth storing and worth restoring. String sizes ("50%", "auto") are the caller's
+ *  business and always pass; only numbers are judged. A window mounted at a zero viewport
+ *  (hidden tab, prerender, offscreen iframe) gets clamped to 0x0, and that is exactly what
+ *  must never reach - or come back out of - the persisted map. */
+export function isUsableSize(size: FloatingWindowSize | undefined | null): boolean {
+    if (!size) return false;
+    const usable = (value: number | string) => typeof value != "number" || value >= MIN_WINDOW_SIZE;
+    return usable(size.width) && usable(size.height);
+}
+
+/** True when the viewport itself is degenerate, i.e. there is nothing to fit a window into and
+ *  every clamp against it would produce zeros. */
+export function viewportUnusable() {
+    return typeof window == "undefined" || window.innerWidth <= 0 || window.innerHeight <= 0;
+}
 
 /** Structural shape of FloatingWindowProps["limit"] - declared here so the clamp does not have
  *  to import the component's prop type (which would point this leaf back at the component). */

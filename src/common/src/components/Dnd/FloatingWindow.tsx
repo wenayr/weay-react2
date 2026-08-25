@@ -13,10 +13,12 @@ import {useDraggableApi} from "../../hooks/useDraggable.js";
 import {cascadeWindowPosition, useFloatingDesktopWindow} from "./FloatingDesktop.js";
 import {
     clampToLimit,
+    isUsableSize,
     snapGeometry,
     snapLayouts,
     snapPreviewStyle,
     snapRegionLabels,
+    viewportUnusable,
     type FloatingWindowLimit,
     type FloatingWindowSnapLayout,
 } from "./windowGeometry.js";
@@ -217,12 +219,30 @@ export function useFloatingWindowController({
     const positionDef: tPosition = { ...(cascade ? cascadeWindowPosition(desktop.entry.key) : {x: 0, y: 0}), ...(position ?? {}) };
     const sizeDef: tSize = { height: 0, width: 0, ...(size ?? {}) };
 
+    const repaired = useRef(false);
     let map: tRND | undefined;
     if (ks) {
         map = floatingWindowMap.get(ks) ?? floatingWindowMap.set(ks, { size: sizeDef, position: positionDef }).get(ks);
+        // A session that ran at a zero viewport (hidden tab, prerender) could have stored a 0x0
+        // size before this was guarded, and the stored geometry outranks the size prop - the
+        // window came back 2px wide with nothing to grab. Heal the entry in place instead of
+        // just ignoring it, so the mirror below keeps writing through to the same object.
+        if (map && !isUsableSize(map.size)) { map.size = {...sizeDef}; repaired.current = true; }
+        if (map?.freeGeometry && !isUsableSize(map.freeGeometry.size)) { map.freeGeometry.size = {...sizeDef}; repaired.current = true; }
     }
     const persistedMapRef = useRef<tRND | undefined>(map);
     persistedMapRef.current = map;
+    // What a damaged entry falls back to, readable from the hydration effect (which only
+    // re-subscribes on ks/snappable and would otherwise close over the first render's props).
+    const propSizeRef = useRef<tSize>(sizeDef);
+    propSizeRef.current = sizeDef;
+    // Announce a repair once, out of the render phase, so the damaged record is rewritten to
+    // storage instead of being re-healed on every load for the rest of its life.
+    useEffect(() => {
+        if (!ks || !repaired.current) return;
+        repaired.current = false;
+        floatingWindowMap.touch(ks);
+    });
     const appliedMapRef = useRef<tRND | undefined>(map);
     const savedPosition = map?.position ?? positionDef;
     const savedSize = map?.size ?? sizeDef;
@@ -324,6 +344,10 @@ export function useFloatingWindowController({
             if (!next || next === appliedMapRef.current) return;
             appliedMapRef.current = next;
             persistedMapRef.current = next;
+            // Same repair as at mount: storage loaded after the first render can carry the
+            // damaged 0x0 entry just as well.
+            if (!isUsableSize(next.size)) next.size = {...propSizeRef.current};
+            if (next.freeGeometry && !isUsableSize(next.freeGeometry.size)) next.freeGeometry.size = {...propSizeRef.current};
             const free = next.freeGeometry ?? next;
             unsnappedGeometry.current = {
                 position: {...free.position},
@@ -556,8 +580,13 @@ export function useFloatingWindowController({
     }, [a, b]);
 
     if (mode == "normal") {
-        savedSize.height = height;
-        savedSize.width = width;
+        // Position is always the user's; size is only mirrored when it is a size at all. A
+        // clamp against a zero viewport is an adaptation to the environment, not a choice, and
+        // storing it outlives the environment that produced it.
+        if (isUsableSize({width, height})) {
+            savedSize.height = height;
+            savedSize.width = width;
+        }
         savedPosition.x = x;
         savedPosition.y = y;
     }
@@ -573,7 +602,9 @@ export function useFloatingWindowController({
     }, [sizeByWindow]);
 
     useLayoutEffect(() => {
-        if (typeof window == "undefined") return;
+        // No viewport to fill or snap into: leave the geometry alone and redo this once the
+        // tab is shown again, which arrives as a resize and bumps viewportRevision.
+        if (viewportUnusable()) return;
         if (mode == "maximized") {
             commitPosition({x: 0, y: 0});
             commitSize({width: window.innerWidth, height: window.innerHeight});
@@ -586,7 +617,7 @@ export function useFloatingWindowController({
 
     useLayoutEffect(() => {
         const el = windowRef.current;
-        if (!el || !sizeByWindow || typeof window == "undefined") return;
+        if (!el || !sizeByWindow || viewportUnusable()) return;
         const rect = el.getBoundingClientRect();
         const outer = Array.from(el.querySelectorAll<HTMLElement>(".wenayWndClose, .wenayWndControl"))
             .map(node => node.getBoundingClientRect())
