@@ -1,6 +1,6 @@
 import React from "react";
 import {act, render} from "@testing-library/react";
-import {ParamsEditorController, useParamsEditorController} from "../src/common/src/components/ParamsEditor";
+import {ParamsEditorController, useParamsEditorController} from "../src/internal/components/ParamsEditor/ParamsEditor";
 
 afterEach(() => {
     jest.useRealTimers();

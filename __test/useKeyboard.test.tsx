@@ -1,6 +1,6 @@
 import React from "react";
 import {fireEvent, render} from "@testing-library/react";
-import {keyboard, useKeyboard} from "../src/common/src/hooks/useKeyboard";
+import {keyboard, useKeyboard} from "../src/internal/hooks/useKeyboard";
 
 test("shares one document listener and emits one global event across hook consumers", () => {
     const first = jest.fn();

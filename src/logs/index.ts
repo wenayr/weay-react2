@@ -1,10 +1,9 @@
-import "../style/style.css";
 
 export {
     createLogsController,
     createLogsControllerState,
     getSettingLogs,
-} from "../common/src/logs/logsController.js";
+} from "../internal/logs/logsController.js";
 export type {
     CreateLogsControllerOptions,
     LogEntry,
@@ -18,13 +17,13 @@ export type {
     LogsSettings,
     LogsSettingsDefinition,
     LogsSettingsState,
-} from "../common/src/logs/logsController.js";
+} from "../internal/logs/logsController.js";
 export {
     MessageEventLogCard,
     MessageEventLogsView,
     useLogsPageTable,
     useMessageEventLogsController,
-} from "../common/src/logs/logs.js";
+} from "../internal/logs/logs.js";
 export type {
     LogsPageTableController,
     LogsViewState,
@@ -32,18 +31,18 @@ export type {
     MessageEventLogsItem,
     MessageEventLogsViewProps,
     UseMessageEventLogsControllerOptions,
-} from "../common/src/logs/logs.js";
+} from "../internal/logs/logs.js";
 export {
     MiniLogsTable,
     MiniLogsView,
     miniLogsColumnDefs,
     miniLogsDefaultColDef,
     useMiniLogsTable,
-} from "../common/src/logs/miniLogs.js";
+} from "../internal/logs/miniLogs.js";
 export type {
     MiniLogsController,
     MiniLogsTableController,
     MiniLogsTableProps,
     MiniLogsViewProps,
     UseMiniLogsTableOptions,
-} from "../common/src/logs/miniLogs.js";
+} from "../internal/logs/miniLogs.js";

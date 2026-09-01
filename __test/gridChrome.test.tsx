@@ -1,7 +1,7 @@
 import React from 'react'
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react'
-import {createColumnState} from '../src/common/src/grid/columnState/columnState'
-import {appendGridChromeMenuItem, createGridChrome, selectGridChromeContextRow} from '../src/common/src/grid/gridChrome'
+import {createColumnState} from '../src/internal/grid/columnState/columnState'
+import {appendGridChromeMenuItem, createGridChrome, selectGridChromeContextRow} from '../src/internal/grid/gridChrome'
 
 afterEach(() => cleanup())
 

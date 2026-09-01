@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import {tokens, tokensVar} from "../src/common/src/styles/tokens";
+import {tokens, tokensVar} from "../src/internal/styles/tokens";
 
 // tokens.ts is a hand-written mirror of tokens.css (A10: codegen rejected to keep the
 // build pipeline untouched). This test IS the sync guarantee: every CSS custom property

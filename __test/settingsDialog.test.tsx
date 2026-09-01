@@ -1,6 +1,6 @@
 import React from "react";
 import {fireEvent, render, screen, waitFor} from "@testing-library/react";
-import {SettingsDialog, useSettingsDialogController, type SettingsSection} from "../src/common/src/components/Settings/SettingsDialog";
+import {SettingsDialog, useSettingsDialogController, type SettingsSection} from "../src/internal/components/Settings/SettingsDialog";
 
 const sections: SettingsSection[] = [
     {

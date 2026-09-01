@@ -1,4 +1,4 @@
-import {structEqual} from "../src/common/src/utils/structEqual";
+import {structEqual} from "../src/internal/utils/structEqual";
 
 // structEqual replaces the JSON.stringify guard in columnState.readFromGrid.
 // It must keep stringify's tolerances (undefined props absent, NaN==NaN) while

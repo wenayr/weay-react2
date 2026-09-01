@@ -1,3 +1,13 @@
+import {
+    columnGroupKeys,
+    columnVisibleKeys,
+    copyColumnsConfig,
+    defaultColumnsConfig,
+    nextColumnSort,
+    normalizeColumnsConfig,
+} from './columnStateCore.js'
+import type {ColumnCoreConfig, ColumnCoreSort} from './columnStateCore.js'
+
 export type NativeColumnMeta = {
     key: string
     title: string
@@ -9,45 +19,15 @@ export type NativeColumnMeta = {
     cardRole?: 'title' | 'accent'
 }
 
-export type NativeColumnsSort = {key: string, dir: 'asc' | 'desc'}
-export type NativeColumnsConfig = {
-    v: number
-    order: string[]
-    visible: {[key: string]: boolean}
-    width: {[key: string]: number}
-    sort: NativeColumnsSort | null
-    filter: {[key: string]: unknown}
-    groups: {[group: string]: string[]}
-}
+/** Shape aliases over the shared core: the persisted JSON is one schema, not two. */
+export type NativeColumnsSort = ColumnCoreSort
+export type NativeColumnsConfig = ColumnCoreConfig
 export type NativeColumnStorage = {
     getItem(key: string): Promise<string | null>
     setItem(key: string, value: string): Promise<unknown>
     removeItem?(key: string): Promise<unknown>
 }
 export type NativeColumnStateError = {phase: 'read' | 'parse' | 'write', error: unknown}
-
-const SCHEMA_V = 1
-
-function copy(config: NativeColumnsConfig): NativeColumnsConfig {
-    return {
-        ...config,
-        order: config.order.slice(),
-        visible: {...config.visible},
-        width: {...config.width},
-        sort: config.sort ? {...config.sort} : null,
-        filter: {...config.filter},
-        groups: Object.fromEntries(Object.entries(config.groups).map(([group, keys]) => [group, keys.slice()])),
-    }
-}
-
-function pinFixed(order: readonly string[], columns: readonly NativeColumnMeta[]) {
-    const fixed = new Set(columns.filter(column => column.fixed).map(column => column.key))
-    const result = order.filter(key => !fixed.has(key))
-    columns.forEach(function pin(column, index) {
-        if (column.fixed) result.splice(Math.min(index, result.length), 0, column.key)
-    })
-    return result
-}
 
 /** Headless, platform-neutral column controller. AsyncStorage satisfies storage directly. */
 export function createNativeColumnState(opts: {
@@ -61,7 +41,7 @@ export function createNativeColumnState(opts: {
     const columns = opts.columns.slice()
     const byKey = new Map(columns.map(column => [column.key, column]))
     const known = new Set(byKey.keys())
-    const groupKeys = [...new Set(columns.map(column => column.group).filter((group): group is string => !!group))]
+    const groupKeys = columnGroupKeys(columns)
     const listeners = new Set<(config: NativeColumnsConfig) => void>()
     let revision = 0
     let hydrated = !opts.storage
@@ -69,49 +49,15 @@ export function createNativeColumnState(opts: {
     let timer: ReturnType<typeof setTimeout> | undefined
     let writes = Promise.resolve()
 
-    const members = (group: string) => columns.filter(column => column.group == group).map(column => column.key)
-    function defaults(): NativeColumnsConfig {
-        return {
-            v: SCHEMA_V,
-            order: opts.def?.order?.slice() ?? columns.map(column => column.key),
-            visible: opts.def?.visible ? {...opts.def.visible} : Object.fromEntries(columns.map(column => [column.key, column.defaultVisible != false])),
-            width: opts.def?.width ? {...opts.def.width} : {},
-            sort: opts.def?.sort ? {...opts.def.sort} : null,
-            filter: opts.def?.filter ? {...opts.def.filter} : {},
-            groups: opts.def?.groups ? {...opts.def.groups} : Object.fromEntries(groupKeys.map(group => [group, members(group)])),
-        }
-    }
-
-    function normalize(value?: Partial<NativeColumnsConfig> | null): NativeColumnsConfig {
-        const base = defaults()
-        const order = (Array.isArray(value?.order) ? value.order : base.order)
-            .filter(key => known.has(key) && !byKey.get(key)?.fixed)
-        for (const column of columns)
-            if (!column.fixed && !order.includes(column.key)) order.push(column.key)
-        const rawVisible = value?.visible && typeof value.visible == 'object' ? value.visible : base.visible
-        const visible: {[key: string]: boolean} = {}
-        for (const column of columns)
-            visible[column.key] = column.fixed ? true : (rawVisible[column.key] ?? column.defaultVisible != false)
-        const width: {[key: string]: number} = {}
-        for (const [key, item] of Object.entries(value?.width ?? {}))
-            if (known.has(key) && typeof item == 'number' && isFinite(item) && item > 0) width[key] = item
-        const sort = value?.sort && known.has(value.sort.key) && (value.sort.dir == 'asc' || value.sort.dir == 'desc')
-            ? {key: value.sort.key, dir: value.sort.dir} as NativeColumnsSort : null
-        const filter: {[key: string]: unknown} = {}
-        for (const [key, item] of Object.entries(value?.filter ?? {}))
-            if (known.has(key)) filter[key] = item
-        const groups: {[group: string]: string[]} = {}
-        for (const group of groupKeys) {
-            const allowed = members(group)
-            const raw = value?.groups?.[group]
-            groups[group] = Array.isArray(raw) ? raw.filter(key => allowed.includes(key)) : allowed
-        }
-        return {v: SCHEMA_V, order: pinFixed(order, columns), visible, width, sort, filter, groups}
-    }
+    const defaults = (): NativeColumnsConfig => defaultColumnsConfig(columns, opts.def)
+    /** native keeps its "a missing order/visible falls back to the caller's def" behaviour;
+     *  the web side falls back to empty. See NormalizeColumnsOptions. */
+    const normalize = (value?: Partial<NativeColumnsConfig> | null): NativeColumnsConfig =>
+        normalizeColumnsConfig(columns, value, {def: opts.def, fallbackToDefaults: true})
 
     let config = normalize(defaults())
     const emit = () => {
-        const snapshot = copy(config)
+        const snapshot = copyColumnsConfig(config)
         for (const listener of listeners) listener(snapshot)
     }
     const report = (phase: NativeColumnStateError['phase'], error: unknown) => opts.onError?.({phase, error})
@@ -127,7 +73,7 @@ export function createNativeColumnState(opts: {
         clearTimeout(timer)
         timer = setTimeout(function saveLater() {
             timer = undefined
-            enqueue(copy(config))
+            enqueue(copyColumnsConfig(config))
         }, opts.saveMs ?? 100)
     }
     function commit(next: Partial<NativeColumnsConfig>) {
@@ -139,7 +85,7 @@ export function createNativeColumnState(opts: {
     }
 
     const ready = (async function hydrate() {
-        if (!opts.storage) return copy(config)
+        if (!opts.storage) return copyColumnsConfig(config)
         const before = revision
         try {
             const raw = await opts.storage.getItem(opts.key)
@@ -154,10 +100,10 @@ export function createNativeColumnState(opts: {
             hydrated = true
             if (revision != before) schedule()
         }
-        return copy(config)
+        return copyColumnsConfig(config)
     })()
 
-    const getConfig = () => copy(config)
+    const getConfig = () => copyColumnsConfig(config)
     const subscribe = (listener: (config: NativeColumnsConfig) => void) => {
         listeners.add(listener)
         return function unsubscribe() { listeners.delete(listener) }
@@ -179,8 +125,7 @@ export function createNativeColumnState(opts: {
     function setSort(sort: NativeColumnsSort | null) { commit({...config, sort}) }
     function toggleSort(key: string) {
         if (!known.has(key)) return
-        const current = config.sort
-        setSort(current?.key != key ? {key, dir: 'asc'} : current.dir == 'asc' ? {key, dir: 'desc'} : null)
+        setSort(nextColumnSort(config.sort, key))
     }
     function setFilter(key: string, value: unknown) {
         if (!known.has(key)) return
@@ -193,19 +138,13 @@ export function createNativeColumnState(opts: {
         if (!groupKeys.includes(group)) return
         commit({...config, groups: {...config.groups, [group]: keys}})
     }
-    function visibleKeys() {
-        return config.order.filter(key => {
-            if (config.visible[key] == false) return false
-            const group = byKey.get(key)?.group
-            return !group || config.groups[group]?.includes(key)
-        })
-    }
+    const visibleKeys = () => columnVisibleKeys(config, columns)
     function reset() { commit(defaults()) }
     async function flush() {
         clearTimeout(timer)
         timer = undefined
         await ready
-        enqueue(copy(config))
+        enqueue(copyColumnsConfig(config))
         await writes
     }
     function dispose() {

@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "1.2.4",
+  "version": "2.0.0",
   "description": "Common react",
   "type": "module",
   "strict": true,
@@ -53,9 +53,6 @@
     "react-rnd": "^10.5.3",
     "wenay-common2": "^2.13.0"
   },
-  "optionalDependencies": {
-    "socket.io-client": "^4.8.3"
-  },
   "peerDependencies": {
     "ag-grid-community": "^36.1.0",
     "ag-grid-react": "^36.1.0",
@@ -103,11 +100,6 @@
       "import": "./lib/index.js",
       "default": "./lib/index.js"
     },
-    "./lib/common/api.js": {
-      "types": "./lib/common/api.d.ts",
-      "import": "./lib/common/api.js",
-      "default": "./lib/common/api.js"
-    },
     "./core": {
       "types": "./lib/core/index.d.ts",
       "import": "./lib/core/index.js",
@@ -148,19 +140,14 @@
       "default": "./lib/communication/index.js"
     },
     "./demo/peer-media": {
-      "types": "./lib/common/demo/peerMedia.d.ts",
-      "import": "./lib/common/demo/peerMedia.js",
-      "default": "./lib/common/demo/peerMedia.js"
+      "types": "./lib/stand/demo/peerMedia.d.ts",
+      "import": "./lib/stand/demo/peerMedia.js",
+      "default": "./lib/stand/demo/peerMedia.js"
     },
     "./demo/peer-conference": {
-      "types": "./lib/common/demo/peerConference.d.ts",
-      "import": "./lib/common/demo/peerConference.js",
-      "default": "./lib/common/demo/peerConference.js"
-    },
-    "./demo/stand": {
-      "types": "./lib/common/testUseReact/qa.d.ts",
-      "import": "./lib/common/testUseReact/qa.js",
-      "default": "./lib/common/testUseReact/qa.js"
+      "types": "./lib/stand/demo/peerConference.d.ts",
+      "import": "./lib/stand/demo/peerConference.js",
+      "default": "./lib/stand/demo/peerConference.js"
     }
   }
 }

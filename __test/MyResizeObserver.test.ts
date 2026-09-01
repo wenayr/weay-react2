@@ -1,4 +1,4 @@
-type ResizeModule = typeof import("../src/common/src/components/MyResizeObserver");
+type ResizeModule = typeof import("../src/internal/components/MyResizeObserver");
 
 let fireResize: ((target: Element) => void) | undefined;
 
@@ -16,7 +16,7 @@ function loadModule(): ResizeModule {
     jest.resetModules();
     fireResize = undefined;
     (globalThis as any).ResizeObserver = ResizeObserverMock;
-    return require("../src/common/src/components/MyResizeObserver") as ResizeModule;
+    return require("../src/internal/components/MyResizeObserver") as ResizeModule;
 }
 
 function domRect(width: number): DOMRect {

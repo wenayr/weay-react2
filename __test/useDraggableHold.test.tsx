@@ -1,6 +1,6 @@
 import React from "react";
 import {act, fireEvent, render} from "@testing-library/react";
-import {useDraggableApi} from "../src/common/src/hooks/useDraggable";
+import {useDraggableApi} from "../src/internal/hooks/useDraggable";
 
 function renderHandle(holdMs: number, starts: string[], ends: string[]) {
     function Host() {

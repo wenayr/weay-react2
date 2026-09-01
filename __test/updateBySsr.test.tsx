@@ -1,6 +1,6 @@
 import React from "react";
 import {renderToString} from "react-dom/server";
-import {useUpdateBy} from "../src/common/updateBy";
+import {useUpdateBy} from "../src/internal/updateBy";
 
 test("useUpdateBy provides a stable server snapshot", () => {
     const model = {};

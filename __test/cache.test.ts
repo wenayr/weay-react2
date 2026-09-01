@@ -1,4 +1,4 @@
-import {BrowserCacheStorage, LocalStorageCache} from "../src/common/src/utils/cache";
+import {BrowserCacheStorage, LocalStorageCache} from "../src/internal/utils/cache";
 
 type CacheEntryMap = Map<string, Response>;
 

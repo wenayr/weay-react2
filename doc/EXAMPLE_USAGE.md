@@ -1087,12 +1087,12 @@ Current strong examples:
 - `qa.tsx` card 48 for common2 AI/file-job clients: a live Store/event transition beside the
   RPC-boundary ownership pattern for `useAiRunClient` and `useFileJobClient`.
 - `qa.tsx` cards 23-26 for Replay hooks.
-- `src/common/src/grid/agGrid4/example.tsx` for `useAgGrid` / `AgGridTable` controller examples.
+- `src/internal/grid/agGrid4/example.tsx` for `useAgGrid` / `AgGridTable` controller examples.
 - `qa.tsx` active cards for current work.
 
 Legacy or low-level examples:
 
-- `src/common/testUseReact/useGrid.tsx` and archive card 5 use direct
+- `src/stand/testUseReact/useGrid.tsx` and archive card 5 use direct
   `applyGridRows`. Keep this as regression coverage for the low-level helper,
   but do not copy it as the first pattern for new grids.
 - Archive cards may preserve old bug repros or compatibility paths. Their

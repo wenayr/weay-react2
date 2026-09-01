@@ -1,7 +1,7 @@
 import React from "react";
 import {fireEvent, render, screen} from "@testing-library/react";
-import {FloatingWindow} from "../src/common/src/components/Dnd/FloatingWindow";
-import {Button} from "../src/common/src/hooks/useOutside";
+import {FloatingWindow} from "../src/internal/components/Dnd/FloatingWindow";
+import {Button} from "../src/internal/components/Buttons/Button";
 
 function rootFor(testId: string) {
     const content = screen.getByTestId(testId);

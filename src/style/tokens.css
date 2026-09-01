@@ -1,5 +1,5 @@
 /* Shared library design tokens. Values are collected from style.css and menuRight.css
-   without changes. TS mirror for inline styles and ag-grid themes - src/common/src/styles/tokens.ts */
+   without changes. TS mirror for inline styles and ag-grid themes - src/internal/styles/tokens.ts */
 :root {
   /* Main background colors */
   --color-bg-dark: #131821;

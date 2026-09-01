@@ -1,1 +1,1 @@
-export * from "./common/api.js";
+export * from "./api.js";

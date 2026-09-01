@@ -38,13 +38,24 @@ type _Saved = Expect<Eq<
     import("../src/windows/index").FloatingWindowSavedGeometry
 >>;
 
-/** Documented, deliberate divergences. Each entry is a name the root barrel and a subpath
- *  barrel resolve DIFFERENTLY; all three are marked @deprecated at the declaration site in
- *  logsContext.tsx and are scheduled to be renamed in a major.
- *  - LogEntry / LogInput: logsContext's loose `[key: string]: any` shape vs logsController's
- *    strict generic one.
- *  - LogsSettings: a React COMPONENT in the root barrel, a TYPE in ./logs. */
-const knownLogDivergences = ["LogEntry", "LogInput", "LogsSettings"] as const;
+/** 2.0.0 removed src/internal/logs/logsContext.tsx, the parallel logs stack that owned the
+ *  loose `LogEntry` / `LogInput` shapes and the `LogsSettings` React component. Every log name
+ *  now resolves to logsController on BOTH surfaces, so the divergence list is empty and these
+ *  three names became ordinary parity assertions. */
+type _LogEntry = Expect<Eq<
+    import("../src/index").LogEntry<{a: number}>,
+    import("../src/logs/index").LogEntry<{a: number}>
+>>;
+type _LogInput = Expect<Eq<
+    import("../src/index").LogInput<{a: number}>,
+    import("../src/logs/index").LogInput<{a: number}>
+>>;
+type _LogsSettings = Expect<Eq<
+    import("../src/index").LogsSettings,
+    import("../src/logs/index").LogsSettings
+>>;
+
+const knownLogDivergences = [] as const;
 
 describe("barrel type parity", () => {
     test("the compile-time assertions above hold", () => {
@@ -52,15 +63,15 @@ describe("barrel type parity", () => {
         expect(true).toBe(true);
     });
 
-    test("LogsSettings is still a component in root and absent as a value from ./logs", () => {
-        // the runtime half of the documented divergence: if someone ever makes ./logs export a
-        // VALUE under this name, the two surfaces start fighting and this fails
-        expect(typeof (root as Record<string, unknown>).LogsSettings).toBe("function");
+    test("LogsSettings is a type on both surfaces and a value on neither", () => {
+        // the runtime half: logsContext used to export a COMPONENT under this name from the root
+        // barrel while ./logs exported a TYPE. Both must now be type-only.
+        expect((root as Record<string, unknown>).LogsSettings).toBeUndefined();
         expect((logs as Record<string, unknown>).LogsSettings).toBeUndefined();
     });
 
-    test("the list of known divergences is not silently growing", () => {
-        expect(knownLogDivergences).toHaveLength(3);
+    test("the list of known divergences is empty", () => {
+        expect(knownLogDivergences).toHaveLength(0);
     });
 
     test("core and react surfaces are non-empty and disjoint in purpose", () => {

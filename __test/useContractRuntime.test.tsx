@@ -1,7 +1,7 @@
 import React from 'react'
 import {act, render, screen, waitFor} from '@testing-library/react'
 import {Contract} from 'wenay-common2'
-import {useContractSlot} from '../src/common/src/hooks/useContractRuntime'
+import {useContractSlot} from '../src/internal/hooks/useContractRuntime'
 
 type EditorApi = {format(value: string): string}
 

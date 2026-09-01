@@ -11,7 +11,7 @@ import {
     useStoreNode,
     useStoreSelect,
     type RemoteStoreLike,
-} from "../src/common/src/hooks/useObserveStore";
+} from "../src/internal/hooks/useObserveStore";
 
 type LocalState = {
     count: number;

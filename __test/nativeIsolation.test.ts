@@ -36,8 +36,8 @@ describe("wenay-react2/native isolation", () => {
 
     // A guard that cannot fail is worse than none: pin what it must catch.
     test("the detector flags the imports that would break the guarantee", () => {
-        expect(escapingSpecifiers(`import {structEqual} from '../common/src/utils/structEqual'`))
-            .toEqual(["../common/src/utils/structEqual"]);
+        expect(escapingSpecifiers(`import {structEqual} from '../internal/utils/structEqual'`))
+            .toEqual(["../internal/utils/structEqual"]);
         expect(escapingSpecifiers(`import React from "react"`)).toEqual(["react"]);
         expect(escapingSpecifiers(`import 'ag-grid-community/styles/ag-grid.css'`))
             .toEqual(["ag-grid-community/styles/ag-grid.css"]);

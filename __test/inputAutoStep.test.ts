@@ -1,4 +1,4 @@
-import {setAutoStepForElement} from "../src/common/src/utils/inputAutoStep";
+import {setAutoStepForElement} from "../src/internal/utils/inputAutoStep";
 
 // The change handler used to write parseFloat("").toFixed(d) - the literal string
 // "NaN" - into the field, and to write `stepDefault + ""` even when the element

@@ -28,7 +28,7 @@
     "src/windows/index.ts",
     "src/logs/index.ts",
     "src/communication/index.ts",
-    "src/common/demo/peerMedia.tsx",
-    "src/common/testUseReact/qa.tsx"
+    "src/stand/demo/peerMedia.tsx",
+    "src/stand/demo/peerConference.tsx"
   ]
 }

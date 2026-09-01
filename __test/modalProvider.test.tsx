@@ -1,6 +1,6 @@
 import React from "react";
 import {fireEvent, render, screen} from "@testing-library/react";
-import {ModalProvider, useModal} from "../src/common/src/components/Modal/ModalContextProvider";
+import {ModalProvider, useModal} from "../src/internal/components/Modal/ModalContextProvider";
 
 // ModalProvider now composes the internal Overlay primitive (A9). This suite pins the
 // public contract that used to live inline: portal to document.body, token scrim,

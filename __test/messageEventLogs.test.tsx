@@ -1,6 +1,6 @@
 import React from "react";
 import {act, render, screen} from "@testing-library/react";
-import {logsApi, type MessageEventLogsController, useMessageEventLogsController} from "../src/common/src/logs/logs";
+import {logsApi, type MessageEventLogsController, useMessageEventLogsController} from "../src/internal/logs/logs";
 
 function Probe(props: {onReady: (controller: MessageEventLogsController) => void}) {
     const controller = useMessageEventLogsController({maxVisible: 2});

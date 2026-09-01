@@ -1,6 +1,6 @@
 import React, {useMemo} from "react";
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
-import {createRightMenuController, DropdownMenu, useRightMenuController} from "../src/common/src/components/Menu/RightMenu";
+import {createRightMenuController, DropdownMenu, useRightMenuController} from "../src/internal/components/Menu/RightMenu";
 
 test("createRightMenuController.set rerenders an already mounted Render with newly added menu elements", async () => {
     let api: ReturnType<typeof createRightMenuController> | null = null;

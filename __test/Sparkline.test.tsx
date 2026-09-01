@@ -1,6 +1,6 @@
 import React from "react";
 import {act, render} from "@testing-library/react";
-import {Sparkline} from "../src/common/src/myChart/Sparkline";
+import {Sparkline} from "../src/internal/myChart/Sparkline";
 
 function rect(width: number, height: number): DOMRectReadOnly {
     return {

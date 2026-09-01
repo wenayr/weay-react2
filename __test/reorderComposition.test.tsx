@@ -1,6 +1,6 @@
 import React, {useState} from "react";
 import {fireEvent, render, screen} from "@testing-library/react";
-import {useReorder} from "../src/common/src/hooks/useReorder";
+import {useReorder} from "../src/internal/hooks/useReorder";
 
 function ColumnReorderHarness() {
     const [order, setOrder] = useState(["c1", "c2", "c3"]);

@@ -1,6 +1,6 @@
 import React from "react";
 import {render, screen} from "@testing-library/react";
-import {FResizableReact, mapResiReact} from "../src/common/src/components/Dnd/Resizable";
+import {FResizableReact, mapResiReact} from "../src/internal/components/Dnd/Resizable";
 
 /** The box re-resizable renders carries the applied size as inline styles. */
 function box(testId: string) {

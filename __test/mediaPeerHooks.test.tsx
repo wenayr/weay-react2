@@ -8,8 +8,8 @@ import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import * as Media from "wenay-common2/media";
 import * as Observe from "wenay-common2/observe";
 import * as Peer from "wenay-common2/peer";
-import {useMediaSource} from "../src/common/src/hooks/useMedia";
-import {usePeer} from "../src/common/src/hooks/usePeer";
+import {useMediaSource} from "../src/internal/hooks/useMedia";
+import {usePeer} from "../src/internal/hooks/usePeer";
 
 function fakeMedia() {
     const source: any = [() => {}, {on: () => () => {}}];

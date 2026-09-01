@@ -1,8 +1,8 @@
 import React from "react";
 import {act, fireEvent, render, screen} from "@testing-library/react";
-import {createContextMenu} from "../src/common/src/menu/menuMouse";
-import {Menu} from "../src/common/src/menu/menu";
-import {FloatingWindow} from "../src/common/src/components/Dnd/FloatingWindow";
+import {createContextMenu} from "../src/internal/menu/menuMouse";
+import {Menu} from "../src/internal/menu/menu";
+import {FloatingWindow} from "../src/internal/components/Dnd/FloatingWindow";
 
 /** jsdom measures every element as a zero rect, so the placement logic has nothing to react to.
  *  The menu root reports a box of the given size at whatever left it has applied (its offset

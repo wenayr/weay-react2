@@ -11,7 +11,7 @@ const entries = {
         console.log(AgGridReact)
     `,
     targeted: `
-        import {defaultAgGridModules} from './src/common/src/grid/agGrid4/modules.ts'
+        import {defaultAgGridModules} from './src/internal/grid/agGrid4/modules.ts'
         import {ModuleRegistry} from 'ag-grid-community'
         import {AgGridReact} from 'ag-grid-react'
         ModuleRegistry.registerModules(defaultAgGridModules)

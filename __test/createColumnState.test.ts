@@ -1,4 +1,4 @@
-import {createColumnState} from "../src/common/src/grid/columnState/columnState";
+import {createColumnState} from "../src/internal/grid/columnState/columnState";
 
 test("createColumnState presentGate is runtime-only and intersects actual presence", () => {
     const cs = createColumnState({

@@ -1,6 +1,6 @@
 import React from "react";
 import {render} from "@testing-library/react";
-import {OutsideClickArea} from "../src/common/src/hooks/useOutside";
+import {OutsideClickArea} from "../src/internal/components/OutsideClickArea";
 
 /** Every instance used to add its own mousedown+touchstart pair to `document`, so N open
  *  overlays meant 2N native listeners. They are now multiplexed through a single pair. */

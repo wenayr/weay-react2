@@ -4,11 +4,11 @@ import {
     CsvExportModule,
     ModuleRegistry,
 } from 'ag-grid-community'
-import {GridStyleDefault} from '../src/common/src/styles/styleGrid'
+import {GridStyleDefault} from '../src/internal/styles/styleGrid'
 import {
     defaultAgGridModules,
     ensureAgGridModules,
-} from '../src/common/src/grid/agGrid4/modules'
+} from '../src/internal/grid/agGrid4/modules'
 
 let lastAgGridProps: Record<string, unknown> | undefined
 
@@ -19,7 +19,7 @@ jest.mock('ag-grid-react', () => ({
     },
 }))
 
-import {AgGridTable} from '../src/common/src/grid/agGrid4/agGrid4'
+import {AgGridTable} from '../src/internal/grid/agGrid4/agGrid4'
 
 test('default AG Grid modules are targeted and register only once', () => {
     const names = defaultAgGridModules.map(module => module.moduleName)

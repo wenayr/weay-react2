@@ -1,5 +1,5 @@
-import {deepMergeWithMap} from "../src/common/src/utils/memoryStore";
-import {map3, renderBy, createUpdateApi} from "../src/common/updateBy";
+import {deepMergeWithMap} from "../src/internal/utils/memoryStore";
+import {__observerStateForTests, renderBy, createUpdateApi} from "../src/internal/updateBy";
 
 // deepMergeWithMap fed the visited map a {} placeholder it never filled in, treated a truthy
 // primitive as a merge base, and aliased the def's arrays straight into persisted state.
@@ -57,21 +57,21 @@ describe("deepMergeWithMap", () => {
 describe("updateBy version", () => {
     test("the version moves even with no subscribers", () => {
         const store = {n: 0};
-        const before = map3.get(store)?.version ?? 0;
+        const before = __observerStateForTests(store)?.version ?? 0;
 
         store.n = 1;
         renderBy(store);
 
-        const after = map3.get(store)?.version ?? 0;
+        const after = __observerStateForTests(store)?.version ?? 0;
         expect(after).toBeGreaterThan(before);
     });
 
     test("repeated unsubscribed updates keep moving the version", () => {
         const store = {n: 0};
         renderBy(store);
-        const first = map3.get(store)!.version;
+        const first = __observerStateForTests(store)!.version;
         renderBy(store);
-        expect(map3.get(store)!.version).toBeGreaterThan(first);
+        expect(__observerStateForTests(store)!.version).toBeGreaterThan(first);
     });
 
     test("a subscribed store still gets exactly one bump per renderBy", () => {
@@ -80,9 +80,9 @@ describe("updateBy version", () => {
         const off = api.on(() => {});
         api.render();   // the observer state is created lazily, on the first trigger
 
-        const before = map3.get(store)!.version;
+        const before = __observerStateForTests(store)!.version;
         api.render();
-        expect(map3.get(store)!.version).toBe(before + 1);
+        expect(__observerStateForTests(store)!.version).toBe(before + 1);
 
         off();
     });

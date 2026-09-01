@@ -8,7 +8,7 @@ Read this together with:
 - `doc/wenay-react2.md` for everyday signatures.
 - `doc/wenay-react2-rare.md` for low-level details and edge cases.
 - `doc/EXAMPLE_USAGE.md` for usage standards and examples.
-- `src/common/testUseReact/qa.tsx` for the live QA stand.
+- `src/stand/testUseReact/qa.tsx` for the live QA stand.
 
 ## Project Role
 
@@ -50,24 +50,20 @@ on -> off                          // subscriptions
 
 ## Public Entry
 
-Consumers import from the package root:
+Consumers import from the package root or from a subpath, and import the stylesheet once:
 
 ```ts
+import "wenay-react2/styles"            // once per app; tokens: "wenay-react2/styles/tokens"
 import { createToolbar, useAgGrid, createColumnState } from "wenay-react2"
+import { useStoreNode } from "wenay-react2/react"   // CSS-free, tree-shake-safe subpaths:
+                                                    // ./core ./react ./native ./grid ./windows ./logs ./communication
 ```
 
-`src/common/api.tsx` is the root export aggregator. It also exports `kit` for
-large files that prefer grouped namespaces:
-
-```ts
-import { kit } from "wenay-react2"
-
-kit.grid
-kit.modal
-kit.menu
-kit.logs
-kit.updateBy
-```
+`src/api.tsx` is the root export aggregator: a flat re-export list with no side effects.
+Since 2.0.0 no entrypoint imports CSS on its own, there is no `kit` namespace object,
+and no demo, stand or application code is compiled into `lib/`. The library lives under
+`src/internal/`, the QA stand and demos under `src/stand/` (`./demo/peer-media` and
+`./demo/peer-conference` are the two demo entrypoints still published, from `lib/stand/demo`).
 
 ## Compatibility Policy
 
@@ -370,11 +366,11 @@ Purpose: shared visual tokens and theme hooks for library primitives.
 Main files:
 
 - `src/style/tokens.css`
-- `src/common/src/styles/tokens.ts`
+- `src/internal/styles/tokens.ts`
 - `src/style/style.css`
 - `src/style/menuRight.css`
-- `src/common/src/styles/styleGrid.ts`
-- `src/common/src/grid/agGrid4/theme.ts`
+- `src/internal/styles/styleGrid.ts`
+- `src/internal/grid/agGrid4/theme.ts`
 
 New shared UI should try existing tokens first. Add tokens when the value is
 part of a reusable primitive or expected to be themed by apps. One-off QA or
@@ -397,7 +393,7 @@ using it as a domain chart.
 
 ## QA Stand
 
-The live stand is `src/common/testUseReact/qa.tsx`.
+The live stand is `src/stand/testUseReact/qa.tsx`.
 
 Run:
 
@@ -418,7 +414,7 @@ Important current cards:
 - 31: `createToolbar` over `columnState.api.listSource`.
 - 32: `createColumnGrid` wrapper with built-in dots overlay driving table/cards.
 
-Known audit note: archive card 5 and `src/common/testUseReact/useGrid.tsx`
+Known audit note: archive card 5 and `src/stand/testUseReact/useGrid.tsx`
 still demonstrate direct `applyGridRows`. That is useful as a regression
 check for the low-level helper, but new examples should teach `useAgGrid`,
 `AgGridTable`, or `createGridBuffer` first.

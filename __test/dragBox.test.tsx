@@ -1,6 +1,6 @@
 import React from "react";
 import {fireEvent, render} from "@testing-library/react";
-import {DragBox} from "../src/common/src/components/Dnd/FloatingWindow";
+import {DragBox} from "../src/internal/components/Dnd/FloatingWindow";
 
 // DragBox is now a thin adapter over useDraggableApi (A7). This suite pins the
 // observable contract of the old bespoke loop: immediate start, per-tick imperative

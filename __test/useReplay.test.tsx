@@ -1,8 +1,8 @@
 import React, {StrictMode, useRef, useState} from "react";
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {Observe, Replay} from "wenay-common2";
-import {useReplayRouteSubscribe, useStoreLazyLineMirror, useStoreReplayEach, useStoreReplayMirror, useStoreReplayRouteMirror} from "../src/common/src/hooks/useReplay";
-import {useStoreNode} from "../src/common/src/hooks/useObserveStore";
+import {useReplayRouteSubscribe, useStoreLazyLineMirror, useStoreReplayEach, useStoreReplayMirror, useStoreReplayRouteMirror} from "../src/internal/hooks/useReplay";
+import {useStoreNode} from "../src/internal/hooks/useObserveStore";
 
 type Rows = Record<string, {qty: number}>;
 type RowsRemote = Observe.StoreReplayRemote;

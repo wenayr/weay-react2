@@ -1,7 +1,7 @@
 import React from "react";
 import {act, render, screen} from "@testing-library/react";
 import {Replay} from "wenay-common2";
-import {useRouteState} from "../src/common/src/hooks/useRoute";
+import {useRouteState} from "../src/internal/hooks/useRoute";
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 

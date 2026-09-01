@@ -1,8 +1,8 @@
 import React from "react";
 import {act, fireEvent, render, screen} from "@testing-library/react";
-import {Button} from "../src/common/src/hooks/useOutside";
-import {buttonStatusMap} from "../src/common/src/utils/persistedMaps";
-import {memoryCache, memoryMaps} from "../src/common/src/utils/memoryStore";
+import {Button} from "../src/internal/components/Buttons/Button";
+import {buttonStatusMap} from "../src/internal/utils/persistedMaps";
+import {memoryCache, memoryMaps} from "../src/internal/utils/memoryStore";
 
 function renderButton(keyForSave?: string) {
     return render(

@@ -1,0 +1,137 @@
+/** Pure geometry of the floating-window layer: drag clamping, snap regions and the snap-layout
+ *  catalogue. No React state, no DOM writes - split out of FloatingWindow.tsx so it can be unit
+ *  tested on its own and reused by the drag loop, the controller and the chrome without any of
+ *  them importing the others. FloatingWindow.tsx re-exports whatever of this is public. */
+import type {
+    FloatingWindowPosition,
+    FloatingWindowSavedGeometry,
+    FloatingWindowSize,
+    FloatingWindowSnapRegion,
+} from "../../utils/floatingWindowTypes.js";
+
+/** Below this a window has no title bar left to grab, so it can never be recovered from the UI.
+ *  Any smaller number is treated as damage rather than as a size somebody chose. */
+export const MIN_WINDOW_SIZE = 24;
+
+/** One dimension worth storing and worth restoring. String sizes ("50%", "auto") and absent
+ *  ones are the caller's business and always pass; only numbers are judged, NaN included -
+ *  it compares false against every bound, so an unguarded clamp lets it through. */
+export function isUsableDimension(value: number | string | undefined, min: number = MIN_WINDOW_SIZE): boolean {
+    if (typeof value != "number") return true;
+    return Number.isFinite(value) && value >= min;
+}
+
+/** A size worth storing and worth restoring. A window mounted at a zero viewport (hidden tab,
+ *  prerender, offscreen iframe) gets clamped to 0x0, and that is exactly what must never reach
+ *  - or come back out of - a persisted map. `min` lets a caller judge against its own floor
+ *  rather than a window's title bar. */
+export function isUsableSize(
+    size: {width?: number | string; height?: number | string} | undefined | null,
+    min: number = MIN_WINDOW_SIZE,
+): boolean {
+    if (!size) return false;
+    return isUsableDimension(size.width, min) && isUsableDimension(size.height, min);
+}
+
+/** True when the viewport itself is degenerate, i.e. there is nothing to fit a window into and
+ *  every clamp against it would produce zeros. */
+export function viewportUnusable() {
+    return typeof window == "undefined" || window.innerWidth <= 0 || window.innerHeight <= 0;
+}
+
+/** Structural shape of FloatingWindowProps["limit"] - declared here so the clamp does not have
+ *  to import the component's prop type (which would point this leaf back at the component). */
+export type FloatingWindowLimit = {
+    x?: { max?: number; min?: number };
+    y?: { max?: number; min?: number };
+};
+
+export type FloatingWindowSnapLayout = {
+    id: string;
+    label: string;
+    zones: Array<{region: FloatingWindowSnapRegion; gridArea: string}>;
+};
+
+export const snapRegionLabels: Record<FloatingWindowSnapRegion, string> = {
+    left: "left",
+    right: "right",
+    top: "top",
+    bottom: "bottom",
+    "top-left": "top left",
+    "top-right": "top right",
+    "bottom-left": "bottom left",
+    "bottom-right": "bottom right",
+};
+
+export const snapLayouts: FloatingWindowSnapLayout[] = [
+    {
+        id: "halves",
+        label: "Two columns",
+        zones: [
+            {region: "left", gridArea: "1 / 1 / 3 / 2"},
+            {region: "right", gridArea: "1 / 2 / 3 / 3"},
+        ],
+    },
+    {
+        id: "rows",
+        label: "Two rows",
+        zones: [
+            {region: "top", gridArea: "1 / 1 / 2 / 3"},
+            {region: "bottom", gridArea: "2 / 1 / 3 / 3"},
+        ],
+    },
+    {
+        id: "quarters",
+        label: "Four quarters",
+        zones: [
+            {region: "top-left", gridArea: "1 / 1 / 2 / 2"},
+            {region: "top-right", gridArea: "1 / 2 / 2 / 3"},
+            {region: "bottom-left", gridArea: "2 / 1 / 3 / 2"},
+            {region: "bottom-right", gridArea: "2 / 2 / 3 / 3"},
+        ],
+    },
+];
+
+/** Shared by the mouse and touch drag loops, which clamp identically. */
+export function clampToLimit(x: number, y: number, lim: FloatingWindowLimit | undefined): FloatingWindowPosition {
+    if (!lim) return {x, y};
+    if (lim.x?.min !== undefined && lim.x.min > x) x = lim.x.min;
+    if (lim.x?.max !== undefined && lim.x.max < x) x = lim.x.max;
+    if (lim.y?.min !== undefined && lim.y.min > y) y = lim.y.min;
+    if (lim.y?.max !== undefined && lim.y.max < y) y = lim.y.max;
+    return {x, y};
+}
+
+export function snapPreviewStyle(region: FloatingWindowSnapRegion): React.CSSProperties {
+    // A region occupies half the viewport on the axes it names and all of the other one:
+    // the column halves are full height, the row halves full width, quarters neither.
+    const right = region == "right" || region.endsWith("-right");
+    const bottom = region == "bottom" || region.startsWith("bottom-");
+    const fullHeight = region == "left" || region == "right";
+    const fullWidth = region == "top" || region == "bottom";
+    return {
+        left: right ? "50%" : 6,
+        top: bottom ? "50%" : 6,
+        width: fullWidth ? "calc(100% - 12px)" : "calc(50% - 9px)",
+        height: fullHeight ? "calc(100% - 12px)" : "calc(50% - 9px)",
+    };
+}
+
+/** Target geometry for a snap region. Reads the viewport at call time (the caller already
+ *  guards against SSR), so it stays a plain function rather than closing over the controller. */
+export function snapGeometry(region: FloatingWindowSnapRegion): FloatingWindowSavedGeometry {
+    const viewportWidth = typeof window == "undefined" ? 0 : window.innerWidth;
+    const viewportHeight = typeof window == "undefined" ? 0 : window.innerHeight;
+    const halfWidth = Math.floor(viewportWidth / 2);
+    const halfHeight = Math.floor(viewportHeight / 2);
+    switch (region) {
+        case "left": return {position: {x: 0, y: 0}, size: {width: halfWidth, height: viewportHeight}};
+        case "right": return {position: {x: halfWidth, y: 0}, size: {width: viewportWidth - halfWidth, height: viewportHeight}};
+        case "top": return {position: {x: 0, y: 0}, size: {width: viewportWidth, height: halfHeight}};
+        case "bottom": return {position: {x: 0, y: halfHeight}, size: {width: viewportWidth, height: viewportHeight - halfHeight}};
+        case "top-left": return {position: {x: 0, y: 0}, size: {width: halfWidth, height: halfHeight}};
+        case "top-right": return {position: {x: halfWidth, y: 0}, size: {width: viewportWidth - halfWidth, height: halfHeight}};
+        case "bottom-left": return {position: {x: 0, y: halfHeight}, size: {width: halfWidth, height: viewportHeight - halfHeight}};
+        case "bottom-right": return {position: {x: halfWidth, y: halfHeight}, size: {width: viewportWidth - halfWidth, height: viewportHeight - halfHeight}};
+    }
+}

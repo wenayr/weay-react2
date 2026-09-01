@@ -1,6 +1,6 @@
 import React from "react";
 import {fireEvent, render, screen, waitFor} from "@testing-library/react";
-import {Menu, type MenuActionEvent, type MenuItem} from "../src/common/src/menu/menu";
+import {Menu, type MenuActionEvent, type MenuItem} from "../src/internal/menu/menu";
 
 function openItem(label: string) {
     const item = screen.getByText(label).closest(".toLine");

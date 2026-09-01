@@ -798,6 +798,6 @@ demo; neither is used by `Sparkline`.
 npm run testReact                                // http://localhost:3010/
 ```
 
-The stand lives in `src/common/testUseReact/qa.tsx`. Use it for visual checks; agGrid4 overlay/dynamic-column demos are dedicated QA cards.
+The stand lives in `src/stand/testUseReact/qa.tsx`. Use it for visual checks; agGrid4 overlay/dynamic-column demos are dedicated QA cards.
 Two tabs: Active checks (current work) and Verified archive (`#archive`) - verified/fixed cards move
 there and stay runnable for regression re-checks.

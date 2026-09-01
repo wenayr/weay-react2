@@ -1,6 +1,6 @@
 import React from "react";
 import {act, render, screen} from "@testing-library/react";
-import {FloatingWindow} from "../src/common/src/components/Dnd/FloatingWindow";
+import {FloatingWindow} from "../src/internal/components/Dnd/FloatingWindow";
 
 describe("FloatingWindow children", () => {
     test("a plain element child follows the parent's re-renders", () => {

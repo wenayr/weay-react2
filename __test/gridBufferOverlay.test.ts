@@ -1,4 +1,4 @@
-import {createGridBuffer, type GridApiLike} from '../src/common/src/grid/agGrid4/core'
+import {createGridBuffer, type GridApiLike} from '../src/internal/grid/agGrid4/core'
 
 type Row = {id: string, name: string, price?: number}
 

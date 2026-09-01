@@ -5,28 +5,28 @@ export {
     renderByRevers,
     useUpdateBy,
     useUpdateByApi,
-} from "../common/updateBy.js";
-export type {UpdateApi, UpdateCallback} from "../common/updateBy.js";
+} from "../internal/updateBy.js";
+export type {UpdateApi, UpdateCallback} from "../internal/updateBy.js";
 
-export {useOutside, useOutsideApi, useOutsideRef} from "../common/src/hooks/useOutside.js";
-export type {UseOutsideApi, UseOutsideOptions} from "../common/src/hooks/useOutside.js";
-export {keyboard, keyboardState, useKeyboard} from "../common/src/hooks/useKeyboard.js";
-export type {KeyboardApi} from "../common/src/hooks/useKeyboard.js";
-export {useDraggable, useDraggableApi} from "../common/src/hooks/useDraggable.js";
+export {useOutside, useOutsideApi, useOutsideRef} from "../internal/hooks/useOutside.js";
+export type {UseOutsideApi, UseOutsideOptions} from "../internal/hooks/useOutside.js";
+export {keyboard, keyboardState, useKeyboard} from "../internal/hooks/useKeyboard.js";
+export type {KeyboardApi} from "../internal/hooks/useKeyboard.js";
+export {useDraggable, useDraggableApi} from "../internal/hooks/useDraggable.js";
 export type {
     Position,
     UseDraggableApi,
     UseDraggableOptions,
     UseDraggableReturn,
-} from "../common/src/hooks/useDraggable.js";
-export {useReorder} from "../common/src/hooks/useReorder.js";
-export type {ReorderItem, ReorderOptions} from "../common/src/hooks/useReorder.js";
-export {useReorderBoard} from "../common/src/hooks/useReorderBoard.js";
+} from "../internal/hooks/useDraggable.js";
+export {useReorder} from "../internal/hooks/useReorder.js";
+export type {ReorderItem, ReorderOptions} from "../internal/hooks/useReorder.js";
+export {useReorderBoard} from "../internal/hooks/useReorderBoard.js";
 export type {
     BoardColumn,
     BoardPosition,
     ReorderBoardOptions,
-} from "../common/src/hooks/useReorderBoard.js";
+} from "../internal/hooks/useReorderBoard.js";
 
 export {
     useListenArgs,
@@ -38,7 +38,7 @@ export {
     useStoreMirror,
     useStoreNode,
     useStoreSelect,
-} from "../common/src/hooks/useObserveStore.js";
+} from "../internal/hooks/useObserveStore.js";
 export type {
     ListenLike,
     RemoteStoreLike,
@@ -60,7 +60,7 @@ export type {
     UseStoreMirrorOptions,
     UseStoreNodeOptions,
     UseStoreSelectOptions,
-} from "../common/src/hooks/useObserveStore.js";
+} from "../internal/hooks/useObserveStore.js";
 export {
     useReplayFrame,
     useReplayHistory,
@@ -73,7 +73,7 @@ export {
     useStoreReplayRouteMirror,
     useStoreReplayRouteSync,
     useStoreReplaySync,
-} from "../common/src/hooks/useReplay.js";
+} from "../internal/hooks/useReplay.js";
 export type {
     ReplayFrameController,
     ReplayHistoryController,
@@ -96,22 +96,22 @@ export type {
     UseStoreReplayEachOptions,
     UseStoreReplayRouteSyncOptions,
     UseStoreReplaySyncOptions,
-} from "../common/src/hooks/useReplay.js";
-export {useRouteState} from "../common/src/hooks/useRoute.js";
-export type {RouteLogEntry} from "../common/src/hooks/useRoute.js";
+} from "../internal/hooks/useReplay.js";
+export {useRouteState} from "../internal/hooks/useRoute.js";
+export type {RouteLogEntry} from "../internal/hooks/useRoute.js";
 export {
     useAiRunClient,
     useClientStore,
     useFileJobClient,
-} from "../common/src/hooks/useWorkflows.js";
+} from "../internal/hooks/useWorkflows.js";
 export type {
     AiRunClientController,
     ClientStoreController,
     FileJobClientController,
     StoreBackedClient,
-} from "../common/src/hooks/useWorkflows.js";
-export {useContractSlot} from "../common/src/hooks/useContractRuntime.js";
-export type {ContractSlotController} from "../common/src/hooks/useContractRuntime.js";
+} from "../internal/hooks/useWorkflows.js";
+export {useContractSlot} from "../internal/hooks/useContractRuntime.js";
+export type {ContractSlotController} from "../internal/hooks/useContractRuntime.js";
 
 // Persistence. ./grid (createColumnState), ./windows (FloatingWindow) and ./react (Button
 // keyForSave) all write into memoryCache, but the documented contract - "the library never
@@ -128,19 +128,19 @@ export {
     memoryMarkDirty,
     memorySet,
     memoryUpdate,
-} from "../common/src/utils/memoryStore.js";
+} from "../internal/utils/memoryStore.js";
 export {
     createCacheMap,
     createCacheMapWithStorage,
-    useCacheMapPersistence,
     browserCacheStorage,
     localStorageCache,
-} from "../common/src/utils/cache.js";
-export type {CacheMap, CacheStorage} from "../common/src/utils/cache.js";
-export {createSearchHistory} from "../common/src/utils/searchHistory.js";
+} from "../internal/utils/cache.js";
+export type {CacheMap, CacheStorage} from "../internal/utils/cache.js";
+export {useCacheMapPersistence} from "../internal/hooks/useCacheMapPersistence.js";
+export {createSearchHistory} from "../internal/utils/searchHistory.js";
 
 // The project's only shared ResizeObserver. It lives under components/ for historical reasons,
 // which kept it out of this barrel entirely - so every consumer (and the chart engines) rolled
 // their own observer instead.
-export {CResizeObserver, useElementSize, useResizeObserver} from "../common/src/components/MyResizeObserver.js";
-export type {ObserveID} from "../common/src/components/MyResizeObserver.js";
+export {CResizeObserver, useElementSize, useResizeObserver} from "../internal/components/MyResizeObserver.js";
+export type {ObserveID} from "../internal/components/MyResizeObserver.js";

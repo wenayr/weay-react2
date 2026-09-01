@@ -1,4 +1,3 @@
-import "../style/style.css";
 
 export {
     FloatingWindow,
@@ -7,7 +6,7 @@ export {
     useFloatingWindowController,
     useWindowPortalContainer,
     DragBox,
-} from "../common/src/components/Dnd/FloatingWindow.js";
+} from "../internal/components/Dnd/FloatingWindow.js";
 export type {
     DragBoxProps,
     FloatingWindowCloseReason,
@@ -20,15 +19,15 @@ export type {
     FloatingWindowSize,
     FloatingWindowSnapRegion,
     FloatingWindowUpdate,
-} from "../common/src/components/Dnd/FloatingWindow.js";
+} from "../internal/components/Dnd/FloatingWindow.js";
 export {
     FloatingWindowTaskbar,
     cascadeWindowPosition,
     useFloatingDesktopWindow,
     useFloatingWindowManager,
-} from "../common/src/components/Dnd/FloatingDesktop.js";
+} from "../internal/components/Dnd/FloatingDesktop.js";
 export type {
     FloatingDesktopWindow,
     FloatingWindowManager,
     FloatingWindowTaskbarProps,
-} from "../common/src/components/Dnd/FloatingDesktop.js";
+} from "../internal/components/Dnd/FloatingDesktop.js";

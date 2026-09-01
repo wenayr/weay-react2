@@ -1,7 +1,7 @@
 import React from "react";
 import {render} from "@testing-library/react";
 import type {CellMouseDownEvent, ColDef, GridApi, GridReadyEvent} from "ag-grid-community";
-import {type MiniLogsTableController, useMiniLogsTable} from "../src/common/src/logs/miniLogs";
+import {type MiniLogsTableController, useMiniLogsTable} from "../src/internal/logs/miniLogs";
 
 type Row = {
     time: Date

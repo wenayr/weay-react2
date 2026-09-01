@@ -27,20 +27,7 @@ on -> off                          // subscriptions
 ```
 
 ## Root Namespaces
-```
-import { kit } from "wenay-react2"
-
-kit.hooks
-kit.dnd
-kit.utils
-kit.grid
-kit.modal
-kit.menu
-kit.logs
-kit.updateBy
-```
-
-The root export is still flat. `kit` is useful when a large file needs grouped names.
+The root export is flat. `kit` was removed in 2.0.0 (see `doc/WENAY_REACT2_RENAMES.md`); import names directly or from a subpath.
 
 ## Toolchain / Development
 
@@ -656,7 +643,7 @@ QA stand coverage:
 ```
 
 ## Replay React Hooks (details)
-`src/common/src/hooks/useReplay.ts`. Client side of the wenay-common2 Replay stack only.
+`src/internal/hooks/useReplay.ts`. Client side of the wenay-common2 Replay stack only.
 ```
 useReplaySubscribe(remote, cb, {since?, keepSeq?=true, enabled?=true, onSeq?, onError?, staleMs?, onStale?, policy?, hint?})
   -> {ready, error, stale, seq(), lastTs(), restart(since?)}
@@ -748,7 +735,7 @@ LogsSettings()
 MainPage()
 ```
 
-The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point. `createLogsController` is the headless layer for append/limit/settings state; `useMessageEventLogsController` owns the global notification queue/timers/settings, while `MessageEventLogsView` and `MessageEventLogCard` own rendering. `PageLogs`, `MessageEventLogs`, and `LogsPage` remain compatibility UI wrappers. `useLogsTableController` and `useLogsNotificationsController` expose the provider-local table/notification state while `LogsTable` and `LogsNotifications` keep the visual wrappers. Shared logger chrome lives in `src/common/src/logs/logStyles.ts` and is themed through `--logs-*` tokens.
+The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point. `createLogsController` is the headless layer for append/limit/settings state; `useMessageEventLogsController` owns the global notification queue/timers/settings, while `MessageEventLogsView` and `MessageEventLogCard` own rendering. `PageLogs`, `MessageEventLogs`, and `LogsPage` remain compatibility UI wrappers. `useLogsTableController` and `useLogsNotificationsController` expose the provider-local table/notification state while `LogsTable` and `LogsNotifications` keep the visual wrappers. Shared logger chrome lives in `src/internal/logs/logStyles.ts` and is themed through `--logs-*` tokens.
 
 Full-page table controller (`useLogsPageTable` -> `LogsPageTableController`): the grid receives a
 MOUNT-TIME snapshot of the accumulated log map once (`useState` initializer), then reconciles
@@ -867,11 +854,11 @@ AgGridClassRule<T>
 
 Style entry points:
 - `src/style/tokens.css` - CSS custom properties shipped to consumers.
-- `src/common/src/styles/tokens.ts` - TS mirror for inline styles, modal z-index, and ag-grid theme params. Values must stay aligned with `tokens.css`.
+- `src/internal/styles/tokens.ts` - TS mirror for inline styles, modal z-index, and ag-grid theme params. Values must stay aligned with `tokens.css`.
 - `src/style/style.css` - shared component classes and token consumers.
 - `src/style/menuRight.css` - right-menu classes and outline-demo CSS.
-- `src/common/src/styles/styleGrid.ts` and `src/common/src/grid/agGrid4/theme.ts` - ag-grid theme setup from `tokens.grid`.
-- QA stand: `npm run testReact -- --host 127.0.0.1 --port 3002`, entry `src/common/testUseReact/qa.tsx`.
+- `src/internal/styles/styleGrid.ts` and `src/internal/grid/agGrid4/theme.ts` - ag-grid theme setup from `tokens.grid`.
+- QA stand: `npm run testReact -- --host 127.0.0.1 --port 3002`, entry `src/stand/testUseReact/qa.tsx`.
 
 The QA stand is both an integration lab and an adopter-facing demonstration. Its
 `wenayQa*` showcase classes deliberately use one-off demo presentation only:
@@ -897,9 +884,9 @@ Normalization rule: new shared CSS should first try an existing token. Add a new
 
 Open normalization candidates:
 - `src/style/style.css`: `.msTradeAlt`, `.msTradeActive`, `.newButtonSimple`, `.toIndicatorMenuButton:hover`, submit-button green, and several toolbar row hover/drag literals still use raw colors.
-- `src/common/src/grid/columnState/*`: compact menu/dots/card visuals now use `.wenayColumnGrid*`, `.wenayColsMenu*`, `.wenayColDots*`, `.wenayCardList*` plus `--cols-grid-*`, `--cols-menu-*`, `--cols-dots-*`, and `--cols-card-*`; further changes here should be visual QA only, not a new default palette.
-- `src/common/src/components/ParamsEditor.tsx` and `src/common/src/components/Input.tsx`: if these stay public primitives, define default class/token contracts instead of component-owned visual styling.
-- `src/common/src/styles/commentaryStyles.css`: standalone `.commentary` CSS is not imported by the root style bundle; either import/tokenize it if still used, or mark it as a local component concern.
+- `src/internal/grid/columnState/*`: compact menu/dots/card visuals now use `.wenayColumnGrid*`, `.wenayColsMenu*`, `.wenayColDots*`, `.wenayCardList*` plus `--cols-grid-*`, `--cols-menu-*`, `--cols-dots-*`, and `--cols-card-*`; further changes here should be visual QA only, not a new default palette.
+- `src/internal/components/ParamsEditor.tsx` and `src/internal/components/Input.tsx`: if these stay public primitives, define default class/token contracts instead of component-owned visual styling.
+- `src/internal/styles/commentaryStyles.css`: standalone `.commentary` CSS is not imported by the root style bundle; either import/tokenize it if still used, or mark it as a local component concern.
 
 Recently normalized: mouse context-menu item colors through `--menu-*`, `--menu-outline-color` for `OutlineDragDemo`, `--logs-*` for logger chrome, `--dlg-scrim` in `ModalProvider`, compact `ColumnsMenu/MenuStrip` visuals through `.wenayColsMenu*` / `--cols-menu-*`, card-29 mobile primitives through `--cols-dots-*` / `--cols-card-*`, createColumnGrid overlay through `.wenayColumnGrid*` / `--cols-grid-*`, and Grid Chrome through `.wenayGridChrome*` / `--grid-chrome-*`.
 
@@ -912,22 +899,18 @@ component/controller modules.
 
 Do not delete a public export just because it looks unused inside this repo. External apps may import it. For cleanup, first move an item into this inventory, then decide in a separate breaking version whether it remains public, moves to a demo namespace, or is removed.
 
-Suspicious but still public:
-- `OutlineDragDemo`, `RightMenuDemo`, `ChartDemo` - demo/test-style exports. They are useful for the QA stand, but look like demo surface rather than core API.
-- `StickerMenu` - exported from `components/Menu`; visually app-specific and should probably become an app wrapper or be documented as an example component.
-- `logsApi` global logger and the context logger (`LogsProvider`, `LogsTable`, `LogsNotifications`, `LogsSettings`, `MainPage`) overlap. Keep both for now; document one as the short integration path and the other as the larger UI surface.
-- Chart engine primitives (`DataSet`, `Panel`, `Renderer`, `Interaction`, `ChartEngine`, etc.) are very low-level. They are public through `chartEngineReact.tsx`; product apps should wrap them before use.
-- `StyleCSSHeadGridEdit` and `StyleCSSHeadGrid` mutate `<head>` directly. They are exported and can have consumers, but new grid styling should prefer ag-grid theme params and tokens.
-
-Added by the 2026-07-09 architecture audit (evidence in the audit report / `doc/target/my.md`):
-- `menuR.tsx` (`createRightClickMenu` / `MenuR`) - CONFIRMED dead: no runtime consumer anywhere (the test that supposedly covers it imports `RightMenu.tsx`); re-exported twice from `api.tsx` (`export *` + `kit.menu.rightClick`). Candidate for removal in a deliberate breaking version; its gesture code duplicates `menuMouse.tsx:342-380`.
-- `logsContext.tsx` - a full PARALLEL logs stack (own `LogEntry` shape divergent from `logsController`, raw unguarded `localStorage`, own settings/notifications/table) exported from the barrel next to `logs.tsx`. Decide: deprecate or converge; new code should use `logsApi`/`createLogsController`.
-- `MyChartEngine` - a hardcoded DEMO (random data + setInterval inside `useEffect`, no props but `style`) exported as public API from `chartEngineReact.tsx`; `generateIncrementalData` (Math.random demo util) is public too. Should move to demo namespace or gain a real props contract.
-- ~~`getLogsApi<T>()` shared module state~~ FIXED (A2, v1.0.41): every call now builds its own map/mini/settings (optional `settingsKey` persists per instance); the global `logsApi` explicitly injects the legacy shared state.
-- ~~`FloatingWindow` `onCLickClose` typo~~ ALIASED (A10, v1.0.42): `onClickClose` added, typo prop is a deprecated alias; REMOVAL of the alias still needs a breaking pass.
-- `DragArea` - `@deprecated` (A7, v1.0.42): no consumers; unique semantics kept as-is (see Drag / Resize Low Level). Removal in a deliberate breaking version.
-- `Button` `keySave` prop - deprecated alias of `keyForSave` (A10, v1.0.42); removal in a breaking pass.
-- `contextMenu` raw `map`/legacy-queue path is test-only-live (populated only by `contextMenuStats.test.tsx`); the `bb`/`map.clear()` reopening invariant itself is intentional and stays.
+Resolved in 2.0.0 (see `doc/WENAY_REACT2_RENAMES.md`, "2.0.0 migration cut"): every item below that
+was marked as a removal candidate is gone - `menuR`, `StickerMenu`, `DragArea`, the demo exports,
+`logsContext`, `myChart/1`, `MyChartEngine`, the deprecated aliases, dead utils, `kit`, CSS side
+effects, the deep `./lib/common/api.js` export and the published stand. What remains open from the
+2026-09-01 review is non-breaking follow-up work, tracked in `doc/target/my.md`:
+- `memoryUpdate` as a wrapper over `persistedController.commit` (a module cycle prevents it today).
+- `Toolbar` pure config algebra -> `toolbarConfig.ts`; `SettingsDialog` search/tree helpers -> `Settings/searchText.ts`.
+- `barrelParity` inverse assertion (root module -> subpath).
+- Chart engine primitives (`DataSet`, `Panel`, `Renderer`, `Interaction`, `ChartEngine`) are still very
+  low-level; product apps should wrap them.
+- `StyleCSSHeadGridEdit` / `StyleCSSHeadGrid` mutate `<head>` directly; new grid styling should prefer
+  ag-grid theme params and tokens.
 
 ## Charts
 Canvas chart:

@@ -1,0 +1,291 @@
+import {Menu, contextMenu, renderBy, MenuItem, updateBy} from "../../api.js";
+import {GridExample, tt} from "./useGrid.js";
+import {MyChartEngine} from "./myChartEngineDemo.js";
+import {TestParams} from "./testParams.js";
+import {createContext, Suspense, use, useContext, useEffect, useMemo, useState} from "react";
+import {sleepAsync} from "wenay-common2/client";
+import {Button, HoverButton} from "../../internal/components/Buttons/index.js";
+import {FloatingWindow} from "../../internal/components/index.js";
+
+const a = {}
+const b = {}
+
+const TimelineDemo = () => {
+    return (
+        <div className="demo-grid">
+            <div className="demo-card demo-timeline">
+                <div className="demo-track">
+                    <div className="demo-clip" style={{left: "8%", width: "22%"}} />
+                    <div className="demo-clip" style={{left: "36%", width: "18%", background: "rgba(100, 240, 194, 0.25)", borderColor: "rgba(100, 240, 194, 0.5)"}} />
+                    <div className="demo-clip" style={{left: "58%", width: "30%"}} />
+                    <div className="demo-playhead" style={{left: "42%"}} />
+                </div>
+                <div style={{fontSize: 12, color: "#aab4c2"}}>Storyboard timeline with clips and playhead.</div>
+            </div>
+        </div>
+    );
+};
+
+const PhotoEditorDemo = () => {
+    return (
+        <div className="demo-grid">
+            <div className="demo-card demo-photo">
+                <div className="demo-photo-canvas">Photo canvas preview</div>
+                <div className="demo-tools">
+                    <div className="demo-tool">Crop</div>
+                    <div className="demo-tool">Light</div>
+                    <div className="demo-tool">Contrast</div>
+                    <div className="demo-tool">Remove bg</div>
+                    <div className="demo-tool">Voice commands</div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export function LegacyTestMain() {
+    console.log(1111111)
+    updateBy(b)
+    return <div className={"maxSize"}>
+        <div style={{margin: 80}}>
+            <HoverButton button={()=><div >menu</div>}>
+                <Menu zIndex={12} coordinate={{x: 0, y: 0}} data={[
+                    {
+                        name: "test",
+                        next: ()=> [
+                            {
+                                name: "test1",
+                                status: true,
+                            },
+                            {
+                                name: "test1",
+                                getStatus: ()=> true,
+                            },
+                            {
+                                name: "test1",
+                                active: ()=> true,
+                            },
+                            {
+                                name: "test1",
+                                next: ()=> [
+                                    {
+                                        name: "test1",
+                                    },
+                                    {
+                                        name: "test1",
+                                    },
+                                    {
+                                        name: "test1",
+                                    },
+                                ]
+                            },
+                        ]
+                    }
+                ]}/>
+            </HoverButton>
+        </div>
+        <div  style={{background: "#545454", width: 400, height: 400}}>
+
+        </div>
+        <contextMenu.Layer zIndex={15}>
+            <div style={{height: 2250}}
+                onContextMenu={e=>{
+                        const z: MenuItem[] = [
+                            {name: "eee", onClick: ()=> {console.log("eee")}},
+                            {name: "eee", next: () => [
+                                    {name: "eee", onClick: ()=> {console.log("eee")}},
+                                    {name: "eee", next: () => [
+
+                                        ]},
+                                ]},
+                            {name: "eee", next: async () => [
+                                    {name: "eee", onClick: ()=> {console.log("eee")}},
+                                    {name: "eee", next: () => [
+
+                                        ]},
+                                ]},
+                            {name: "eee", func: async () => <Menu data={
+                                    [
+                                        {name: "eee", onClick: ()=> {console.log("eee")}},
+                                        {name: "eee", next: () => [
+
+                                            ]},
+                                    ]
+                                }/>},
+                        ]
+                        contextMenu.openAt(e, z)
+                }}
+            ></div>
+        </contextMenu.Layer>
+        <ExampleUsage/>
+        <ButtonChart/>
+        <App/>
+        <ButtonParams/>
+        <div className={"msTradeAlt"}
+            onClick={()=>{
+                renderBy(tt)
+            }}
+        >menu</div>
+        <div className={"msTradeAlt"}
+            onClick={()=>{
+                renderBy(a)
+            }}
+        >update</div>
+        <contextMenu.Layer>
+            <GridExample/>
+        </contextMenu.Layer>
+    </div>
+}
+
+const Container = () => {
+    console.log(Date.now())
+    updateBy(a)
+    return <div className={"maxSize"}>
+        <GridExample/>
+    </div>
+}
+const ExampleUsage = () => {
+    return <Button button={e => <div className={!e ? "msTradeAlt" : "msTradeAlt msTradeActive"}>menu</div>}>
+        {(api) => {
+            return <FloatingWindow keyForSave={"tt1232"}
+                           key={"sds"}
+                           size={{height: 300, width: 300}}
+                           className={"fon border fonLight"} // fon border fonLight
+                           moveOnlyHeader={true}
+                           onClickClose={api.onClose}
+                           limit={{y: {min: 0}}}
+                           onUpdate={() => {
+                               // setUpdate(update + 1)
+                           }}>
+                <div className={"maxSize"}>
+                    <Container/>
+                </div>
+                {/*<MenuSeries update={update} key={"2323"}/>*/}
+            </FloatingWindow>
+        }}
+    </Button>
+};
+const ButtonChart = () => {
+    return <Button button={e => <div className={!e ? "msTradeAlt" : "msTradeAlt msTradeActive"}>chart</div>}>
+        {(api) => {
+            return <FloatingWindow keyForSave={"tt123322"}
+                           key={"sds2"}
+                           size={{height: 300, width: 300}}
+                           className={"fon border fonLight"} // fon border fonLight
+                           moveOnlyHeader={true}
+                           onClickClose={api.onClose}
+                           limit={{y: {min: 0}}}
+                           onUpdate={() => {
+                               // setUpdate(update + 1)
+                           }}>
+                <div className={"maxSize"}>
+                    <MyChartEngine/>
+                </div>
+                {/*<MenuSeries update={update} key={"2323"}/>*/}
+            </FloatingWindow>
+        }}
+    </Button>
+};
+const ButtonParams = () => {
+    return <Button button={e => <div className={!e ? "msTradeAlt" : "msTradeAlt msTradeActive"}>chart</div>}>
+        {(api) => {
+            return <FloatingWindow keyForSave={"tt123322"}
+                           key={"sds2"}
+                           size={{height: 300, width: 300}}
+                           className={"fon border fonLight"} // fon border fonLight
+                           moveOnlyHeader={true}
+                           onClickClose={api.onClose}
+                           limit={{y: {min: 0}}}
+                           onUpdate={() => {
+                               // setUpdate(update + 1)
+                           }}>
+                <div className={"maxSize"}>
+                    <TestParams/>
+                </div>
+                {/*<MenuSeries update={update} key={"2323"}/>*/}
+            </FloatingWindow>
+        }}
+    </Button>
+};
+const UseTest2 = () => {
+    return <Suspense fallback={<div>7777</div>}>
+        <UseTest/>
+    </Suspense>
+}
+const FFF = () => {
+    return sleepAsync(500).then(()=>123)
+}
+const UseTest = () => {
+    console.log("1233333")
+    const r = use(FFF())
+    console.log("!!!!!!")
+    return <div>{r}</div>
+}
+
+// Simulates an async process, for example fetching data from a server.
+const fetchData = async (): Promise<string> => {
+    console.log("!444")
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            console.log("!111")
+            resolve("Data loaded successfully!")
+        }, 2000); // 2-second delay
+    });
+};
+
+// Component that uses the use hook to wait for an async operation.
+const FetchExample = () => {
+    // Important: the use hook can only be called at the top level of a component;
+    // it returns the result of the async function.
+    const data = use(fetchData());
+
+    // React suspends the component until the Promises passed to use are resolved.
+    return <div>{data}</div>;
+};
+const FetchExample2 = () => {
+    console.log("dsdsds")
+    // Important: the use hook can only be called at the top level of a component;
+    // it returns the result of the async function.
+    return useMemo(()=><FetchExample/>,[])
+};
+
+const Ztr = createContext({a: 4 as number},)
+// Main application component.
+const Ttt2 = () => {
+    console.log("Rrrrrrrrrrr")
+    return useMemo(()=><Ttt3/>,[true])
+
+}
+const Ttt3 = () => {
+    console.log("444444444444444444")
+    return <Ttt/>
+
+}
+const Ttt = () => {
+    const data = useContext(Ztr)
+    console.log(data)
+    return <div>{data.a}</div>
+
+}
+
+export const App = () => {
+    const [a, setA] = useState(0)
+    useEffect(()=>{
+        sleepAsync(1000)
+            .then(()=>{
+
+                setA(e=>e+1)
+            })
+    }, [])
+    console.log("FFFFFFFFFFFFFFFFFFF")
+    return <div>
+        <Ztr value={{a: a}}>
+            {useMemo(()=><Ttt3 key = {1}/>,[true])}
+        </Ztr>
+        <Ttt3 key = {2}/>
+
+        <Ttt3 key = {1}/>
+    </div>
+};
+
+

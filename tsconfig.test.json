@@ -8,7 +8,7 @@
   },
   "files": [],
   "include": [
-    "src/styles.d.ts",
+    "src/style/*.css.d.ts",
     "__test/**/*.ts",
     "__test/**/*.tsx"
   ]

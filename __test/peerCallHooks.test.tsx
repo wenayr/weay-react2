@@ -1,7 +1,7 @@
 import React from "react";
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {Peer} from "wenay-common2";
-import {usePeerCalls, usePeerPresence} from "../src/common/src/hooks/usePeerCall";
+import {usePeerCalls, usePeerPresence} from "../src/internal/hooks/usePeerCall";
 
 test("usePeerCalls follows the real in-process ring accept hangup lifecycle", async () => {
     const host = Peer.createPeerHost();

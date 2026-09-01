@@ -27,3 +27,6 @@ yarn-error.log*
 
 # machine-specific Claude Code launch config
 /.claude
+
+# IDE
+/.idea

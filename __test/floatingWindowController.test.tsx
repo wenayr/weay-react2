@@ -5,7 +5,7 @@ import {
     type FloatingWindowController,
     type FloatingWindowControllerOptions,
     useFloatingWindowController,
-} from "../src/common/src/components/Dnd/FloatingWindow";
+} from "../src/internal/components/Dnd/FloatingWindow";
 
 function HookProbe(props: FloatingWindowControllerOptions & { onReady: (api: FloatingWindowController) => void }) {
     const api = useFloatingWindowController(props);

@@ -4,7 +4,7 @@ import {act, render, screen, waitFor} from "@testing-library/react";
 import {Server as SocketIOServer} from "socket.io";
 import {io} from "socket.io-client";
 import {createRpcClientHub, createRpcServerAuto, listen, Replay, rpc} from "wenay-common2";
-import {useReplaySubscribe} from "../src/common/src/hooks/useReplay";
+import {useReplaySubscribe} from "../src/internal/hooks/useReplay";
 
 jest.setTimeout(15000);
 

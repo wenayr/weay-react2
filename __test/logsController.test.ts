@@ -1,4 +1,4 @@
-import {createLogsController, createLogsControllerState} from "../src/common/src/logs/logsController";
+import {createLogsController, createLogsControllerState} from "../src/internal/logs/logsController";
 
 test("createLogsController appends logs with numbers and applies mini/per-id limits", () => {
     const controller = createLogsController<{address: string}>({

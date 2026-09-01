@@ -1,6 +1,6 @@
 import React from "react";
 import {fireEvent, render, screen} from "@testing-library/react";
-import {createToolbar, type UiListConfig} from "../src/common/src/components/Toolbar/Toolbar";
+import {createToolbar, type UiListConfig} from "../src/internal/components/Toolbar/Toolbar";
 
 function createSource(initial: UiListConfig) {
     let state: UiListConfig = {

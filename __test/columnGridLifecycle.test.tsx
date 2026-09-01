@@ -3,7 +3,7 @@ import {act, render} from "@testing-library/react";
 import {
     useColumnGrid,
     type ColumnGridController,
-} from "../src/common/src/grid/columnState/columnGrid";
+} from "../src/internal/grid/columnState/columnGrid";
 
 test("useColumnGrid disposes its owned factory subscriptions after unmount", async () => {
     type Row = {id: string};

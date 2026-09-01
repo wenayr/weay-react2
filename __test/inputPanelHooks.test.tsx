@@ -1,6 +1,6 @@
 import React from "react";
 import {fireEvent, render, screen} from "@testing-library/react";
-import {FileInputPanel, TextInputPanel, useFileInputPanel, useTextInputPanel} from "../src/common/src/components/Input";
+import {FileInputPanel, TextInputPanel, useFileInputPanel, useTextInputPanel} from "../src/internal/components/Input";
 
 test("TextInputPanel submits the latest text through useTextInputPanel", () => {
     const callback = jest.fn();

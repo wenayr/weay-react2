@@ -1,6 +1,6 @@
 import React, {useState} from "react";
 import {fireEvent, render, screen, waitFor} from "@testing-library/react";
-import {Overlay} from "../src/common/src/components/Overlay";
+import {Overlay} from "../src/internal/components/Overlay";
 
 function NestedOverlays({onParentOutside = () => undefined, onChildOutside = () => undefined}: {
     onParentOutside?: () => void;

@@ -1,7 +1,7 @@
 import React from "react";
 import {act, fireEvent, render, screen, within} from "@testing-library/react";
-import {FloatingWindow, FloatingWindowTaskbar, WindowPortal, floatingWindowMap} from "../src/common/src/components/Dnd/FloatingWindow";
-import {OutsideClickArea} from "../src/common/src/hooks/useOutside";
+import {FloatingWindow, FloatingWindowTaskbar, WindowPortal, floatingWindowMap} from "../src/internal/components/Dnd/FloatingWindow";
+import {OutsideClickArea} from "../src/internal/components/OutsideClickArea";
 
 function rootFor(testId: string) {
     const content = screen.getByTestId(testId);

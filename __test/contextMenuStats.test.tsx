@@ -1,6 +1,6 @@
 import React from "react";
 import {fireEvent, render, screen} from "@testing-library/react";
-import {createContextMenu} from "../src/common/src/menu/menuMouse";
+import {createContextMenu} from "../src/internal/menu/menuMouse";
 
 const zeroActionTotals = {
     click: 0,
