@@ -1,5 +1,3 @@
-import "../../../style/style.css";
-
 export {VideoCall, useVideoCallController} from "./VideoCall.js";
 export type {
     UseVideoCallControllerOptions,
