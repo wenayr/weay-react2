@@ -193,12 +193,9 @@ export function ColumnsMenu(p: {
     const columns = p.state.columns
     const byKey = useMemo(() => new Map(columns.map(c => [c.key, c])), [columns])
     const marks = p.marks
-    // cfg is rebuilt by normalize() on every render, so the item list is keyed on the
-    // VALUES it actually reads - not on cfg's identity. groups and sort are in the key
-    // even though this component never reads them itself: a marks() callback gets the
-    // whole cfg, and sub-column adornments are exactly what it renders from. width and
-    // filter stay out - no button face can depend on them.
-    const itemsId = JSON.stringify([cfg.order, cfg.visible, cfg.groups, cfg.sort, present])
+    // cfg keeps its identity until the next commit / preview change (columnState memoizes
+    // normalize and displayConfig), and present is replaced only when it really changes -
+    // so the item list is keyed on both directly, no stringify per render.
     const items: MenuStripItem[] = useMemo(() => cfg.order.filter(k => byKey.has(k)).map(k => {
         const c = byKey.get(k)!
         return {
@@ -206,7 +203,7 @@ export function ColumnsMenu(p: {
             state: present && !present[k] ? 'disabled' : cfg.visible[k] != false ? 'on' : 'off',
             marks: marks?.(k, cfg),
         }
-    }), [byKey, itemsId, marks])
+    }), [byKey, cfg, present, marks])
 
     function onItem(key: string, e: React.MouseEvent) {
         if (!byKey.has(key)) return p.onTail?.(key, e)

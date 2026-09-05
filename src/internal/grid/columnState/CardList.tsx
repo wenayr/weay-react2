@@ -59,23 +59,23 @@ export function CardList<T extends object>(p: {
     const cfg = p.state.api.useConfig()
     const cols = p.state.columns
     const keys = p.state.api.visibleKeys()
-    const titleKey = cols.find(c => c.cardRole == 'title' && cfg.visible[c.key] != false)?.key ?? keys[0]
-    const accentKey = cols.find(c => c.cardRole == 'accent' && cfg.visible[c.key] != false)?.key
-    const fieldKeys = keys.filter(k => k != titleKey && k != accentKey)
-    const fieldKeysId = JSON.stringify(fieldKeys)
-    // stable per field set, so CardRow's memo is not defeated by a fresh array/map
-    const stableFieldKeys = useMemo(() => fieldKeys, [fieldKeysId])
-    const labels = useMemo(() => {
+    // cfg and keys keep their identity until the next commit (columnState memoizes normalize),
+    // so the derived field set is memoized on them directly - no stringify per render.
+    const {titleKey, accentKey, fieldKeys: stableFieldKeys, labels} = useMemo(() => {
+        const titleKey = cols.find(c => c.cardRole == 'title' && cfg.visible[c.key] != false)?.key ?? keys[0]
+        const accentKey = cols.find(c => c.cardRole == 'accent' && cfg.visible[c.key] != false)?.key
+        const fieldKeys = keys.filter(k => k != titleKey && k != accentKey)
         const byKey = new Map(cols.map(c => [c.key, c]))
-        return Object.fromEntries(fieldKeys.map(k => [k, byKey.get(k)?.short ?? byKey.get(k)?.title ?? k]))
-    }, [cols, fieldKeysId])
+        const labels = Object.fromEntries(fieldKeys.map(k => [k, byKey.get(k)?.short ?? byKey.get(k)?.title ?? k]))
+        return {titleKey, accentKey, fieldKeys, labels}
+    }, [cfg, keys, cols])
 
     const renderValue = p.renderValue
     const value = useMemo(() => (key: string, row: T): React.ReactNode =>
         renderValue?.(key, row) ?? String((row as Record<string, unknown>)[key] ?? ''), [renderValue])
 
-    // The sticky sort orders the cards even when its column is hidden. cfg is rebuilt by
-    // normalize() on every render, so the sort is tracked by its VALUE (key/dir), not identity.
+    // The sticky sort orders the cards even when its column is hidden. Tracked by VALUE
+    // (key/dir): a visibility commit must not re-sort the rows.
     const sortKey = cfg.sort?.key
     const sortDir = cfg.sort?.dir
     const rows = useMemo(() => {

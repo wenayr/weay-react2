@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
-import {Color, colorGenerator2, ColorString, sleepAsync} from "wenay-common2/client";
+import {colorGenerator2, ColorString} from "wenay-common2/client";
 import {createUpdateApi} from "../../updateBy.js";
 import {createModalElementStore} from "./Modal.js";
 import { DragBox } from "../Dnd/FloatingWindow.js";
@@ -104,29 +104,32 @@ function SidebarMenuComponent({y_, x_, api, arr, zIndex}: {
         return () => { mountedRef.current = false; };
     }, []);
 
-    // Smooth animation function to target position; cancels on unmount,
-    // and the returned promise now resolves at the end (recursion was not awaited)
-    const animateToPosition = async (target: number) => {
+    // Smooth slide to the target x. One state update per animation frame, paced by elapsed
+    // time (the old loop was `sleepAsync(10)` + setState, i.e. ~100 renders/s that never lined
+    // up with paint and got throttled to >=1s ticks in a background tab). Same pace as before:
+    // 40px per 10ms. Cancels on unmount and on moveStop()/start() via the `auto` flag.
+    const SLIDE_PX_PER_MS = 4;
+    const animateToPosition = (target: number) => {
         lastPosition.current.auto = true;
-        const step = 40;
-
-        while (lastPosition.current.auto && currentPosition.current.x !== target) {
-            const direction = target > currentPosition.current.x ? 1 : -1;
-            await sleepAsync(10);
+        let prev = performance.now();
+        const tick = (now: number) => {
             if (!mountedRef.current || !lastPosition.current.auto) return;
-            const nextPos = currentPosition.current.x + direction * step;
-
-            if (Math.abs(target - nextPos) < step) {
+            const step = Math.max(1, SLIDE_PX_PER_MS * (now - prev));
+            prev = now;
+            const cur = currentPosition.current.x;
+            if (cur === target || Math.abs(target - cur) <= step) {
                 lastPosition.current.auto = false;
                 currentPosition.current.x = target;
                 if (target === 0) setOpen(false);
                 setX(target);
                 return;
             }
-
+            const nextPos = cur + (target > cur ? 1 : -1) * step;
             currentPosition.current.x = nextPos;
             setX(nextPos);
-        }
+            requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
     };
     useEffect(() => {
         const menuApi: Parameters<typeof api>[0] = {

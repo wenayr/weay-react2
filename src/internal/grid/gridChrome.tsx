@@ -283,6 +283,11 @@ export function createGridChrome<T extends object>(opts: GridChromeOptions<T>) {
             }
         }
 
+        // The popover's command model (context, filtered app commands, group order, the
+        // built-in size/data/columns lists) is only needed while it is open. Chrome re-renders
+        // on every attach/detach and feedback tick, so a closed trigger used to rebuild and
+        // sort all of it for nothing.
+        const renderPopover = () => {
         const context = commandContext()
         const visible = (command: GridChromeCommand<T>) => typeof command.visible == 'function' ? command.visible(context) : command.visible != false
         const disabled = (command: GridChromeCommand<T>) => typeof command.disabled == 'function' ? command.disabled(context) : command.disabled == true
@@ -337,6 +342,14 @@ export function createGridChrome<T extends object>(opts: GridChromeOptions<T>) {
                 run: (command: GridChromeCommand<T>) => void run(command),
             }
         }
+        return <div className="wenayGridChromePopover" role="dialog" aria-label={labels.trigger}>
+            {opts.columnState && <ChromeCommandGroup {...groupProps('columns')} commands={columnCommands}><ColumnsMenu state={opts.columnState} compact /></ChromeCommandGroup>}
+            <ChromeCommandGroup {...groupProps('size')} commands={sizeCommands}/>
+            <ChromeCommandGroup {...groupProps('data')} commands={dataCommands}/>
+            {appGroups.map(group => <ChromeCommandGroup key={group} {...groupProps(group)} commands={appCommands.filter(command => command.group == group)}/>) }
+            {feedback && <div className={classNames(['wenayGridChromeFeedback', feedback.kind == 'error' && 'wenayGridChromeFeedback_error'])} role="status">{feedback.message}</div>}
+        </div>
+        }
 
         return <div ref={rootRef} className={classNames(['wenayGridChrome', open && 'wenayGridChrome_open', props.className])} style={props.style}>
             <button ref={triggerRef} type="button" className="wenayGridChromeTrigger" aria-label={labels.trigger}
@@ -346,13 +359,7 @@ export function createGridChrome<T extends object>(opts: GridChromeOptions<T>) {
                     event.preventDefault()
                     setOpen(v => !v)
                 }}>⋮</button>
-            {open && <div className="wenayGridChromePopover" role="dialog" aria-label={labels.trigger}>
-                {opts.columnState && <ChromeCommandGroup {...groupProps('columns')} commands={columnCommands}><ColumnsMenu state={opts.columnState} compact /></ChromeCommandGroup>}
-                <ChromeCommandGroup {...groupProps('size')} commands={sizeCommands}/>
-                <ChromeCommandGroup {...groupProps('data')} commands={dataCommands}/>
-                {appGroups.map(group => <ChromeCommandGroup key={group} {...groupProps(group)} commands={appCommands.filter(command => command.group == group)}/>) }
-                {feedback && <div className={classNames(['wenayGridChromeFeedback', feedback.kind == 'error' && 'wenayGridChromeFeedback_error'])} role="status">{feedback.message}</div>}
-            </div>}
+            {open && renderPopover()}
             {!open && feedback && <div className={classNames(['wenayGridChromeFeedback', 'wenayGridChromeFeedback_toast', feedback.kind == 'error' && 'wenayGridChromeFeedback_error'])} role="status">{feedback.message}</div>}
         </div>
     }

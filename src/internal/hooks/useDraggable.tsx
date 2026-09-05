@@ -68,12 +68,11 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
     holdMsRef.current = holdMs;
     trackStateRef.current = trackState;
     draggingRef.current = draggingMouse || draggingTouch;
-
-    useEffect(() => {
-        onDragEndRef.current = onDragEnd;
-        onDragStartRef.current = onDragStart;
-        onMoveRef.current = onMove;
-    });
+    // Same render-time ref write as holdMs/trackState above: the no-deps effect this used to be
+    // scheduled a passive effect on every render of every draggable for three assignments.
+    onDragEndRef.current = onDragEnd;
+    onDragStartRef.current = onDragStart;
+    onMoveRef.current = onMove;
 
     const cancelMouseHold = useMemo(() => function cancelMouseHold() {
         if (holdTimerMouse.current != null) {

@@ -15,7 +15,7 @@
 //                                  another dot does not touch it, and it may
 //                                  point at a hidden column.
 // No ag-grid, no storage - only the columnState config.
-import React, {useRef, useState} from 'react'
+import React, {useMemo, useRef, useState} from 'react'
 import type {ColumnStateController} from './columnState.js'
 import {cx} from "../../utils/cx.js";
 
@@ -35,7 +35,7 @@ export function ColumnDots(p: {
 }) {
     const cfg = p.state.api.useConfig()
     const cols = p.state.columns
-    const byKey = new Map(cols.map(c => [c.key, c]))
+    const byKey = useMemo(() => new Map(cols.map(c => [c.key, c])), [cols])
     const max = p.max ?? 8
     const order = cfg.order
     const n = order.length

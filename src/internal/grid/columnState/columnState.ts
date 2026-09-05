@@ -157,8 +157,27 @@ export function createColumnState(opts: {
      *  descriptor index. The rules live in the shared core, so native and web agree about the
      *  same persisted JSON. Web keeps the "a missing order/visible falls back to EMPTY" reading:
      *  st is seeded from defConfig(), so a caller def reaches normalize through st already. */
+    // Memoized by the IDENTITY of the persisted fields. commit() below assigns a fresh array/
+    // object to every field, and storage hydration (cache.ts addDataToMap) Object.assign()s new
+    // references in the same way - so "some field reference changed" is exactly "the config
+    // changed". Before this every subscriber render (CardList, ColumnsMenu, ColumnDots, the
+    // Toolbar over listSource, columnGrid's visibleCount) re-derived the whole config and then
+    // JSON.stringify'ed it again to get a stable identity back. Now the same object comes back
+    // until the next commit, and consumers key their memos on it directly.
+    // The returned config is shared: callers spread it (they already did), never mutate it.
+    type NormalizedCache = {
+        order: unknown, visible: unknown, width: unknown, sort: unknown, filter: unknown, groups: unknown,
+        cfg: ColumnsConfig,
+        keys: string[] | null,
+    }
+    let normalizedCache: NormalizedCache | null = null
     function normalize(): ColumnsConfig {
-        return normalizeColumnsConfig(opts.columns, st)
+        const c = normalizedCache
+        if (c && c.order === st.order && c.visible === st.visible && c.width === st.width
+            && c.sort === st.sort && c.filter === st.filter && c.groups === st.groups) return c.cfg
+        const cfg = normalizeColumnsConfig(opts.columns, st)
+        normalizedCache = {order: st.order, visible: st.visible, width: st.width, sort: st.sort, filter: st.filter, groups: st.groups, cfg, keys: null}
+        return cfg
     }
 
     /** Every edit funnels through here: mutate the persisted object in place
@@ -185,9 +204,18 @@ export function createColumnState(opts: {
     const setConfig = (next: ColumnsConfig) => commit(next, false)
     const reset = () => commit(defConfig(), false)
 
+    // Same identity contract for the preview-overlaid config: previewRt.order is only ever
+    // replaced (applyPreviewOrder), so (cfg, previewRt.order) identities key the overlay.
+    let displayCache: {cfg: ColumnsConfig, preview: string[] | null, out: ColumnsConfig} | null = null
     function displayConfig() {
         const cfg = normalize()
-        return previewRt.order ? {...cfg, order: previewRt.order.slice()} : cfg
+        const preview = previewRt.order
+        if (!preview) return cfg
+        const d = displayCache
+        if (d && d.cfg === cfg && d.preview === preview) return d.out
+        const out = {...cfg, order: preview.slice()}
+        displayCache = {cfg, preview, out}
+        return out
     }
     function useDisplayConfig() {
         stApi.use()
@@ -271,7 +299,10 @@ export function createColumnState(opts: {
     /** Keys to render, in order. Grouped columns are additionally gated by their
      *  group's enabled set. */
     function visibleKeys(): string[] {
-        return columnVisibleKeys(normalize(), opts.columns)
+        const cfg = normalize()
+        const c = normalizedCache!
+        // derived from the cached config, cached alongside it: one array per config version
+        return c.keys ??= columnVisibleKeys(cfg, opts.columns)
     }
 
     /* ----- grid adapter (two-way) ----- */

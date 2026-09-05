@@ -140,3 +140,36 @@ test("detach without a pending read leaves the config untouched", () => {
     cs.grid.detach();
     expect(cs.api.getConfig()).toEqual(before);
 });
+
+test("createColumnState memoizes the normalized config and visibleKeys between commits", () => {
+    const cs = createColumnState({
+        key: "test.columnState.memo",
+        columns: [
+            {key: "a", title: "A", fixed: true},
+            {key: "b", title: "B"},
+            {key: "c", title: "C", defaultVisible: false},
+        ],
+    });
+
+    const cfg1 = cs.api.getConfig();
+    const keys1 = cs.api.visibleKeys();
+    // same object until something is committed: subscribers key their memos on it
+    expect(cs.api.getConfig()).toBe(cfg1);
+    expect(cs.api.visibleKeys()).toBe(keys1);
+    expect(keys1).toEqual(["a", "b"]);
+
+    cs.api.show("c", true);
+    const cfg2 = cs.api.getConfig();
+    expect(cfg2).not.toBe(cfg1);
+    expect(cs.api.visibleKeys()).toEqual(["a", "b", "c"]);
+    expect(cs.api.visibleKeys()).toBe(cs.api.visibleKeys());
+    // the previous snapshot is untouched: commits never mutate a handed-out config
+    expect(cfg1.visible.c).toBe(false);
+
+    // every commit replaces the persisted fields, which is what invalidates the cache
+    const cfg3 = cs.api.getConfig();
+    cs.api.move(["a", "c", "b"]);
+    expect(cs.api.getConfig()).not.toBe(cfg3);
+    expect(cs.api.getConfig().order).toEqual(["a", "c", "b"]);
+    expect(cs.api.getConfig()).toBe(cs.api.getConfig());
+});
