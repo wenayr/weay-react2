@@ -126,19 +126,27 @@ function assertBoundary(name, patterns) {
     }
 }
 
+// wenay-common2 ships as CommonJS, so one helper imported from its `./client` barrel drags the
+// whole barrel (RPC client, media, exchange bars: ~61 KB gzip) into the bundle. The entries below
+// must reach wenay-common2 only through its narrow entries (observe/replay/listen/peer/media).
+const COMMON2_CLIENT_BARREL = /wenay-common2\/lib\/(?:client\.js|Common\/rcp\/|Exchange\/)/
 assertBoundary('core', [
+    COMMON2_CLIENT_BARREL,
     /node_modules\/(?:react|ag-grid-|react-rnd|re-resizable)/,
     /src\/internal\/(?:components|grid|hooks|logs|myChart)\//,
 ])
 assertBoundary('react', [
+    COMMON2_CLIENT_BARREL,
     /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
     /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
 ])
 assertBoundary('grid', [
+    COMMON2_CLIENT_BARREL,
     /src\/stand\//,
     /src\/internal\/(?:components\/Dnd|components\/Communication|logs|myChart)\//,
 ])
 assertBoundary('windows', [
+    COMMON2_CLIENT_BARREL,
     /node_modules\/ag-grid-/,
     /src\/stand\//,
     /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
@@ -148,6 +156,7 @@ assertBoundary('logs', [
     /src\/internal\/(?:components\/Dnd|components\/Communication|myChart)\//,
 ])
 assertBoundary('communication', [
+    COMMON2_CLIENT_BARREL,
     /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
     /src\/stand\//,
     /src\/internal\/(?:components\/Dnd|grid|logs|myChart)\//,

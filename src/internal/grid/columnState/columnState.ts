@@ -10,7 +10,8 @@
 // same mechanics as createToolbar: the caller supplies one string key.
 import type {ReactNode} from 'react'
 import type {ColumnState as AgColumnState, GridApi} from 'ag-grid-community'
-import {listen as createListen} from 'wenay-common2/client'
+// the narrow `./listen` entry (2.5 KB gzip) instead of the CommonJS client barrel (61 KB)
+import {listen as createListen} from 'wenay-common2/listen'
 import {createUpdateApi} from '../../updateBy.js'
 import {memoryMarkDirty} from '../../utils/memoryStore.js'
 import {createPersistedController} from '../../utils/persistedController.js'

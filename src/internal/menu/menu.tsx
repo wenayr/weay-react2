@@ -7,7 +7,7 @@ import React, {
     useRef,
     useState,
 } from 'react';
-import { promiseProgress, sleepAsync } from "wenay-common2/client";
+import { promiseProgress, sleepAsync } from "../utils/async.js";
 
 /*******************************************************
  * Menu data types

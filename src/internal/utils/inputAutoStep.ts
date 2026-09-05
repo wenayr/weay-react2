@@ -1,5 +1,19 @@
 /// <reference lib="dom" />
-import {decimals, round} from "wenay-common2/client";
+// Local copies of wenay-common2's round/decimals (NormalizeDouble / GetDblPrecision2): the
+// package is CommonJS, so the two one-liners used to cost the whole client barrel here.
+function round(value: number, digits = 0) {
+    const factor = 10 ** digits
+    return Math.round(value * factor) / factor
+}
+function decimals(value: number, maxDigits = 8, minDigits = 0) {
+    maxDigits = Math.min(maxDigits, 16)
+    const epsilon = Math.pow(0.1, maxDigits + 1)
+    let d: number
+    for (d = minDigits; d < maxDigits; d++)
+        if (Math.abs(value - round(value, d)) < epsilon) break
+    if (d < 0 || d >= 100) throw new Error("wrong digits:  value=" + value + "  mindigits=" + minDigits + "  maxdigits=" + maxDigits)
+    return d
+}
 
 interface StepInputElement extends HTMLElement {
     value: string;

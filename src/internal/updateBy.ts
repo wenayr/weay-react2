@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
-import { waitRun } from "wenay-common2/client";
 
 // изоморфный layout-эффект: на сервере (SSR) useLayoutEffect шумит предупреждением,
 // поэтому там падаем на useEffect
@@ -16,7 +15,24 @@ interface ObserverState {
 }
 
 const map3 = new WeakMap<object, ObserverState>();
-const mapWait = new Map<object, ReturnType<typeof waitRun>>();
+// Trailing-drop throttle, the exact shape of wenay-common2's waitRun().refreshAsync: the first
+// call runs (async, on the microtask queue), further calls while it is busy or within `ms` of
+// the last run are dropped. Local because wenay-common2 is CommonJS - importing waitRun from
+// `wenay-common2/client` pulled the entire client barrel (~61 KB gzip) into EVERY entry that
+// reaches updateBy, which is all of them.
+function createThrottle() {
+    let last = 0, busy = false;
+    let chain: Promise<unknown> = Promise.resolve();
+    return (ms: number, func: () => void) => {
+        if (busy || last + ms >= Date.now()) return;
+        busy = true;
+        chain = chain.catch(() => {}).then(async () => {
+            try { return await func(); }
+            finally { busy = false; last = Date.now(); }
+        }).catch(() => {});
+    };
+}
+const mapWait = new Map<object, ReturnType<typeof createThrottle>>();
 
 /** The raw registries used to be exported. They are implementation detail - a consumer holding
  *  map3 can corrupt the reentrancy flags - so 2.0.0 keeps them module-private and exposes only
@@ -124,11 +140,10 @@ function triggerUpdate(obj: object, reverse = false, lastOnly = false) {
 
 function schedule(a: object, ms: number | undefined, reverse = false, lastOnly = false) {
     if (ms) {
-        (mapWait.get(a) || mapWait.set(a, waitRun()).get(a)!)
-            .refreshAsync(ms, () => {
-                mapWait.delete(a);
-                triggerUpdate(a, reverse, lastOnly);
-            });
+        (mapWait.get(a) || mapWait.set(a, createThrottle()).get(a)!)(ms, () => {
+            mapWait.delete(a);
+            triggerUpdate(a, reverse, lastOnly);
+        });
     } else triggerUpdate(a, reverse, lastOnly);
 }
 

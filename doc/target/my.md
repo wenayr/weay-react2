@@ -124,7 +124,7 @@
 
 ## Inbox
 
-- **wenay-common2: declare `"sideEffects": false`** (bundle audit 2026-09-02, `doc/changes/v2.1.0.md`). Measured in this repo: importing one helper from `wenay-common2/client` (`sleepAsync`, `round`, `listen`) costs the same ~181 KB raw / 61 KB gzip as the whole namespace, because bundlers cannot drop modules without the declaration. It dominates `./react` (192 KB), `./logs` (182 KB) and the root utility path (195 KB). Fix is upstream, one line, after verifying common2 has no import-time effects; here, alternatively, inline the trivial helpers. Also parked from the same audit: filter modules opt-in (34 KB gzip, behavioural), react-rnd -> re-resizable (dragging is disabled on Rnd already; ~8 KB gzip, needs visual check).
+- **wenay-common2: ESM build or a narrow `./params` entry** (bundle audits 2026-09-02 / 2026-09-06, `doc/changes/v2.2.0.md`). The package is CommonJS, so `sideEffects: false` cannot help: a bundler cannot tree-shake a CJS barrel, and one helper from `wenay-common2/client` costs the whole barrel (~61 KB gzip). 2.2.0 removed every client-barrel import from the `./react` / `./windows` / root-utility paths (local helpers + the narrow `./listen` entry). What is left is `Params` in `./logs` and ParamsEditor - it has no narrow entry. Upstream fix: ship ESM, or add `./params` to `exports` next to `./listen`. Also parked from the same audit: filter modules opt-in (34 KB gzip, behavioural), react-rnd -> re-resizable (dragging is disabled on Rnd already; ~8 KB gzip, needs visual check).
 
 
 - **ColumnDots: фильтр-ползунок по значениям + мультисорт-опция + именованные пресеты** (надиктовка 2026-07-10, дословно в конце файла; контекст — мобильный ползунок таблицы, карточки 29/32).

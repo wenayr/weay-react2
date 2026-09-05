@@ -1,5 +1,6 @@
 import React, {useLayoutEffect, useRef, useState} from 'react'
-import {listen as createListen} from 'wenay-common2/client'
+// the narrow `./listen` entry (2.5 KB gzip) instead of the CommonJS client barrel (61 KB)
+import {listen as createListen} from 'wenay-common2/listen'
 import {createUpdateApi} from '../../updateBy.js'
 import {createPersistedController} from '../../utils/persistedController.js'
 import {pinFixedOrder, movedOrderWithFixed} from '../../utils/fixedOrder.js'

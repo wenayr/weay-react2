@@ -6,7 +6,7 @@ import React, {
     useRef,
     useState
 } from 'react';
-import { sleepAsync } from 'wenay-common2/client';
+import { sleepAsync } from '../../utils/async.js';
 import {type Position, useDraggable} from "../../hooks/useDraggable.js";
 import {OutsideClickArea} from "../OutsideClickArea.js";
 import { createModalRenderStore } from "../Modal/Modal.js";

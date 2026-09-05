@@ -1,5 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
-import {colorGenerator2, ColorString} from "wenay-common2/client";
+import type {ColorString} from "wenay-common2/client";
+import {colorGenerator2} from "../../utils/colorGenerator.js";
 import {createUpdateApi} from "../../updateBy.js";
 import {createModalElementStore} from "./Modal.js";
 import { DragBox } from "../Dnd/FloatingWindow.js";
