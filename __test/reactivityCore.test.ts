@@ -86,4 +86,33 @@ describe("updateBy version", () => {
 
         off();
     });
+
+    // копия массива подписчиков нужна ради отписки посреди прохода (это был реальный баг);
+    // для единственного подписчика копия пропускается — поведение должно остаться тем же
+    test("a lone callback may unsubscribe itself mid-pass without breaking the pass", () => {
+        const store = {n: 0};
+        const api = createUpdateApi(store);
+        let calls = 0;
+        const off = api.on(() => { calls++; off(); });
+
+        api.render();
+        expect(calls).toBe(1);
+        api.render();
+        expect(calls).toBe(1);   // отписался — второй проход его не зовёт
+        off();
+    });
+
+    test("two callbacks: the first unsubscribing does not skip the second", () => {
+        const store = {n: 0};
+        const api = createUpdateApi(store);
+        const seen: string[] = [];
+        const offA = api.on(() => { seen.push("a"); offA(); });
+        const offB = api.on(() => { seen.push("b"); });
+
+        api.render();
+        expect(seen).toEqual(["a", "b"]);
+        api.render();
+        expect(seen).toEqual(["a", "b", "b"]);
+        offB();
+    });
 });

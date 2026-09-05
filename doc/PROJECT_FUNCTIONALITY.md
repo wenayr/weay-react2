@@ -54,6 +54,7 @@ Consumers import from the package root or from a subpath, and import the stylesh
 
 ```ts
 import "wenay-react2/styles"            // once per app; tokens: "wenay-react2/styles/tokens"
+import "wenay-react2/styles/communication" // only if VideoCall (./communication) is rendered
 import { createToolbar, useAgGrid, createColumnState } from "wenay-react2"
 import { useStoreNode } from "wenay-react2/react"   // CSS-free, tree-shake-safe subpaths:
                                                     // ./core ./react ./native ./grid ./windows ./logs ./communication

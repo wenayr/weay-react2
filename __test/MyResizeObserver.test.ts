@@ -104,3 +104,40 @@ test("setResizeableElement does not mutate width when the parent width depends o
 
     expect(tree.el.style.width).toBe("180px");
 });
+
+test("setResizeableElement converges with a bounded probe count when the overflow is not 1:1", () => {
+    const {setResizeableElement} = loadModule();
+
+    const outer = document.createElement("div");
+    const parent = document.createElement("div");
+    const el = document.createElement("select");
+    const naturalWidth = 180;
+    el.style.width = naturalWidth + "px";
+    parent.append(el);
+    outer.append(parent);
+    document.body.append(outer);
+
+    const elementWidth = () => Number.parseFloat(el.style.width) || naturalWidth;
+    Object.defineProperty(el, "clientWidth", {configurable: true, get: () => elementWidth()});
+
+    // the overflowing edge moves slower than the element width, so the linear estimate
+    // overshoots and the binary search has to take over
+    let probes = 0;
+    el.getBoundingClientRect = () => {
+        probes++;
+        return domRect(60 + elementWidth() * 0.6);
+    };
+    outer.getBoundingClientRect = () => domRect(150);
+
+    setResizeableElement(el);
+    probes = 0;
+    fireResize?.(outer);
+
+    const width = Number.parseFloat(el.style.width);
+    // fits inside the container (right edge = 60 + 0.6 * width <= 150 means width <= 150)
+    expect(width).toBeLessThanOrEqual(150);
+    // and is not a wild undershoot - the search keeps the widest probed width that fit
+    expect(width).toBeGreaterThan(120);
+    // at most 4 measuring probes for one resize pass
+    expect(probes).toBeLessThanOrEqual(5);
+});

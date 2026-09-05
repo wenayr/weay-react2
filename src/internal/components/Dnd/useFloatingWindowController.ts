@@ -332,6 +332,11 @@ export function useFloatingWindowController({
         // run on restore instead: a window persisted offscreen and minimized at load used to
         // come back from the taskbar still offscreen, with nothing to correct it.
         if (minimized) return;
+        // A drag/resize moves the geometry every frame, and this effect is the most expensive
+        // thing in that loop (a rect for the window plus one per chrome node). The pointer owns
+        // the position while it is down, so clamping it there is also pointless. `a || b` going
+        // back to false re-runs this once on release, which is where the clamp belongs.
+        if (a || b) return;
         const rect = el.getBoundingClientRect();
         const outer = Array.from(el.querySelectorAll<HTMLElement>(".wenayWndClose, .wenayWndControl"))
             .map(node => node.getBoundingClientRect())
@@ -363,7 +368,7 @@ export function useFloatingWindowController({
         if (typeof height === "number" && height > maxWindowHeight) {
             commitSize({width: typeof width == "number" && width > maxWindowWidth ? maxWindowWidth : width, height: maxWindowHeight});
         }
-    }, [x, y, width, height, sizeByWindow, viewportRevision, mode, minimized]);
+    }, [x, y, width, height, sizeByWindow, viewportRevision, mode, minimized, a, b]);
 
     const onHeaderTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
         const t = e.changedTouches[0];

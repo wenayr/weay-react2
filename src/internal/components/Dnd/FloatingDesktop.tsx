@@ -1,4 +1,4 @@
-import React, {ReactNode, useEffect, useRef} from "react";
+import React, {ReactNode, useCallback, useEffect, useRef, useSyncExternalStore} from "react";
 import {createPortal} from "react-dom";
 import {createUpdateApi} from "../../updateBy.js";
 import type {FloatingWindowMode, FloatingWindowSnapRegion} from "../../utils/floatingWindowTypes.js";
@@ -31,6 +31,7 @@ export type FloatingDesktopEntry = {
 
 const desktopState = {entries: [] as FloatingDesktopEntry[]};
 const desktopApi = createUpdateApi(desktopState);
+const subscribeDesktop = (onStoreChange: () => void) => desktopApi.subscribe(onStoreChange);
 let desktopKey = 0;
 
 function groupEntries(group: string, includeMinimized = true) {
@@ -46,6 +47,23 @@ function resolveStack(entry: FloatingDesktopEntry) {
         if (current === entry) return {index, zIndex, active: index == visible.length - 1};
     }
     return null;
+}
+
+export type FloatingDesktopStack = {index: number; zIndex: number; active: boolean};
+
+/** Every raise/register/minimize re-runs resolveStack for every window, but it only *changes*
+ *  for the few windows whose slot moved. Windows subscribe to this memoised tuple instead of to
+ *  the desktop object, so an unchanged stack position is an identical snapshot and React bails
+ *  the window (and its whole subtree) out of the re-render. */
+const stackSnapshots = new WeakMap<FloatingDesktopEntry, FloatingDesktopStack>();
+
+function stackSnapshot(entry: FloatingDesktopEntry): FloatingDesktopStack {
+    const next = resolveStack(entry) ?? {index: 0, zIndex: entry.baseZIndex, active: false};
+    const previous = stackSnapshots.get(entry);
+    if (previous && previous.index == next.index && previous.zIndex == next.zIndex && previous.active == next.active)
+        return previous;
+    stackSnapshots.set(entry, next);
+    return next;
 }
 
 function registerEntry(entry: FloatingDesktopEntry) {
@@ -104,7 +122,8 @@ export function useFloatingDesktopWindow({windowId, group, baseZIndex, label}: {
     entry.baseZIndex = baseZIndex;
     entry.label = label ?? entry.publicId;
 
-    desktopApi.use();
+    const getStack = useCallback(() => stackSnapshot(entry), [entry]);
+    const stack = useSyncExternalStore(subscribeDesktop, getStack, getStack);
     useEffect(() => {
         registerEntry(entry);
         return () => {
@@ -116,7 +135,7 @@ export function useFloatingDesktopWindow({windowId, group, baseZIndex, label}: {
 
     return {
         entry,
-        stack: resolveStack(entry) ?? {index: 0, zIndex: baseZIndex, active: false},
+        stack,
         bringToFront: () => bringEntryToFront(entry),
         sync(next: Pick<FloatingDesktopEntry, "minimized" | "mode" | "snapRegion"> & {actions: DesktopActions}) {
             const changed = entry.minimized != next.minimized || entry.mode != next.mode || entry.snapRegion != next.snapRegion;

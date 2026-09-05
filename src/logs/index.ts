@@ -9,6 +9,7 @@ export type {
     LogEntry,
     LogInput,
     LogsApiOptions,
+    LogsChange,
     LogsController,
     LogsControllerEvents,
     LogsControllerState,

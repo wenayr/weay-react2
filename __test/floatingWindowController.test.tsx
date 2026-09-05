@@ -6,6 +6,7 @@ import {
     type FloatingWindowControllerOptions,
     useFloatingWindowController,
 } from "../src/internal/components/Dnd/FloatingWindow";
+import {flushAnimationFrames} from "./setup";
 
 function HookProbe(props: FloatingWindowControllerOptions & { onReady: (api: FloatingWindowController) => void }) {
     const api = useFloatingWindowController(props);
@@ -77,6 +78,8 @@ test("useFloatingWindowController clamps header drag and announces saved movemen
 
     act(() => {
         document.dispatchEvent(new MouseEvent("mousemove", {clientX: 100, clientY: 100, buttons: 1}));
+        // The loop coalesces moves into one frame; drain it so the commit is observable.
+        flushAnimationFrames();
     });
     expect(controller!.position).toEqual({x: 50, y: 40});
 

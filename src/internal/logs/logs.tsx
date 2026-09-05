@@ -13,6 +13,7 @@ import {
     getSettingLogs,
     type LogEntry,
     type LogsApiOptions,
+    type LogsChange,
     type LogsControllerState,
     type LogsFullState,
     type LogsMiniState,
@@ -27,6 +28,7 @@ export {
 export type {
     CreateLogsControllerOptions,
     LogsApiOptions,
+    LogsChange,
     LogsController,
     LogsControllerState,
     LogsFullState,
@@ -40,10 +42,10 @@ export type {
 
 const cashLogs = new Map<string, LogEntry<any>[]>()
 
-const datumConst = {
+const datumConst: LogsFullState<any> = {
     map: cashLogs,
 }
-const datumMiniConst = {
+const datumMiniConst: LogsMiniState<any> = {
     last: [] as LogEntry[]
 }
 const settingLogs = {params: Params.GetSimpleParams(getSettingLogs())}
@@ -128,6 +130,9 @@ export function useLogsPageTable(state?: LogsViewState) {
     // mount-time snapshot: the live grid is fed by transactions, not re-renders
     const [rowData] = useState(() => [...full.map.values()].flat())
     const shownRows = useRef(new Map(rowData.map(row => [row.num, row])))
+    // identity of the change already pushed into the grid, so a wake-up carrying no new delta
+    // (settings write, a second subscriber) does not re-apply the same transaction
+    const appliedChange = useRef<LogsChange<any> | undefined>(undefined)
 
     const getApi = useCallback(() => apiGrid.current, [])
     const fit = useCallback(() => { apiGrid.current?.api.sizeColumnsToFit() }, [])
@@ -145,15 +150,41 @@ export function useLogsPageTable(state?: LogsViewState) {
             api.destroyFilter("var")
         }
     }, [])
-    const syncRows = useCallback(() => {
+    // Full reconcile: O(total logs). It walks every per-id array (500 entries each by
+    // default), so it is NOT the per-entry path any more - only this explicit resync, used
+    // once at onGridReady to catch up with whatever landed before the grid existed.
+    const resync = useCallback(() => {
         const api = apiGrid.current?.api
         if (!api) return
         const next = new Map([...full.map.values()].flat().map(row => [row.num, row]))
         const add = [...next].filter(([num]) => !shownRows.current.has(num)).map(([, row]) => row)
         const remove = [...shownRows.current].filter(([num]) => !next.has(num)).map(([, row]) => row)
         shownRows.current = next
+        appliedChange.current = full.lastChange
         if (add.length || remove.length) api.applyTransactionAsync({add, remove})
     }, [full])
+    // Per-entry path: one addLogs -> one added row plus whatever limitPer evicted, both
+    // carried by the change the controller stamped on the full state. O(1) in the log count.
+    const syncRows = useCallback(() => {
+        const api = apiGrid.current?.api
+        if (!api) return
+        const change = full.lastChange as LogsChange<any> | undefined
+        // no delta at all (state built without the change channel) -> full reconcile;
+        // a delta already applied (params.set also fires onFullChange) -> nothing to do
+        if (!change) { resync(); return }
+        if (change === appliedChange.current) return
+        appliedChange.current = change
+
+        const remove: LogRow[] = []
+        for (const evicted of change.evictedFull) {
+            if (shownRows.current.delete(evicted.num)) remove.push(evicted)
+        }
+        // limitPer 0 evicts the entry that was just pushed: never add a row we also remove
+        const evictedItself = change.evictedFull.some(evicted => evicted.num === change.item.num)
+        const add = !evictedItself && !shownRows.current.has(change.item.num) ? [change.item] : []
+        if (add.length) shownRows.current.set(change.item.num, change.item)
+        if (add.length || remove.length) api.applyTransactionAsync({add, remove})
+    }, [full, resync])
 
     // settings change -> single filter method (no re-render: updateBy with a callback)
     updateBy(setting, ()=>{
@@ -166,11 +197,12 @@ export function useLogsPageTable(state?: LogsViewState) {
 
     const onGridReady = useCallback((a: GridReadyEvent<LogRow>)=>{
         apiGrid.current = a
-        syncRows()
+        // the grid missed every change that happened before it existed -> full reconcile once
+        resync()
         fit()
         // fresh grid has no filter - only apply when the setting asks for one
         if (setting.params.minVarLogs) applyImportanceFilter(setting.params.minVarLogs)
-    }, [applyImportanceFilter, fit, setting, syncRows])
+    }, [applyImportanceFilter, fit, resync, setting])
 
     const columnDefs = useMemo(() => [
         {
@@ -232,7 +264,7 @@ export function useLogsPageTable(state?: LogsViewState) {
         },
     }), [columnDefs, onGridReady, rowData])
 
-    return {getApi, fit, applyImportanceFilter, syncRows, onGridReady, columnDefs, gridProps}
+    return {getApi, fit, applyImportanceFilter, syncRows, resync, onGridReady, columnDefs, gridProps}
 }
 
 export type LogsPageTableController = ReturnType<typeof useLogsPageTable>
@@ -274,7 +306,11 @@ export type MessageEventLogsViewProps = {
     style?: React.CSSProperties
 }
 
-export function MessageEventLogCard({logs}: {logs: LogEntry}) {
+/** memo + the two per-item strings computed once: the card used to re-stringify the payload
+ *  and rebuild a Date on every parent render, and the parent re-renders on every new log. */
+export const MessageEventLogCard = React.memo(function MessageEventLogCard({logs}: {logs: LogEntry}) {
+    const text = useMemo(() => typeof logs.txt == "object" ? JSON.stringify(logs.txt) : logs.txt, [logs.txt])
+    const dateText = useMemo(() => (new Date(logs.time)).toLocaleDateString(), [logs.time])
     return <div className={"testAnime"}
                 style={{ width:"200px", color: logStyleTokens.text, height:"auto", marginTop:"10px", borderRight:`5px solid ${logStyleTokens.accent}`, background: logSeverityBackground(logs.var)}}>
         <p style = {{textAlign:"center", fontSize: "10px", marginBottom:"1px"}}>{"notification"}</p>
@@ -286,10 +322,10 @@ export function MessageEventLogCard({logs}: {logs: LogEntry}) {
             boxSizing: "content-box",
             display: "block"
         }}/>
-        <div style={{textAlign:"right", marginRight:"10px", height:"auto", overflowWrap: "break-word", textOverflow: "ellipsis"}}>{typeof logs.txt == "object" ? JSON.stringify(logs.txt) : logs.txt}</div>
-        <p style={{float:"inline-end", textAlign:"right",  marginRight:"10px"}}>{(new Date(logs.time)).toLocaleDateString()}</p>
+        <div style={{textAlign:"right", marginRight:"10px", height:"auto", overflowWrap: "break-word", textOverflow: "ellipsis"}}>{text}</div>
+        <p style={{float:"inline-end", textAlign:"right",  marginRight:"10px"}}>{dateText}</p>
     </div>
-}
+})
 
 export function useMessageEventLogsController(options: UseMessageEventLogsControllerOptions = {}): MessageEventLogsController {
     const setting = options.settings ?? memoryGetOrCreate("settingLogs",settingLogs)
@@ -299,6 +335,9 @@ export function useMessageEventLogsController(options: UseMessageEventLogsContro
     const counterRef = useRef(0)
     const lastLogRef = useRef<LogEntry | null>(null)
     const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+    // mirror of `notifications`: the cap has to clear the timer of every dropped item, and a
+    // setState updater must stay side-effect free (React double-invokes it in StrictMode)
+    const itemsRef = useRef<MessageEventLogsItem[]>([])
 
     updateBy(setting)
 
@@ -309,13 +348,28 @@ export function useMessageEventLogsController(options: UseMessageEventLogsContro
         const item = {key, logs: last}
         const displayMs = (setting.params.timeShow ? setting.params.timeShow : 2) * 1000
 
-        setNotifications(prev => [item, ...prev])
+        // Cap at maxVisible: only that many are ever rendered, so everything past the cap was
+        // retained memory plus a re-render per arrival and nothing else. Oldest drop first,
+        // and their pending expiry timers drop with them.
+        const next = [item, ...itemsRef.current]
+        const dropped = next.length > maxVisible ? next.splice(maxVisible) : []
+        for (const old of dropped) {
+            const oldTimer = timersRef.current.get(old.key)
+            if (oldTimer !== undefined) {
+                clearTimeout(oldTimer)
+                timersRef.current.delete(old.key)
+            }
+        }
+        itemsRef.current = next
+        setNotifications(next)
+
         const timer = setTimeout(()=>{
             timersRef.current.delete(key)
-            setNotifications(prev => prev.filter(e => e.key !== key))
+            itemsRef.current = itemsRef.current.filter(e => e.key !== key)
+            setNotifications(itemsRef.current)
         }, displayMs)
         timersRef.current.set(key, timer)
-    }, [setting])
+    }, [maxVisible, setting])
 
     const onMiniChange = useCallback(() => {
         const last = mini.last[0]

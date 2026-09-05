@@ -19,7 +19,7 @@
 // A column REMOVED from the live grid (dynamic defs, "drop empty columns"
 // standards) keeps its button: it renders 'disabled' (dashed, inert) and
 // comes back to life when the column returns. No ag-grid, no storage here.
-import React, {useRef} from 'react'
+import React, {useCallback, useMemo, useRef} from 'react'
 import {useReorder} from '../../hooks/useReorder.js'
 import {movedOrderWithFixed} from '../../utils/fixedOrder.js'
 import type {ColumnStateController, ColumnsConfig} from './columnState.js'
@@ -45,7 +45,7 @@ function colsMenuClass(parts: Array<string | false | null | undefined>) {
     return parts.filter(Boolean).join(' ')
 }
 
-function MenuButton(p: {
+type MenuButtonProps = {
     item: MenuStripItem
     onItem?: (key: string, e: React.MouseEvent) => void
     drag?: {onMouseDown: React.MouseEventHandler, onTouchStart: React.TouchEventHandler}
@@ -54,7 +54,12 @@ function MenuButton(p: {
     /** icon-only face: the icon, or the first letters of short/title as a
      *  text pseudo-icon; the full title stays in the tooltip */
     compact?: boolean
-}) {
+}
+
+/** Memoized: a strip of N buttons must not re-render N times because one of them
+ *  moved. Holds only while its props keep identity - hence the stable onItem and
+ *  the per-key drag object cached below. */
+const MenuButton = React.memo(function MenuButton(p: MenuButtonProps) {
     const it = p.item
     const disabled = it.state == 'disabled'
     const on = it.state == 'on'
@@ -74,7 +79,7 @@ function MenuButton(p: {
         {!p.compact && <span className='wenayColsMenuLabel'>{it.short ?? it.title}</span>}
         {it.marks != null && <span className='wenayColsMenuMarks'>{it.marks}</span>}
     </div>
-}
+})
 
 /** The presentation layer: renders the buttons in the given order, reports
  *  clicks (onItem) and drag-reorders (onMove) - never interprets either.
@@ -112,32 +117,48 @@ export function MenuStrip(p: {
     // click - without this guard every snapped-back drag would ALSO toggle the
     // button. Track the press point; a click that travelled is not a click.
     const down = useRef<{x: number, y: number} | null>(null)
-    function onItem(key: string, e: React.MouseEvent) {
+    // the stable handlers below must see the CURRENT props/reorder without depending
+    // on their identity - a ref keeps them factory-of-render-lifetime stable
+    const cur = useRef({onItem: p.onItem, reorder})
+    cur.current = {onItem: p.onItem, reorder}
+    const onItem = useCallback(function onItem(key: string, e: React.MouseEvent) {
         const d = down.current
         down.current = null
         if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return
-        p.onItem?.(key, e)
-    }
+        cur.current.onItem?.(key, e)
+    }, [])
+    const onTail = useCallback((key: string, e: React.MouseEvent) => cur.current.onItem?.(key, e), [])
+    // one drag handler object per key, kept across renders: reorder.item() hands back a
+    // fresh props object every render, which alone would defeat MenuButton's memo
+    const dragCache = useRef(new Map<string, {onMouseDown: React.MouseEventHandler, onTouchStart: React.TouchEventHandler}>())
+    const dragFor = useCallback((key: string) => {
+        const cache = dragCache.current
+        let d = cache.get(key)
+        if (!d) {
+            d = {
+                onMouseDown: (e: React.MouseEvent<HTMLElement>) => {
+                    down.current = {x: e.clientX, y: e.clientY}
+                    cur.current.reorder.item(key).props.onMouseDown(e)
+                },
+                onTouchStart: (e: React.TouchEvent<HTMLElement>) => cur.current.reorder.item(key).props.onTouchStart(e),
+            }
+            cache.set(key, d)
+        }
+        return d
+    }, [])
     return <div className={colsMenuClass(['wenayColsMenu', p.className])} style={p.style}>
         {/* the reorder container holds ONLY the reorderable items (1:1 with order) */}
         <div ref={reorder.listRef} className='wenayColsMenuList'>
             {p.items.map(it => {
                 const r = reorder.item(it.key)
-                const drag = {
-                    onMouseDown: (e: React.MouseEvent<HTMLElement>) => {
-                        down.current = {x: e.clientX, y: e.clientY}
-                        r.props.onMouseDown(e)
-                    },
-                    onTouchStart: r.props.onTouchStart,
-                }
                 const dragClass = r.dragging ? 'wenayColsMenuBtn_dragging' : r.active ? 'wenayColsMenuBtn_shift' : undefined
-                return <MenuButton key={it.key} item={it} onItem={onItem} drag={drag} compact={p.compact}
+                return <MenuButton key={it.key} item={it} onItem={onItem} drag={dragFor(it.key)} compact={p.compact}
                                    className={dragClass} style={r.style}/>
             })}
         </div>
         {!!p.tail?.length && <>
             <div className='wenayColsMenuDivider'/>
-            {p.tail.map(it => <MenuButton key={it.key} item={it} onItem={p.onItem} compact={p.compact}/>)}
+            {p.tail.map(it => <MenuButton key={it.key} item={it} onItem={onTail} compact={p.compact}/>)}
         </>}
     </div>
 }
@@ -169,15 +190,23 @@ export function ColumnsMenu(p: {
 }) {
     const cfg = p.state.api.useDisplayConfig()
     const present = p.state.api.usePresent()
-    const byKey = new Map(p.state.columns.map(c => [c.key, c]))
-    const items: MenuStripItem[] = cfg.order.filter(k => byKey.has(k)).map(k => {
+    const columns = p.state.columns
+    const byKey = useMemo(() => new Map(columns.map(c => [c.key, c])), [columns])
+    const marks = p.marks
+    // cfg is rebuilt by normalize() on every render, so the item list is keyed on the
+    // VALUES it actually reads - not on cfg's identity. groups and sort are in the key
+    // even though this component never reads them itself: a marks() callback gets the
+    // whole cfg, and sub-column adornments are exactly what it renders from. width and
+    // filter stay out - no button face can depend on them.
+    const itemsId = JSON.stringify([cfg.order, cfg.visible, cfg.groups, cfg.sort, present])
+    const items: MenuStripItem[] = useMemo(() => cfg.order.filter(k => byKey.has(k)).map(k => {
         const c = byKey.get(k)!
         return {
             key: k, title: c.title, short: c.short, icon: c.icon, fixed: c.fixed,
             state: present && !present[k] ? 'disabled' : cfg.visible[k] != false ? 'on' : 'off',
-            marks: p.marks?.(k, cfg),
+            marks: marks?.(k, cfg),
         }
-    })
+    }), [byKey, itemsId, marks])
 
     function onItem(key: string, e: React.MouseEvent) {
         if (!byKey.has(key)) return p.onTail?.(key, e)

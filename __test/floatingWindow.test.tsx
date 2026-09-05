@@ -2,6 +2,15 @@ import React from "react";
 import {act, fireEvent, render, screen, within} from "@testing-library/react";
 import {FloatingWindow, FloatingWindowTaskbar, WindowPortal, floatingWindowMap} from "../src/internal/components/Dnd/FloatingWindow";
 import {OutsideClickArea} from "../src/internal/components/OutsideClickArea";
+import {flushAnimationFrames} from "./setup";
+import {useFloatingDesktopWindow} from "../src/internal/components/Dnd/FloatingDesktop";
+
+/** The drag loop commits one position per animation frame, so a synthetic move is only
+ *  observable once the frame it was coalesced into has run. */
+function dragTo(init: {clientX: number, clientY: number, buttons?: number}) {
+    fireEvent.mouseMove(document, init);
+    act(() => { flushAnimationFrames(); });
+}
 
 function rootFor(testId: string) {
     const content = screen.getByTestId(testId);
@@ -199,7 +208,7 @@ describe("FloatingWindow viewport layer", () => {
         const header = root.querySelector(".wenayWndHeader") as HTMLElement;
 
         fireEvent.mouseDown(header, {clientX: 120, clientY: 100, buttons: 1});
-        fireEvent.mouseMove(document, {clientX: window.innerWidth / 2, clientY: 10, buttons: 1});
+        dragTo({clientX: window.innerWidth / 2, clientY: 10, buttons: 1});
         expect(screen.getByRole("toolbar", {name: "Snap layouts"})).not.toBeNull();
         expect(screen.getAllByRole("group")).toHaveLength(3);
         expect(within(screen.getByRole("group", {name: "Two columns"})).getAllByRole("button")).toHaveLength(2);
@@ -219,7 +228,7 @@ describe("FloatingWindow viewport layer", () => {
 
         fireEvent.mouseDown(header, {clientX: 100, clientY: 300, buttons: 1});
         expect(root.dataset.snapRegion).toBe("bottom-right");   // a press alone must not tear it off
-        fireEvent.mouseMove(document, {clientX: 140, clientY: 340, buttons: 1});
+        dragTo({clientX: 140, clientY: 340, buttons: 1});
         expect(root.dataset.snapRegion).toBeUndefined();
         expect(root.style.width).toBe("300px");
         expect(onSnapChange).toHaveBeenLastCalledWith(null);
@@ -236,7 +245,7 @@ describe("FloatingWindow viewport layer", () => {
         const header = root.querySelector(".wenayWndHeader") as HTMLElement;
 
         fireEvent.mouseDown(header, {clientX: 120, clientY: 100, buttons: 1});
-        fireEvent.mouseMove(document, {clientX: window.innerWidth / 2, clientY: 10, buttons: 1});
+        dragTo({clientX: window.innerWidth / 2, clientY: 10, buttons: 1});
         const rows = screen.getByRole("group", {name: "Two rows"});
         fireEvent.click(within(rows).getByRole("button", {name: "Two rows: bottom"}));
 
@@ -264,10 +273,10 @@ describe("FloatingWindow viewport layer", () => {
         // A press that never travels leaves the window maximized, so a double click still toggles.
         fireEvent.mouseDown(header, {clientX: 400, clientY: 12, buttons: 1});
         expect(root.dataset.mode).toBe("maximized");
-        fireEvent.mouseMove(document, {clientX: 404, clientY: 16, buttons: 1});
+        dragTo({clientX: 404, clientY: 16, buttons: 1});
         expect(root.dataset.mode).toBe("maximized");
 
-        fireEvent.mouseMove(document, {clientX: 420, clientY: 120, buttons: 1});
+        dragTo({clientX: 420, clientY: 120, buttons: 1});
         expect(root.dataset.mode).toBe("normal");
         expect(root.style.width).toBe("320px");
         expect(root.style.height).toBe("220px");
@@ -275,7 +284,7 @@ describe("FloatingWindow viewport layer", () => {
         expect(root.dataset.positionY).toBe(`${120 - 12}`);
 
         // From here the window follows the pointer with the grab offset taken at the tear-off.
-        fireEvent.mouseMove(document, {clientX: 430, clientY: 140, buttons: 1});
+        dragTo({clientX: 430, clientY: 140, buttons: 1});
         expect(root.dataset.positionX).toBe(`${430 - 160}`);
         expect(root.dataset.positionY).toBe(`${140 - 12}`);
         fireEvent.mouseUp(document);
@@ -660,5 +669,35 @@ describe("FloatingWindow offscreen recovery", () => {
             restore();
             floatingWindowMap.delete(persistedKey);
         }
+    });
+});
+
+describe("FloatingDesktop stacking subscription", () => {
+    test("a raise only re-renders the windows whose slot in the stack actually moved", () => {
+        const renders: {[id: string]: number} = {a: 0, b: 0, c: 0};
+        const raise: {[id: string]: () => void} = {};
+
+        function StackProbe({id}: {id: string}) {
+            const desktop = useFloatingDesktopWindow({windowId: id, group: "raise-probe", baseZIndex: 9});
+            raise[id] = desktop.bringToFront;
+            renders[id] += 1;
+            return <div data-testid={`probe-${id}`}>{`${desktop.stack.index}:${desktop.stack.active}`}</div>;
+        }
+
+        render(<><StackProbe id="a"/><StackProbe id="b"/><StackProbe id="c"/></>);
+        expect(screen.getByTestId("probe-a").textContent).toBe("0:false");
+        expect(screen.getByTestId("probe-c").textContent).toBe("2:true");
+
+        const before = {...renders};
+        act(() => { raise.b(); });
+
+        // b goes on top, c slides down one - a keeps slot 0 at the same z, so its snapshot is
+        // identical and React must bail it (and its whole subtree) out.
+        expect(screen.getByTestId("probe-b").textContent).toBe("2:true");
+        expect(screen.getByTestId("probe-c").textContent).toBe("1:false");
+        expect(screen.getByTestId("probe-a").textContent).toBe("0:false");
+        expect(renders.a).toBe(before.a);
+        expect(renders.b).toBeGreaterThan(before.b);
+        expect(renders.c).toBeGreaterThan(before.c);
     });
 });

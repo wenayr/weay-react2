@@ -13,10 +13,8 @@ import {
     RowApiModule,
     RowAutoHeightModule,
     RowSelectionModule,
-    RowStyleModule,
     ScrollApiModule,
     TextFilterModule,
-    TooltipModule,
     type Module,
 } from 'ag-grid-community'
 
@@ -38,11 +36,9 @@ export const defaultAgGridModules: Module[] = [
     ScrollApiModule,
     RowSelectionModule,
     CellStyleModule,
-    RowStyleModule,
     TextFilterModule,
     NumberFilterModule,
     DateFilterModule,
-    TooltipModule,
 ]
 
 declare const process: {env: {NODE_ENV?: string}}

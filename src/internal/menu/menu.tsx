@@ -1,5 +1,6 @@
 import React, {
     ReactElement,
+    useCallback,
     useEffect,
     useLayoutEffect,
     useMemo,
@@ -331,7 +332,11 @@ const SUBMENU_EVENTS = ["submenuOpen", "submenuOk", "submenuError"] as const;
 const FUNC_EVENTS = ["funcOpen", "funcOk", "funcError"] as const;
 const FOCUS_EVENTS = ["focusOpen", "focusOk", "focusError"] as const;
 
-const MenuItemWrapper = ({
+/** memo: hovering one item calls setActiveIndex on the parent Menu, which used to re-render
+ *  EVERY sibling wrapper (each running three useAsyncMenuValue effects) even though only the
+ *  `open` flag of two of them actually changed. `update` is a stable useCallback in Menu, and
+ *  the remaining props are either primitives or caller-owned, so the memo actually holds. */
+const MenuItemWrapper = React.memo(({
                              item,
                              index,
                              update,
@@ -429,7 +434,8 @@ const MenuItemWrapper = ({
             </div>
         </div>
     );
-};
+});
+MenuItemWrapper.displayName = "MenuItemWrapper";
 
 /*******************************************************
  * Menu renders the popup menu with support for
@@ -474,12 +480,15 @@ export function Menu({
                               onActionEvent,
                          }: MenuProps): ReactElement {
     const [, forceUpdate] = useState(false);
-    const update = () => forceUpdate((p) => !p);
+    // stable identity: a fresh closure per render would defeat the memo on MenuItemWrapper
+    const update = useCallback(() => forceUpdate((p) => !p), []);
     const refMenu = useRef<HTMLDivElement | null>(null);
 
     const dataMemo = useMemo(
+        // data.length was dead weight: a new length always comes with a new `data` identity,
+        // and a mutated-in-place array does not re-render anyone anyway
         () => data.filter(Boolean) as MenuItemStrict[],
-        [data, data.length]
+        [data]
     );
     const initialActiveIndex = () => {
         const i = dataMemo.findIndex(item => item.status);

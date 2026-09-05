@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {useDeferredValue, useEffect, useMemo, useRef, useState} from "react";
 import {createUpdateApi} from "../../updateBy.js";
 import {FloatingWindowBase} from "../Dnd/FloatingWindow.js";
 import {Overlay} from "../Overlay.js";
@@ -203,7 +203,17 @@ function searchSourceText(source: SettingsSearchSource) {
     return reactNodeText(value)
 }
 
+/** section.render() is invoked and walked for EVERY section on every filter pass - by far the
+ *  most expensive thing the dialog does, and it re-ran on every keystroke. The text depends only
+ *  on the descriptor, so it is memoised per descriptor object: a consumer that builds its
+ *  sections inline (the usual literal) hands over a new object and gets a fresh walk, while a
+ *  stable descriptor is walked once. A descriptor kept stable across a content change should
+ *  declare `searchText` rather than expect the re-walk. */
+const sectionSearchTextCache = new WeakMap<SettingsSection, string>()
+
 function sectionSearchText(section: SettingsSection) {
+    const cached = sectionSearchTextCache.get(section)
+    if (cached != null) return cached
     const parts = [section.key, section.name, ...(section.keywords ?? [])]
     if (section.searchText != null) parts.push(searchSourceText(section.searchText))
     try {
@@ -211,7 +221,9 @@ function sectionSearchText(section: SettingsSection) {
     } catch {
         // Search should not break the dialog if a consumer render throws outside its normal path.
     }
-    return normalizeSearch(parts.join(" "))
+    const text = normalizeSearch(parts.join(" "))
+    sectionSearchTextCache.set(section, text)
+    return text
 }
 
 function sectionMatches(section: SettingsSection, terms: SettingsSearchTerm[]) {
@@ -362,13 +374,17 @@ export function useSettingsDialogController(props: SettingsDialogProps): Setting
     const tree = buildSettingsTree(sections)
     const treeSignature = getTreeSignature(tree.ordered)
     const branchKeys = getBranchKeys(tree.ordered)
-    const searchTerms = getSearchTerms(search)
+    // The input itself stays urgent - typing must never wait on the tree - while the filter runs
+    // against the settled query, so React keeps showing the previous result instead of re-walking
+    // every section between two keystrokes.
+    const deferredSearch = useDeferredValue(search)
+    const searchTerms = getSearchTerms(deferredSearch)
     // While a search is active this walks section.render() for EVERY section; unmemoised it
     // re-ran on renders that had nothing to do with the query - notably setNavWidth on each
     // pointermove of the splitter drag. treeSignature covers the structure, search the query.
     const filtered = useMemo(
         () => filterSettingsTree(tree.roots, searchTerms),
-        [treeSignature, search],
+        [treeSignature, deferredSearch],
     )
     const activeNode = active == null ? undefined : tree.byKey.get(active)
     const defaultNode = props.defaultSection == null ? undefined : tree.byKey.get(props.defaultSection)

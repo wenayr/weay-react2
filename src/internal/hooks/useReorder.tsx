@@ -1,5 +1,12 @@
-import React, {useEffect, useRef, useState} from 'react'
+import React, {useEffect, useLayoutEffect, useRef, useState} from 'react'
 import {useDraggableApi} from './useDraggable.js'
+
+function sameOrder(a: string[] | null, b: string[] | null) {
+    if (a === b) return true
+    if (a == null || b == null || a.length != b.length) return false
+    for (let i = 0; i < a.length; i++) if (a[i] != b[i]) return false
+    return true
+}
 
 /** useReorder - a deliberately small reorder-by-drag for keyed blocks laid out
  *  by CSS (vertical list, horizontal bar, wrapped grid - the hook never knows
@@ -57,6 +64,9 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
     // (client styling, zoomed containers) they diverge - normalize by the ratio.
     const scaleRef = useRef(1)
     const measureRef = useRef<{target: number, pos: {x: number, y: number}[]} | null>(null)
+    // Published by the layout effect below; item() only READS it, so nothing measures or
+    // mutates the DOM during render.
+    const [measured, setMeasured] = useState<{target: number, pos: {x: number, y: number}[]} | null>(null)
 
     const move = o.move ?? function plainSplice(order: string[], key: string, to: number) {
         const next = order.slice()
@@ -139,8 +149,30 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
     const from = dragKey != null ? o.order.indexOf(dragKey) : -1
     const target = from != -1 ? dragTarget(from, local(drag.position.x), local(drag.position.y)) : -1
     const preview = from != -1 && dragKey != null ? move(o.order, dragKey, target) : null
-    const previewKey = preview?.join("\u0000") ?? ""
-    useEffect(() => o.onPreviewChange?.(preview), [previewKey])
+    // `preview` is a fresh array on every pointer move, but its CONTENT changes only when the
+    // target slot does. An element-wise compare is the same walk the joined key was, minus a
+    // string allocation per move; the effect keys off a revision counter instead.
+    const previewRef = useRef<string[] | null>(null)
+    const previewRevision = useRef(0)
+    if (!sameOrder(previewRef.current, preview)) {
+        previewRef.current = preview
+        previewRevision.current++
+    }
+    useEffect(() => o.onPreviewChange?.(previewRef.current), [previewRevision.current])
+    // The FLIP measurement writes style.order on every child and reads the layout back - a
+    // side effect on the committed DOM, so it runs in a layout effect instead of inside item()
+    // during render. Keyed on `target`, it keeps the measure-once-per-target contract, and the
+    // state it publishes lands in a synchronous re-render before paint, so the intermediate
+    // state still never reaches the screen.
+    useLayoutEffect(() => {
+        if (o.preview != 'measure' || dragKey == null || target == -1) {
+            measureRef.current = null
+            setMeasured(null)
+            return
+        }
+        if (measureRef.current?.target == target) return
+        setMeasured({target, pos: measuredPositions(move(o.order, dragKey, target), target)})
+    }, [dragKey, target, o.preview])
     // unmount mid-drag must not leave the preview order applied in columnState/grid
     const previewChangeRef = useRef(o.onPreviewChange)
     previewChangeRef.current = o.onPreviewChange
@@ -155,8 +187,8 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
             if (dragging) {
                 style = {transform: `translate(${local(drag.position.x)}px, ${local(drag.position.y)}px)`}
             } else if (o.preview == 'measure') {
-                const pos = measuredPositions(preview!, target)
-                const a = startRef.current[i], b = pos[i]
+                const pos = measured?.target == target ? measured.pos : null
+                const a = startRef.current[i], b = pos?.[i]
                 if (a && b && (a.x != b.x || a.y != b.y)) style = {transform: `translate(${b.x - a.x}px, ${b.y - a.y}px)`}
             } else {
                 const pi = preview!.indexOf(key)

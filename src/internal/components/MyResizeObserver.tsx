@@ -96,6 +96,9 @@ export function useElementSize<T extends Element = HTMLElement>() {
 type ResizeableElementState = { observerId: ObserveID, defaultWidth: number, styleWidth: string, resizing: boolean };
 const resizeableElementMap = new WeakMap<HTMLElement, ResizeableElementState>();
 
+/** Floor of the shrink range - the element never collapses below this. */
+const MIN_WIDTH = 10;
+
 function getWidth(el: HTMLElement) {
     return Math.ceil(el.clientWidth || el.getBoundingClientRect().width);
 }
@@ -137,11 +140,14 @@ export function setResizeableElement(el: HTMLElement) {
             // wide enough" branch. The line above has just restored the natural width, so
             // this is the moment to capture it on the first observation that has a layout.
             if (!state.defaultWidth) state.defaultWidth = getWidth(el);
-            let rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentParent.getBoundingClientRect().right);
+            // one read of the container box, reused below: it is the reference edge for every
+            // probe and (see the probe right after) it does not move with the element
+            const parentRect = parentParent.getBoundingClientRect();
+            let rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentRect.right);
             if (rangeDelta <= 0) return;
 
-            const parentWidth = parentParent.getBoundingClientRect().width;
-            const probeWidth = Math.max(10, Math.floor(state.defaultWidth * 0.8));
+            const parentWidth = parentRect.width;
+            const probeWidth = Math.max(MIN_WIDTH, Math.floor(state.defaultWidth * 0.8));
             if (state.defaultWidth - probeWidth >= 2) {
                 el.style.width = probeWidth + "px";
                 const probedParentWidth = parentParent.getBoundingClientRect().width;
@@ -149,13 +155,39 @@ export function setResizeableElement(el: HTMLElement) {
                 if (Math.abs(parentWidth - probedParentWidth) > 0.5) return;
             }
 
-            for (let width = state.defaultWidth, i = 0; i < 8; i++) {
-                width = Math.max(10, Math.min(state.defaultWidth, width - rangeDelta));
+            // Binary search instead of the old 8-step linear shrink: bounded at 4 probes (4
+            // forced layouts instead of up to 8) and it cannot stall on a slowly converging
+            // overflow. The container edge is invariant across probes (proved just above), so
+            // only lastEl is re-measured; `parentRect` stays hoisted out of the loop.
+            // The first probe is the linear estimate, which is exact whenever the overflow
+            // moves 1:1 with the element width (the common case: lastEl IS the element) - the
+            // halving steps are the fallback for everything else.
+            let lo = MIN_WIDTH;                 // narrowest width we are ever willing to apply
+            let hi = state.defaultWidth;        // known too wide (rangeDelta > 0 above)
+            let best = -1;                      // widest probed width that fit
+            let width = Math.max(lo, Math.min(hi, state.defaultWidth - rangeDelta));
+            let linearProbe = true;
+            for (let i = 0; i < 4; i++) {
                 applyWidth(el, state, width);
-                if (width == 10 || width == state.defaultWidth) break;
-                rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentParent.getBoundingClientRect().right);
-                if (rangeDelta <= 0) break;
+                rangeDelta = Math.floor(lastEl.getBoundingClientRect().right - parentRect.right);
+                if (rangeDelta <= 0) {
+                    best = width;
+                    // the linear estimate is EXACT whenever the overflow moves 1:1 with the
+                    // element width (lastEl is the element itself, the common case) - once it
+                    // fits there is nothing better to find, so do not pay for more layouts
+                    if (linearProbe || width >= hi - 1) break;
+                    lo = width;
+                } else {
+                    if (width <= MIN_WIDTH) break;  // nothing narrower left to try
+                    hi = width;
+                }
+                linearProbe = false;
+                const next = Math.floor((lo + hi) / 2);
+                if (next <= lo || next >= hi) break;
+                width = next;
             }
+            // the last probe may have been a miss - settle on the widest width that fit
+            if (best >= 0 && best != width) applyWidth(el, state, best);
         } finally {
             state.resizing = false;
         }

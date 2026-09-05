@@ -133,26 +133,40 @@ export type StoreKeysController<T extends object = any> = {
     get<K extends keyof T>(key: K): T[K];
 };
 
+function sameKeyList(a: PropertyKey[], b: PropertyKey[]) {
+    if (a.length != b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+}
+
 export function useStoreKeys<T extends object>(
     node: StoreNode<T>,
-    options: Omit<UseStoreNodeOptions<T>, "mode"> = {},
+    // `mode` is additive: the default stays "snapshot", so `.value` keeps its
+    // change-per-emission identity (memo/effect deps downstream depend on it).
+    options: UseStoreNodeOptions<T> = {},
 ): StoreKeysController<T> {
-    const state = useStoreNode(node, {...options, mode: "snapshot"});
-    const keys = useMemo(() => {
-        const value = state.value;
-        return value != null && typeof value == "object" ? Reflect.ownKeys(value) : [];
-    }, [state.value]);
+    const {mode = "snapshot", ...rest} = options;
+    const state = useStoreNode(node, {...rest, mode});
+    // In "get" mode the node hands back the LIVE object: no per-emission snapshot clone (the
+    // point of the mode), but its identity never changes, so the key list must be re-read on
+    // every render instead of memoised on the value. The ref keeps the array identity stable
+    // while the key SET is unchanged, which is what downstream deps actually care about.
+    const value = mode == "snapshot" ? state.value : (state.exists ? node.get() as T : state.value);
+    const nextKeys = value != null && typeof value == "object" ? Reflect.ownKeys(value) : [];
+    const keysRef = useRef<PropertyKey[]>(nextKeys);
+    if (!sameKeyList(keysRef.current, nextKeys)) keysRef.current = nextKeys;
+    const keys = keysRef.current;
 
     return useMemo(() => ({
         node,
         keys,
         stringKeys: keys.map(String),
-        value: state.value,
+        value,
         exists: state.exists,
         refresh: state.refresh,
-        has: (key: PropertyKey) => state.value != null && typeof state.value == "object" && key in state.value,
-        get: <K extends keyof T>(key: K) => state.value[key],
-    }), [node, keys, state]);
+        has: (key: PropertyKey) => value != null && typeof value == "object" && key in value,
+        get: <K extends keyof T>(key: K) => value[key],
+    }), [node, keys, value, state]);
 }
 
 export function useStoreSelect<T, M extends StoreMask<T>>(

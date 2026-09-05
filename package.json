@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Common react",
   "type": "module",
   "strict": true,
@@ -134,6 +134,7 @@
     "./styles": "./lib/style/style.css",
     "./styles/tokens": "./lib/style/tokens.css",
     "./styles/menu-right": "./lib/style/menuRight.css",
+    "./styles/communication": "./lib/style/communication.css",
     "./communication": {
       "types": "./lib/communication/index.d.ts",
       "import": "./lib/communication/index.js",

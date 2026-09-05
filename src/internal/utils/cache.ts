@@ -7,6 +7,12 @@ export interface CacheStorage {
     set(key: string, value: object): Promise<boolean>
     get<T extends (object)>(key: string): Promise<T | null>;
     delete(key: string): Promise<boolean>;
+    /** Optional fast path: store an ALREADY serialized payload. The cache save path builds the
+     *  JSON string anyway (it is the diff key), so a storage that can take the string writes it
+     *  as-is instead of being forced through a JSON.parse + JSON.stringify round trip per
+     *  changed scope. Optional on purpose: third-party CacheStorage implementations that only
+     *  implement set/get/delete stay valid. */
+    setRaw?(key: string, payload: string): Promise<boolean>;
 }
 
 // Стабильный ключ запроса внутри Cache: НЕ зависит от текущего маршрута SPA
@@ -24,7 +30,11 @@ function getLegacyRequestKey() {
 
 export class BrowserCacheStorage implements CacheStorage{
     async set(key: string, value: object) : Promise<boolean>  {
-        const t = new Response(JSON.stringify(value));
+        return this.setRaw(key, JSON.stringify(value))
+    }
+    /** The Cache API stores a Response body, i.e. the serialized string - no parse needed. */
+    async setRaw(key: string, payload: string) : Promise<boolean>  {
+        const t = new Response(payload);
         if (typeof caches != "undefined") {
             const Cache = await caches.open(key)
             await Cache.put(getStableRequestKey(), t);
@@ -69,8 +79,12 @@ export class LocalStorageCache implements CacheStorage {
     private readonly keys = new Set<string>()
 
     async set(key: string, value: object) : Promise<boolean>  {
+        return this.setRaw(key, JSON.stringify(value))
+    }
+    /** localStorage stores strings anyway - take the caller's serialized payload as-is. */
+    async setRaw(key: string, payload: string) : Promise<boolean>  {
         if (typeof localStorage != "undefined") {
-            localStorage.setItem(key, JSON.stringify(value))
+            localStorage.setItem(key, payload)
             this.keys.add(key)
             return true
         }
@@ -136,6 +150,7 @@ function isDate(_date: string){
 export function createCacheMapWithStorage(arr: [k: string, v: Map<string, unknown>][], Save: CacheStorage) {
     const savedPayloadByKey = new Map<string, string>()
     let saveTimer: ReturnType<typeof setTimeout> | null = null
+    let saveTimerDelay: number | null = null
     let runningSave: Promise<void> | null = null
 
     // Instance dirty channel, fed by the ObservableMaps this instance owns (plain Maps stay
@@ -183,6 +198,7 @@ export function createCacheMapWithStorage(arr: [k: string, v: Map<string, unknow
         if (saveTimer === null) return
         clearTimeout(saveTimer)
         saveTimer = null
+        saveTimerDelay = null
     }
     const saveChangedPayloads = async () => {
         // a save racing an in-flight load() would diff against the pre-load snapshot and
@@ -196,9 +212,14 @@ export function createCacheMapWithStorage(arr: [k: string, v: Map<string, unknow
         // "never saved". Scoping the scan would quietly turn that tolerance into data loss.
         for (const [key, payload] of getPayloads()) {
             if (savedPayloadByKey.get(key) === payload) continue
-            if (await Save.set(key, JSON.parse(payload) as object)) {
-                savedPayloadByKey.set(key, payload)
-            }
+            // setRaw when the storage offers it: `payload` is already exactly the JSON the
+            // storage would produce, so parsing it back into an object just to have the
+            // storage stringify it again costs a second full serialization per changed
+            // scope. Storages without setRaw keep the original object contract.
+            const written = Save.setRaw
+                ? await Save.setRaw(key, payload)
+                : await Save.set(key, JSON.parse(payload) as object)
+            if (written) savedPayloadByKey.set(key, payload)
         }
     }
     const trackSave = (savePromise: Promise<void>) => {
@@ -237,9 +258,21 @@ export function createCacheMapWithStorage(arr: [k: string, v: Map<string, unknow
             await queueSave()
         },
         saveDebounced(delay = 800){
+            // Save semantics on purpose: a burst of changes is written `delay` after its
+            // FIRST change, not after the last one. The dirty channel announces once per
+            // changed key, so restarting the timer on every announcement (clearTimeout +
+            // setTimeout per key) churned timers and let a steady stream of edits postpone
+            // the write indefinitely. One write covers the whole burst anyway - the save
+            // path is a full serialized-snapshot diff, not a per-key write - and anything
+            // that lands after the timer fires re-arms it via the next dirty announcement.
+            // A call with a DIFFERENT delay still re-arms, so changing the write policy
+            // takes effect immediately.
+            if (saveTimer !== null && saveTimerDelay === delay) return
             cancelDebouncedSave()
+            saveTimerDelay = delay
             saveTimer = setTimeout(() => {
                 saveTimer = null
+                saveTimerDelay = null
                 void queueSave()
             }, delay)
         },

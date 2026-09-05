@@ -661,6 +661,7 @@ Conference composition ships as a live example: `wenay-react2/demo/peer-conferen
 Media lines (common2 1.0.66 `Media.createAudioSource` / `Media.createVideoSource`) are ordinary binary Listen sources; with `replay:true` their `listen` is a replay line, so `useReplaySubscribe` / `useReplayFrame` consume mic/camera frames with no media-specific hook. `useMediaSource(kind, options)` is only the capture lifecycle adapter (`start`, `stop`, device selection, state and stats); it stops a started source on unmount and returns `listen` unchanged. Each frame is one `Uint8Array` (`Media.decodeMediaFrame`); draw/play it via ref (canvas, AudioContext), never useState — the same rule as any high-frequency line. Without `replay`, the plain `listen` works with the listen hooks above.
 
 ## Communication UI
+`VideoCall` styles ship separately: `import "wenay-react2/styles/communication"` once, next to `wenay-react2/styles`.
 ```tsx
 import {VideoCall, useVideoCallController} from "wenay-react2"
 // or the independent entry: wenay-react2/communication

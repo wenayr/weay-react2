@@ -391,3 +391,43 @@ test("useStoreMirror keeps an inline structurally equal mask from resyncing on r
     await waitFor(() => expect(screen.getByTestId("inline-tick").textContent).toBe("1"));
     expect(getMasks).toHaveLength(1);
 });
+
+test("useStoreKeys mode:\"get\" tracks keys off the live object; the default stays snapshot", async () => {
+    const snapshotValues: unknown[] = [];
+    const liveValues: unknown[] = [];
+
+    function KeysModeProbe() {
+        const store = useMemo(() => Observe.createStore<{items: Record<string, number>}>({
+            items: {a: 1, b: 2},
+        }), []);
+        const snapshotKeys = useStoreKeys(store.node.items);
+        const liveKeys = useStoreKeys(store.node.items, {mode: "get"});
+        snapshotValues.push(snapshotKeys.value);
+        liveValues.push(liveKeys.value);
+
+        return <div>
+            <output data-testid="snapshot-keys">{snapshotKeys.stringKeys.join(",")}</output>
+            <output data-testid="live-keys">{liveKeys.stringKeys.join(",")}</output>
+            <output data-testid="live-get">{String(liveKeys.get("b" as never) ?? "-")}</output>
+            <button onClick={() => { store.state.items.c = 3; void Observe.flushReactive(store.state); }}>add key</button>
+            <button onClick={() => { delete store.state.items.a; void Observe.flushReactive(store.state); }}>delete key</button>
+        </div>;
+    }
+
+    render(<KeysModeProbe />);
+    expect(screen.getByTestId("snapshot-keys").textContent).toBe("a,b");
+    expect(screen.getByTestId("live-keys").textContent).toBe("a,b");
+    expect(screen.getByTestId("live-get").textContent).toBe("2");
+
+    await act(async () => { fireEvent.click(screen.getByText("add key")); });
+    await waitFor(() => expect(screen.getByTestId("live-keys").textContent).toBe("a,b,c"));
+    expect(screen.getByTestId("snapshot-keys").textContent).toBe("a,b,c");
+
+    await act(async () => { fireEvent.click(screen.getByText("delete key")); });
+    await waitFor(() => expect(screen.getByTestId("live-keys").textContent).toBe("b,c"));
+    expect(screen.getByTestId("snapshot-keys").textContent).toBe("b,c");
+
+    // default mode keeps the per-emission snapshot identity, "get" hands back the live object
+    expect(snapshotValues[0]).not.toBe(snapshotValues[snapshotValues.length - 1]);
+    expect(liveValues[0]).toBe(liveValues[liveValues.length - 1]);
+});

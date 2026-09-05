@@ -85,6 +85,10 @@ export function createColumnState(opts: {
 }) {
     const groupMembers = (g: string) => columnGroupMembers(opts.columns, g)
     const groupKeys = columnGroupKeys(opts.columns)
+    // opts.columns is the controller's descriptor set: captured once at creation and never
+    // reassigned (createColumnGrid resolves it before calling us), so the key index is
+    // controller-lifetime data, not per-event data.
+    const knownKeys = new Set(opts.columns.map(c => c.key))
 
     const defConfig = (): ColumnsConfig => defaultColumnsConfig(opts.columns, opts.def)
 
@@ -171,8 +175,10 @@ export function createColumnState(opts: {
         st.groups = Object.fromEntries(Object.entries(next.groups).map(([g, keys]) => [g, keys.slice()]))
         stApi.render()
         memoryMarkDirty(opts.key)
-        if (!fromGrid) applyToGrid()
-        emitChange(normalize())
+        // one normalize per commit: the same normalized config goes to the grid and outward
+        const normalized = normalize()
+        if (!fromGrid) applyToGrid(normalized)
+        emitChange(normalized)
     }
 
     const getConfig = () => normalize()
@@ -188,8 +194,10 @@ export function createColumnState(opts: {
         previewApi.use()
         return displayConfig()
     }
-    function setPreviewOrder(order: string[] | null) {
-        const cfg = normalize()
+    /** Internal: takes the caller's already normalized config so a caller that just
+     *  normalized (onGridEvent) does not pay for a second pass. The public
+     *  setPreviewOrder keeps its one-argument signature (it is part of listSource). */
+    function applyPreviewOrder(order: string[] | null, cfg: ColumnsConfig) {
         const known = new Set(cfg.order)
         const next = order ? pinFixedOrder(order.filter(k => known.has(k)), opts.columns) : null
         if (structEqual(next, previewRt.order)) return
@@ -199,6 +207,9 @@ export function createColumnState(opts: {
         applying = true
         try { gridApi.applyColumnState({state: (next ?? cfg.order).map(colId => ({colId})), applyOrder: true}) }
         finally { applying = false }
+    }
+    function setPreviewOrder(order: string[] | null) {
+        applyPreviewOrder(order, normalize())
     }
     function useConfig() {
         stApi.use()
@@ -280,11 +291,11 @@ export function createColumnState(opts: {
 
     /** Store -> grid. The applying flag (plus source=='api' on events) keeps the
      *  restore from bouncing back as a save. */
-    function applyToGrid() {
+    function applyToGrid(config?: ColumnsConfig) {
         if (!gridApi) return
         applying = true
         try {
-            const cfg = normalize()
+            const cfg = config ?? normalize()
             gridApi.applyColumnState({state: toAgState(cfg), applyOrder: true})
             gridApi.setFilterModel(Object.keys(cfg.filter).length ? cfg.filter : null)
         } finally {
@@ -299,7 +310,6 @@ export function createColumnState(opts: {
     function readFromGrid() {
         if (!gridApi || gridApi.isDestroyed?.()) return
         const cfg = normalize()
-        const known = new Set(opts.columns.map(c => c.key))
         const order: string[] = []
         const visible = {...cfg.visible}
         const width = {...cfg.width}
@@ -308,7 +318,7 @@ export function createColumnState(opts: {
         for (const s of gridApi.getColumnState()) {
             if (!s.colId) continue
             gridIds.add(s.colId)
-            if (!known.has(s.colId)) continue
+            if (!knownKeys.has(s.colId)) continue
             order.push(s.colId)
             // `hide` for a gated-out column was written by applyToGrid(), not by
             // the user. Folding it back would turn runtime presence into persisted
@@ -337,10 +347,12 @@ export function createColumnState(opts: {
     function onGridEvent(e: {source?: string, finished?: boolean, type?: string}) {
         if (applying || e?.source == 'api') return
         if (e?.type == 'columnMoved' && e.finished === false && gridApi) {
-            const known = new Set(opts.columns.map(c => c.key))
-            const order = gridApi.getColumnState().map(c => c.colId).filter((k): k is string => !!k && known.has(k))
-            for (const k of normalize().order) if (!order.includes(k)) order.push(k)
-            setPreviewOrder(order)
+            // fires per pointer move while a header is dragged: normalize once and hand
+            // the same config to the preview instead of normalizing twice per frame
+            const cfg = normalize()
+            const order = gridApi.getColumnState().map(c => c.colId).filter((k): k is string => !!k && knownKeys.has(k))
+            for (const k of cfg.order) if (!order.includes(k)) order.push(k)
+            applyPreviewOrder(order, cfg)
             return
         }
         if (e?.type == 'columnMoved' && previewRt.order) {

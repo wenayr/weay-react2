@@ -81,8 +81,10 @@ export function createGridBuffer<T>(deps: CreateGridBufferOptions<T>) {
     function gridHas(id: RowId) {
         if (!api) return false
         if (mode == 'mirror') return inGrid.has(id)
-        const node = api.getRowNode?.(id)
-        if (node) return !!node.data
+        // The real GridApi always has getRowNode, so its answer is authoritative:
+        // a miss means "not in the grid", not "cannot tell". The O(n) full scan below
+        // is the fallback for minimal GridApiLike stubs that omit getRowNode entirely.
+        if (api.getRowNode) return !!api.getRowNode(id)?.data
         let found = false
         api.forEachNode(rowNode => {
             if (!found && rowNode.data && getId(rowNode.data) == id) found = true
@@ -123,7 +125,13 @@ export function createGridBuffer<T>(deps: CreateGridBufferOptions<T>) {
             const merged = node?.data
                 ? Object.assign({}, node.data, buf[id]) as T
                 : buf[id] as T
-            if (gridHas(id)) toUpdate.push(merged)
+            // Reuse the node already resolved above instead of asking the api twice:
+            // mirror answers from inGrid, overlay from this very lookup. gridHas() is
+            // only needed for the getRowNode-less stub, where it falls back to a scan.
+            const has = mode == 'mirror'
+                ? inGrid.has(id)
+                : api.getRowNode ? !!node?.data : gridHas(id)
+            if (has) toUpdate.push(merged)
             else toAdd.push(merged)
         }
 

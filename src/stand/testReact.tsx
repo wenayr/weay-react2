@@ -2,6 +2,8 @@ import {createRoot} from "react-dom/client";
 import "../index.js"
 import "../style/style.css"
 import "../style/menuRight.css"
+import "../style/communication.css"
+import "./stand.css"
 import {GridStyleDefault} from "../internal/styles/styleGrid.js";
 import {QABoard} from "./testUseReact/qa.js";
 // import {LegacyTestMain} from "./testUseReact/use.js";  // old demo screen - uncomment if needed

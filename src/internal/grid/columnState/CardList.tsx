@@ -3,9 +3,39 @@
 // live as dots are placed), cardRole:'title' is the card header,
 // cardRole:'accent' renders as a badge. The sticky sort orders the cards even
 // when its column is hidden. No ag-grid, no storage.
-import React from 'react'
+import React, {useMemo} from 'react'
 import type {ColumnStateController} from './columnState.js'
 import {cx} from "../../utils/cx.js";
+
+type CardRowProps<T extends object> = {
+    row: T
+    titleKey: string | undefined
+    accentKey: string | undefined
+    fieldKeys: string[]
+    labels: {[key: string]: string}
+    layout?: 'stack' | 'compact'
+    value: (key: string, row: T) => React.ReactNode
+}
+
+/** One card. Memoized: a config change that does not touch this row's inputs
+ *  (a re-render from an unrelated store) must not re-render every card. */
+const CardRow = React.memo(function CardRow<T extends object>(p: CardRowProps<T>) {
+    const {row, titleKey, accentKey, fieldKeys, labels, value} = p
+    return <div className={cx(['wenayCardListItem', p.layout == 'compact' && 'wenayCardListItem_compact'])}>
+        <div className={cx(['wenayCardListHeader', fieldKeys.length == 0 && 'wenayCardListHeader_compact'])}>
+            <b className='wenayCardListTitle'>{titleKey ? value(titleKey, row) : ''}</b>
+            {accentKey && <span className='wenayCardListAccent'>{value(accentKey, row)}</span>}
+        </div>
+        <div className='wenayCardListFields'>
+            {fieldKeys.map(k => (
+                <div key={k} className='wenayCardListField'>
+                    <span className='wenayCardListLabel'>{labels[k] ?? k}</span>
+                    <span className='wenayCardListValue'>{value(k, row)}</span>
+                </div>
+            ))}
+        </div>
+    </div>
+}) as <T extends object>(p: CardRowProps<T>) => React.JSX.Element
 
 function cmpValues(a: unknown, b: unknown): number {
     if (typeof a == 'number' && typeof b == 'number') return a - b
@@ -28,37 +58,37 @@ export function CardList<T extends object>(p: {
 }) {
     const cfg = p.state.api.useConfig()
     const cols = p.state.columns
-    const byKey = new Map(cols.map(c => [c.key, c]))
     const keys = p.state.api.visibleKeys()
     const titleKey = cols.find(c => c.cardRole == 'title' && cfg.visible[c.key] != false)?.key ?? keys[0]
     const accentKey = cols.find(c => c.cardRole == 'accent' && cfg.visible[c.key] != false)?.key
     const fieldKeys = keys.filter(k => k != titleKey && k != accentKey)
+    const fieldKeysId = JSON.stringify(fieldKeys)
+    // stable per field set, so CardRow's memo is not defeated by a fresh array/map
+    const stableFieldKeys = useMemo(() => fieldKeys, [fieldKeysId])
+    const labels = useMemo(() => {
+        const byKey = new Map(cols.map(c => [c.key, c]))
+        return Object.fromEntries(fieldKeys.map(k => [k, byKey.get(k)?.short ?? byKey.get(k)?.title ?? k]))
+    }, [cols, fieldKeysId])
 
-    const value = (key: string, row: T): React.ReactNode =>
-        p.renderValue?.(key, row) ?? String((row as Record<string, unknown>)[key] ?? '')
+    const renderValue = p.renderValue
+    const value = useMemo(() => (key: string, row: T): React.ReactNode =>
+        renderValue?.(key, row) ?? String((row as Record<string, unknown>)[key] ?? ''), [renderValue])
 
-    const rows = [...p.data]
-    if (cfg.sort) {
-        const {key, dir} = cfg.sort
-        rows.sort((a, b) => cmpValues((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]) * (dir == 'asc' ? 1 : -1))
-    }
+    // The sticky sort orders the cards even when its column is hidden. cfg is rebuilt by
+    // normalize() on every render, so the sort is tracked by its VALUE (key/dir), not identity.
+    const sortKey = cfg.sort?.key
+    const sortDir = cfg.sort?.dir
+    const rows = useMemo(() => {
+        const res = [...p.data]
+        if (sortKey && sortDir)
+            res.sort((a, b) => cmpValues((a as Record<string, unknown>)[sortKey], (b as Record<string, unknown>)[sortKey]) * (sortDir == 'asc' ? 1 : -1))
+        return res
+    }, [p.data, sortKey, sortDir])
 
     return <div className={cx(['wenayCardList', p.className])} style={p.style}>
         {rows.map((row, i) => (
-            <div key={p.getId?.(row, i) ?? i} className={cx(['wenayCardListItem', p.layout == 'compact' && 'wenayCardListItem_compact'])}>
-                <div className={cx(['wenayCardListHeader', fieldKeys.length == 0 && 'wenayCardListHeader_compact'])}>
-                    <b className='wenayCardListTitle'>{titleKey ? value(titleKey, row) : ''}</b>
-                    {accentKey && <span className='wenayCardListAccent'>{value(accentKey, row)}</span>}
-                </div>
-                <div className='wenayCardListFields'>
-                    {fieldKeys.map(k => (
-                        <div key={k} className='wenayCardListField'>
-                            <span className='wenayCardListLabel'>{byKey.get(k)?.short ?? byKey.get(k)?.title ?? k}</span>
-                            <span className='wenayCardListValue'>{value(k, row)}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
+            <CardRow<T> key={p.getId?.(row, i) ?? i} row={row} titleKey={titleKey} accentKey={accentKey}
+                        fieldKeys={stableFieldKeys} labels={labels} layout={p.layout} value={value}/>
         ))}
     </div>
 }

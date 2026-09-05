@@ -38,8 +38,19 @@ export function createColumnBuffer<TData = any>() {
         attachOptions = null
     }
 
+    function sameNames(next: readonly string[]) {
+        if (next.length != names.length) return false
+        for (let i = 0; i < next.length; i++) if (next[i] != names[i]) return false
+        return true
+    }
+
     function setNames(list: string[]) {
-        names = [...new Set(list)]
+        const next = [...new Set(list)]
+        // Streams re-announce the same dynamic set on every tick. An unchanged set is
+        // a no-op: rebuilding columnDefs would drop grid-side column state for nothing.
+        // apply() stays the explicit force path when the caller DOES want a re-apply.
+        if (sameNames(next)) return
+        names = next
         apply()
     }
 

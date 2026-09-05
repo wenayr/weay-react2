@@ -146,6 +146,11 @@ function useToolbarFlip(layoutKey: string) {
         rafs.current.forEach(cancelAnimationFrame)
         rafs.current = []
 
+        // Read every rect first, then write every transform: interleaving them made the browser
+        // recalculate layout once per item (write -> forced read -> write ...). One read pass, one
+        // write pass, one forced reflow to flush the inverted transforms, one frame to release
+        // them all.
+        const moved: Array<{node: HTMLDivElement, dx: number, dy: number}> = []
         itemRefs.current.forEach((node, key) => {
             const rect = node.getBoundingClientRect()
             next.set(key, {left: rect.left, top: rect.top})
@@ -154,15 +159,22 @@ function useToolbarFlip(layoutKey: string) {
             const dx = old.left - rect.left
             const dy = old.top - rect.top
             if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return
-            node.style.transition = 'none'
-            node.style.transform = `translate(${dx}px, ${dy}px)`
-            node.getBoundingClientRect()
-            const raf = requestAnimationFrame(() => {
-                node.style.transition = 'transform 180ms ease'
-                node.style.transform = ''
-            })
-            rafs.current.push(raf)
+            moved.push({node, dx, dy})
         })
+
+        if (moved.length) {
+            moved.forEach(({node, dx, dy}) => {
+                node.style.transition = 'none'
+                node.style.transform = `translate(${dx}px, ${dy}px)`
+            })
+            moved[0].node.getBoundingClientRect()   // one forced reflow for the whole batch
+            rafs.current.push(requestAnimationFrame(() => {
+                moved.forEach(({node}) => {
+                    node.style.transition = 'transform 180ms ease'
+                    node.style.transform = ''
+                })
+            }))
+        }
 
         prevRects.current = next
         return () => {
@@ -342,14 +354,23 @@ export function createToolbar(opts: {
      *  consumer re-renders from this list rather than the library re-parenting
      *  someone else's nodes.) */
     function useItems() {
+        return useItemsWithConfig().items
+    }
+
+    /** Internal twin of useItems: normalize() is a full re-derivation of the config (filter,
+     *  append, pin, per-item visibility) and Bar needs BOTH the item list and the config it was
+     *  built from. Handing the same cfg back costs nothing and drops the second pass; the
+     *  public useItems keeps its array contract. */
+    function useItemsWithConfig() {
         useSubscribe()
         densitiesApi.use()
         const cfg = normalize()
         const byKey = new Map(opts.items.map(i => [i.key, i]))
-        return cfg.order
+        const items = cfg.order
             .map(k => byKey.get(k))
             .filter((it): it is ToolbarItem => !!it && cfg.visible[it.key] != false)
             .map(it => ({item: it, density: cfg.density, content: itemContent(it, cfg.density)}))
+        return {cfg, items}
     }
 
     const reset = () => setConfig(defConfig())
@@ -398,8 +419,7 @@ export function createToolbar(opts: {
      *  the popover sticks to - 'right' (default, for bars in a top-right corner)
      *  or 'left'. */
     function Bar(p: {className?: string, settings?: boolean, reset?: boolean, popAlign?: 'left' | 'right'} = {}) {
-        const items = useItems()
-        const cfg = normalize()
+        const {cfg, items} = useItemsWithConfig()
         const [open, setOpen] = useState(false)
         const resetOn = opts.resetItem !== false && (p.reset ?? p.settings ?? false) && cfg.visible[RESET_KEY] != false
         const settingsOn = !!p.settings && cfg.visible[SETTINGS_KEY] != false

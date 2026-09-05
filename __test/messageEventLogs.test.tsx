@@ -59,3 +59,22 @@ test("useMessageEventLogsController exposes global logsApi notification state", 
     });
     expect(screen.getByTestId("count").textContent).toBe("0");
 });
+
+test("the pushed list is capped at maxVisible and drops the oldest with its timer", () => {
+    let controller: MessageEventLogsController | null = null;
+    render(<Probe onReady={api => { controller = api; }} />);
+
+    // maxVisible is 2 in Probe: a burst of four must not retain four items
+    act(() => {
+        for (let i = 0; i < 4; i++) screen.getByText("high").click();
+    });
+
+    expect(controller!.notifications.length).toBe(2);
+    expect(controller!.visibleNotifications.length).toBe(2);
+    expect(screen.getByTestId("count").textContent).toBe("2");
+
+    // the two dropped entries took their expiry timers with them: one sweep clears the rest
+    act(() => { jest.advanceTimersByTime(2000); });
+    expect(controller!.notifications.length).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+});

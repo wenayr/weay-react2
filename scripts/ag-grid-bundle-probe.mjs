@@ -128,29 +128,29 @@ function assertBoundary(name, patterns) {
 
 assertBoundary('core', [
     /node_modules\/(?:react|ag-grid-|react-rnd|re-resizable)/,
-    /src\/common\/src\/(?:components|grid|hooks|logs|myChart)\//,
+    /src\/internal\/(?:components|grid|hooks|logs|myChart)\//,
 ])
 assertBoundary('react', [
     /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
-    /src\/common\/src\/(?:components\/Communication|grid|logs|myChart)\//,
+    /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
 ])
 assertBoundary('grid', [
-    /src\/common\/(?:demo|testUseReact)\//,
-    /src\/common\/src\/(?:components\/Dnd|components\/Communication|logs|myChart)\//,
+    /src\/stand\//,
+    /src\/internal\/(?:components\/Dnd|components\/Communication|logs|myChart)\//,
 ])
 assertBoundary('windows', [
     /node_modules\/ag-grid-/,
-    /src\/common\/(?:demo|testUseReact)\//,
-    /src\/common\/src\/(?:components\/Communication|grid|logs|myChart)\//,
+    /src\/stand\//,
+    /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
 ])
 assertBoundary('logs', [
-    /src\/common\/(?:demo|testUseReact)\//,
-    /src\/common\/src\/(?:components\/Dnd|components\/Communication|myChart)\//,
+    /src\/stand\//,
+    /src\/internal\/(?:components\/Dnd|components\/Communication|myChart)\//,
 ])
 assertBoundary('communication', [
     /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
-    /src\/common\/(?:demo|testUseReact)\//,
-    /src\/common\/src\/(?:components\/Dnd|grid|logs|myChart)\//,
+    /src\/stand\//,
+    /src\/internal\/(?:components\/Dnd|grid|logs|myChart)\//,
 ])
 
 console.log('checks: targeted smaller; root utility AG Grid-free; validation development-only; canonical boundaries isolated')

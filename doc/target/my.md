@@ -124,6 +124,9 @@
 
 ## Inbox
 
+- **wenay-common2: declare `"sideEffects": false`** (bundle audit 2026-09-02, `doc/changes/v2.1.0.md`). Measured in this repo: importing one helper from `wenay-common2/client` (`sleepAsync`, `round`, `listen`) costs the same ~181 KB raw / 61 KB gzip as the whole namespace, because bundlers cannot drop modules without the declaration. It dominates `./react` (192 KB), `./logs` (182 KB) and the root utility path (195 KB). Fix is upstream, one line, after verifying common2 has no import-time effects; here, alternatively, inline the trivial helpers. Also parked from the same audit: filter modules opt-in (34 KB gzip, behavioural), react-rnd -> re-resizable (dragging is disabled on Rnd already; ~8 KB gzip, needs visual check).
+
+
 - **ColumnDots: фильтр-ползунок по значениям + мультисорт-опция + именованные пресеты** (надиктовка 2026-07-10, дословно в конце файла; контекст — мобильный ползунок таблицы, карточки 29/32).
   - **1. Сорт-кнопка**: сейчас одна (asc→desc→off) — оставить одиночной по умолчанию, но добавить ОПЦИЮ множественной сортировки (multi-sort) настройкой.
   - **2. Второй ползунок — фильтр по значениям** (открывается по кнопке при необходимости, кнопок вызова две — уточнить у пользователя что вторая): такой же трек с ячейками/метками, на котором пользователь СТАВИТ ТОЧКИ:

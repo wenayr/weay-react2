@@ -9,6 +9,7 @@ Breaking by design; documented here and in `doc/changes/v2.0.0.md`. Nothing belo
 | Old | New |
 | --- | --- |
 | CSS loaded as a side effect of `wenay-react2`, `/grid`, `/windows`, `/logs`, `/communication` | import once: `import "wenay-react2/styles"` (+ `"wenay-react2/styles/menu-right"` if RightMenu is used); every entrypoint is CSS-free |
+| `VideoCall` visuals inside `wenay-react2/styles` (2.1.0) | `import "wenay-react2/styles/communication"` next to `styles`; the block was a quarter of the stylesheet and only `./communication` needs it |
 | `import { kit } from "wenay-react2"` (`kit.grid`, `kit.menu.context`, ...) | removed; import names directly or from a subpath (`/react`, `/grid`, `/windows`, `/logs`, `/communication`, `/core`, `/native`) |
 | `wenay-react2/lib/common/api.js` | removed; use the root |
 | `wenay-react2/demo/stand` (`QABoard`) | not published; run the stand from the repository (`npm run testReact`, `src/stand/`) |

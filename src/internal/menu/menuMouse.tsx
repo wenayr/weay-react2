@@ -205,6 +205,9 @@ export function createContextMenu(data?: {name?: string}) {
     }
 
     function emitStats() {
+        // every open/close/action calls this; with nobody listening the snapshot (four object
+        // spreads plus two deep clones of the action counters) was built and thrown away
+        if (statsListeners.size === 0) return;
         const snapshot = statsSnapshot();
         for (const cb of [...statsListeners]) cb(snapshot);
     }

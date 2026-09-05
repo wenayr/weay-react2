@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react'
-import type {ColDef, ColGroupDef, GridApi, GridPreDestroyedEvent, GridReadyEvent} from 'ag-grid-community'
+import type {CellContextMenuEvent, ColDef, ColGroupDef, GridApi, GridPreDestroyedEvent, GridReadyEvent} from 'ag-grid-community'
 import type {AgGridReactProps} from 'ag-grid-react'
 import {AgGridTable, type AgGridTableProps} from '../agGrid4/index.js'
 import {createToolbar, type ToolbarConfig, type ToolbarItem, type ToolbarSourceMode} from '../../components/Toolbar/index.js'
@@ -220,40 +220,83 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
     const chromeOptions = opts.chrome === false ? null : opts.chrome ?? null
     const chrome = chromeOptions ? createGridChrome<T>({...chromeOptions, columnState: state}) : null
 
+    // The three grid callbacks are FACTORY-lifetime: one identity for the life of the
+    // controller, so a re-render that only re-spreads the same props cannot invalidate
+    // memo(AgGridTable). The per-call bits they need (the caller's own callbacks, the
+    // per-call autoSize flag) live in this slot, refreshed by tableProps(). The factory
+    // already drives a single grid (gridApiForFit is one slot), so one slot is enough.
+    const live = {
+        onGridReady: undefined as ColumnGridTableProps<T>['onGridReady'],
+        onGridPreDestroyed: undefined as ColumnGridTableProps<T>['onGridPreDestroyed'],
+        onCellContextMenu: undefined as ColumnGridTableProps<T>['onCellContextMenu'],
+        fitOnCountChange: opts.autoSizeOnColumnCountChange === true,
+    }
+
+    function handleGridReady(event: GridReadyEvent<T>) {
+        gridApiForFit = event.api
+        fitOnCountChange = live.fitOnCountChange
+        state.grid.attach(event.api)
+        chrome?.grid.attach(event.api)
+        // re-seed: the column count may have changed while no grid was attached,
+        // and the first post-remount onChange must not mis-skip the auto-fit
+        visibleCount = state.api.visibleKeys().length
+        if (fitOnCountChange) scheduleFit()
+        live.onGridReady?.(event)
+    }
+
+    function handleGridPreDestroyed(event: GridPreDestroyedEvent<T>) {
+        if (gridApiForFit === event.api) gridApiForFit = null
+        cancelAnimationFrame(fitRaf)
+        fitRaf = 0
+        chrome?.grid.detach(event.api)
+        state.grid.detach()
+        live.onGridPreDestroyed?.(event)
+    }
+
+    function handleCellContextMenu(event: CellContextMenuEvent<T>) {
+        const appCallback = live.onCellContextMenu
+        const appResult = appCallback?.(event)
+        // A legacy callback may already open its own menu. Only open the
+        // chrome menu automatically when it has an explicit composer or
+        // there is no app callback to preserve.
+        if (chrome && (!appCallback || chromeOptions?.contextItems))
+            chrome.api.openContextMenu(event, Array.isArray(appResult) ? appResult : undefined)
+    }
+
+    /** Last tableProps() input/output pair. Re-rendering a parent re-spreads the same
+     *  values into a fresh object, so identity alone would never hit; a shallow compare
+     *  of the caller's own keys does, and then memo(AgGridTable) actually holds. */
+    let tablePropsMemo: {input: ColumnGridTableProps<T>, out: AgGridTableProps<T>} | null = null
+
+    function sameTableInput(a: ColumnGridTableProps<T>, b: ColumnGridTableProps<T>) {
+        if (a === b) return true
+        const ka = Object.keys(a), kb = Object.keys(b)
+        if (ka.length != kb.length) return false
+        for (const k of ka) {
+            if (!Object.prototype.hasOwnProperty.call(b, k)) return false
+            if ((a as Record<string, unknown>)[k] !== (b as Record<string, unknown>)[k]) return false
+        }
+        return true
+    }
+
     function tableProps(props: ColumnGridTableProps<T> = {}): AgGridTableProps<T> {
         const {onGridReady, onGridPreDestroyed, onCellContextMenu, autoSizeColumns = false, autoSizeOnColumnCountChange = opts.autoSizeOnColumnCountChange === true, columnDefs: localDefs = columnDefs, ...rest} = props
-        return {
+        // the stable handlers always run against the LATEST caller callbacks, memo hit or not
+        live.onGridReady = onGridReady
+        live.onGridPreDestroyed = onGridPreDestroyed
+        live.onCellContextMenu = onCellContextMenu
+        live.fitOnCountChange = autoSizeOnColumnCountChange
+        if (tablePropsMemo && sameTableInput(tablePropsMemo.input, props)) return tablePropsMemo.out
+        const out: AgGridTableProps<T> = {
             ...rest,
             columnDefs: localDefs,
             autoSizeColumns,
-            onGridReady(event) {
-                gridApiForFit = event.api
-                fitOnCountChange = autoSizeOnColumnCountChange
-                state.grid.attach(event.api)
-                chrome?.grid.attach(event.api)
-                // re-seed: the column count may have changed while no grid was attached,
-                // and the first post-remount onChange must not mis-skip the auto-fit
-                visibleCount = state.api.visibleKeys().length
-                if (fitOnCountChange) scheduleFit()
-                onGridReady?.(event)
-            },
-            onGridPreDestroyed(event) {
-                if (gridApiForFit === event.api) gridApiForFit = null
-                cancelAnimationFrame(fitRaf)
-                fitRaf = 0
-                chrome?.grid.detach(event.api)
-                state.grid.detach()
-                onGridPreDestroyed?.(event)
-            },
-            onCellContextMenu(event) {
-                const appResult = onCellContextMenu?.(event)
-                // A legacy callback may already open its own menu. Only open the
-                // chrome menu automatically when it has an explicit composer or
-                // there is no app callback to preserve.
-                if (chrome && (!onCellContextMenu || chromeOptions?.contextItems))
-                    chrome.api.openContextMenu(event, Array.isArray(appResult) ? appResult : undefined)
-            },
+            onGridReady: handleGridReady,
+            onGridPreDestroyed: handleGridPreDestroyed,
+            onCellContextMenu: handleCellContextMenu,
         }
+        tablePropsMemo = {input: {...props}, out}
+        return out
     }
 
     function Table(props: ColumnGridTableProps<T>) {

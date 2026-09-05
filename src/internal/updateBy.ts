@@ -54,8 +54,11 @@ function runTriggerPass(obj: object, state: ObserverState, reverse: boolean, las
     };
 
     // императивные f-колбэки: всегда все, в порядке подписки
-    // копия нужна: колбэк может отписаться прямо во время прохода
-    if (state.callbacks.size) for (const callback of [...state.callbacks]) call(callback);
+    // копия нужна: колбэк может отписаться прямо во время прохода (это был реальный баг).
+    // Единственного подписчика копировать не нужно: отписка себя во время for..of по Set
+    // безопасна, а обойти нечего — самый горячий случай идёт без аллокации массива.
+    if (state.callbacks.size === 1) { for (const callback of state.callbacks) call(callback); }
+    else if (state.callbacks.size) for (const callback of [...state.callbacks]) call(callback);
 
     if (state.listeners.size) {
         if (lastOnly) {
@@ -66,6 +69,9 @@ function runTriggerPass(obj: object, state: ObserverState, reverse: boolean, las
         } else if (reverse) {
             const listeners = [...state.listeners];
             for (let i = listeners.length - 1; i >= 0; i--) call(listeners[i]);
+        } else if (state.listeners.size === 1) {
+            // тот же случай, что и с одним колбэком: копия массива не нужна
+            for (const listener of state.listeners) call(listener);
         } else {
             for (const listener of [...state.listeners]) call(listener);
         }
