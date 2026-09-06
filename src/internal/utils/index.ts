@@ -3,16 +3,19 @@
  *  `DirtyListener`, `deepMergeWithMap`, plus three dead modules. The list below is now explicit
  *  and matches what ./react and ./core already publish; the leaked names stay exported from
  *  their own modules for internal use, they are just no longer part of the package surface.
- *  Deliberately absent (documented at their declaration sites): `cx`, `persistedController`,
- *  `persistedMaps` - the maps reach the surface through their consuming components. */
+ *  Deliberately absent (documented at its declaration site): `cx`.
+ *  The persistence primitives (cache, memoryStore, observableMap, persistedController,
+ *  persistedMaps, searchHistory) moved to ../persist and own the ./persist entrypoint
+ *  (src/persist/index.ts); they stay re-exported here so the root barrel remains a superset of
+ *  every subpath entry (the barrel parity test). */
 
 export {
     createCacheMap,
     createCacheMapWithStorage,
     browserCacheStorage,
     localStorageCache,
-} from './cache.js';
-export type {CacheMap, CacheStorage} from './cache.js';
+} from '../persist/cache.js';
+export type {CacheMap, CacheStorage} from '../persist/cache.js';
 
 export {createCallbackHub} from './callbackHub.js';
 
@@ -24,18 +27,31 @@ export {setAutoStepForElement} from './inputAutoStep.js';
 export {
     memoryCache,
     memoryMaps,
+    memoryCommit,
     memoryGet,
     memoryGetById,
     memoryGetOrCreate,
     memoryMarkDirty,
     memorySet,
     memoryUpdate,
-} from './memoryStore.js';
+} from '../persist/memoryStore.js';
 
-export {ObservableMap} from './observableMap.js';
-export type {MapChangeListener} from './observableMap.js';
+export {ObservableMap} from '../persist/observableMap.js';
+export type {MapChangeListener} from '../persist/observableMap.js';
 
-export {createSearchHistory} from './searchHistory.js';
-export type {SearchHistoryApi, SearchHistoryState} from './searchHistory.js';
+export {createPersistedController} from '../persist/persistedController.js';
+export type {PersistedController, PersistedControllerOptions} from '../persist/persistedController.js';
+
+export {buttonStatusMap, floatingWindowMap, mapResiReact, mapRightMenu} from '../persist/persistedMaps.js';
+export type {
+    ButtonSavedState,
+    MenuRightPosition,
+    MenuRightSavedState,
+    MenuRightVerticalPosition,
+    ResizableSavedSize,
+} from '../persist/persistedMaps.js';
+
+export {createSearchHistory} from '../persist/searchHistory.js';
+export type {SearchHistoryApi, SearchHistoryState} from '../persist/searchHistory.js';
 
 export {structEqual} from './structEqual.js';

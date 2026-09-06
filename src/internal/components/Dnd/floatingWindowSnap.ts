@@ -5,7 +5,7 @@ import type {
     FloatingWindowPosition,
     FloatingWindowSavedGeometry,
     FloatingWindowSnapRegion,
-} from "../../utils/floatingWindowTypes.js";
+} from "../../persist/floatingWindowTypes.js";
 
 /** Distance a press on an attached (maximized/snapped) window must travel before it detaches. */
 export const DETACH_THRESHOLD = 8;

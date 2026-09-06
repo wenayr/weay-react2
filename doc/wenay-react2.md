@@ -20,22 +20,41 @@ Put app-specific layout/build rules in an app wrapper above the primitive.
 
 ## Package entrypoints
 
-The root import remains the backwards-compatible `1.x` facade. New code can use
-the smaller canonical feature surfaces; they intentionally omit demos and legacy
-compatibility wrappers:
+Since 3.0.0 every runtime name has a canonical subpath. The root `wenay-react2` is a
+deprecated compatibility union of the subpaths (same bindings, trimmed in the next major);
+the CSS is still imported once: `import "wenay-react2/styles"`. Map for root code:
+`WENAY_REACT2_RENAMES.md`, "3.0.0 entry map".
 
-```ts
-import {structEqual, tokens} from "wenay-react2/core"
-import {createUpdateApi, useStoreNode} from "wenay-react2/react"
-import {createColumnState, createGridBuffer} from "wenay-react2/grid"
-import {FloatingWindow, useFloatingWindowManager} from "wenay-react2/windows"
-import {createLogsController, MiniLogsTable} from "wenay-react2/logs"
-import {VideoCall, useMediaSource, usePeerCalls} from "wenay-react2/communication"
-```
+- `wenay-react2/core` - tokens, callback hub, fixed-order helpers, `ObservableMap`, `structEqual`; no React.
+  `import {structEqual, tokens} from "wenay-react2/core"`
+- `wenay-react2/react` - `updateBy`/`renderBy`, outside/keyboard/drag/reorder hooks, Observe and Replay adapters, resize observer.
+  `import {updateBy, useStoreNode, useReplaySubscribe} from "wenay-react2/react"`
+- `wenay-react2/persist` - `memoryCache`, the persisted maps, `memoryCommit`, `createPersistedController`, `CacheStorage` adapters, `useCacheMapPersistence`.
+  `import {memoryGetOrCreate, memoryCommit, useCacheMapPersistence} from "wenay-react2/persist"`
+- `wenay-react2/grid` - agGrid4 buffer/table/theme, columnState + ColumnGrid, grid chrome, ag-grid style helpers.
+  `import {createColumnGrid, createGridBuffer, GridStyleDefault} from "wenay-react2/grid"`
+- `wenay-react2/windows` - FloatingWindow, WindowPortal, DragBox, desktop manager/taskbar, `floatingWindowMap`.
+  `import {FloatingWindow, useFloatingWindowManager} from "wenay-react2/windows"`
+- `wenay-react2/logs` - logs controller, `logsApi`, `PageLogs`, `MiniLogs`, `MessageEventLogs` and their table hooks.
+  `import {createLogsController, logsApi, MiniLogsTable} from "wenay-react2/logs"`
+- `wenay-react2/communication` - peer/media hooks and `VideoCall` (+ `"wenay-react2/styles/communication"`).
+  `import {VideoCall, useMediaSource, usePeerCalls} from "wenay-react2/communication"`
+- `wenay-react2/params` - `ParamsEditor` and its controller, row renderers, `ParamsEdit`/`ParamsArrayEdit`; pulls the wenay-common2 `Params` model (the heavy entry).
+  `import {ParamsEditor, useParamsEditorController} from "wenay-react2/params"`
+- `wenay-react2/modal` - `ModalProvider`/`useModal`, confirm/input helpers, text/file input panels, `LeftModal`.
+  `import {ModalProvider, useModal, TextInputModal} from "wenay-react2/modal"`
+- `wenay-react2/menu` - context-menu engine (`Menu`, `contextMenu`, `createContextMenu`) and `DropdownMenu` (+ `"wenay-react2/styles/menu-right"`).
+  `import {contextMenu, DropdownMenu} from "wenay-react2/menu"`
+- `wenay-react2/chart` - `Sparkline` and the canvas chart engine factories.
+  `import {Sparkline, createChartEngine} from "wenay-react2/chart"`
+- `wenay-react2/ui` - button family, `OutsideClickArea`, `Overlay`, `FResizableReact`, `createUiSlot`, `createToolbar`, `SettingsDialog`.
+  `import {Button, createToolbar, SettingsDialog} from "wenay-react2/ui"`
+- `wenay-react2/native` - the DOM/CSS/ag-grid-free React Native entrypoint (`doc/native.md`).
+  `import {createNativeColumnState} from "wenay-react2/native"`
 
-`wenay-react2/native` remains the DOM/CSS/ag-grid-free React Native entrypoint.
-Every public subpath publishes an explicit declaration target through the package
-`types` condition.
+Every subpath is CSS-free, an explicit named-export list, and publishes its own declaration
+target through the package `types` condition. Per-entry dependency boundaries are asserted by
+`scripts/ag-grid-bundle-probe.mjs`.
 
 ## Render Memory
 ```
@@ -90,6 +109,22 @@ const persistence = useCacheMapPersistence(memoryCache, delayMs?=300)
 persistence.isDirty(); persistence.flush(); persistence.save(); persistence.reload()  // reload = load() alias
 ```
 The pagehide/visibility flush backstops stay app-side (see above) - the hook deliberately does not own them.
+
+## Persistence
+```
+import {memoryGetOrCreate, memoryCommit, createPersistedController,
+        memoryCache, useCacheMapPersistence, createCacheMapWithStorage} from "wenay-react2/persist"
+
+memoryCommit(key, entry, mutate?) -> entry   // mutate + renderBy(entry) + memoryMarkDirty(key); the one commit idiom
+memoryUpdate(key, mutate) -> entry|undefined // memoryCommit over an existing memoryProps entry
+createPersistedController({key, def, version?, migrate?, memory?}) -> {state, api, commit, ...}
+useCacheMapPersistence(memoryCache, delay = 300)  // app-owned load + debounced save on dirty
+createCacheMapWithStorage(memoryMaps, storage: CacheStorage)  // storage adapter: {get, set, delete, setRaw?}
+```
+The block is storage-neutral: `localStorageCache` is the browser default, and a React Native
+host supplies an AsyncStorage-shaped `CacheStorage` object instead (`doc/native.md`). The
+persisted maps (`floatingWindowMap`, `mapResiReact`, `mapRightMenu`, `buttonStatusMap`) and
+the saved-state types are exported from here; `./react` keeps re-exporting the memory names.
 
 ## Outside Click / Buttons
 ```

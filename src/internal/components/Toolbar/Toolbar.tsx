@@ -2,7 +2,7 @@ import React, {useLayoutEffect, useRef, useState} from 'react'
 // the narrow `./listen` entry (2.5 KB gzip) instead of the CommonJS client barrel (61 KB)
 import {listen as createListen} from 'wenay-common2/listen'
 import {createUpdateApi} from '../../updateBy.js'
-import {createPersistedController} from '../../utils/persistedController.js'
+import {createPersistedController} from '../../persist/persistedController.js'
 import {movedOrderWithFixed} from '../../utils/fixedOrder.js'
 import {normalizeToolbarConfig, sameOrder, sourceKeySet, RESET_KEY, SETTINGS_KEY, type ToolbarListConfig} from './toolbarConfig.js'
 import {OutsideClickArea} from '../OutsideClickArea.js'

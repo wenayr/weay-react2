@@ -10,6 +10,12 @@ const canonicalEntries = {
     "./windows": "src/windows/index.ts",
     "./logs": "src/logs/index.ts",
     "./communication": "src/communication/index.ts",
+    "./persist": "src/persist/index.ts",
+    "./params": "src/params/index.ts",
+    "./modal": "src/modal/index.ts",
+    "./menu": "src/menu/index.ts",
+    "./chart": "src/chart/index.ts",
+    "./ui": "src/ui/index.ts",
 };
 
 function readJson(file) {
@@ -54,7 +60,8 @@ for (const [subpath, source] of Object.entries(canonicalEntries)) {
     assert(sourceManifest.exports?.[subpath], `source package.json: missing ${subpath}`);
     const text = fs.readFileSync(path.join(projectRoot, source), "utf8");
     assert(!/^\s*export\s+\*/m.test(text), `${source}: canonical entrypoints must use explicit exports`);
-    assert(!/(?:[/\\]demo[/\\]|OutlineDragDemo|logsContext|FResizableReact|mapResiReact|components[/\\]Dnd[/\\]DragArea)/.test(text),
+    // 3.0.0: FResizableReact / mapResiReact left this list - ./ui is their canonical home now
+    assert(!/(?:[/\\]demo[/\\]|OutlineDragDemo|logsContext|components[/\\]Dnd[/\\]DragArea)/.test(text),
         `${source}: canonical entrypoint contains a demo or compatibility export`);
 }
 

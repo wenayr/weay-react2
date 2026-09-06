@@ -35,3 +35,15 @@ live field replacement along the slider, explicit reorder and toggle, sticky
 
 Call `dots.dispose()` and `columns.dispose()` with the owning screen. Use
 `columns.api.flush()` when the latest AsyncStorage write must be awaited.
+
+## Persistence seam
+
+Since 3.0.0 the persistence block ships as `wenay-react2/persist` and is storage-neutral: it
+never touches `document`, `window` or `localStorage` itself. `CacheStorage` is the adapter
+contract (`get`, `set`, `delete`, optional `setRaw` for a pre-serialized payload);
+`localStorageCache` is only the browser default. On React Native, hand
+`createCacheMapWithStorage(memoryMaps, storage)` an object that wraps AsyncStorage with the
+same three async methods (example in `doc/changes/v3.0.0.md`), and the same `memoryCache` /
+`memoryCommit` / `createPersistedController` idioms work unchanged. This is the seam only:
+`./persist` pulls React (for `useCacheMapPersistence` and `renderBy`) but no component code,
+and no native UI layer is promised - views on RN stay app-owned, as with `createNativeColumnState`.

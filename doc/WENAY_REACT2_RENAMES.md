@@ -1,5 +1,55 @@
 # wenay-react2 Rename Map
 
+## 3.0.0 entry map (2026-09-06)
+
+Not a rename: every name keeps its binding, and the root barrel `wenay-react2` still exports
+all of them (`__test/barrelParity.test.ts` asserts `root[name] === subpath[name]`). What
+changed is the canonical import path. The root is a compatibility union, deprecated in 3.x
+and trimmed in the next major, so new code and touched files import from the subpath in the
+right-hand column. Details: `doc/changes/v3.0.0.md`. `./native` is untouched.
+
+### Root import -> canonical subpath (names that were root-only before 3.0.0)
+
+| Root name | Canonical subpath |
+| --- | --- |
+| `Button`, `HoverButton`, `OutsideButton`, `AbsoluteButton`, `MiniButton`, `PopupButton` | `wenay-react2/ui` |
+| `OutsideClickArea`, `Overlay` | `wenay-react2/ui` |
+| `setResizeableElement`, `removeResizeableElement`, `FResizableReact`, `mapResiReact` | `wenay-react2/ui` (`mapResiReact` also on `/persist`) |
+| `createUiSlot` | `wenay-react2/ui` |
+| `createToolbar`, `registerToolbarDensity`, `getToolbarDensities`, `toolbarItemIcon` | `wenay-react2/ui` |
+| `SettingsDialog`, `useSettingsDialogController`, `registerSettingsSection`, `getSettingsSections` | `wenay-react2/ui` |
+| `ModalProvider`, `useModal` | `wenay-react2/modal` |
+| `confirmModal`, `inputModal`, `createModalElementStore`, `createModalRenderStore` | `wenay-react2/modal` |
+| `LeftModal`, `getApiLeftMenu` | `wenay-react2/modal` |
+| `FreeModal`, `TextInputModal`, `TextInputPanel`, `useTextInputPanel`, `FileInputModal`, `FileInputPanel`, `useFileInputPanel` | `wenay-react2/modal` |
+| `Menu`, `MenuItemElement`, `MenuProgress` | `wenay-react2/menu` |
+| `contextMenu`, `createContextMenu` | `wenay-react2/menu` |
+| `DropdownMenu`, `createRightMenuController`, `useRightMenuController`, `mapRightMenu` | `wenay-react2/menu` (`mapRightMenu` also on `/persist`) |
+| `ParamsEditor`, `useParamsEditorController` | `wenay-react2/params` |
+| `ParamRow`, `ParamLabelContent`, `ParamToggleLabel` | `wenay-react2/params` |
+| `ParamsEdit`, `ParamsArrayEdit`, `setAutoStepForElement` | `wenay-react2/params` |
+| `Sparkline` | `wenay-react2/chart` |
+| `createChartEngine`, `createDataModel`, `createDataSet`, `createPanelManager`, `createRenderer`, `createInteraction` | `wenay-react2/chart` |
+| `GridStyleDefault`, `StyleGridDefault`, `StyleCSSHeadGrid`, `StyleCSSHeadGridEdit` (type `AgGridClassRule`) | `wenay-react2/grid` |
+| `logsApi`, `getLogsApi`, `PageLogs`, `MiniLogs`, `MessageEventLogs` | `wenay-react2/logs` |
+| `updateBy`, `__observerStateForTests` | `wenay-react2/react` |
+| `floatingWindowMap` | `wenay-react2/windows` (also on `/persist`) |
+
+### New on the root and on `wenay-react2/persist` (3.0.0)
+
+| Name | Canonical subpath |
+| --- | --- |
+| `createPersistedController` (types `PersistedController`, `PersistedControllerOptions`) | `wenay-react2/persist` |
+| `memoryCommit` | `wenay-react2/persist` |
+| `buttonStatusMap`, `floatingWindowMap`, `mapResiReact`, `mapRightMenu` | `wenay-react2/persist` |
+| `memoryCache`, `memoryMaps`, `memoryGet`, `memoryGetById`, `memoryGetOrCreate`, `memorySet`, `memoryUpdate`, `memoryMarkDirty` | `wenay-react2/persist` (`/react` keeps re-exporting them) |
+| `createCacheMap`, `createCacheMapWithStorage`, `browserCacheStorage`, `localStorageCache`, `useCacheMapPersistence`, `createSearchHistory`, `ObservableMap` | `wenay-react2/persist` (`ObservableMap` also on `/core`; `/react` re-exports the rest) |
+| types `CacheMap`, `CacheStorage`, `DirtyListener`, `MapChangeListener`, `CacheMapPersistence`, `SearchHistoryApi`, `SearchHistoryState`, `ButtonSavedState`, `ResizableSavedSize`, `MenuRightPosition`, `MenuRightSavedState`, `MenuRightVerticalPosition`, `FloatingWindowCloseReason`, `FloatingWindowMode`, `FloatingWindowPosition`, `FloatingWindowSavedGeometry`, `FloatingWindowSize`, `FloatingWindowSnapRegion` | `wenay-react2/persist` |
+
+Internal moves in the same release (never a public path): `src/internal/utils/{memoryStore,
+cache, persistedMaps, persistedController, observableMap, floatingWindowTypes, searchHistory}`
+and `src/internal/hooks/useCacheMapPersistence` -> `src/internal/persist/`.
+
 ## 2.0.0 migration cut (2026-09-02)
 
 Breaking by design; documented here and in `doc/changes/v2.0.0.md`. Nothing below has an alias.

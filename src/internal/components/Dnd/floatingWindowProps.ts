@@ -10,7 +10,7 @@ import type {
     FloatingWindowPosition,
     FloatingWindowSize,
     FloatingWindowSnapRegion,
-} from "../../utils/floatingWindowTypes.js";
+} from "../../persist/floatingWindowTypes.js";
 
 export type FloatingWindowUpdate = {
     e: MouseEvent | TouchEvent;

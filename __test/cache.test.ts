@@ -1,4 +1,4 @@
-import {BrowserCacheStorage, LocalStorageCache} from "../src/internal/utils/cache";
+import {BrowserCacheStorage, LocalStorageCache} from "../src/internal/persist/cache";
 
 type CacheEntryMap = Map<string, Response>;
 
@@ -107,8 +107,8 @@ test("LocalStorageCache deleteAll preserves unrelated application keys", async (
 });
 
 test("save serializes each changed scope exactly once and hands the raw payload to setRaw", async () => {
-    const {createCacheMapWithStorage} = await import("../src/internal/utils/cache");
-    const {ObservableMap} = await import("../src/internal/utils/observableMap");
+    const {createCacheMapWithStorage} = await import("../src/internal/persist/cache");
+    const {ObservableMap} = await import("../src/internal/persist/observableMap");
 
     const written: [string, string][] = [];
     const parsed: object[] = [];
@@ -146,8 +146,8 @@ test("save serializes each changed scope exactly once and hands the raw payload 
 });
 
 test("save falls back to set(object) for a storage without setRaw", async () => {
-    const {createCacheMapWithStorage} = await import("../src/internal/utils/cache");
-    const {ObservableMap} = await import("../src/internal/utils/observableMap");
+    const {createCacheMapWithStorage} = await import("../src/internal/persist/cache");
+    const {ObservableMap} = await import("../src/internal/persist/observableMap");
 
     const parsed: [string, object][] = [];
     const storage = {
@@ -169,8 +169,8 @@ test("save falls back to set(object) for a storage without setRaw", async () => 
 test("saveDebounced keeps the pending timer across a burst and writes delay after the FIRST change", async () => {
     jest.useFakeTimers();
     try {
-        const {createCacheMapWithStorage} = await import("../src/internal/utils/cache");
-        const {ObservableMap} = await import("../src/internal/utils/observableMap");
+        const {createCacheMapWithStorage} = await import("../src/internal/persist/cache");
+        const {ObservableMap} = await import("../src/internal/persist/observableMap");
 
         const writes: string[] = [];
         const storage = {

@@ -1,4 +1,13 @@
 
+// ag-grid theme helpers (3.0.0: moved here from the root-only surface; same bindings)
+export {
+    GridStyleDefault,
+    StyleCSSHeadGrid,
+    StyleCSSHeadGridEdit,
+    StyleGridDefault,
+} from "../internal/styles/styleGrid.js";
+export type {AgGridClassRule} from "../internal/styles/styleGrid.js";
+
 export {
     AgGridTable,
     buildAgTheme,

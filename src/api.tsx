@@ -1,4 +1,13 @@
-/** Root barrel. Since 2.0.0 it is a plain re-export list: no CSS side effects (consumers
+/** Root barrel.
+ *
+ *  3.0.0: the root is a compatibility union of the subpath entries. Every runtime name it exports
+ *  has a canonical home in one of `wenay-react2/core`, `/react`, `/persist`, `/grid`, `/windows`,
+ *  `/logs`, `/communication`, `/params`, `/modal`, `/menu`, `/chart` or `/ui` (./native is the
+ *  separate DOM-free surface). New code imports from the subpaths; the root stays until the next
+ *  major so existing `import {...} from "wenay-react2"` keeps resolving to the same bindings
+ *  (__test/barrelParity.test.ts asserts root[name] === subpath[name]).
+ *
+ *  Since 2.0.0 it is a plain re-export list: no CSS side effects (consumers
  *  import "wenay-react2/styles" once - see doc/WENAY_REACT2_RENAMES.md), no `kit` namespace
  *  object (it held a live reference to every member and defeated tree-shaking for the whole
  *  package), no demo/stand code. Sections are ordered by dependency direction. */
@@ -57,7 +66,7 @@ export * from "./internal/components/Communication/index.js";
 
 // 13. Context menu engine
 export { Menu, MenuProgress, MenuElement as MenuItemElement } from "./internal/menu/menu.js";
-export type { MenuItem, MenuItemStrict } from "./internal/menu/menu.js";
+export type { MenuItem, MenuItemStrict, MenuActionEvent, MenuActionEventType, MenuActionHandler } from "./internal/menu/menu.js";
 export * from "./internal/menu/menuMouse.js";
 
 // 14. LOGS - controller + three views (page table, mini feed, message events)

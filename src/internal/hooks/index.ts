@@ -10,4 +10,4 @@ export * from './usePeer.js';export * from './usePeerCall.js';
 export * from './useRoute.js';
 export * from './useWorkflows.js';
 export * from './useContractRuntime.js';
-export * from './useCacheMapPersistence.js';
+export * from '../persist/useCacheMapPersistence.js';

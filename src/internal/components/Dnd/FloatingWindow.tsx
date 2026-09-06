@@ -3,7 +3,7 @@
  *  renderer), floatingWindowProps (the contracts), plus floatingWindowPersistence,
  *  floatingWindowDrag and floatingWindowSnap - and this file re-exports exactly the surface it
  *  has always had, so `src/windows/index.ts` and `Dnd/index.ts` are unaffected. */
-import { floatingWindowMap } from "../../utils/persistedMaps.js";
+import { floatingWindowMap } from "../../persist/persistedMaps.js";
 
 export { FloatingWindowTaskbar, useFloatingWindowManager } from "./FloatingDesktop.js";
 export type { FloatingDesktopWindow, FloatingWindowManager, FloatingWindowTaskbarProps } from "./FloatingDesktop.js";
@@ -14,7 +14,7 @@ export type {
     FloatingWindowSavedGeometry,
     FloatingWindowSize,
     FloatingWindowSnapRegion,
-} from "../../utils/floatingWindowTypes.js";
+} from "../../persist/floatingWindowTypes.js";
 export type {
     FloatingWindowController,
     FloatingWindowControllerOptions,
@@ -22,7 +22,7 @@ export type {
     FloatingWindowUpdate,
 } from "./floatingWindowProps.js";
 
-// Map of all popup window sizes; declared in utils/persistedMaps (memoryCache registry must not
+// Map of all popup window sizes; declared in persist/persistedMaps (memoryCache registry must not
 // import the component layer) and re-exported here so the public surface is unchanged
 export { floatingWindowMap };
 

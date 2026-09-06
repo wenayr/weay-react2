@@ -13,8 +13,8 @@ import type {ColumnState as AgColumnState, GridApi} from 'ag-grid-community'
 // the narrow `./listen` entry (2.5 KB gzip) instead of the CommonJS client barrel (61 KB)
 import {listen as createListen} from 'wenay-common2/listen'
 import {createUpdateApi} from '../../updateBy.js'
-import {memoryMarkDirty} from '../../utils/memoryStore.js'
-import {createPersistedController} from '../../utils/persistedController.js'
+import {memoryMarkDirty} from '../../persist/memoryStore.js'
+import {createPersistedController} from '../../persist/persistedController.js'
 import {pinFixedOrder} from '../../utils/fixedOrder.js'
 // The pure column-state core (defaults / normalize / visibleKeys / sort cycle / fixed pinning)
 // is shared with the React Native controller. It lives under src/native because that folder may

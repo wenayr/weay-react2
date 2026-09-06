@@ -2,8 +2,8 @@ import React, {useDeferredValue, useEffect, useMemo, useRef, useState} from "rea
 import {createUpdateApi} from "../../updateBy.js";
 import {FloatingWindowBase} from "../Dnd/FloatingWindow.js";
 import {Overlay} from "../Overlay.js";
-import {createSearchHistory} from "../../utils/searchHistory.js";
-import {createPersistedController} from "../../utils/persistedController.js";
+import {createSearchHistory} from "../../persist/searchHistory.js";
+import {createPersistedController} from "../../persist/persistedController.js";
 import {cx as classNames} from "../../utils/cx.js";
 import {buildSettingsTree, getTreeSignature, getBranchKeys, getCurrentBranchKeys, filterSettingsTree} from "./settingsTree.js";
 import type {SettingsSection, SettingsTreeNode, SettingsTree, SettingsTreeFilter} from "./settingsTree.js";

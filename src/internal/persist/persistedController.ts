@@ -7,13 +7,13 @@
  *  a place to notice that the shape on disk is older than the code and migrate it. That is why
  *  this exists, and why `version`/`migrate` are the point rather than the line count.
  *
- *  Deliberately NOT re-exported from utils/index.ts: that barrel is the root public surface, and
- *  this is an internal building block. Import it by path.
+ *  Not re-exported from utils/index.ts (the root public surface); it reaches consumers through
+ *  the ./persist entrypoint (src/persist/index.ts) and internally by path.
  *
  *  The surrounding controllers keep their own logic (listen channels, runtime-only state,
  *  normalize) - this owns only the persisted slot itself. */
 import {createUpdateApi} from "../updateBy.js";
-import {memoryGetOrCreate, memoryMarkDirty} from "./memoryStore.js";
+import {memoryCommit, memoryGetOrCreate, memoryMarkDirty} from "./memoryStore.js";
 
 export type PersistedControllerOptions<T extends object> = {
     /** memoryProps key; also the scope memoryCache marks dirty. */
@@ -43,12 +43,10 @@ export function createPersistedController<T extends object>(opts: PersistedContr
         }
     }
 
-    /** Mutate in place, then announce: rerender subscribers AND mark the cache dirty. Skipping
-     *  either half is the classic bug - a silent UI, or a change that never reaches storage. */
+    /** Mutate in place, then announce: rerender subscribers AND mark the cache dirty. The body
+     *  is memoryCommit - the same idiom memoryUpdate uses - so the two cannot drift apart. */
     const commit = (mutate?: (current: T) => void) => {
-        mutate?.(state);
-        api.render();
-        memoryMarkDirty(opts.key);
+        memoryCommit(opts.key, state, mutate);
     };
 
     return {

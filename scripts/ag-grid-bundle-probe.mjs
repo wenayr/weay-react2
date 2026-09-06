@@ -49,6 +49,30 @@ const entries = {
         import {VideoCall} from './src/communication/index.ts'
         console.log(VideoCall)
     `,
+    canonicalPersist: `
+        import {memoryCache} from './src/persist/index.ts'
+        console.log(memoryCache)
+    `,
+    canonicalParams: `
+        import {ParamsEditor} from './src/params/index.ts'
+        console.log(ParamsEditor)
+    `,
+    canonicalModal: `
+        import {ModalProvider} from './src/modal/index.ts'
+        console.log(ModalProvider)
+    `,
+    canonicalMenu: `
+        import {createContextMenu} from './src/menu/index.ts'
+        console.log(createContextMenu)
+    `,
+    canonicalChart: `
+        import {createChartEngine} from './src/chart/index.ts'
+        console.log(createChartEngine)
+    `,
+    canonicalUi: `
+        import {createToolbar} from './src/ui/index.ts'
+        console.log(createToolbar)
+    `,
 }
 
 async function bundle(name, nodeEnv, minify = true) {
@@ -88,6 +112,12 @@ const canonical = {
     windows: await bundle('canonicalWindows', 'production'),
     logs: await bundle('canonicalLogs', 'production'),
     communication: await bundle('canonicalCommunication', 'production'),
+    persist: await bundle('canonicalPersist', 'production'),
+    params: await bundle('canonicalParams', 'production'),
+    modal: await bundle('canonicalModal', 'production'),
+    menu: await bundle('canonicalMenu', 'production'),
+    chart: await bundle('canonicalChart', 'production'),
+    ui: await bundle('canonicalUi', 'production'),
 }
 
 for (const [name, value] of Object.entries({allCommunity, targeted, rootUtility, wrapper}))
@@ -160,6 +190,48 @@ assertBoundary('communication', [
     /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
     /src\/stand\//,
     /src\/internal\/(?:components\/Dnd|grid|logs|myChart)\//,
+])
+// 3.0.0 entries. ./persist is the storage layer: React is allowed (useCacheMapPersistence,
+// updateBy) but nothing from the component layer, no grid, no window libraries.
+assertBoundary('persist', [
+    COMMON2_CLIENT_BARREL,
+    /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
+    /src\/stand\//,
+    /src\/internal\/(?:components|grid|logs|myChart)\//,
+])
+// ./params reaches wenay-common2 through the `Params` model, which only its client barrel
+// exports - that one is a documented cost of the entry, so it is not on the list.
+assertBoundary('params', [
+    /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
+    /src\/stand\//,
+    /src\/internal\/(?:components\/Dnd|components\/Communication|grid|logs|myChart)\//,
+])
+// ./modal, ./menu and ./ui host themselves in floating windows (Input -> FloatingWindow,
+// DropdownMenu -> modal render store, SettingsDialog -> FloatingWindowBase), so react-rnd and
+// re-resizable are theirs to pull; ag-grid and the data blocks are not.
+assertBoundary('modal', [
+    COMMON2_CLIENT_BARREL,
+    /node_modules\/ag-grid-/,
+    /src\/stand\//,
+    /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
+])
+assertBoundary('menu', [
+    COMMON2_CLIENT_BARREL,
+    /node_modules\/ag-grid-/,
+    /src\/stand\//,
+    /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
+])
+assertBoundary('chart', [
+    COMMON2_CLIENT_BARREL,
+    /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
+    /src\/stand\//,
+    /src\/internal\/(?:components|grid|hooks|logs|persist)\//,
+])
+assertBoundary('ui', [
+    COMMON2_CLIENT_BARREL,
+    /node_modules\/ag-grid-/,
+    /src\/stand\//,
+    /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
 ])
 
 console.log('checks: targeted smaller; root utility AG Grid-free; validation development-only; canonical boundaries isolated')

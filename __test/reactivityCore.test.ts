@@ -1,4 +1,4 @@
-import {deepMergeWithMap} from "../src/internal/utils/memoryStore";
+import {deepMergeWithMap} from "../src/internal/persist/memoryStore";
 import {__observerStateForTests, renderBy, createUpdateApi} from "../src/internal/updateBy";
 
 // deepMergeWithMap fed the visited map a {} placeholder it never filled in, treated a truthy

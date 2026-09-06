@@ -6,6 +6,7 @@ export {
     useFloatingWindowController,
     useWindowPortalContainer,
     DragBox,
+    floatingWindowMap,
 } from "../internal/components/Dnd/FloatingWindow.js";
 export type {
     DragBoxProps,

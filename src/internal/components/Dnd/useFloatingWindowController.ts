@@ -6,7 +6,7 @@
  *  the original dependency arrays; only the bodies moved. */
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RndResizeCallback, RndResizeStartCallback } from "react-rnd";
-import { floatingWindowMap } from "../../utils/persistedMaps.js";
+import { floatingWindowMap } from "../../persist/persistedMaps.js";
 import { cascadeWindowPosition, useFloatingDesktopWindow } from "./FloatingDesktop.js";
 import {
     isUsableSize,
@@ -22,7 +22,7 @@ import type {
     FloatingWindowSavedGeometry,
     FloatingWindowSize,
     FloatingWindowSnapRegion,
-} from "../../utils/floatingWindowTypes.js";
+} from "../../persist/floatingWindowTypes.js";
 import type { FloatingWindowController, FloatingWindowControllerOptions } from "./floatingWindowProps.js";
 
 type tPosition = FloatingWindowPosition;

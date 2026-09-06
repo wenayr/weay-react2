@@ -5,6 +5,12 @@ import * as grid from "../src/grid/index";
 import * as windows from "../src/windows/index";
 import * as logs from "../src/logs/index";
 import * as communication from "../src/communication/index";
+import * as persist from "../src/persist/index";
+import * as params from "../src/params/index";
+import * as modal from "../src/modal/index";
+import * as menu from "../src/menu/index";
+import * as chart from "../src/chart/index";
+import * as ui from "../src/ui/index";
 import * as native from "../src/native/index";
 
 /** The subpath barrels are hand-maintained lists over the same modules the root
@@ -22,6 +28,12 @@ const mirrored: [string, Record<string, unknown>][] = [
     ["./windows", windows],
     ["./logs", logs],
     ["./communication", communication],
+    ["./persist", persist],
+    ["./params", params],
+    ["./modal", modal],
+    ["./menu", menu],
+    ["./chart", chart],
+    ["./ui", ui],
 ];
 
 const runtimeNames = (module: Record<string, unknown>) =>
@@ -49,24 +61,12 @@ describe("package barrels", () => {
 
 /** Inverse direction: the root is `export *` over everything, so a new module lands there
  *  by default and nobody notices it never reached a subpath. Every root-only runtime name
- *  must be on this list - a deliberate root-only surface (legacy components, the chart
- *  engine, modal/menu kits) - so adding a module makes you choose its subpath explicitly. */
-const ROOT_ONLY = [
-    "AbsoluteButton", "Button", "DropdownMenu", "FResizableReact", "FileInputModal", "FileInputPanel",
-    "FreeModal", "GridStyleDefault", "HoverButton", "LeftModal", "Menu", "MenuItemElement", "MenuProgress",
-    "MessageEventLogs", "MiniButton", "MiniLogs", "ModalProvider", "OutsideButton", "OutsideClickArea",
-    "Overlay", "PageLogs", "ParamLabelContent", "ParamRow", "ParamToggleLabel", "ParamsArrayEdit", "ParamsEdit",
-    "ParamsEditor", "PopupButton", "SettingsDialog", "Sparkline", "StyleCSSHeadGrid", "StyleCSSHeadGridEdit",
-    "StyleGridDefault", "TextInputModal", "TextInputPanel", "__observerStateForTests", "confirmModal",
-    "contextMenu", "createChartEngine", "createContextMenu", "createDataModel", "createDataSet",
-    "createInteraction", "createModalElementStore", "createModalRenderStore", "createPanelManager",
-    "createRenderer", "createRightMenuController", "createToolbar", "createUiSlot", "floatingWindowMap",
-    "getApiLeftMenu", "getLogsApi", "getSettingsSections", "getToolbarDensities", "inputModal", "logsApi",
-    "mapResiReact", "mapRightMenu", "registerSettingsSection", "registerToolbarDensity",
-    "removeResizeableElement", "setAutoStepForElement", "setResizeableElement", "toolbarItemIcon", "updateBy",
-    "useFileInputPanel", "useModal", "useParamsEditorController", "useRightMenuController",
-    "useSettingsDialogController", "useTextInputPanel",
-].sort();
+ *  must be on this list, so adding a module makes you choose its subpath explicitly.
+ *
+ *  3.0.0: the list is empty. The root is a pure compatibility union - every runtime name has a
+ *  canonical subpath (params/modal/menu/chart/ui joined the six earlier entries, persist took
+ *  the storage layer). Keep it empty: a name that lands here has no documented home. */
+const ROOT_ONLY: string[] = [];
 
 test("root-only runtime names are exactly the documented root-only surface", () => {
     const inSubpath = new Set(mirrored.flatMap(([, module]) => runtimeNames(module)));

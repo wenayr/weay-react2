@@ -1,5 +1,5 @@
-import {createPersistedController} from "../src/internal/utils/persistedController";
-import {memoryGetOrCreate, memoryGet, memoryCache} from "../src/internal/utils/memoryStore";
+import {createPersistedController} from "../src/internal/persist/persistedController";
+import {memoryGetOrCreate, memoryGet, memoryCache} from "../src/internal/persist/memoryStore";
 
 /** The reason this primitive exists: five controllers repeated read -> subscribe -> mutate/
  *  render/markDirty, and none of them could notice that the shape on disk predates the code.

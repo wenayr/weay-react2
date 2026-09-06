@@ -50,21 +50,45 @@ on -> off                          // subscriptions
 
 ## Public Entry
 
-Consumers import from the package root or from a subpath, and import the stylesheet once:
+Consumers import from a canonical subpath and import the stylesheet once:
 
 ```ts
 import "wenay-react2/styles"            // once per app; tokens: "wenay-react2/styles/tokens"
 import "wenay-react2/styles/communication" // only if VideoCall (./communication) is rendered
-import { createToolbar, useAgGrid, createColumnState } from "wenay-react2"
-import { useStoreNode } from "wenay-react2/react"   // CSS-free, tree-shake-safe subpaths:
-                                                    // ./core ./react ./native ./grid ./windows ./logs ./communication
+import { useStoreNode } from "wenay-react2/react"
+import { useAgGrid, createColumnState } from "wenay-react2/grid"
+import { createToolbar } from "wenay-react2/ui"     // CSS-free, tree-shake-safe subpaths (3.0.0):
+                                                    // ./core ./react ./persist ./grid ./windows ./logs
+                                                    // ./communication ./params ./modal ./menu ./chart ./ui
+                                                    // ./native (DOM-free, never overlaps the root)
 ```
 
-`src/api.tsx` is the root export aggregator: a flat re-export list with no side effects.
-Since 2.0.0 no entrypoint imports CSS on its own, there is no `kit` namespace object,
-and no demo, stand or application code is compiled into `lib/`. The library lives under
-`src/internal/`, the QA stand and demos under `src/stand/` (`./demo/peer-media` and
-`./demo/peer-conference` are the two demo entrypoints still published, from `lib/stand/demo`).
+Each subsystem below names its canonical entry. `src/api.tsx` is the root barrel
+`wenay-react2`: since 3.0.0 a deprecated compatibility union of the subpaths (same bindings,
+asserted by `__test/barrelParity.test.ts`, trimmed in the next major); since 2.0.0 a flat
+re-export list with no side effects. No entrypoint imports CSS on its own, there is no `kit`
+namespace object, and no demo, stand or application code is compiled into `lib/`. The library
+lives under `src/internal/`, the QA stand and demos under `src/stand/` (`./demo/peer-media`
+and `./demo/peer-conference` are the two demo entrypoints still published, from
+`lib/stand/demo`). What each entry may pull (ag-grid, react-rnd, the wenay-common2 client
+barrel) is asserted per entry by `scripts/ag-grid-bundle-probe.mjs`.
+
+Subsystem -> canonical entry, at a glance:
+
+| Subsystem | Entry |
+| --- | --- |
+| Render Memory (`updateBy`), Observe / Replay adapters, interaction hooks, resize observer | `wenay-react2/react` |
+| Persistence and memory cache | `wenay-react2/persist` |
+| Buttons, outside click, Overlay, resizable, UI slot, Toolbar, Settings dialog | `wenay-react2/ui` |
+| Floating windows, desktop manager | `wenay-react2/windows` |
+| Modal and input helpers | `wenay-react2/modal` |
+| Menus (context menu engine, DropdownMenu) | `wenay-react2/menu` |
+| agGrid4, Column State, grid chrome, ag-grid style helpers | `wenay-react2/grid` (`wenay-react2/native` for the DOM-free column state) |
+| Logs | `wenay-react2/logs` |
+| Params | `wenay-react2/params` |
+| Charts | `wenay-react2/chart` |
+| Communication UI | `wenay-react2/communication` |
+| Tokens, callback hub, pure helpers | `wenay-react2/core` |
 
 ## Compatibility Policy
 
@@ -86,11 +110,14 @@ published source surface and the Jest test tree before a release.
 
 Purpose: bridge external mutable objects into React renders.
 
+Canonical entry: `wenay-react2/react` (the memory names are canonical on
+`wenay-react2/persist`; `./react` re-exports them).
+
 Main APIs:
 
 - `updateBy`, `useUpdateBy`, `renderBy`, `renderByRevers`, `renderByLast`
 - `createUpdateApi`, `useUpdateByApi`
-- `memoryGetOrCreate`, `memoryUpdate`, `memoryMarkDirty`, `memoryCache`
+- `memoryGetOrCreate`, `memoryCommit`, `memoryUpdate`, `memoryMarkDirty`, `memoryCache`
 
 Use this when a module-level controller or persisted config needs React views
 to refresh without moving all state into component-local `useState`.
@@ -101,6 +128,14 @@ local to one component and has no external lifecycle, `useState` is simpler.
 ### Persistence And Memory Cache
 
 Purpose: centralize process/browser memory maps used by shared UI surfaces.
+
+Canonical entry: `wenay-react2/persist` (3.0.0; `src/internal/persist/`). It exports
+`memoryCache`, the persisted maps (`floatingWindowMap`, `mapResiReact`, `mapRightMenu`,
+`buttonStatusMap`), `memoryCommit` (the one commit idiom: mutate, render, mark dirty; used by
+`memoryUpdate` and `createPersistedController().commit`), `createPersistedController`,
+`useCacheMapPersistence` and the `CacheStorage` adapter contract. The block is
+storage-neutral: `localStorageCache` is the browser default, React Native supplies an
+AsyncStorage-shaped adapter (`doc/native.md`).
 
 Shared primitives can mark config as dirty. They do not choose a write policy.
 The application should call `memoryCache.load()` on startup and decide whether
@@ -114,6 +149,10 @@ should not silently write storage at surprising times.
 ### Outside Click, Buttons, And Floating UI
 
 Purpose: reusable interaction wrappers for menus, popups, and floating panels.
+
+Canonical entries: `wenay-react2/ui` (buttons, `OutsideClickArea`, `Overlay`,
+`FResizableReact`), `wenay-react2/windows` (floating windows, desktop manager,
+`floatingWindowMap`), `wenay-react2/react` (`useOutside`, drag and reorder hooks).
 
 Main APIs:
 
@@ -151,6 +190,8 @@ primitive.
 
 Purpose: common modal lifecycle and simple text/file input flows.
 
+Canonical entry: `wenay-react2/modal`.
+
 Main APIs:
 
 - `ModalProvider`, `useModal`
@@ -164,6 +205,8 @@ compatibility and rare cases.
 
 Purpose: configurable product chrome without each app inventing its own
 settings registry, placement switcher, and toolbar editor.
+
+Canonical entry: `wenay-react2/ui`.
 
 Main APIs:
 
@@ -193,6 +236,9 @@ column menu, and toolbar should all mirror one column order/visibility source.
 
 Purpose: generic menu rendering and context-menu coordination.
 
+Canonical entry: `wenay-react2/menu` (plus `"wenay-react2/styles/menu-right"` for
+`DropdownMenu`).
+
 Main APIs:
 
 - `Menu`
@@ -215,6 +261,9 @@ Menu diagnostics should start from the right-click surface: count `openAt` vs le
 
 Purpose: shared ag-grid lifecycle, row buffering, dynamic columns, and common
 grid defaults.
+
+Canonical entry: `wenay-react2/grid` (also home of the ag-grid style helpers
+`GridStyleDefault`, `StyleGridDefault`, `StyleCSSHeadGrid`, `StyleCSSHeadGridEdit`).
 
 Main APIs:
 
@@ -248,6 +297,9 @@ and reduces race conditions around grid readiness.
 Purpose: one persisted column config that can drive desktop grids, icon menus,
 toolbars, and mobile card views.
 
+Canonical entry: `wenay-react2/grid`; the DOM-free core ships as
+`createNativeColumnState` from `wenay-react2/native`.
+
 Main APIs:
 
 - `createColumnGrid`, `useColumnGrid`
@@ -274,6 +326,8 @@ modes where some stable schema columns are currently unavailable.
 
 Purpose: React hooks around `wenay-common2` Observe stores and listen objects.
 
+Canonical entry: `wenay-react2/react`.
+
 Main APIs:
 
 - `useStoreNode`, `useStoreKeys`, `useStoreSelect`
@@ -289,6 +343,8 @@ start hidden transport work.
 
 Purpose: React-side lifecycle over `wenay-common2` Replay lines, store replay,
 route hand-off, pull frames, and archive playback.
+
+Canonical entry: `wenay-react2/react`.
 
 Main APIs:
 
@@ -332,6 +388,10 @@ rerendering on every event.
 
 Purpose: shared logging UI and notification/table chrome.
 
+Canonical entry: `wenay-react2/logs` (`logsApi`, `getLogsApi`, `PageLogs`, `MiniLogs`,
+`MessageEventLogs` joined it in 3.0.0). Note the entry pays for the wenay-common2 `Params`
+model through the settings editor; it is the second-heaviest entry after `./params`.
+
 Main APIs:
 
 - `logsApi`
@@ -346,6 +406,10 @@ Use `logsApi` for quick global logging. Use `createLogsController` when an app n
 
 Purpose: editable parameter UIs over `wenay-common2` Params structures and
 simple row/section editors.
+
+Canonical entry: `wenay-react2/params` for the editor, rows and async wrappers
+(deliberately the only entry besides `./logs` that pulls the wenay-common2 client barrel:
+`Params` lives only there); the text/file input panels are `wenay-react2/modal`.
 
 Main APIs:
 
@@ -364,6 +428,10 @@ Product-specific validation and save policy stay in the app.
 
 Purpose: shared visual tokens and theme hooks for library primitives.
 
+Canonical entries: `wenay-react2/core` (`tokens`, `tokensVar`), `wenay-react2/grid`
+(ag-grid theme and style helpers), and the CSS subpaths `wenay-react2/styles`,
+`styles/tokens`, `styles/menu-right`, `styles/communication`.
+
 Main files:
 
 - `src/style/tokens.css`
@@ -381,13 +449,16 @@ Default styles are part of the public usability contract. A primitive should rem
 
 ### Charts
 
-Purpose: low-level chart engine and React chart demo surface.
+Purpose: low-level canvas chart engine and the `Sparkline` component.
+
+Canonical entry: `wenay-react2/chart` (React only; no wenay-common2, no components).
 
 Main APIs:
 
-- `MyChartEngine`
-- `createChartCanvas`
-- chart engine internals exported through the rare surface
+- `Sparkline`
+- `createChartEngine` over `createDataModel` / `createDataSet`, `createPanelManager`,
+  `createRenderer`, `createInteraction`
+- `MyChartEngine` and `createChartCanvas` were removed in 2.0.0 (stand-only demo)
 
 The chart engine is intentionally low-level. Product apps should wrap it before
 using it as a domain chart.

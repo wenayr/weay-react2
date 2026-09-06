@@ -3,9 +3,9 @@
  *  and the effect keeps its original `[a, b]` dependency array, so the handlers close over the
  *  same render they always did. */
 import { useEffect } from "react";
-import { floatingWindowMap } from "../../utils/persistedMaps.js";
+import { floatingWindowMap } from "../../persist/persistedMaps.js";
 import { clampToLimit, type FloatingWindowLimit } from "./windowGeometry.js";
-import type { FloatingWindowSnapRegion } from "../../utils/floatingWindowTypes.js";
+import type { FloatingWindowSnapRegion } from "../../persist/floatingWindowTypes.js";
 
 export type FloatingWindowDragLoop = {
     /** Mouse drag armed. */

@@ -7,7 +7,7 @@ import type {
     FloatingWindowSavedGeometry,
     FloatingWindowSize,
     FloatingWindowSnapRegion,
-} from "../../utils/floatingWindowTypes.js";
+} from "../../persist/floatingWindowTypes.js";
 
 /** Below this a window has no title bar left to grab, so it can never be recovered from the UI.
  *  Any smaller number is treated as damage rather than as a size somebody chose. */

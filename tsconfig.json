@@ -27,7 +27,13 @@
     "src/grid/index.ts",
     "src/windows/index.ts",
     "src/logs/index.ts",
+    "src/persist/index.ts",
     "src/communication/index.ts",
+    "src/params/index.ts",
+    "src/modal/index.ts",
+    "src/menu/index.ts",
+    "src/chart/index.ts",
+    "src/ui/index.ts",
     "src/stand/demo/peerMedia.tsx",
     "src/stand/demo/peerConference.tsx"
   ]

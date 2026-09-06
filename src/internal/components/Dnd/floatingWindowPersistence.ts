@@ -5,14 +5,14 @@
  *  hook order, effect order and dependency arrays are the same as before. */
 import type React from "react";
 import { useEffect, useRef } from "react";
-import { floatingWindowMap } from "../../utils/persistedMaps.js";
+import { floatingWindowMap } from "../../persist/persistedMaps.js";
 import { isUsableSize, snapGeometry, viewportUnusable } from "./windowGeometry.js";
 import type {
     FloatingWindowPosition,
     FloatingWindowSavedGeometry,
     FloatingWindowSize,
     FloatingWindowSnapRegion,
-} from "../../utils/floatingWindowTypes.js";
+} from "../../persist/floatingWindowTypes.js";
 
 type tRND = FloatingWindowSavedGeometry;
 type tSize = FloatingWindowSize;

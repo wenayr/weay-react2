@@ -1,5 +1,5 @@
 import React from "react";
-import {createPersistedController} from "../../utils/persistedController.js";
+import {createPersistedController} from "../../persist/persistedController.js";
 
 /** One UI block shown in exactly one of several mount points; the point is a persisted setting.
  *  Persistence rides the existing memoryProps -> memoryCache mechanics: memoryProps is observable,

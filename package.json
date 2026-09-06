@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "2.3.0",
+  "version": "3.0.0",
   "description": "Common react",
   "type": "module",
   "strict": true,
@@ -25,7 +25,7 @@
     "_publish": "npm publish .\\dist",
     "_afterBuild": "node copyCompiledFiles.mjs .\\dist  &&  cd dist  &&  npm pkg delete scripts devDependencies private",
     "_copyTypeSupport": "node copyTypeSupport.mjs",
-    "_checkGeneratedTypes": "tsc --ignoreConfig --noEmit --target ESNext --module ESNext --moduleResolution Bundler --jsx react-jsx --strict --skipLibCheck false lib/index.d.ts lib/native/index.d.ts lib/core/index.d.ts lib/react/index.d.ts lib/grid/index.d.ts lib/windows/index.d.ts lib/logs/index.d.ts lib/communication/index.d.ts",
+    "_checkGeneratedTypes": "tsc --ignoreConfig --noEmit --target ESNext --module ESNext --moduleResolution Bundler --jsx react-jsx --strict --skipLibCheck false lib/index.d.ts lib/native/index.d.ts lib/core/index.d.ts lib/react/index.d.ts lib/grid/index.d.ts lib/windows/index.d.ts lib/logs/index.d.ts lib/communication/index.d.ts lib/persist/index.d.ts lib/params/index.d.ts lib/modal/index.d.ts lib/menu/index.d.ts lib/chart/index.d.ts lib/ui/index.d.ts",
     "_copyStyle": "xcopy /Y /S \".\\src\\style\\*.*\" \".\\dist\\lib\\style\\\"\n",
     "publish": "npm run _afterBuild && npm run _copyStyle &&  npm run _publish",
     "build & publish": "npm run build  &&  npm run _publish",
@@ -125,6 +125,11 @@
       "import": "./lib/logs/index.js",
       "default": "./lib/logs/index.js"
     },
+    "./persist": {
+      "types": "./lib/persist/index.d.ts",
+      "import": "./lib/persist/index.js",
+      "default": "./lib/persist/index.js"
+    },
     "./native": {
       "types": "./lib/native/index.d.ts",
       "import": "./lib/native/index.js",
@@ -139,6 +144,31 @@
       "types": "./lib/communication/index.d.ts",
       "import": "./lib/communication/index.js",
       "default": "./lib/communication/index.js"
+    },
+    "./params": {
+      "types": "./lib/params/index.d.ts",
+      "import": "./lib/params/index.js",
+      "default": "./lib/params/index.js"
+    },
+    "./modal": {
+      "types": "./lib/modal/index.d.ts",
+      "import": "./lib/modal/index.js",
+      "default": "./lib/modal/index.js"
+    },
+    "./menu": {
+      "types": "./lib/menu/index.d.ts",
+      "import": "./lib/menu/index.js",
+      "default": "./lib/menu/index.js"
+    },
+    "./chart": {
+      "types": "./lib/chart/index.d.ts",
+      "import": "./lib/chart/index.js",
+      "default": "./lib/chart/index.js"
+    },
+    "./ui": {
+      "types": "./lib/ui/index.d.ts",
+      "import": "./lib/ui/index.js",
+      "default": "./lib/ui/index.js"
     },
     "./demo/peer-media": {
       "types": "./lib/stand/demo/peerMedia.d.ts",

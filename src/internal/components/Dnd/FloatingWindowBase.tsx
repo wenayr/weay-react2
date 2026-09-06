@@ -8,7 +8,7 @@ import { WindowPortalContext } from "./WindowPortal.js";
 import { SnapLayoutOverlay, WindowControls, WindowHeader } from "./WindowChrome.js";
 import { useFloatingWindowController } from "./useFloatingWindowController.js";
 import type { FloatingWindowProps } from "./floatingWindowProps.js";
-import type { FloatingWindowCloseReason } from "../../utils/floatingWindowTypes.js";
+import type { FloatingWindowCloseReason } from "../../persist/floatingWindowTypes.js";
 
 // Freezes the subtree until update changes (intentionally ignores render closure changes) -
 // the previous useMemo-in-callback semantics, but without calling a hook from an arbitrary place

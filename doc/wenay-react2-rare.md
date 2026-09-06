@@ -29,6 +29,17 @@ on -> off                          // subscriptions
 ## Root Namespaces
 The root export is flat. `kit` was removed in 2.0.0 (see `doc/WENAY_REACT2_RENAMES.md`); import names directly or from a subpath.
 
+Root barrel compatibility (3.0.0): the root `wenay-react2` is a compatibility union of the
+canonical subpaths (`/core`, `/react`, `/persist`, `/grid`, `/windows`, `/logs`,
+`/communication`, `/params`, `/modal`, `/menu`, `/chart`, `/ui`; `/native` is separate and
+never overlaps the root). Every root import keeps resolving to the same binding in 3.x
+(`__test/barrelParity.test.ts` asserts `root[name] === subpath[name]` and that no runtime
+name is root-only), but the root is deprecated and the union will be trimmed in the next
+major. Do not add a module to the root without a subpath home - the parity test rejects it.
+The map for existing root code is the "3.0.0 entry map" section of
+`doc/WENAY_REACT2_RENAMES.md`; the cost of each entry (what it may pull) is asserted by
+`scripts/ag-grid-bundle-probe.mjs` and listed in `doc/changes/v3.0.0.md`.
+
 ## Toolchain / Development
 
 - The supported project compiler is TypeScript 7. Module lookup is

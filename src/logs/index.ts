@@ -21,7 +21,11 @@ export type {
 } from "../internal/logs/logsController.js";
 export {
     MessageEventLogCard,
+    MessageEventLogs,
     MessageEventLogsView,
+    PageLogs,
+    getLogsApi,
+    logsApi,
     useLogsPageTable,
     useMessageEventLogsController,
 } from "../internal/logs/logs.js";
@@ -34,6 +38,7 @@ export type {
     UseMessageEventLogsControllerOptions,
 } from "../internal/logs/logs.js";
 export {
+    MiniLogs,
     MiniLogsTable,
     MiniLogsView,
     miniLogsColumnDefs,

@@ -37,8 +37,15 @@ import {createGridBuffer} from "wenay-react2/grid";
 import {FloatingWindow} from "wenay-react2/windows";
 import {createLogsController} from "wenay-react2/logs";
 import {VideoCall} from "wenay-react2/communication";
+import {memoryCache} from "wenay-react2/persist";
+import {ParamsEditor} from "wenay-react2/params";
+import {ModalProvider} from "wenay-react2/modal";
+import {createContextMenu} from "wenay-react2/menu";
+import {createChartEngine} from "wenay-react2/chart";
+import {createToolbar} from "wenay-react2/ui";
 
 console.log(structEqual, createUpdateApi, createGridBuffer, FloatingWindow, createLogsController, VideoCall);
+console.log(memoryCache, ParamsEditor, ModalProvider, createContextMenu, createChartEngine, createToolbar);
 `;
 
 try {

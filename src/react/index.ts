@@ -1,8 +1,10 @@
 export {
+    __observerStateForTests,
     createUpdateApi,
     renderBy,
     renderByLast,
     renderByRevers,
+    updateBy,
     useUpdateBy,
     useUpdateByApi,
 } from "../internal/updateBy.js";
@@ -128,16 +130,16 @@ export {
     memoryMarkDirty,
     memorySet,
     memoryUpdate,
-} from "../internal/utils/memoryStore.js";
+} from "../internal/persist/memoryStore.js";
 export {
     createCacheMap,
     createCacheMapWithStorage,
     browserCacheStorage,
     localStorageCache,
-} from "../internal/utils/cache.js";
-export type {CacheMap, CacheStorage} from "../internal/utils/cache.js";
-export {useCacheMapPersistence} from "../internal/hooks/useCacheMapPersistence.js";
-export {createSearchHistory} from "../internal/utils/searchHistory.js";
+} from "../internal/persist/cache.js";
+export type {CacheMap, CacheStorage} from "../internal/persist/cache.js";
+export {useCacheMapPersistence} from "../internal/persist/useCacheMapPersistence.js";
+export {createSearchHistory} from "../internal/persist/searchHistory.js";
 
 // The project's only shared ResizeObserver. It lives under components/ for historical reasons,
 // which kept it out of this barrel entirely - so every consumer (and the chart engines) rolled

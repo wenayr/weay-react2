@@ -1,6 +1,6 @@
 import React, {useEffect, useRef} from "react";
 import {Resizable, ResizableProps} from "re-resizable";
-import {mapResiReact, type ResizableSavedSize} from "../../utils/persistedMaps.js";
+import {mapResiReact, type ResizableSavedSize} from "../../persist/persistedMaps.js";
 import {isUsableDimension} from "./windowGeometry.js";
 
 /** What re-resizable itself refuses to shrink below when the caller declares no minimum
@@ -11,7 +11,7 @@ const RESIZABLE_MIN = 10;
 const floorFor = (min: number | string | undefined) => typeof min == "number" ? min : RESIZABLE_MIN;
 
 type tSaveMap = ResizableSavedSize
-// Memory for all column sizes; declared in utils/persistedMaps (memoryCache registry must not
+// Memory for all column sizes; declared in persist/persistedMaps (memoryCache registry must not
 // import the component layer) and re-exported here so the public surface is unchanged
 export { mapResiReact }
 type t3 = Pick<ResizableProps, "style" | "enable" | "onResize" | "children" | "size" | "maxWidth"| "maxHeight"| "minWidth"| "minHeight">

@@ -55,6 +55,45 @@ type _LogsSettings = Expect<Eq<
     import("../src/logs/index").LogsSettings
 >>;
 
+/** 3.0.0 entries: one representative type per new subpath, so a rewrite of an entry that
+ *  re-declares a shape instead of re-exporting it fails to compile here. */
+type _MenuItem = Expect<Eq<
+    import("../src/index").MenuItem<{a: number}>,
+    import("../src/menu/index").MenuItem<{a: number}>
+>>;
+type _MenuRightSavedState = Expect<Eq<
+    import("../src/index").MenuRightSavedState,
+    import("../src/menu/index").MenuRightSavedState
+>>;
+type _ModalController = Expect<Eq<
+    import("../src/index").ModalController,
+    import("../src/modal/index").ModalController
+>>;
+type _ParamsEditorController = Expect<Eq<
+    import("../src/index").ParamsEditorController,
+    import("../src/params/index").ParamsEditorController
+>>;
+type _SparklineProps = Expect<Eq<
+    import("../src/index").SparklineProps,
+    import("../src/chart/index").SparklineProps
+>>;
+type _ChartEngine = Expect<Eq<
+    import("../src/index").ChartEngine,
+    import("../src/chart/index").ChartEngine
+>>;
+type _ToolbarItem = Expect<Eq<
+    import("../src/index").ToolbarItem,
+    import("../src/ui/index").ToolbarItem
+>>;
+type _SettingsSection = Expect<Eq<
+    import("../src/index").SettingsSection,
+    import("../src/ui/index").SettingsSection
+>>;
+type _AgGridClassRule = Expect<Eq<
+    import("../src/index").AgGridClassRule<{a: number}>,
+    import("../src/grid/index").AgGridClassRule<{a: number}>
+>>;
+
 const knownLogDivergences = [] as const;
 
 describe("barrel type parity", () => {

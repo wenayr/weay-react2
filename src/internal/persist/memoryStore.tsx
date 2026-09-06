@@ -1,4 +1,4 @@
-import { deepClone } from "./deepClone.js";
+import { deepClone } from "../utils/deepClone.js";
 import { renderBy } from "../updateBy.js";
 import { buttonStatusMap, floatingWindowMap, mapResiReact, mapRightMenu } from "./persistedMaps.js";
 import {createCacheMap} from "./cache.js";
@@ -91,15 +91,25 @@ export function memoryMarkDirty(key: any) {
     memoryProps.touch(typeof key == "string" ? key : undefined)
 }
 
+/** The persisted-commit idiom, in ONE place: mutate in place, rerender subscribers, mark the
+ *  cache dirty. Skipping either half is the classic bug - a silent UI, or a change that never
+ *  reaches storage. memoryUpdate and createPersistedController's commit() both go through here
+ *  (the controller imports this module, so the shared body has to live on this side of the
+ *  edge to stay cycle-free). `entry` is passed explicitly rather than re-read from the map:
+ *  a controller announces the object it handed out, whatever the map holds now. */
+export function memoryCommit<T extends object>(key: any, entry: T, mutate?: (cur: T) => void): T {
+    mutate?.(entry)
+    renderBy(entry)
+    memoryMarkDirty(key)
+    return entry
+}
+
 /** App-facing change of a persisted memoryProps entry in one call:
  *  mutate + rerender subscribers + mark the cache dirty. No-op if the key is absent. */
 export function memoryUpdate<T extends object>(key: any, mutate: (cur: T) => void): T | undefined {
     const cur = memoryProps.get(key) as T | undefined
     if (cur === undefined) return undefined
-    mutate(cur)
-    renderBy(cur)
-    memoryMarkDirty(key)
-    return cur
+    return memoryCommit(key, cur, mutate)
 }
 
 export function memoryGetById<T extends object>(key: any, def: T, id: string|number){

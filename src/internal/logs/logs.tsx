@@ -3,7 +3,7 @@ import {copyToClipboard, Params, timeLocalToStr_hhmmss} from "wenay-common2/clie
 import {renderBy, updateBy} from "../updateBy.js";
 import {ColDef, ColGroupDef, GridReadyEvent} from "ag-grid-community";
 import {contextMenu} from "../menu/menuMouse.js";
-import { memoryGetOrCreate } from "../utils/memoryStore.js";
+import { memoryGetOrCreate } from "../persist/memoryStore.js";
 import { ParamsEditor } from "../components/ParamsEditor/index.js";
 import {logDividerGradient, logSeverityBackground, logStyleTokens} from "./logStyles.js";
 import {AgGridTable, colDefCentered} from "../grid/agGrid4/index.js";

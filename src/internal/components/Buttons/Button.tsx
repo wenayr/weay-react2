@@ -1,5 +1,5 @@
 import React, {ReactElement, useEffect, useRef, useState} from "react";
-import {buttonStatusMap} from "../../utils/persistedMaps.js";
+import {buttonStatusMap} from "../../persist/persistedMaps.js";
 import {OutsideClickArea} from "../OutsideClickArea.js";
 
 /** Moved out of hooks/useOutside.tsx: a persisted toggle button family is a component with
