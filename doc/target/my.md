@@ -23,7 +23,7 @@
 ## Ready
 
 - **Architecture review 2026-09-01 — DONE as the 2.0.0 migration cut** (`doc/changes/v2.0.0.md`, `doc/WENAY_REACT2_RENAMES.md`). Shipped: layout flatten (`src/internal` / `src/stand`), stand and calls out of `lib/`, `./demo/stand` + `./lib/common/api.js` unpublished, CSS side effects removed from every entrypoint, `kit` removed, dead/demo/duplicate exports removed, `logsContext` and `myChart/1` deleted, FloatingWindow / chartEngine / columnState core splits, shared context-menu gesture, persisted `commit` everywhere.
-  - Remaining non-breaking follow-ups (separate focused passes): `memoryUpdate` over `persistedController.commit` (module cycle to untangle); `Toolbar` config algebra -> `toolbarConfig.ts`; `SettingsDialog` search/tree helpers -> `Settings/searchText.ts`; `barrelParity` inverse assertion; per-subpath CSS files if consumers ever need less than the full stylesheet.
+  - DONE in 2.3.0 (`doc/changes/v2.3.0.md`): `Toolbar` config algebra -> `toolbarConfig.ts`; `SettingsDialog` -> `settingsTree.ts` + `searchText.tsx`; `barrelParity` inverse assertion; grid ownership/lifecycle items (AgGridTable row identity, ColumnGrid attachment, dispose, groups on the grid). Still open: `memoryUpdate` over `persistedController.commit` (module cycle); per-subpath CSS files if consumers ever need less than the full stylesheet.
 
 - **common2 2.0.1 + TypeScript 7 adoption — DONE in 1.0.65.** Dependency
   updated to `^2.0.1`; React/ReactDOM, AG Grid, Vite and Jest were refreshed to
