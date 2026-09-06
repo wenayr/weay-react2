@@ -110,6 +110,16 @@ export type AgGridController<T> = ReturnType<typeof useAgGrid<T>>
 // Stable module-level reference so the grid does not re-evaluate the option on each render.
 const ROW_SELECTION = { mode: 'multiRow' } as const
 
+// same shape as modules.ts: bundlers replace NODE_ENV, no @types/node in the library build
+declare const process: {env: {NODE_ENV?: string}}
+
+let warnedGetRowId = false
+function warnGetRowIdIgnored() {
+    if (warnedGetRowId) return
+    warnedGetRowId = true
+    console.warn('wenay-react2 AgGridTable: getRowId is ignored when a controller is supplied - the controller\'s getId owns row identity (pass getId to useAgGrid instead)')
+}
+
 export type AgGridTableProps<T> = AgGridReactProps<T> & {
     /** Controller from useAgGrid: all wiring (getRowId, ready/destroy, sync) is inside. */
     controller?: AgGridController<T>
@@ -162,7 +172,13 @@ function AgGridTableInner<T>(props: AgGridTableProps<T>) {
         () => ({ sortable: true, resizable: true, filter: true, ...defaultColDef }),
         [defaultColDef],
     )
-    const wiredGetRowId = getRowId ?? (controller || data ? grid.props.getRowId : undefined)
+    // Row identity has ONE owner. With a controller it is the controller's getId: the buffer
+    // keys rows by it and every transaction (update/remove) is matched by it, so a different
+    // grid-level getRowId would let updates miss their rows. A stray getRowId prop next to a
+    // controller is therefore ignored (dev warning once); without a controller the prop feeds
+    // the table's own overlay buffer as before.
+    if (process.env.NODE_ENV !== 'production' && controller && getRowId) warnGetRowIdIgnored()
+    const wiredGetRowId = controller ? grid.props.getRowId : (getRowId ?? (data ? grid.props.getRowId : undefined))
 
     return (
         <div ref={containerRef} style={{ height: '100%', width: '100%', overflow: 'hidden' }}>

@@ -3,7 +3,8 @@ import React, {useLayoutEffect, useRef, useState} from 'react'
 import {listen as createListen} from 'wenay-common2/listen'
 import {createUpdateApi} from '../../updateBy.js'
 import {createPersistedController} from '../../utils/persistedController.js'
-import {pinFixedOrder, movedOrderWithFixed} from '../../utils/fixedOrder.js'
+import {movedOrderWithFixed} from '../../utils/fixedOrder.js'
+import {normalizeToolbarConfig, sameOrder, sourceKeySet, RESET_KEY, SETTINGS_KEY, type ToolbarListConfig} from './toolbarConfig.js'
 import {OutsideClickArea} from '../OutsideClickArea.js'
 import {useReorder} from '../../hooks/useReorder.js'
 
@@ -131,11 +132,6 @@ function itemContent(item: ToolbarItem, densityKey: string) {
     </>
 }
 
-/** Reserved visible-map key for the bar's settings (gear) button: not part of
- *  order (the gear always sits at the bar edge), but toggleable like an item. */
-const SETTINGS_KEY = '__settings'
-const RESET_KEY = '__reset'
-
 function useToolbarFlip(layoutKey: string) {
     const itemRefs = useRef(new Map<string, HTMLDivElement>())
     const prevRects = useRef(new Map<string, {left: number, top: number}>())
@@ -238,50 +234,21 @@ export function createToolbar(opts: {
     // one key used to leak a permanent listener per call - HMR, remounts)
     const offSource = ext?.onChange?.(() => emitChange(normalize()))
 
-    function sameOrder(a: string[], b: string[]) {
-        return a.length == b.length && a.every((k, i) => k == b[i])
-    }
-
-    function sourceKeySet(raw: UiListConfig | undefined, known: Set<string>) {
-        return new Set((Array.isArray(raw?.order) ? raw.order : []).filter(k => known.has(k)))
-    }
-
-    function mergeSourceOrder(localOrder: string[], rawSourceOrder: string[], sourceKeys: Set<string>) {
-        if (!sourceKeys.size) return localOrder
-        const sourceOrder = rawSourceOrder.filter(k => sourceKeys.has(k))
-        let i = 0
-        return localOrder.map(k => sourceKeys.has(k) ? (sourceOrder[i++] ?? k) : k)
-    }
-
-    /** The persisted state may be stale or partial (older app version, removed
-     *  items, an unregistered density) - never crash, never drop user data that
-     *  still applies: unknown keys are filtered out, missing items are appended
-     *  (default-visible), fixed items are pinned back to their descriptor index. */
+    /** The rules live in toolbarConfig.ts (pure); this reads the two inputs they need -
+     *  the persisted entry and what the external source reports right now (base = the
+     *  source's un-previewed config, for the Settings editor which authors the preview). */
     function normalize(base = false): ToolbarConfig {
-        const known = new Set(opts.items.map(i => i.key))
-        const extRaw = ext ? (base ? (ext.getBaseConfig?.() ?? ext.getConfig()) : ext.getConfig()) : undefined
-        const localRaw = {order: st.order, visible: st.visible}
-        const raw = ext && sourceMode == 'orderVisible' ? extRaw! : localRaw
-        const sourceKeys = ext && sourceMode == 'order' ? sourceKeySet(extRaw, known) : new Set<string>()
-        const rawOrder = ext && sourceMode == 'order'
-            ? mergeSourceOrder(Array.isArray(st.order) ? st.order : [], Array.isArray(extRaw?.order) ? extRaw.order : [], sourceKeys)
-            : Array.isArray(raw.order) ? raw.order : []
-        const prelim = rawOrder.filter(k => known.has(k) && !opts.items.find(i => i.key == k)?.fixed)
-        for (const it of opts.items)
-            if (!it.fixed && prelim.indexOf(it.key) == -1) prelim.push(it.key)
-        const order = pinFixedOrder(prelim, opts.items)
-        const rawVisible = raw.visible && typeof raw.visible == 'object' ? raw.visible : {}
-        const visible: {[k: string]: boolean} = {}
-        for (const it of opts.items)
-            visible[it.key] = it.fixed ? true : (rawVisible[it.key] ?? it.defaultVisible != false)
-        // the gear/reset flags are toolbar-local: an external source only owns items
-        const gearRaw = (ext ? st.visible : rawVisible) ?? {}
-        visible[SETTINGS_KEY] = typeof gearRaw[SETTINGS_KEY] == 'boolean' ? gearRaw[SETTINGS_KEY] : true
-        if (opts.resetItem !== false)
-            visible[RESET_KEY] = typeof gearRaw[RESET_KEY] == 'boolean' ? gearRaw[RESET_KEY] : resetDefaultVisible()
-        const density = typeof st.density == 'string' && densities.list.some(d => d.key == st.density)
-            ? st.density : (opts.def?.density ?? densities.list[0].key)
-        return {order, visible, density}
+        const extRaw: ToolbarListConfig | undefined = ext ? (base ? (ext.getBaseConfig?.() ?? ext.getConfig()) : ext.getConfig()) : undefined
+        return normalizeToolbarConfig({
+            items: opts.items,
+            local: st,
+            extRaw,
+            sourceMode,
+            resetItem: opts.resetItem !== false,
+            resetDefaultVisible: resetDefaultVisible(),
+            densityKeys: densities.list.map(d => d.key),
+            defDensity: opts.def?.density,
+        })
     }
 
     function metaVisible(next: ToolbarConfig, key: string, def: boolean) {

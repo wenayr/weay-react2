@@ -173,3 +173,31 @@ test("createColumnState memoizes the normalized config and visibleKeys between c
     expect(cs.api.getConfig().order).toEqual(["a", "c", "b"]);
     expect(cs.api.getConfig()).toBe(cs.api.getConfig());
 });
+
+test("group membership gates the desktop grid like it gates visibleKeys, and does not fold back as visibility", async () => {
+    const cs = createColumnState({
+        key: "test.columnState.groupsGrid",
+        saveMs: 1,
+        columns: [
+            {key: "name", title: "Name"},
+            {key: "v1", title: "v1", group: "versions"},
+            {key: "v2", title: "v2", group: "versions"},
+        ],
+    });
+    const grid = createFakeGrid(["name", "v1", "v2"]);
+    cs.grid.attach(grid as any);
+    cs.api.setConfig({...cs.api.getConfig(), groups: {versions: ["v1"]}});
+    expect(cs.api.visibleKeys()).toEqual(["name", "v1"]);
+    expect(grid.hidden("v2")).toBe(true);
+    expect(grid.hidden("v1")).toBe(false);
+    // an unrelated grid edit folds the grid state back - the group-driven hide must not
+    // come back as persisted visible:false
+    grid.userResize("name", 140);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    cs.grid.detach();
+    expect(cs.api.getConfig().width.name).toBe(140);
+    expect(cs.api.getConfig().visible.v2).toBe(true);
+    // re-enable the sub-column: it comes back in the grid too
+    cs.api.setConfig({...cs.api.getConfig(), groups: {versions: ["v1", "v2"]}});
+    expect(cs.api.visibleKeys()).toEqual(["name", "v1", "v2"]);
+});

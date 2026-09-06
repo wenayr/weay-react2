@@ -312,10 +312,19 @@ export function createColumnState(opts: {
     let applying = false
     let saveTimer: ReturnType<typeof setTimeout> | undefined
 
+    const groupOf = new Map(opts.columns.filter(c => c.group).map(c => [c.key, c.group!]))
+    /** true when the column belongs to a group and that group currently excludes it */
+    function groupGated(cfg: ColumnsConfig, key: string) {
+        const g = groupOf.get(key)
+        return !!g && (cfg.groups[g]?.indexOf(key) ?? -1) == -1
+    }
+
     function toAgState(cfg: ColumnsConfig): AgColumnState[] {
         return cfg.order.map(k => ({
             colId: k,
-            hide: cfg.visible[k] == false || !passesPresentGate(k),
+            // groups gate the desktop grid too (they always gated visibleKeys()/cards): a
+            // sub-column disabled in its group is hidden here, so table and cards agree
+            hide: cfg.visible[k] == false || !passesPresentGate(k) || groupGated(cfg, k),
             width: cfg.width[k], // undefined = leave the grid's current width
             sort: cfg.sort?.key == k ? cfg.sort.dir : null,
         }))
@@ -355,7 +364,7 @@ export function createColumnState(opts: {
             // `hide` for a gated-out column was written by applyToGrid(), not by
             // the user. Folding it back would turn runtime presence into persisted
             // visibility and keep the column hidden when the gate opens again.
-            if (passesPresentGate(s.colId)) visible[s.colId] = !s.hide
+            if (passesPresentGate(s.colId) && !groupGated(cfg, s.colId)) visible[s.colId] = !s.hide
             if (typeof s.width == 'number' && s.width > 0) width[s.colId] = s.width
             if (s.sort == 'asc' || s.sort == 'desc') sort = {key: s.colId, dir: s.sort}
         }

@@ -180,6 +180,8 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
         saveMs: opts.saveMs,
     })
     let gridApiForFit: GridApi<T> | null = null
+    /** the grid the state is currently attached to (see handleGridPreDestroyed) */
+    let attachedApi: GridApi<T> | null = null
     let fitOnCountChange = opts.autoSizeOnColumnCountChange === true
     let visibleCount = state.api.visibleKeys().length
     let fitRaf = 0
@@ -234,6 +236,7 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
 
     function handleGridReady(event: GridReadyEvent<T>) {
         gridApiForFit = event.api
+        attachedApi = event.api
         fitOnCountChange = live.fitOnCountChange
         state.grid.attach(event.api)
         chrome?.grid.attach(event.api)
@@ -245,12 +248,27 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
     }
 
     function handleGridPreDestroyed(event: GridPreDestroyedEvent<T>) {
-        if (gridApiForFit === event.api) gridApiForFit = null
+        // One controller drives ONE grid: the most recently attached one. A second <Table>
+        // mount re-attaches the state to its grid; when the older table is then destroyed it
+        // must not detach the newer one (it used to - the state went silent while a live grid
+        // was still on screen). Only the currently attached grid releases the state/chrome.
+        if (attachedApi !== event.api) {
+            live.onGridPreDestroyed?.(event)
+            return
+        }
+        releaseGrid()
+        live.onGridPreDestroyed?.(event)
+    }
+
+    function releaseGrid() {
+        const api = attachedApi
+        if (!api) return
+        attachedApi = null
+        gridApiForFit = null
         cancelAnimationFrame(fitRaf)
         fitRaf = 0
-        chrome?.grid.detach(event.api)
+        chrome?.grid.detach(api)
         state.grid.detach()
-        live.onGridPreDestroyed?.(event)
     }
 
     function handleCellContextMenu(event: CellContextMenuEvent<T>) {
@@ -377,15 +395,15 @@ export function createColumnGrid<T extends object>(opts: ColumnGridOptions<T>): 
         </div>
     }
 
-    /** Release factory-lifetime subscriptions (config onChange, toolbar source, pending fit).
-     *  Persisted config stays; this is listener lifetime only (HMR, repeated factories). */
+    /** Full release: factory-lifetime subscriptions (config onChange, toolbar source, pending
+     *  fit) AND the attached grid - after dispose() no grid event can reach the state any more
+     *  (a disposed controller used to keep its grid listeners until that grid was destroyed).
+     *  Persisted config stays. */
     function dispose() {
+        releaseGrid()
         offConfigChange()
         toolbar?.api.dispose()
         chrome?.dispose()
-        cancelAnimationFrame(fitRaf)
-        fitRaf = 0
-        gridApiForFit = null
     }
 
     return {
