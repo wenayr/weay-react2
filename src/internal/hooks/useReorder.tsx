@@ -55,6 +55,14 @@ export type ReorderItem = {
     active: boolean
 }
 
+/** Optional consumer-rendered preview: portal it outside clipping/transform ancestors.
+ *  Hide the original with visibility:hidden while rendering it; keep its layout box. */
+export type ReorderOverlay = {
+    key: string
+    /** Viewport coordinates; add the consumer's stacking level and appearance. */
+    style: React.CSSProperties
+}
+
 export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOptions) {
     const listRef = useRef<E>(null)
     const [dragKey, setDragKey] = useState<string | null>(null)
@@ -63,6 +71,7 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
     // Pointer deltas are viewport px, layout is local px: under a scaled ancestor
     // (client styling, zoomed containers) they diverge - normalize by the ratio.
     const scaleRef = useRef(1)
+    const overlayRectRef = useRef<{left: number, top: number, width: number, height: number} | null>(null)
     const measureRef = useRef<{target: number, pos: {x: number, y: number}[]} | null>(null)
     // Published by the layout effect below; item() only READS it, so nothing measures or
     // mutates the DOM during render.
@@ -118,6 +127,10 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
         // offsetLeft/Top, NOT getBoundingClientRect: offsets are pure layout-box
         // positions - transforms (incl. mid-flight transitions) never leak in
         const els = kids()
+        const grabbed = els[o.order.indexOf(key)]
+        if (!grabbed) return false
+        const rect = grabbed.getBoundingClientRect()
+        overlayRectRef.current = {left: rect.left, top: rect.top, width: rect.width, height: rect.height}
         slotsRef.current = els.map(el => ({x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2}))
         startRef.current = els.map(el => ({x: el.offsetLeft, y: el.offsetTop}))
         measureRef.current = null
@@ -207,5 +220,15 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
         }
     }
 
-    return {listRef, item, dragKey, preview}
+    const rect = overlayRectRef.current
+    const overlay: ReorderOverlay | null = dragKey != null && drag.isDragging && rect ? {
+        key: dragKey,
+        style: {
+            position: 'fixed', left: rect.left + drag.position.x, top: rect.top + drag.position.y,
+            width: rect.width, height: rect.height, boxSizing: 'border-box',
+            pointerEvents: 'none', margin: 0,
+        },
+    } : null
+
+    return {listRef, item, dragKey, preview, overlay}
 }

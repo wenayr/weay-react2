@@ -8,14 +8,14 @@ type StoreEachCtx = Observe.StoreEachCtx;
 type StorePatch = Observe.StorePatch;
 type ReplayEvent<Z extends any[]> = Replay.ReplayEvent<Z>;
 type ReplayRemote<Z extends any[]> = Replay.ReplayRemote<Z>;
-type StoreReplayRemote = Observe.StoreReplayRemote;
+type StoreReplayRemote<T extends object = any> = Observe.StoreReplayRemote<T>;
 type StoreLazyRemote = Observe.StoreLazyRemote;
 type StoreLazyCursor = Observe.StoreLazyCursor;
 type StaleInfo = Replay.StaleInfo;
 export type ReplayRouteEvent = Replay.ReplayRouteEvent;
 export type ReplayRouteSwitchOptions = Replay.ReplayRouteSwitchOpts;
 type ReplayRouteHandle<Z extends any[]> = (() => void) & {ready: Promise<void>, switch: (nextRemote: ReplayRemote<Z>, nextOpts?: ReplayRouteSwitchOptions) => Promise<void>, seq: () => number, label: () => string | undefined, active: () => boolean};
-type StoreReplayRouteHandle = (() => void) & {ready: Promise<void>, switch: (nextRemote: StoreReplayRemote, nextOpts?: ReplayRouteSwitchOptions) => Promise<void>, seq: () => number, label: () => string | undefined, active: () => boolean};
+type StoreReplayRouteHandle<T extends object> = (() => void) & {ready: Promise<void>, switch: (nextRemote: StoreReplayRemote<T>, nextOpts?: ReplayRouteSwitchOptions) => Promise<void>, seq: () => number, label: () => string | undefined, active: () => boolean};
 
 /**
  * React bridge over the Replay stack (snapshot + sequenced delta line) of wenay-common2.
@@ -63,6 +63,7 @@ function useMirrorStore<T extends object, R>(remote: R, create: () => Observe.St
 type SeqSubHandle = (() => void) & {ready: Promise<void>, seq: () => number, lastTs: () => number, isStale: () => boolean};
 
 type ReplayLifecycleCtx = {
+    isActive: () => boolean;
     seqRef: {current: number | undefined};
     markFailed: () => void;
     setReady: (v: boolean) => void;
@@ -116,6 +117,7 @@ function useReplayLifecycle<TRemote, TSub extends SeqSubHandle>(params: {
         if (staleMs === undefined) setStale(false);
 
         const off = attach({
+            isActive: () => alive,
             seqRef,
             markFailed: () => { failed = true; },
             setReady: v => { if (alive) setReady(v); },
@@ -153,6 +155,7 @@ function useReplayLifecycle<TRemote, TSub extends SeqSubHandle>(params: {
 type RouteSubHandle = (() => void) & {ready: Promise<void>, seq: () => number, label: () => string | undefined, active: () => boolean, switch: (nextRemote: any, nextOpts?: ReplayRouteSwitchOptions) => Promise<void>};
 
 type RouteLifecycleCtx = {
+    isActive: () => boolean;
     seqRef: {current: number | undefined};
     setError: (e: unknown) => void;
     onRoute: (ev: ReplayRouteEvent) => void;
@@ -197,6 +200,7 @@ function useRouteLifecycle<TRemote, TSub extends RouteSubHandle>(params: {
         activeRef.current = false;
 
         const off = attach({
+            isActive: () => alive,
             seqRef,
             setError: e => { if (alive) setError(e); },
             onRoute: ev => {
@@ -445,7 +449,24 @@ export function useReplayRouteSubscribe<Z extends any[]>(
 
     return useMemo(() => ({ready, error, route, switching, seq, label: currentLabel, active, switchRoute}), [ready, error, route, switching, seq, currentLabel, active, switchRoute]);
 }
+/** Keep inline option objects/callbacks stable while fencing progress from closed subscriptions. */
+function useChunkedKeyframe(option: Observe.StoreReplayChunkedKeyframeOpt | undefined) {
+    const enabled = option !== false;
+    const budgetBytes = typeof option === "object" ? option.budgetBytes : undefined;
+    const progressRef = useLatestRef(typeof option === "object" ? option.onProgress : undefined);
+    return {
+        enabled,
+        budgetBytes,
+        forSubscription: (isActive: () => boolean): Observe.StoreReplayChunkedKeyframeOpt => enabled ? {
+            budgetBytes,
+            onProgress: progress => { if (isActive()) progressRef.current?.(progress); },
+        } : false,
+    };
+}
+
 export type UseStoreReplaySyncOptions<T extends object = any> = UseReplaySubscribeOptions & {
+    /** Automatic by default; false uses one snapshot. Mode/budget changes resubscribe; onProgress rides a ref. */
+    chunkedKeyframe?: Observe.StoreReplayChunkedKeyframeOpt;
     /**
      * @deprecated Store Replay V2 is the only wire in wenay-common2 2.x.
      * Kept as an ignored compatibility option for consumers compiled against 1.x.
@@ -467,13 +488,14 @@ export type StoreReplaySyncController = ReplaySubscribeController;
  */
 export function useStoreReplaySync<T extends object>(
     store: Observe.Store<T> | null | undefined,
-    remote: StoreReplayRemote | null | undefined,
+    remote: StoreReplayRemote<NoInfer<T>> | null | undefined,
     options: UseStoreReplaySyncOptions<T> = {},
 ): StoreReplaySyncController {
     const {since, keepSeq = true, enabled = true, onSeq, onError, staleMs, onStale, policy, hint, onBatch, validateBatch} = options;
     const hooksRef = useLatestRef({onSeq, onError, onStale});
     const batchHooksRef = useLatestRef({onBatch, validateBatch});
     const hintRef = useLatestRef(hint);
+    const chunks = useChunkedKeyframe(options.chunkedKeyframe);
 
     return useReplayLifecycle({
         remote,
@@ -482,6 +504,7 @@ export function useStoreReplaySync<T extends object>(
         keepSeq,
         staleMs,
         attach: ctx => Observe.syncStoreReplay(store!, remote!, {
+            chunkedKeyframe: chunks.forSubscription(ctx.isActive),
             since: ctx.seqRef.current,
             policy,
             hint: hintRef.current,
@@ -503,11 +526,13 @@ export function useStoreReplaySync<T extends object>(
                 },
             } : null),
         }),
-        deps: [store, enabled, policy],
+        deps: [store, enabled, policy, chunks.enabled, chunks.budgetBytes],
     });
 }
 
 export type UseStoreReplayRouteSyncOptions<T extends object = any> = UseReplayRouteSubscribeOptions & {
+    /** Shared by the initial route and switchRoute; callback identity does not resubscribe. */
+    chunkedKeyframe?: Observe.StoreReplayChunkedKeyframeOpt;
     /**
      * @deprecated Store Replay V2 is the only wire in wenay-common2 2.x.
      * Kept as an ignored compatibility option for consumers compiled against 1.x.
@@ -517,7 +542,7 @@ export type UseStoreReplayRouteSyncOptions<T extends object = any> = UseReplayRo
     validateBatch?: (patches: readonly StorePatch[], store: Observe.Store<T>) => void;
 };
 
-export type StoreReplayRouteSyncController = {
+export type StoreReplayRouteSyncController<T extends object = any> = {
     readonly ready: boolean;
     readonly error: unknown;
     readonly route: ReplayRouteEvent | null;
@@ -525,7 +550,7 @@ export type StoreReplayRouteSyncController = {
     seq(): number;
     label(): string | undefined;
     active(): boolean;
-    switchRoute(nextRemote: StoreReplayRemote, options?: ReplayRouteSwitchOptions): Promise<void>;
+    switchRoute(nextRemote: StoreReplayRemote<T>, options?: ReplayRouteSwitchOptions): Promise<void>;
 };
 
 /**
@@ -534,21 +559,23 @@ export type StoreReplayRouteSyncController = {
  */
 export function useStoreReplayRouteSync<T extends object>(
     store: Observe.Store<T> | null | undefined,
-    remote: StoreReplayRemote | null | undefined,
+    remote: StoreReplayRemote<NoInfer<T>> | null | undefined,
     options: UseStoreReplayRouteSyncOptions<T> = {},
-): StoreReplayRouteSyncController {
+): StoreReplayRouteSyncController<T> {
     const {since, keepSeq = true, enabled = true, label, onSeq, onError, onRoute, policy, hint, onBatch, validateBatch} = options;
     const hooksRef = useLatestRef({onSeq, onError, onRoute});
     const batchHooksRef = useLatestRef({onBatch, validateBatch});
     const hintRef = useLatestRef(hint);
+    const chunks = useChunkedKeyframe(options.chunkedKeyframe);
 
-    const {ready, error, route, switching, seq, label: currentLabel, active, subRef, setError} = useRouteLifecycle<StoreReplayRemote, StoreReplayRouteHandle>({
+    const {ready, error, route, switching, seq, label: currentLabel, active, subRef, setError} = useRouteLifecycle<StoreReplayRemote<T>, StoreReplayRouteHandle<T>>({
         remote,
         guard: !!store && !!remote && enabled,
         since,
         keepSeq,
         label,
         attach: ctx => Observe.syncStoreReplayRoute(store!, remote!, {
+            chunkedKeyframe: chunks.forSubscription(ctx.isActive),
             since: ctx.seqRef.current,
             label,
             policy,
@@ -568,10 +595,10 @@ export function useStoreReplayRouteSync<T extends object>(
                 hooksRef.current.onRoute?.(ev);
             },
         }),
-        deps: [store, enabled, policy],
+        deps: [store, enabled, policy, chunks.enabled, chunks.budgetBytes],
     });
 
-    const switchRoute = useCallback((nextRemote: StoreReplayRemote, switchOptions?: ReplayRouteSwitchOptions) => {
+    const switchRoute = useCallback((nextRemote: StoreReplayRemote<T>, switchOptions?: ReplayRouteSwitchOptions) => {
         const sub = subRef.current;
         if (!sub) return Promise.reject(new Error("useStoreReplayRouteSync: no active route subscription"));
         setError(null);
@@ -581,13 +608,13 @@ export function useStoreReplayRouteSync<T extends object>(
     return useMemo(() => ({ready, error, route, switching, seq, label: currentLabel, active, switchRoute}), [ready, error, route, switching, seq, currentLabel, active, switchRoute]);
 }
 
-export type StoreReplayRouteMirrorController<T extends object> = StoreReplayRouteSyncController & {
+export type StoreReplayRouteMirrorController<T extends object> = StoreReplayRouteSyncController<T> & {
     readonly store: Observe.Store<T>;
 };
 
 /** Create a local mirror store and keep it synced through a route-replaceable replay remote. */
 export function useStoreReplayRouteMirror<T extends object>(
-    remote: StoreReplayRemote | null | undefined,
+    remote: StoreReplayRemote<NoInfer<T>> | null | undefined,
     initial: T,
     options: UseStoreReplayRouteSyncOptions<T> = {},
 ): StoreReplayRouteMirrorController<T> {
@@ -605,7 +632,7 @@ export type StoreReplayMirrorController<T extends object> = StoreReplaySyncContr
  * so reconnect is a journal tail, not a keyframe. A new `remote` recreates the store.
  */
 export function useStoreReplayMirror<T extends object>(
-    remote: StoreReplayRemote | null | undefined,
+    remote: StoreReplayRemote<NoInfer<T>> | null | undefined,
     initial: T,
     options: UseStoreReplaySyncOptions<T> = {},
 ): StoreReplayMirrorController<T> {
@@ -756,9 +783,9 @@ export type UseStoreReplayEachOptions<T extends object> = UseStoreReplaySyncOpti
  * subscriptions: controller.store (useStoreNode/useStoreKeys work on it as usual).
  */
 export function useStoreReplayEach<T extends object>(
-    remote: StoreReplayRemote | null | undefined,
-    cb: (key: string, value: T[keyof T] | undefined, ctx: StoreEachCtx) => void,
-    options: UseStoreReplayEachOptions<T> = {},
+    remote: StoreReplayRemote<T> | null | undefined,
+    cb: (key: string, value: NoInfer<T>[keyof T] | undefined, ctx: StoreEachCtx) => void,
+    options: UseStoreReplayEachOptions<NoInfer<T>> = {},
 ): StoreReplayMirrorController<T> {
     const {initial, drain, ...syncOptions} = options;
     const store = useMirrorStore(remote, () => Observe.createStore<T>((initial ?? {}) as T, drain !== undefined ? {drain} : undefined));

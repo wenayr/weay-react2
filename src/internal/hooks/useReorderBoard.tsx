@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react'
 import {useDraggableApi} from './useDraggable.js'
-import {ReorderItem} from './useReorder.js'
+import type {ReorderItem, ReorderOverlay} from './useReorder.js'
 
 /** useReorderBoard - the columns extension of useReorder: keyed blocks live in
  *  VERTICAL columns (plain consumer divs), one block drags between/within them,
@@ -45,6 +45,7 @@ type BoardGeometry = {
     rowGap: Map<string, number>
     draggedCenter: {x: number, y: number}
     draggedSize: {w: number, h: number}
+    overlayRect: {left: number, top: number, width: number, height: number} | null
 }
 
 export function useReorderBoard(o: ReorderBoardOptions) {
@@ -181,7 +182,7 @@ export function useReorderBoard(o: ReorderBoardOptions) {
         const fromEl = from && colEls.current.get(from.col)
         if (!from || !fromEl) return false
         const scale = fromEl.offsetWidth ? fromEl.getBoundingClientRect().width / fromEl.offsetWidth : 1
-        const g: BoardGeometry = {scale, from, colRect: new Map(), centers: new Map(), startOffset: new Map(), rowGap: new Map(), draggedCenter: {x: 0, y: 0}, draggedSize: {w: 0, h: 0}}
+        const g: BoardGeometry = {scale, from, colRect: new Map(), centers: new Map(), startOffset: new Map(), rowGap: new Map(), draggedCenter: {x: 0, y: 0}, draggedSize: {w: 0, h: 0}, overlayRect: null}
         for (const c of cols) {
             const el = colEls.current.get(c.key)
             if (!el) continue
@@ -199,6 +200,7 @@ export function useReorderBoard(o: ReorderBoardOptions) {
                 if (k == key) {
                     g.draggedCenter = {x: (kr.x + kr.width / 2) / scale, y: (kr.y + kr.height / 2) / scale}
                     g.draggedSize = {w: kid.offsetWidth, h: kid.offsetHeight}
+                    g.overlayRect = {left: kr.left, top: kr.top, width: kr.width, height: kr.height}
                 }
             })
             g.centers.set(c.key, cs)
@@ -252,5 +254,15 @@ export function useReorderBoard(o: ReorderBoardOptions) {
         }
     }
 
-    return {columnRef, item, dragKey, over}
+    const rect = geom.current?.overlayRect
+    const overlay: ReorderOverlay | null = dragKey != null && drag.isDragging && rect ? {
+        key: dragKey,
+        style: {
+            position: 'fixed', left: rect.left + drag.position.x, top: rect.top + drag.position.y,
+            width: rect.width, height: rect.height, boxSizing: 'border-box',
+            pointerEvents: 'none', margin: 0,
+        },
+    } : null
+
+    return {columnRef, item, dragKey, over, overlay}
 }

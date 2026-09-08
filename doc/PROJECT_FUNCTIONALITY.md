@@ -369,6 +369,11 @@ after each physical V2 envelope; `validateBatch` can reject an envelope before
 it mutates the target store. The deprecated React `batch` option is accepted
 only as an ignored source-compatibility field.
 
+Store Replay hooks preserve typed remote/destination compatibility, including route switches.
+`chunkedKeyframe` exposes snapshot byte budgets and progress across sync/mirror/route/per-key
+hooks; common2 owns assembly and fallback, React owns callback refs and subscription cleanup.
+QA card 55 is the live chunked inventory example.
+
 Transport reconnect and replay recovery belong to `wenay-common2`, not these
 hooks. With a stable RPC `remote`, the reconnect contract introduced in common2
 1.0.75 and retained in 2.x rebinds a transiently lost physical Listen

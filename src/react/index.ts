@@ -22,7 +22,7 @@ export type {
     UseDraggableReturn,
 } from "../internal/hooks/useDraggable.js";
 export {useReorder} from "../internal/hooks/useReorder.js";
-export type {ReorderItem, ReorderOptions} from "../internal/hooks/useReorder.js";
+export type {ReorderItem, ReorderOptions, ReorderOverlay} from "../internal/hooks/useReorder.js";
 export {useReorderBoard} from "../internal/hooks/useReorderBoard.js";
 export type {
     BoardColumn,

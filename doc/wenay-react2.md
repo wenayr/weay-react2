@@ -183,6 +183,16 @@ b.over                                                                      // {
 // draggable column wrappers stay headless too: compose a second useReorder over column keys,
 // bind its item(key).props to YOUR header and item(key).style to YOUR complete wrapper.
 
+// Clipped/scrolling containers: both hooks expose overlay {key, style} | null.
+// Render a consumer-owned visual copy outside the list (import createPortal from "react-dom"):
+{b.overlay && createPortal(
+    <div aria-hidden style={{...b.overlay.style, zIndex: 10000}}><ItemPreview itemKey={b.overlay.key}/></div>,
+    document.body,
+)}
+// While showing the overlay, add visibility:"hidden" to the ORIGINAL dragged item.
+// Keep its layout box (do not use display:none). Overlay style uses viewport coordinates,
+// the complete item's measured size and pointerEvents:"none". Appearance belongs to the app.
+
 <FloatingWindow keyForSave="tool" size={{width: 320, height: 240}} header={<div>Tool</div>}
                 closable closeOnEscape onClose={reason => setOpen(false)}> {/* legacy onClickClose remains */}
     <Panel />
@@ -638,6 +648,35 @@ are transparent transport fixes and require no React wrapper changes.
 
 ## Replay React Adapter
 Client-side hooks over the wenay-common2 Replay stack (snapshot + sequenced delta line). Server parts (`conflateReplay`, `archiveReplay`, `createRpcServerAuto` replayOpts) are per-connection and stay hook-free by design.
+
+Since 3.1.0, Store Replay hooks check `StoreReplayRemote<T>` against the destination
+Store/initial state, and route controllers preserve `T` in `switchRoute`. For an empty
+dictionary seed, provide the state type explicitly (`useStoreReplayMirror<Rows>(remote, {})`).
+`useStoreReplayEach` also infers its row values from a typed remote. A remote declared without
+`<T>` upstream remains untyped; use a typed remote to get state compatibility checks.
+
+All five Store Replay hooks accept `chunkedKeyframe`: omit it or use `true` for automatic
+chunking, use `false` for a single snapshot, or supply a byte budget and progress callback:
+
+```tsx
+import {useStoreReplayMirror} from "wenay-react2/react";
+import type {StoreReplayRemote} from "wenay-common2/observe";
+
+type Rows = Record<string, {stock: number}>;
+function Inventory({remote}: {remote: StoreReplayRemote<Rows>}) {
+    const [parts, setParts] = React.useState({received: 0, total: 1});
+    const mirror = useStoreReplayMirror<Rows>(remote, {}, {
+        chunkedKeyframe: {budgetBytes: 64 * 1024, onProgress: setParts},
+    });
+    return <span>{mirror.ready ? "Ready" : `${parts.received}/${parts.total} parts`}</span>;
+}
+```
+
+Progress describes snapshot transfer, not state application: the Store receives the assembled
+snapshot, and `ready` signals completed initialization. Hosts without chunks fall back to a
+single snapshot. Inline options/callbacks do not resubscribe; changing mode or budget does,
+while preserving the normal `keepSeq` resume policy. QA card 55 demonstrates this with a live
+inventory, configurable chunks and a progress bar.
 
 ```ts
 import { useReplaySubscribe, useReplayRouteSubscribe, useStoreReplaySync, useStoreReplayMirror, useStoreReplayRouteSync, useStoreReplayRouteMirror, useStoreReplayEach, useReplayFrame, useReplayHistory } from "wenay-react2"

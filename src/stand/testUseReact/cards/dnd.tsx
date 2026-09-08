@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import {createPortal} from 'react-dom';
 import { useReorder, useReorderBoard, renderBy, updateBy, useCacheMapPersistence, memoryCache, type BoardColumn } from "../../../api.js";
 import { Button } from "../../../internal/components/Buttons/index.js";
 import { FloatingWindow, FloatingWindowTaskbar, WindowPortal, type FloatingWindowMode, type FloatingWindowSnapRegion } from "../../../internal/components/index.js";
@@ -380,7 +381,17 @@ const BoardDemo = () => {
         log(`created ${k}`);
     };
     const trashOver = r.over?.col == qaBoardTrash;
+    const draggedColumn = boardState.cols.find(c => c.key === columnsReorder.overlay?.key);
+    const itemStyle = (it: ReturnType<typeof r.item>): React.CSSProperties => ({
+        ...qaBoardItemStyle(it),
+        ...(it.dragging && r.overlay ? {visibility: 'hidden', transform: undefined} : {}),
+    });
     return <div style={qaBoardStyles.root}>
+        <div role="status" style={{color: '#52647a', minHeight: 20}}>
+            {r.overlay && r.over ? `${r.overlay.key} → ${r.over.col === qaBoardTrash ? 'Удалить' : r.over.col === qaBoardTray ? 'Новые элементы' : r.over.col.toUpperCase()} · позиция ${r.over.index + 1}`
+                : columnsReorder.overlay ? `Перемещаем колонку ${columnsReorder.overlay.key.toUpperCase()}`
+                : 'Переносите карточки между колонками. За заголовок можно переместить всю колонку.'}
+        </div>
         <div style={qaBoardStyles.workspace}>
             <div style={qaBoardStyles.leftRail}>
                 <div style={qaBoardStyles.toolButtons}>
@@ -395,7 +406,7 @@ const BoardDemo = () => {
                     }}>
                         {boardState.tray.map(k => {
                             const it = r.item(k);
-                            return <div key={k} {...it.props} style={qaBoardItemStyle(it)}>{k}</div>;
+                            return <div key={k} {...it.props} style={itemStyle(it)}>{k}</div>;
                         })}
                     </div>
                 </div>
@@ -417,6 +428,7 @@ const BoardDemo = () => {
                         style={{
                             ...qaBoardStyles.columnWrap,
                             ...columnDrag.style,
+                            ...(columnDrag.dragging && columnsReorder.overlay ? {visibility: 'hidden', transform: undefined} : {}),
                             transition: columnDrag.active && !columnDrag.dragging ? "transform .14s ease" : undefined,
                             zIndex: columnDrag.dragging ? 2 : undefined,
                             boxShadow: columnDrag.dragging ? "0 10px 24px rgba(0,0,0,.35)" : undefined,
@@ -430,16 +442,30 @@ const BoardDemo = () => {
                         <div ref={r.columnRef(c.key)} style={qaBoardColumnStyle(r.over?.col == c.key, bottom)}>
                             {c.items.map(k => {
                                 const it = r.item(k);
-                                return <div key={k} {...it.props} style={qaBoardItemStyle(it)}>{k}</div>;
+                                return <div key={k} {...it.props} style={itemStyle(it)}>{k}</div>;
                             })}
                         </div>
                     </section>;
                 })}
             </div>
         </div>
-        <div style={qaBoardStyles.status}>
+        {r.overlay && createPortal(<div aria-hidden="true" data-testid="board-item-overlay" style={{
+            ...qaBoardStyles.item, ...r.overlay.style, zIndex: 2147483647, fontSize: 13, fontFamily: 'system-ui, sans-serif',
+            background: '#2f5a8f', boxShadow: '0 10px 24px rgba(0,0,0,.35)',
+            outline: '1px solid #85b7f4', cursor: 'grabbing',
+        }}>{r.overlay.key}</div>, document.body)}
+        {columnsReorder.overlay && draggedColumn && createPortal(<section aria-hidden="true" data-testid="board-column-overlay" style={{
+            ...qaBoardStyles.columnWrap, ...columnsReorder.overlay.style, zIndex: 2147483647, fontSize: 13, fontFamily: 'system-ui, sans-serif',
+            boxShadow: '0 12px 28px rgba(0,0,0,.4)', outline: '1px solid #85b7f4',
+        }}>
+            <header style={qaBoardStyles.columnHeader}><span style={qaBoardStyles.columnHandle}>⠿ {draggedColumn.key}</span></header>
+            <div style={qaBoardColumnStyle(false, boardState.gravity[draggedColumn.key] === 'bottom')}>
+                {draggedColumn.items.map(key => <div key={key} style={qaBoardItemStyle({dragging: false, active: false})}>{key}</div>)}
+            </div>
+        </section>, document.body)}
+        <details style={qaBoardStyles.status}><summary>Диагностика</summary>
             order:[{boardState.cols.map(c => c.key).join(",")}] · {boardState.cols.map(c => c.key + (boardState.gravity[c.key] == "bottom" ? "↓" : "↑") + ":[" + c.items.join(",") + "]").join(" ")} tray:[{boardState.tray.join(",")}] | item commits: {boardState.commits} | column commits: {boardState.columnCommits} | events: {boardState.events} | last: {boardState.last}
-        </div>
+        </details>
     </div>;
 };
 
@@ -459,10 +485,10 @@ export function Card26() {
 
 export function Card27() {
     return (
-    <Check n={27} title="useReorderBoard + useReorder - draggable columns and items"
+    <Check id="reorder-board" n={27} title="useReorderBoard + useReorder - draggable columns and items"
                        do="Use the compact controls on the left to create an item or a column. Drag new items from the small tray into columns and between columns. Drag an entire column left/right by its ⠿ header. Change top/bottom gravity from the arrow in a header. Press Del in a header; any items from that column must return to the tray. Drop an individual item on delete item to remove only that item."
-                       expect="Items and columns preview and commit independently: item drag never moves a container, header drag moves the complete container, and header buttons stay clickable. The tray grows only with its contents instead of occupying a tall empty box. A new column appears at the start and can immediately be moved anywhere. Deleting a non-empty column preserves its items in the tray."
-                       note="Canonical headless composition: useReorderBoard owns item movement across registered bodies; useReorder owns the outer column order. All section/header/button/body markup and styling belong to the consumer. The stand supplies one compact default design only—neither hook renders UI or assumes a header."
+                       expect="The complete grabbed card/column follows the pointer above clipped and scrolling containers, without changing its width. The source keeps its layout box; other items preview the landing slot. Items and columns commit independently; header buttons stay clickable. The tray grows with content. Deleting a column preserves its items in the tray."
+                       note="Both headless hooks expose overlay viewport geometry. The consumer portals a non-interactive preview to document.body and hides the original with visibility:hidden. Appearance stays consumer-owned; useReorderBoard owns item moves and useReorder owns column order."
                        tall>
                     <BoardDemo />
                 </Check>

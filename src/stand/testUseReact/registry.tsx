@@ -1,4 +1,5 @@
 import type { QaCard } from "./standKit.js";
+import { Card55 } from "./cards/replayChunks.js";
 import { Card49, Card6 } from "./cards/chart.js";
 import { Card51, Card38, Card39, Card40, Card41, Card42, Card43, Card44, Card45, Card46 } from "./cards/peerMedia.js";
 import { Card18, Card17, Card23, Card24, Card33, Card34, Card48, Card50 } from "./cards/replay.js";
@@ -9,6 +10,7 @@ import { Card8, Card1, Card14, Card7, Card19, Card9, Card10, Card11 } from "./ca
 import { Card5, Card12, Card15, Card16 } from "./cards/grid.js";
 
 export const qaCards: QaCard[] = [
+    { id: 'store-replay-chunks', n: 55, section: 'active', title: 'Store Replay — typed inventory and chunked loading', Component: Card55 },
     { id: 'param-commentary-hover', n: 7, section: 'active', title: 'Parameters - sliders and stable commentary hover', tall: true, Component: Card7 },
     { id: 'sparkline', n: 49, section: 'active', title: 'Sparkline — compact canvas chart', Component: Card49 },
     { id: 'peer-packet-mesh', n: 51, section: 'active', title: 'common2 Peer packet mesh — multi-hop routing + fallback', tall: true, Component: Card51 },
@@ -33,7 +35,7 @@ export const qaCards: QaCard[] = [
     { n: 22, section: 'active', title: 'createCallbackHub - one slot, many subscribers', Component: Card22 },
     { n: 25, section: 'active', title: 'createToolbar - customizable toolbar (config / Bar / Settings)', tall: true, Component: Card25 },
     { n: 26, section: 'active', title: 'useReorder - drag blocks in a field (mini dnd)', Component: Card26 },
-    { n: 27, section: 'active', title: 'useReorderBoard + useReorder - draggable columns and items', tall: true, Component: Card27 },
+    { id: 'reorder-board', n: 27, section: 'active', title: 'useReorderBoard + useReorder - draggable columns and items', tall: true, Component: Card27 },
     { n: 35, section: 'active', title: 'DragBox - imperative delta drag (adapter over useDraggableApi)', Component: Card35 },
     { id: 'floating-window-stack', n: 52, section: 'active', title: 'FloatingWindow - desktop taskbar, sessions, cascade and Snap', tall: true, Component: Card52 },
     { id: 'right-menu-dropdown', n: 54, section: 'active', title: 'RightMenu dropdown - createRightMenuController + submenus', tall: true, Component: Card54 },

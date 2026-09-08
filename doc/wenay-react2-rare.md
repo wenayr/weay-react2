@@ -474,7 +474,7 @@ Reorder-by-drag (useReorder, `hooks/useReorder.tsx` - extracted from the Toolbar
 its first consumer):
 ```
 useReorder({order, commit, move?, canDrag?, preview?: 'slots'|'measure', holdMs?})
-    -> {listRef, item(key) -> {props, style?, dragging, active}, dragKey, preview}
+    -> {listRef, item(key) -> {props, style?, dragging, active}, dragKey, preview, overlay}
 ```
 A deliberately SMALL reorder for keyed blocks laid out by CSS - the hook never knows the layout
 (vertical list, horizontal bar, wrapped grid all work). Semantics:
@@ -504,7 +504,7 @@ Board (useReorderBoard, `hooks/useReorderBoard.tsx` - the columns extension of u
 ```
 useReorderBoard({columns: [{key, items}], commit(next), canDrag?, holdMs?,
                  onDragStart?, onDragMove?, onOverChange?, onDragEnd?})
-    -> {columnRef(col) -> RefCallback, item(key), dragKey, over: {col, index} | null}
+    -> {columnRef(col) -> RefCallback, item(key), dragKey, over: {col, index} | null, overlay}
 ```
 - Columns are plain consumer divs registered via `columnRef(key)` (live callback-ref registry -
   ADDING a column is just consumer state + one more div, spliced at ANY position of the columns
@@ -533,6 +533,20 @@ useReorderBoard({columns: [{key, items}], commit(next), canDrag?, holdMs?,
   Neither hook renders a header, delete button, tray, or visual style.
 - QA card 27 is the live example: compact left tray/actions, item drag between bodies,
   complete-column drag by consumer headers, header `Del`, mixed gravity, and an empty column.
+- **Drag visibility (3.1.0).** Both hooks expose `overlay: ReorderOverlay | null`, with the
+  dragged `key` and a fixed-position `style` measured from the complete item's viewport rect
+  at grab time (the whole list child even when the gesture starts on its header). The style
+  preserves viewport width/height, grab offset and raw pointer delta under scaled ancestors;
+  it disables pointer events. Portal the consumer's visual preview to `document.body` (or an
+  unclipped overlay root), and add its appearance/stacking level there. While showing it, use
+  `visibility: hidden` on the original, never `display:none`: the hook still needs that item's
+  layout box and DOM index. Do not add the preview as another child of a registered list/body.
+  Inline-transform rendering remains available for existing consumers. The overlay appears
+  only when the underlying gesture actually starts (after `holdMs`), disappears on release,
+  and a consumer-owned portal unmounts with its owner. It does not introduce autoscroll or
+  bypass the browser's viewport/top-layer rules.
+  Card 27 (`#reorder-board`) adopts the portal for both cards and entire columns, shows the
+  target in a status line, and keeps diagnostic counters in a collapsed details block.
 
 ## Grid Row Utilities
 ```
@@ -671,6 +685,28 @@ useReplayHistory(history, apply, {head?, reset?, tickMs?=300, autoPlay?=true})
   -> {live, seq, head, pause(), play(), seek({seq?|ts?})}
 ```
 Semantics that are easy to get wrong:
+- **3.1.0 typed Store Replay and snapshot chunks.** `useStoreReplaySync` and its route variant
+  infer state from the destination Store; mirror variants infer it from `initial` or an explicit
+  `<T>`. The remote cannot widen that type (`NoInfer<T>`). `useStoreReplayEach` infers from the
+  remote and checks the initial state/callback against it. Both route controllers carry `T`
+  through `switchRoute`. Unparameterized upstream `StoreReplayRemote` still defaults to `any`;
+  TypeScript cannot recover state information that the caller already erased. Use an explicit
+  state type for an empty `{}` mirror seed. The declarations require TypeScript 5.4+ (`NoInfer`),
+  matching common2 2.16.0's requirement.
+  All five hooks expose common2's `chunkedKeyframe` option unchanged in shape. `undefined`/`true`
+  enable automatic chunking, `false` disables it; `{budgetBytes?, onProgress?}` configures it.
+  The scalar mode/budget participates in effect identity, so inline objects and callback changes
+  stay stable. New callbacks are read through a ref even during an in-flight assembly. Progress
+  from a closed/replaced subscription is suppressed; in-flight transport requests themselves
+  remain common2-owned. A changed mode/budget resubscribes using normal `keepSeq`, so it may
+  resume by journal tail without requesting a new snapshot. Force a fresh snapshot via
+  `restart(-1)` on non-route hooks, or deliberately remount the mirror; route switches share
+  the current subscription's chunk config. Progress is per snapshot (`snapshotId`, `received`,
+  `total`), not overall synchronization readiness; fallback can complete without progress.
+  Common2 assembles all parts before `validateBatch`/apply/`onBatch`; callbacks do not see
+  intermediate partial roots. Active QA card 55 (`#store-replay-chunks`) uses a real common2
+  facade with delayed pulls, plus 16/64 KiB and single-snapshot modes, live stock changes and
+  unmount during loading.
 - **common2 2.16.0 compatibility.** Its stricter Store/Replay declarations compile against the
   existing React hooks without API changes. RPC replay members are now recognized after the
   client-side `since` transformation, so the QA stand and reconnect integration test use the
