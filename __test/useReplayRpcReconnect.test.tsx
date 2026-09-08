@@ -47,7 +47,7 @@ async function makeRpcFixture(history = 128) {
         rpcType => ({replay: rpcType<typeof object>("replay")}),
     );
     const clients = await hub.connect(null);
-    const remote = clients.replay.func.ticks as unknown as NumberRemote;
+    const remote: NumberRemote = clients.replay.func.ticks;
 
     return {
         emit,

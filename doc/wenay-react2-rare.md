@@ -671,6 +671,12 @@ useReplayHistory(history, apply, {head?, reset?, tickMs?=300, autoPlay?=true})
   -> {live, seq, head, pause(), play(), seek({seq?|ts?})}
 ```
 Semantics that are easy to get wrong:
+- **common2 2.16.0 compatibility.** Its stricter Store/Replay declarations compile against the
+  existing React hooks without API changes. RPC replay members are now recognized after the
+  client-side `since` transformation, so the QA stand and reconnect integration test use the
+  inferred `ReplayRemote` directly instead of casting through `unknown`. The new framework-free
+  `Observe.storeExternal` tuple is useful for direct `useSyncExternalStore` consumers, but does
+  not replace these hooks' replay, per-key, lifecycle, and controller surfaces.
 - **common2 2.0.0 Store Replay reset.** Store Replay has one supported facade,
   `Observe.exposeStoreReplay(...).api.replay`, one mode (`"v2"`), and one JSON
   RPC application wire. RPB/1-RPB/3, MessagePack, legacy Store Replay,

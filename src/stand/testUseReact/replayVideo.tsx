@@ -442,15 +442,7 @@ export const ReplayRpcReconnectDemo = () => {
         const offDisconnect = hub.disconnectListen(() => { if (alive) { setConnected(false); void refresh(); } });
         void hub.setToken(null).then(clients => {
             if (!alive) return;
-            // Cast through unknown because of a TYPE-level defect in wenay-common2 2.12.0, not
-            // because the object is wrong at runtime (the RPC server exposes both the plain
-            // listen and the replay surface under one key - doc/wenay-common2-rare.md, "rpc (full)").
-            // createRpcClientHub composes ClientAPIAll<DeepSocketListenSmart<T>>: the inner pass
-            // correctly yields ReplaySocketListen, whose method is named `since`, and the outer
-            // pass re-runs IsReplayMember, which looks for the SERVER-side name `getSince`. The
-            // second pass therefore misses and degrades the member to SocketListenMember, dropping
-            // line/since/keyframe from the type. Drop the cast once common2 detects either name.
-            const next = clients.qaReplay.func.events as unknown as Replay.ReplayRemote<[number]>;
+            const next: Replay.ReplayRemote<[number]> = clients.qaReplay.func.events;
             firstRemote.current ??= next;
             setRemote(next);
             setConnected(true);
