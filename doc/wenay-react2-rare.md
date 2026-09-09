@@ -40,6 +40,46 @@ The map for existing root code is the "3.0.0 entry map" section of
 `doc/WENAY_REACT2_RENAMES.md`; the cost of each entry (what it may pull) is asserted by
 `scripts/ag-grid-bundle-probe.mjs` and listed in `doc/changes/v3.0.0.md`.
 
+## Reorder handles, cancellation and edge scroll (3.3.0)
+
+Keep `item.props` on a non-interactive row for legacy pointer-only use, or use
+`item.handleProps` on a real `<button>` inside it. The handle opts only that button into drag;
+inputs, links, contenteditable and other buttons still work normally. Spread the provided ref,
+events, type and style (`touchAction: none`); compose rather than overwrite them. Supply an
+accessible name/description and a visible focus style. `aria-disabled` keeps a prohibited
+handle discoverable while `canDrag` guards pointer, touch and keyboard starts/commits.
+
+Space/Enter picks up and confirms; repeated keydown does not accidentally confirm.
+Single-list arrows step backwards/forwards in the declared order (not spatial grid navigation).
+Board Up/Down changes insertion index; Left/Right selects the adjacent declared column and
+clamps the index, including empty columns. There is no commit on unchanged confirmation.
+`inputMode` is `pointer | keyboard | null`; `dragKey`, `preview`/`over` and item states are the
+app's announcement inputs. Escape, `cancel()`, blur, touchcancel, changed order/columns or a
+false `canDrag` discard the gesture without commit/onDragEnd. Do not optimistically mutate
+the input order during a gesture. Unmount releases listeners/timers without committing.
+
+Portal the non-interactive, aria-hidden `overlay` to body. It follows the pointer, or marks the
+keyboard destination. Hide the source with visibility:hidden ONLY when inputMode === 'pointer';
+the keyboard handle must remain visible/focusable. The hook restores focus when the committed
+handle mounts. For delayed persistence, apply the committed order locally before awaiting the
+server (or let the app handle focus on its eventual remount). Keep accessible text/state in the
+real card, not in its visual overlay. No screen-reader-specific announcement text is built in.
+
+`autoScroll` defaults off. Enable with `{edge: 40, maxSpeed: 480, canScroll}`: edge is viewport
+pixels, speed is viewport pixels/second. The nearest allowed scrollable with room moves per
+axis; when it reaches its limit the parent can move. Hit-testing ignores the non-interactive
+overlay and clips edge bands to the viewport/overflow ancestors. Actual scroll deltas update
+start-geometry targeting, not transient FLIP transforms. Reduced motion halves the cap and
+uses no smooth-scroll animation; set autoScroll:false to disable it entirely. Keyboard moves
+do not run the edge loop. The app should normally allow-list its board/columns to avoid page
+scrolling. Supported scope: ordinary LTR CSS scroll containers with uniform scaling, mounted
+items and stable geometry. Virtualization, RTL scroll conventions, layout resizing during a
+gesture, nested boards and collision packing remain outside this small controller's contract.
+
+Card 57 uses scoped stand styles only. Browser checks cover its organizer-shaped UI at normal
+and 390px width; touch/reduced-motion/lifecycle edges also have automated tests. This is not
+an accessibility audit with a physical screen reader or acceptance of the separately deployed app.
+
 ## Owned clients and action scopes (3.2.0)
 
 `useOwnedClient` is opt-in ownership, not another subscription wrapper. Its factory must
@@ -68,6 +108,12 @@ results are inferred; only a leading string request ID is supplied by the bindin
 `crypto.randomUUID()` needs a secure browser context; inject `requestId` otherwise. One ID is
 allocated per accepted invocation, never for a busy/disabled rejection. Running again creates
 a new ID, not a receipt retry; reuse of a receipt ID must be an explicit application decision.
+
+3.3.0 adds `ServiceCommandCall<C>` (a union of `[name, ...args]` tuples) and `runTuple(call)`.
+It removes consumer-side conditional-type duplication/casts when forwarding a call between
+components. Known tuples retain exact results; a union call returns the union of its possible
+results. Zero and multiple arguments after request ID work. It is a type boundary, not runtime
+validation for untrusted serialized data. `run` and `runTuple` share one controller lock.
 
 Active QA card 56 exercises these public hooks over real common2 Store/Replay, with artificial
 700 ms startup/action delays. It checks account changes, duplicate clicks, errors, explicit

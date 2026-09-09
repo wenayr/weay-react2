@@ -79,7 +79,7 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
             clearTimeout(holdTimerMouse.current);
             holdTimerMouse.current = null;
         }
-        document.removeEventListener("mouseup", cancelMouseHold);
+        document.removeEventListener("mouseup", cancelMouseHold, true);
     }, []);
 
     const cancelTouchHold = useMemo(() => function cancelTouchHold() {
@@ -87,7 +87,7 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
             clearTimeout(holdTimerTouch.current);
             holdTimerTouch.current = null;
         }
-        document.removeEventListener("touchend", cancelTouchHold);
+        document.removeEventListener("touchend", cancelTouchHold, true);
     }, []);
 
     const bind = useMemo<UseDraggableReturn["dragProps"]>(() => ({
@@ -100,11 +100,11 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
             if (holdMsRef.current > 0) {
                 holdTimerMouse.current = window.setTimeout(() => {
                     holdTimerMouse.current = null;
-                    document.removeEventListener("mouseup", cancelMouseHold);
+                    document.removeEventListener("mouseup", cancelMouseHold, true);
                     setDraggingMouse(true);
                     onDragStartRef.current?.();
                 }, holdMsRef.current);
-                document.addEventListener("mouseup", cancelMouseHold);
+                document.addEventListener("mouseup", cancelMouseHold, true);
             } else {
                 setDraggingMouse(true);
                 onDragStartRef.current?.();
@@ -117,11 +117,11 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
             if (holdMsRef.current > 0) {
                 holdTimerTouch.current = window.setTimeout(() => {
                     holdTimerTouch.current = null;
-                    document.removeEventListener("touchend", cancelTouchHold);
+                    document.removeEventListener("touchend", cancelTouchHold, true);
                     setDraggingTouch(true);
                     onDragStartRef.current?.();
                 }, holdMsRef.current);
-                document.addEventListener("touchend", cancelTouchHold);
+                document.addEventListener("touchend", cancelTouchHold, true);
             } else {
                 setDraggingTouch(true);
                 onDragStartRef.current?.();
@@ -140,7 +140,7 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
 
         const handleMouseUp = () => {
             document.removeEventListener("mousemove", handleMouseMove);
-            document.removeEventListener("mouseup", handleMouseUp);
+            document.removeEventListener("mouseup", handleMouseUp, true);
             const final = { ...positionRef.current };
             setPos({ x: 0, y: 0 });
             setDraggingMouse(false);
@@ -149,11 +149,11 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
         };
 
         document.addEventListener("mousemove", handleMouseMove);
-        document.addEventListener("mouseup", handleMouseUp);
+        document.addEventListener("mouseup", handleMouseUp, true);
 
         return () => {
             document.removeEventListener("mousemove", handleMouseMove);
-            document.removeEventListener("mouseup", handleMouseUp);
+            document.removeEventListener("mouseup", handleMouseUp, true);
         };
     }, [draggingMouse]);
 
@@ -174,7 +174,7 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
             const ended = Array.from(e.changedTouches).find((t) => t.identifier === offsetTouch.current?.id);
             if (ended) {
                 document.removeEventListener("touchmove", handleTouchMove);
-                document.removeEventListener("touchend", handleTouchEnd);
+                document.removeEventListener("touchend", handleTouchEnd, true);
                 const final = { ...positionRef.current };
                 setPos({ x: 0, y: 0 });
                 setDraggingTouch(false);
@@ -184,19 +184,19 @@ export function useDraggableApi(options: UseDraggableOptions = {}): UseDraggable
         };
 
         document.addEventListener("touchmove", handleTouchMove);
-        document.addEventListener("touchend", handleTouchEnd);
+        document.addEventListener("touchend", handleTouchEnd, true);
 
         return () => {
             document.removeEventListener("touchmove", handleTouchMove);
-            document.removeEventListener("touchend", handleTouchEnd);
+            document.removeEventListener("touchend", handleTouchEnd, true);
         };
     }, [draggingTouch]);
 
     useEffect(() => () => {
         if (holdTimerMouse.current != null) clearTimeout(holdTimerMouse.current);
         if (holdTimerTouch.current != null) clearTimeout(holdTimerTouch.current);
-        document.removeEventListener("mouseup", cancelMouseHold);
-        document.removeEventListener("touchend", cancelTouchHold);
+        document.removeEventListener("mouseup", cancelMouseHold, true);
+        document.removeEventListener("touchend", cancelTouchHold, true);
     }, [cancelMouseHold, cancelTouchHold]);
 
     return useMemo(() => ({

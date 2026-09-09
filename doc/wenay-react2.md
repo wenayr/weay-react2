@@ -179,6 +179,17 @@ const b = useReorderBoard({columns: [{key, items}], commit,                 // d
     canDrag?, holdMs?, onDragStart?, onDragMove?, onOverChange?, onDragEnd?})
 <div ref={b.columnRef('todo')}>{items.map(k => ...b.item(k)...)}</div>      // one div per column, any count
 b.over                                                                      // {col, index} | null - live target
+// Accessible handle (both hooks, 3.3.0):
+const item = b.item(key)
+<article style={item.style}>
+  <button {...item.handleProps} aria-label={`Move ${key}`} aria-describedby="move-help">⠿</button>
+  <input aria-label="Note" /> {/* does not start a drag */}
+</article>
+// Space/Enter: start/confirm; arrows: slots (board Left/Right: columns); Escape: no commit.
+// Announce b.dragKey/b.over in your live region. b.inputMode: pointer | keyboard | null.
+b.cancel() // discard preview; data changes / canDrag=false also cancel
+// Opt-in in either hook: autoScroll: {edge: 40, maxSpeed: 480, canScroll: el => allowed(el)}
+// Default off; nearest allowed scrollable per axis; reduced motion halves speed.
 // column gravity is YOUR CSS: justify-content flex-start packs up, flex-end packs down
 // draggable column wrappers stay headless too: compose a second useReorder over column keys,
 // bind its item(key).props to YOUR header and item(key).style to YOUR complete wrapper.
@@ -189,7 +200,8 @@ b.over                                                                      // {
     <div aria-hidden style={{...b.overlay.style, zIndex: 10000}}><ItemPreview itemKey={b.overlay.key}/></div>,
     document.body,
 )}
-// While showing the overlay, add visibility:"hidden" to the ORIGINAL dragged item.
+// While showing a POINTER overlay (b.inputMode === 'pointer'), add visibility:"hidden" to the original.
+// Keep the real keyboard handle visible/focusable; the keyboard overlay marks the target.
 // Keep its layout box (do not use display:none). Overlay style uses viewport coordinates,
 // the complete item's measured size and pointerEvents:"none". Appearance belongs to the app.
 
@@ -591,6 +603,24 @@ their receiver and allocates one ID inside the accepted invocation. The default 
 `crypto.randomUUID()` (secure context required); pass `requestId` for another ID policy.
 No automatic retry: retrying through this binding is a new invocation with a new ID. Reusing
 the same receipt ID after an uncertain outcome is explicit application/scaffold policy.
+
+For a command forwarded through components, use `ServiceCommandCall<C>` and `runTuple`:
+
+```tsx
+import type {ServiceCommandCall, ServiceCommandsController} from 'wenay-react2/react'
+type Commands = typeof commands
+function CommandButton({call, execute}: {
+  call: ServiceCommandCall<Commands>
+  execute: ServiceCommandsController<Commands>['runTuple']
+}) {
+  return <button onClick={() => { void execute(call).catch(() => {}) }}>Run</button>
+}
+<CommandButton call={['save', {title: 'One'}]} execute={actions.runTuple}/>
+await actions.runTuple(['save', {title: 'One'}]) // exact save result; run('save', ...) still works
+```
+
+No local conditional types or cast is needed. Zero/multiple arguments after request ID work;
+tuple and direct calls share pending/error, duplicate protection and ID allocation.
 
 common2 2.17.0 retains view Store identity across role/failover changes. A view's `ready` only
 describes its **first permitted keyframe**, not current permission. Observe the client's

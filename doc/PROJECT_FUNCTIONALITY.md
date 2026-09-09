@@ -100,6 +100,12 @@ Account keys, cancellation, receipts/retry, current authorization and service/do
 stay in the application or common2 client. Active QA card 56 demonstrates the composition
 with real common2 Store/Replay; runtime tests additionally own a real common2 AI client.
 
+Since 3.3.0 `ServiceCommandCall<C>` / `runTuple` preserve command correlation across component
+boundaries without local conditional types or a cast. Reorder hooks offer explicit accessible
+button handles, keyboard slot movement, shared cancellation and opt-in bounded edge scrolling.
+Card 57 composes them as a local organizer. Application persistence, live-region text and
+which containers may scroll remain consumer policy; this is not a second DnD engine.
+
 ## Compatibility Policy
 
 New hook/controller surfaces should prefer migration without breaking old public APIs, but compatibility is not absolute. An aggressive migration is allowed only as an explicit migration cut: separate task, changelog, migration notes, and a clear list of changed imports/behavior. Default visual styles have a stricter rule: do not remove a default class/style contract unless the replacement class/token path already exists and is documented.

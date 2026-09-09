@@ -426,3 +426,21 @@
   .wenayMeetingInviteBar small { display: none; }
 }
 
+.wenayQaAccessibleBoard { color: #24334b; text-transform: none; }
+.wenayQaAccessibleBoard h3 { margin: 0 0 8px; font-size: 19px; }
+.wenayQaAccessibleBoard p { font-size: 13px; line-height: 1.5; }
+.wenayQaAccessibleControls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.wenayQaAccessibleBoard button { border: 1px solid #a6b8cf; background: #fff; color: #203d66; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+.wenayQaAccessibleBoard button:focus-visible { outline: 3px solid #2675dd; outline-offset: 2px; }
+.wenayQaAccessibleBoard button[aria-pressed="true"] { background: #245dae; color: white; }
+.wenayQaAccessibleBoard button[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.wenayQaAccessibleTrack { display: flex; gap: 12px; overflow-x: auto; padding: 6px 4px 14px; overscroll-behavior: contain; }
+.wenayQaAccessibleColumn { flex: 0 0 250px; min-width: 0; border: 1px solid #cad5e2; border-radius: 10px; background: #f0f4fa; }
+.wenayQaAccessibleColumn h4 { display: flex; justify-content: space-between; margin: 12px; }
+.wenayQaAccessibleColumn small { color: #64748b; }
+.wenayQaAccessibleItems { display: flex; flex-direction: column; gap: 8px; height: 248px; overflow-y: auto; padding: 10px; overscroll-behavior: contain; }
+.wenayQaAccessibleTask { position: relative; flex: 0 0 auto; display: grid; grid-template-columns: 36px 1fr 36px; gap: 6px; align-items: center; padding: 8px; background: white; border: 1px solid #c1d1e5; border-radius: 8px; font-size: 13px; }
+.wenayQaAccessibleTask input { min-width: 0; width: 100%; box-sizing: border-box; grid-column: 2; grid-row: 2; border: 1px solid #b6c6da; border-radius: 4px; padding: 5px; }
+.wenayQaAccessibleTask > button:first-child { grid-row: 1 / 3; min-height: 44px; padding: 4px; }
+.wenayQaAccessibleTask > button:last-child { grid-column: 3; grid-row: 1 / 3; padding: 5px; }
+.wenayQaAccessibleGhost { display: flex; align-items: center; padding: 12px; background: #e9f2ff; border: 2px solid #3473c9; color: #203d66; border-radius: 8px; box-shadow: 0 8px 20px #0f254333; font: 14px system-ui; }

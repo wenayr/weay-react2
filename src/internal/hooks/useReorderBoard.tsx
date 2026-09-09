@@ -1,6 +1,9 @@
-import React, {useEffect, useRef, useState} from 'react'
+import React, {useEffect, useLayoutEffect, useRef, useState} from 'react'
 import {useDraggableApi} from './useDraggable.js'
 import type {ReorderItem, ReorderOverlay} from './useReorder.js'
+import {isReorderControl, useReorderInteraction} from './reorderInteraction.js'
+import {captureReorderScroll, useReorderScroll} from './reorderScroll.js'
+import type {ReorderAutoScrollOptions} from './reorderScroll.js'
 
 /** useReorderBoard - the columns extension of useReorder: keyed blocks live in
  *  VERTICAL columns (plain consumer divs), one block drags between/within them,
@@ -9,8 +12,8 @@ import type {ReorderItem, ReorderOverlay} from './useReorder.js'
  *  measures the real layout. Columns can appear/disappear between drags (the
  *  ref callback registry is live); the set is frozen for the duration of one
  *  drag. Children of a column div must be exactly its items, 1:1, in order.
- *  Same non-goals as useReorder: no nesting, no spans/collision packing, no
- *  autoscroll - that day is a ready-made dnd library. */
+ *  Same non-goals as useReorder: no nesting or spans/collision packing.
+ *  Edge scrolling is opt-in; application permissions and announcements stay outside. */
 
 export type BoardPosition = {col: string, index: number}
 export type BoardColumn = {key: string, items: string[]}
@@ -24,6 +27,8 @@ export type ReorderBoardOptions = {
     canDrag?: (key: string) => boolean
     /** hold before the drag starts; default 0 */
     holdMs?: number
+    /** Bounded edge scrolling; off by default. */
+    autoScroll?: false | ReorderAutoScrollOptions
     /** the block was grabbed */
     onDragStart?: (e: {key: string, from: BoardPosition}) => void
     /** every pointer move while dragging; position = pointer delta in local px */
@@ -54,8 +59,12 @@ export function useReorderBoard(o: ReorderBoardOptions) {
     const colEls = useRef(new Map<string, HTMLElement>())
     const refCbs = useRef(new Map<string, (el: HTMLElement | null) => void>())
     const [dragKey, setDragKey] = useState<string | null>(null)
+    const [keyboardOver, setKeyboardOver] = useState<BoardPosition | null>(null)
+    const scrollDeltas = useRef(new Map<string, () => {x: number; y: number}>())
+    const rectDeltas = useRef(new Map<string, () => {x: number; y: number}>())
     const geom = useRef<BoardGeometry | null>(null)
     const measureCache = useRef<{key: string, pos: Map<string, {x: number, y: number}>} | null>(null)
+    const [measuredPreview, setMeasuredPreview] = useState<{key: string, pos: Map<string, {x: number, y: number}>} | null>(null)
 
     /** stable callback ref for a column div; columns can be added at runtime */
     function columnRef(col: string) {
@@ -79,15 +88,18 @@ export function useReorderBoard(o: ReorderBoardOptions) {
         const cx = g.draggedCenter.x + dx, cy = g.draggedCenter.y + dy
         let best: string | null = null, bestD = Infinity
         for (const [col, r] of g.colRect) {
-            const px = Math.max(r.x, Math.min(r.x + r.w, cx))
-            const py = Math.max(r.y, Math.min(r.y + r.h, cy))
+            const s = rectDeltas.current.get(col)?.() ?? {x: 0, y: 0}
+            const x = r.x - local(s.x), y = r.y - local(s.y)
+            const px = Math.max(x, Math.min(x + r.w, cx))
+            const py = Math.max(y, Math.min(y + r.h, cy))
             const d = (px - cx) ** 2 + (py - cy) ** 2
             if (d < bestD) { bestD = d; best = col }
         }
         if (best == null) return g.from
         let index = 0
+        const scrolled = local(scrollDeltas.current.get(best)?.().y ?? 0)
         for (const c of geom.current!.centers.get(best) ?? [])
-            if (c.key != dragKey && c.y < cy) index++
+            if (c.key != dragKey && c.y - scrolled < cy) index++
         return {col: best, index}
     }
 
@@ -114,6 +126,7 @@ export function useReorderBoard(o: ReorderBoardOptions) {
         const cacheKey = over.col + '#' + over.index
         if (measureCache.current?.key == cacheKey) return measureCache.current.pos
         const g = geom.current!
+        const scrollPositions = [...colEls.current.values()].map(el => ({el, left: el.scrollLeft, top: el.scrollTop}))
         const keyToEl = new Map<string, HTMLElement>()
         for (const c of oRef.current.columns) {
             const el = colEls.current.get(c.key)
@@ -149,30 +162,35 @@ export function useReorderBoard(o: ReorderBoardOptions) {
                 if (el) pos.set(k, {x: el.offsetLeft, y: el.offsetTop})
             }
         saved.reverse().forEach(s => { s.el.style.order = s.order; s.el.style.display = s.display; s.el.style.marginTop = s.mt; s.el.style.marginBottom = s.mb })
+        scrollPositions.forEach(s => { s.el.scrollLeft = s.left; s.el.scrollTop = s.top })
         measureCache.current = {key: cacheKey, pos}
         return pos
     }
 
-    const drag = useDraggableApi({holdMs: o.holdMs ?? 0, onDragEnd: function commitBoard(final) {
-        const key = dragKey
-        setDragKey(null)
-        measureCache.current = null
+    const interaction = useReorderInteraction({shape: JSON.stringify(o.columns), canDrag: o.canDrag, isDragging: () => drag.isDragging, cancel() {
+        drag.cancelDrag(); setDragKey(null); setKeyboardOver(null); geom.current = null; measureCache.current = null
+    }})
+    function finish(over: BoardPosition) {
+        const key = interaction.current.current?.key
         const g = geom.current
-        geom.current = null
-        if (key == null || !g) return
-        geom.current = g // dragTarget/local need it for this last computation
-        const over = dragTarget(local(final.x), local(final.y))
+        if (!interaction.valid() || !key || !g) { interaction.cancel(); return }
+        interaction.finish()
+        setDragKey(null); setKeyboardOver(null); measureCache.current = null
         const next = movedColumns(key, over)
         const cur = oRef.current.columns
         const committed = next.some((c, i) => c.items.length != cur[i].items.length || c.items.some((k, j) => k != cur[i].items[j]))
         geom.current = null
         if (committed) oRef.current.commit(next)
         oRef.current.onDragEnd?.({key, from: g.from, over, committed})
+    }
+    const drag = useDraggableApi({holdMs: o.holdMs ?? 0, onMove: p => scroll.move(p), onDragEnd: function commitBoard(final) {
+        finish(dragTarget(local(final.x), local(final.y)))
     }})
+    const scroll = useReorderScroll(interaction.mode === 'pointer' && drag.isDragging, o.autoScroll)
 
-    function beginDrag(key: string, e: React.SyntheticEvent): boolean {
+    function beginDrag(key: string, e: React.SyntheticEvent, handle = false, keyboard = false): boolean {
         if (oRef.current.canDrag && !oRef.current.canDrag(key)) return false
-        if ((e.target as HTMLElement).closest('input, button, select, textarea, a')) return false
+        if (isReorderControl(e, handle)) return false
         const cols = oRef.current.columns
         let from: BoardPosition | null = null
         for (const c of cols) {
@@ -181,11 +199,24 @@ export function useReorderBoard(o: ReorderBoardOptions) {
         }
         const fromEl = from && colEls.current.get(from.col)
         if (!from || !fromEl) return false
+        if (!fromEl.children[from.index]) return false
+        if (!interaction.start(key, keyboard ? 'keyboard' : 'pointer')) return false
+        if (handle) { e.stopPropagation(); (e.currentTarget as HTMLElement).focus({preventScroll: true}) }
+        if (!keyboard) {
+            const event = e as React.MouseEvent & React.TouchEvent
+            const point = event.changedTouches?.[0] ?? event
+            scroll.begin(fromEl.children[from.index] as HTMLElement, {x: point.clientX, y: point.clientY})
+        }
+        setKeyboardOver(from)
+        scrollDeltas.current.clear()
+        rectDeltas.current.clear()
         const scale = fromEl.offsetWidth ? fromEl.getBoundingClientRect().width / fromEl.offsetWidth : 1
         const g: BoardGeometry = {scale, from, colRect: new Map(), centers: new Map(), startOffset: new Map(), rowGap: new Map(), draggedCenter: {x: 0, y: 0}, draggedSize: {w: 0, h: 0}, overlayRect: null}
         for (const c of cols) {
             const el = colEls.current.get(c.key)
             if (!el) continue
+            scrollDeltas.current.set(c.key, captureReorderScroll(el))
+            if (el.parentElement) rectDeltas.current.set(c.key, captureReorderScroll(el.parentElement))
             const r = el.getBoundingClientRect()
             g.colRect.set(c.key, {x: r.x / scale, y: r.y / scale, w: r.width / scale, h: r.height / scale})
             g.rowGap.set(c.key, parseFloat(getComputedStyle(el).rowGap) || 0)
@@ -213,7 +244,13 @@ export function useReorderBoard(o: ReorderBoardOptions) {
     }
 
     const over: BoardPosition | null = dragKey != null && geom.current
-        ? dragTarget(local(drag.position.x), local(drag.position.y)) : null
+        ? interaction.mode === 'keyboard' ? keyboardOver : dragTarget(local(drag.position.x), local(drag.position.y)) : null
+    useLayoutEffect(() => {
+        if (!dragKey || !over || !geom.current) { setMeasuredPreview(null); return }
+        const key = over.col + '#' + over.index
+        if (measureCache.current?.key === key && measuredPreview?.key === key) return
+        setMeasuredPreview({key, pos: measured(dragKey, over)})
+    }, [dragKey, over?.col, over?.index])
 
     // callbacks ride effects (post-render), reading fresh options via oRef
     const prevOverRef = useRef<BoardPosition | null>(null)
@@ -236,14 +273,45 @@ export function useReorderBoard(o: ReorderBoardOptions) {
         let style: React.CSSProperties | undefined
         if (active && geom.current && over) {
             if (dragging) {
-                style = {transform: `translate(${local(drag.position.x)}px, ${local(drag.position.y)}px)`}
+                const g = geom.current
+                const s = scrollDeltas.current.get(g.from.col)?.() ?? {x: 0, y: 0}
+                style = interaction.mode === 'keyboard' ? {zIndex: 1}
+                    : {transform: `translate(${local(drag.position.x + s.x)}px, ${local(drag.position.y + s.y)}px)`}
             } else {
-                const pos = measured(dragKey!, over)
-                const a = geom.current.startOffset.get(key), b = pos.get(key)
+                const pos = measuredPreview?.key === over.col + '#' + over.index ? measuredPreview.pos : null
+                const a = geom.current.startOffset.get(key), b = pos?.get(key)
                 if (a && b && (a.x != b.x || a.y != b.y)) style = {transform: `translate(${b.x - a.x}px, ${b.y - a.y}px)`}
             }
         }
         return {
+            handleProps: {
+                ref: interaction.handleRef(key), type: 'button', style: {touchAction: 'none'}, 'aria-pressed': dragging,
+                'aria-disabled': o.canDrag?.(key) === false,
+                onMouseDown(e) { if (e.button === 0 && beginDrag(key, e, true)) drag.props.onMouseDown(e as React.MouseEvent<HTMLDivElement>) },
+                onTouchStart(e) { if (beginDrag(key, e, true)) drag.props.onTouchStart(e as React.TouchEvent<HTMLDivElement>) },
+                onClick(e) { e.preventDefault(); e.stopPropagation() },
+                onKeyDown(e) {
+                    if (e.target !== e.currentTarget) return
+                    if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault(); e.stopPropagation()
+                        if (e.repeat) return
+                        if (interaction.current.current?.key === key && interaction.mode === 'keyboard' && keyboardOver) finish(keyboardOver)
+                        else beginDrag(key, e, true, true)
+                    } else if (interaction.current.current?.key === key && interaction.mode === 'keyboard' && e.key.startsWith('Arrow')) {
+                        e.preventDefault(); e.stopPropagation()
+                        setKeyboardOver(previous => {
+                            if (!previous) return previous
+                            const cols = oRef.current.columns
+                            let col = cols.findIndex(c => c.key === previous.col), index = previous.index
+                            if (e.key === 'ArrowLeft') col = Math.max(0, col - 1)
+                            if (e.key === 'ArrowRight') col = Math.min(cols.length - 1, col + 1)
+                            if (e.key === 'ArrowUp') index--
+                            if (e.key === 'ArrowDown') index++
+                            return {col: cols[col].key, index: Math.max(0, Math.min(cols[col].items.filter(k => k !== key).length, index))}
+                        })
+                    }
+                },
+            },
             props: {
                 onMouseDown(e) { if (e.button == 0 && beginDrag(key, e)) drag.props.onMouseDown(e as React.MouseEvent<HTMLDivElement>) },
                 onTouchStart(e) { if (beginDrag(key, e)) drag.props.onTouchStart(e as React.TouchEvent<HTMLDivElement>) },
@@ -255,14 +323,24 @@ export function useReorderBoard(o: ReorderBoardOptions) {
     }
 
     const rect = geom.current?.overlayRect
-    const overlay: ReorderOverlay | null = dragKey != null && drag.isDragging && rect ? {
+    let overlayPosition = drag.position
+    if (interaction.mode === 'keyboard' && geom.current && over && rect) {
+        const g = geom.current, r = g.colRect.get(over.col)!
+        const scroll = scrollDeltas.current.get(over.col)?.() ?? {x: 0, y: 0}
+        const centers = (g.centers.get(over.col) ?? []).filter(c => c.key !== dragKey)
+        const cy = (over.col === g.from.col ? g.centers.get(over.col)?.[over.index]?.y : centers[over.index]?.y)
+            ?? ((centers.at(-1)?.y ?? (r.y - g.draggedSize.h / 2)) + g.draggedSize.h + (g.rowGap.get(over.col) ?? 0))
+        overlayPosition = {x: r.x * g.scale - rect.left - scroll.x,
+            y: (cy - g.draggedSize.h / 2) * g.scale - rect.top - scroll.y}
+    }
+    const overlay: ReorderOverlay | null = dragKey != null && (drag.isDragging || interaction.mode === 'keyboard') && rect ? {
         key: dragKey,
         style: {
-            position: 'fixed', left: rect.left + drag.position.x, top: rect.top + drag.position.y,
+            position: 'fixed', left: rect.left + overlayPosition.x, top: rect.top + overlayPosition.y,
             width: rect.width, height: rect.height, boxSizing: 'border-box',
             pointerEvents: 'none', margin: 0,
         },
     } : null
 
-    return {columnRef, item, dragKey, over, overlay}
+    return {columnRef, item, dragKey, over, overlay, inputMode: interaction.mode, cancel: interaction.cancel}
 }

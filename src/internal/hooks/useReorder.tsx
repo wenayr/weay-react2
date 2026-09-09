@@ -1,5 +1,10 @@
 import React, {useEffect, useLayoutEffect, useRef, useState} from 'react'
 import {useDraggableApi} from './useDraggable.js'
+import {isReorderControl, useReorderInteraction} from './reorderInteraction.js'
+import type {ReorderHandleProps} from './reorderInteraction.js'
+import {captureReorderScroll, useReorderScroll} from './reorderScroll.js'
+import type {ReorderAutoScrollOptions} from './reorderScroll.js'
+export type {ReorderHandleProps, ReorderAutoScrollOptions}
 
 function sameOrder(a: string[] | null, b: string[] | null) {
     if (a === b) return true
@@ -39,9 +44,13 @@ export type ReorderOptions = {
     holdMs?: number
     /** transient simulated order while dragging; null on drop/cancel */
     onPreviewChange?: (next: string[] | null) => void
+    /** Opt-in edge scrolling. Default off; manual scrolling still preserves targeting. */
+    autoScroll?: false | ReorderAutoScrollOptions
 }
 
 export type ReorderItem = {
+    /** Spread on a real button inside the block; supply its accessible name/description. */
+    handleProps: ReorderHandleProps
     /** spread on the block element */
     props: {
         onMouseDown: React.MouseEventHandler<HTMLElement>
@@ -56,7 +65,8 @@ export type ReorderItem = {
 }
 
 /** Optional consumer-rendered preview: portal it outside clipping/transform ancestors.
- *  Hide the original with visibility:hidden while rendering it; keep its layout box. */
+ *  Pointer: hide the original with visibility:hidden, preserving its layout box.
+ *  Keyboard: keep the original handle visible/focusable; overlay marks the target slot. */
 export type ReorderOverlay = {
     key: string
     /** Viewport coordinates; add the consumer's stacking level and appearance. */
@@ -66,6 +76,8 @@ export type ReorderOverlay = {
 export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOptions) {
     const listRef = useRef<E>(null)
     const [dragKey, setDragKey] = useState<string | null>(null)
+    const [keyboardTarget, setKeyboardTarget] = useState(0)
+    const scrollDelta = useRef<() => {x: number; y: number}>(() => ({x: 0, y: 0}))
     const slotsRef = useRef<{x: number, y: number}[]>([])   // child centers at drag start (local px)
     const startRef = useRef<{x: number, y: number}[]>([])   // child top-lefts at drag start (local px)
     // Pointer deltas are viewport px, layout is local px: under a scaled ancestor
@@ -107,20 +119,31 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
         return best
     }
 
-    const drag = useDraggableApi({holdMs: o.holdMs ?? 0, onDragEnd: function commitOrder(final) {
+    const interaction = useReorderInteraction({shape: JSON.stringify(o.order), canDrag: o.canDrag, isDragging: () => drag.isDragging, cancel() {
+        drag.cancelDrag(); setDragKey(null); measureRef.current = null
+    }})
+    const adjusted = (p: {x: number; y: number}) => {
+        const s = scrollDelta.current()
+        return {x: local(p.x + s.x), y: local(p.y + s.y)}
+    }
+    const drag = useDraggableApi({holdMs: o.holdMs ?? 0, onMove: p => scroll.move(p), onDragEnd: function commitOrder(final) {
+        if (!interaction.valid()) { interaction.cancel(); return }
+        interaction.finish()
         setDragKey(null)
         measureRef.current = null
         if (dragKey == null) return
         const from = o.order.indexOf(dragKey)
         if (from == -1) return
-        const next = move(o.order, dragKey, dragTarget(from, local(final.x), local(final.y)))
+        const p = adjusted(final)
+        const next = move(o.order, dragKey, dragTarget(from, p.x, p.y))
         if (next.some((k, i) => k != o.order[i])) o.commit(next)
     }})
+    const scroll = useReorderScroll(interaction.mode === 'pointer' && drag.isDragging, o.autoScroll)
 
-    function beginDrag(key: string, e: React.SyntheticEvent): boolean {
+    function beginDrag(key: string, e: React.SyntheticEvent, handle = false, keyboard = false): boolean {
         if (o.canDrag && !o.canDrag(key)) return false
         // interactive children stay clickable (checkboxes in rows etc.)
-        if ((e.target as HTMLElement).closest('input, button, select, textarea, a')) return false
+        if (isReorderControl(e, handle)) return false
         const list = listRef.current
         if (!list) return false
         scaleRef.current = list.offsetWidth ? list.getBoundingClientRect().width / list.offsetWidth : 1
@@ -129,6 +152,15 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
         const els = kids()
         const grabbed = els[o.order.indexOf(key)]
         if (!grabbed) return false
+        if (!interaction.start(key, keyboard ? 'keyboard' : 'pointer')) return false
+        if (handle) { e.stopPropagation(); (e.currentTarget as HTMLElement).focus({preventScroll: true}) }
+        scrollDelta.current = captureReorderScroll(list)
+        if (!keyboard) {
+            const event = e as React.MouseEvent & React.TouchEvent
+            const point = event.changedTouches?.[0] ?? event
+            scroll.begin(grabbed, {x: point.clientX, y: point.clientY})
+        }
+        setKeyboardTarget(o.order.indexOf(key))
         const rect = grabbed.getBoundingClientRect()
         overlayRectRef.current = {left: rect.left, top: rect.top, width: rect.width, height: rect.height}
         slotsRef.current = els.map(el => ({x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2}))
@@ -160,7 +192,8 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
     }
 
     const from = dragKey != null ? o.order.indexOf(dragKey) : -1
-    const target = from != -1 ? dragTarget(from, local(drag.position.x), local(drag.position.y)) : -1
+    const position = adjusted(drag.position)
+    const target = from != -1 ? interaction.mode === 'keyboard' ? keyboardTarget : dragTarget(from, position.x, position.y) : -1
     const preview = from != -1 && dragKey != null ? move(o.order, dragKey, target) : null
     // `preview` is a fresh array on every pointer move, but its CONTENT changes only when the
     // target slot does. An element-wise compare is the same walk the joined key was, minus a
@@ -198,7 +231,7 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
         if (active) {
             const i = o.order.indexOf(key)
             if (dragging) {
-                style = {transform: `translate(${local(drag.position.x)}px, ${local(drag.position.y)}px)`}
+                style = interaction.mode === 'keyboard' ? {zIndex: 1} : {transform: `translate(${position.x}px, ${position.y}px)`}
             } else if (o.preview == 'measure') {
                 const pos = measured?.target == target ? measured.pos : null
                 const a = startRef.current[i], b = pos?.[i]
@@ -210,6 +243,30 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
             }
         }
         return {
+            handleProps: {
+                ref: interaction.handleRef(key), type: 'button', style: {touchAction: 'none'}, 'aria-pressed': dragging,
+                'aria-disabled': o.canDrag?.(key) === false,
+                onMouseDown(e) { if (e.button === 0 && beginDrag(key, e, true)) drag.props.onMouseDown(e as React.MouseEvent<HTMLDivElement>) },
+                onTouchStart(e) { if (beginDrag(key, e, true)) drag.props.onTouchStart(e as React.TouchEvent<HTMLDivElement>) },
+                onClick(e) { e.preventDefault(); e.stopPropagation() },
+                onKeyDown(e) {
+                    if (e.target !== e.currentTarget) return
+                    if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault(); e.stopPropagation()
+                        if (e.repeat) return
+                        if (interaction.current.current?.key === key && interaction.mode === 'keyboard') {
+                            if (!interaction.valid()) { interaction.cancel(); return }
+                            const next = move(o.order, key, keyboardTarget)
+                            interaction.finish(); setDragKey(null)
+                            if (!sameOrder(next, o.order)) o.commit(next)
+                        } else beginDrag(key, e, true, true)
+                    } else if (interaction.current.current?.key === key && interaction.mode === 'keyboard' && e.key.startsWith('Arrow')) {
+                        e.preventDefault(); e.stopPropagation()
+                        const step = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1
+                        setKeyboardTarget(n => Math.max(0, Math.min(o.order.length - 1, n + step)))
+                    }
+                },
+            },
             props: {
                 onMouseDown(e) { if (e.button == 0 && beginDrag(key, e)) drag.props.onMouseDown(e as React.MouseEvent<HTMLDivElement>) },
                 onTouchStart(e) { if (beginDrag(key, e)) drag.props.onTouchStart(e as React.TouchEvent<HTMLDivElement>) },
@@ -221,14 +278,22 @@ export function useReorder<E extends HTMLElement = HTMLDivElement>(o: ReorderOpt
     }
 
     const rect = overlayRectRef.current
-    const overlay: ReorderOverlay | null = dragKey != null && drag.isDragging && rect ? {
+    let overlayPosition = drag.position
+    if (interaction.mode === 'keyboard' && preview && from !== -1) {
+        const useMeasured = o.preview === 'measure' && measured?.target === target
+        const a = useMeasured ? startRef.current[from] : slotsRef.current[from]
+        const b = useMeasured ? measured.pos[from] : slotsRef.current[preview.indexOf(dragKey!)]
+        const s = scrollDelta.current()
+        if (a && b) overlayPosition = {x: (b.x - a.x) * scaleRef.current - s.x, y: (b.y - a.y) * scaleRef.current - s.y}
+    }
+    const overlay: ReorderOverlay | null = dragKey != null && (drag.isDragging || interaction.mode === 'keyboard') && rect ? {
         key: dragKey,
         style: {
-            position: 'fixed', left: rect.left + drag.position.x, top: rect.top + drag.position.y,
+            position: 'fixed', left: rect.left + overlayPosition.x, top: rect.top + overlayPosition.y,
             width: rect.width, height: rect.height, boxSizing: 'border-box',
             pointerEvents: 'none', margin: 0,
         },
     } : null
 
-    return {listRef, item, dragKey, preview, overlay}
+    return {listRef, item, dragKey, preview, overlay, inputMode: interaction.mode, cancel: interaction.cancel}
 }

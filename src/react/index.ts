@@ -10,7 +10,7 @@ export {
 } from "../internal/updateBy.js";
 export type {UpdateApi, UpdateCallback} from "../internal/updateBy.js";
 export {useOwnedClient, useAsyncAction, useServiceCommands, AsyncActionBusyError, AsyncActionUnavailableError} from '../internal/hooks/useServiceBindings.js';
-export type {OwnedClient, UseOwnedClientOptions, OwnedClientController, AsyncActionController, ServiceCommandMap, ServiceCommandsController} from '../internal/hooks/useServiceBindings.js';
+export type {OwnedClient, UseOwnedClientOptions, OwnedClientController, AsyncActionController, ServiceCommandMap, ServiceCommandsController, ServiceCommandCall} from '../internal/hooks/useServiceBindings.js';
 
 export {useOutside, useOutsideApi, useOutsideRef} from "../internal/hooks/useOutside.js";
 export type {UseOutsideApi, UseOutsideOptions} from "../internal/hooks/useOutside.js";
@@ -24,7 +24,7 @@ export type {
     UseDraggableReturn,
 } from "../internal/hooks/useDraggable.js";
 export {useReorder} from "../internal/hooks/useReorder.js";
-export type {ReorderItem, ReorderOptions, ReorderOverlay} from "../internal/hooks/useReorder.js";
+export type {ReorderItem, ReorderOptions, ReorderOverlay, ReorderHandleProps, ReorderAutoScrollOptions} from "../internal/hooks/useReorder.js";
 export {useReorderBoard} from "../internal/hooks/useReorderBoard.js";
 export type {
     BoardColumn,

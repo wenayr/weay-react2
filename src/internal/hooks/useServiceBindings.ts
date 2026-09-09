@@ -144,8 +144,13 @@ export function useAsyncAction(options: {key?: unknown; enabled?: boolean} = {})
 type Command = (requestId: string, ...args: any[]) => any
 export type ServiceCommandMap = Record<string, Command>
 type CommandArgs<F> = F extends (requestId: string, ...args: infer A) => unknown ? A : never
+/** Correlated name/arguments, excluding the binding-owned request ID. */
+export type ServiceCommandCall<C extends ServiceCommandMap> = {
+    [K in keyof C & string]: [name: K, ...args: CommandArgs<C[K]>]
+}[keyof C & string]
 export type ServiceCommandsController<C extends ServiceCommandMap> = Omit<AsyncActionController, 'run'> & {
     run<K extends keyof C & string>(name: K, ...args: CommandArgs<C[NoInfer<K>]>): Promise<Awaited<ReturnType<C[K]>>>
+    runTuple<T extends ServiceCommandCall<C>>(call: T): Promise<Awaited<ReturnType<C[T[0]]>>>
 }
 
 /** Structural command map only: no service definition, ACL, receipts or retry policy. */
@@ -159,5 +164,11 @@ export function useServiceCommands<C extends ServiceCommandMap>(commands: C | nu
             const id = requestId.current ? requestId.current() : crypto.randomUUID()
             return commands![name](id, ...args) as ReturnType<C[K]>
         }), [action.run, commands])
-    return useMemo(() => ({...action, run}), [action, run])
+    const runTuple = useCallback(<T extends ServiceCommandCall<C>>(call: T): Promise<Awaited<ReturnType<C[T[0]]>>> =>
+        action.run(() => {
+            const [name, ...args] = call
+            const id = requestId.current ? requestId.current() : crypto.randomUUID()
+            return commands![name](id, ...args) as ReturnType<C[T[0]]>
+        }), [action.run, commands])
+    return useMemo(() => ({...action, run, runTuple}), [action, run, runTuple])
 }

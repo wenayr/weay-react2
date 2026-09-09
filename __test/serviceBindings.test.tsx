@@ -245,3 +245,23 @@ test('default request ids use crypto.randomUUID once per accepted command', asyn
         expect(uuid).toHaveBeenCalledTimes(1)
     } finally { unmount(); uuid.mockRestore() }
 })
+
+test('tuple and direct calls share one lock, request ID and original rejection without retry', async () => {
+    const work = deferred<number>()
+    const requestId = jest.fn(() => 'tuple-id')
+    const failure = new Error('tuple failed')
+    const commands = {save: jest.fn((_id: string, value: number, enabled: boolean) => work.promise)}
+    const {result, unmount} = renderHook(() => useServiceCommands(commands, {requestId}))
+    let pending!: Promise<number>
+    act(() => { pending = result.current.runTuple(['save', 7, true]) })
+    const handled = pending.catch(error => error)
+    await expect(result.current.run('save', 8, false)).rejects.toBeInstanceOf(AsyncActionBusyError)
+    await expect(result.current.runTuple(['save', 9, false])).rejects.toBeInstanceOf(AsyncActionBusyError)
+    expect(requestId).toHaveBeenCalledTimes(1)
+    expect(commands.save).toHaveBeenCalledWith('tuple-id', 7, true)
+    await act(async () => work.reject(failure))
+    expect(await handled).toBe(failure)
+    expect(result.current).toMatchObject({pending: false, error: failure})
+    expect(commands.save).toHaveBeenCalledTimes(1)
+    unmount()
+})
