@@ -9,5 +9,6 @@ export * from './useMedia.js';
 export * from './usePeer.js';export * from './usePeerCall.js';
 export * from './useRoute.js';
 export * from './useWorkflows.js';
+export * from './useServiceBindings.js';
 export * from './useContractRuntime.js';
 export * from '../persist/useCacheMapPersistence.js';

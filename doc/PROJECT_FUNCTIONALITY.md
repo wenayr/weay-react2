@@ -90,6 +90,16 @@ Subsystem -> canonical entry, at a glance:
 | Communication UI | `wenay-react2/communication` |
 | Tokens, callback hub, pure helpers | `wenay-react2/core` |
 
+## Owned service resources and actions
+
+`wenay-react2/react` provides `useOwnedClient` for explicitly owned async client creation,
+readiness, replacement and disposal; `useAsyncAction` for pending/error state and immediate
+duplicate-call protection; and `useServiceCommands` for typed command invocation with one
+request ID. Existing `useClientStore` and specialized adapters remain non-owning views.
+Account keys, cancellation, receipts/retry, current authorization and service/domain policy
+stay in the application or common2 client. Active QA card 56 demonstrates the composition
+with real common2 Store/Replay; runtime tests additionally own a real common2 AI client.
+
 ## Compatibility Policy
 
 New hook/controller surfaces should prefer migration without breaking old public APIs, but compatibility is not absolute. An aggressive migration is allowed only as an explicit migration cut: separate task, changelog, migration notes, and a clear list of changed imports/behavior. Default visual styles have a stricter rule: do not remove a default class/style contract unless the replacement class/token path already exists and is documented.

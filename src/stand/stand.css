@@ -3,6 +3,30 @@
    src/style/style.css. */
 /* QA stand showcase: public examples pair a live result with the smallest useful
    integration snippet. The wenayQa namespace keeps this presentation out of app UI. */
+.wenayQaEdgeWindow {
+  --wnd-bg: #fff;
+  --wnd-border: 1px solid #93a8c1;
+  --wnd-radius: 10px;
+  --wnd-shadow: 0 12px 36px rgba(15, 23, 42, .28);
+  --wnd-header-bg: #1e40af;
+  --wnd-header-color: #fff;
+  --wnd-header-height: 42px;
+  --wnd-header-padding: 0;
+  --wnd-header-transform: none;
+  --wnd-close-top: 7px;
+  --wnd-close-right: 7px;
+  color: #334155;
+  font: 13px/1.4 system-ui, sans-serif;
+  text-transform: none;
+}
+.wenayQaEdgeWindow .wenayWndHeader {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  cursor: grab;
+}
+.wenayQaEdgeWindow .wenayWndHeader:active { cursor: grabbing; }
+.wenayQaEdgeWindow .wenayWndTitle { padding-right: 44px; }
 .wenayQaShowcaseGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(250px, 0.9fr);

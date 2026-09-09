@@ -1,4 +1,5 @@
 import type { QaCard } from "./standKit.js";
+import { Card56 } from './cards/serviceBindings.js';
 import { Card55 } from "./cards/replayChunks.js";
 import { Card49, Card6 } from "./cards/chart.js";
 import { Card51, Card38, Card39, Card40, Card41, Card42, Card43, Card44, Card45, Card46 } from "./cards/peerMedia.js";
@@ -10,6 +11,7 @@ import { Card8, Card1, Card14, Card7, Card19, Card9, Card10, Card11 } from "./ca
 import { Card5, Card12, Card15, Card16 } from "./cards/grid.js";
 
 export const qaCards: QaCard[] = [
+    { id: 'service-bindings', n: 56, section: 'active', title: 'Owned client + typed commands — session lifecycle', Component: Card56 },
     { id: 'store-replay-chunks', n: 55, section: 'active', title: 'Store Replay — typed inventory and chunked loading', Component: Card55 },
     { id: 'param-commentary-hover', n: 7, section: 'active', title: 'Parameters - sliders and stable commentary hover', tall: true, Component: Card7 },
     { id: 'sparkline', n: 49, section: 'active', title: 'Sparkline — compact canvas chart', Component: Card49 },

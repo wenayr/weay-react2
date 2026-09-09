@@ -9,6 +9,8 @@ export {
     useUpdateByApi,
 } from "../internal/updateBy.js";
 export type {UpdateApi, UpdateCallback} from "../internal/updateBy.js";
+export {useOwnedClient, useAsyncAction, useServiceCommands, AsyncActionBusyError, AsyncActionUnavailableError} from '../internal/hooks/useServiceBindings.js';
+export type {OwnedClient, UseOwnedClientOptions, OwnedClientController, AsyncActionController, ServiceCommandMap, ServiceCommandsController} from '../internal/hooks/useServiceBindings.js';
 
 export {useOutside, useOutsideApi, useOutsideRef} from "../internal/hooks/useOutside.js";
 export type {UseOutsideApi, UseOutsideOptions} from "../internal/hooks/useOutside.js";

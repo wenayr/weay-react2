@@ -97,7 +97,7 @@ export function useFloatingWindowDragLoop(o: FloatingWindowDragLoop) {
         const mouseUpHandler = () => {
             flushFrame();
             const target = o.snapPreviewRef.current;
-            document.removeEventListener("mouseup", mouseUpHandler);
+            document.removeEventListener("mouseup", mouseUpHandler, true);
             document.removeEventListener("mousemove", mouseMoveHandler);
             o.lastC.current = null;
             o.pendingDetach.current = null;
@@ -141,7 +141,7 @@ export function useFloatingWindowDragLoop(o: FloatingWindowDragLoop) {
             }
             if (o.lastT.current == null) {
                 const target = o.snapPreviewRef.current;
-                document.removeEventListener("touchend", touchEndHandler);
+                document.removeEventListener("touchend", touchEndHandler, true);
                 document.removeEventListener("touchmove", touchMoveHandler);
                 o.pendingDetach.current = null;
                 o.setB(false);
@@ -153,11 +153,13 @@ export function useFloatingWindowDragLoop(o: FloatingWindowDragLoop) {
 
         if (a) {
             document.addEventListener("mousemove", mouseMoveHandler);
-            document.addEventListener("mouseup", mouseUpHandler);
+            // Menus and interactive children may stop bubbling on release. Finish the
+            // gesture in capture so their handlers cannot leave the window drag armed.
+            document.addEventListener("mouseup", mouseUpHandler, true);
         }
         if (b) {
             document.addEventListener("touchmove", touchMoveHandler);
-            document.addEventListener("touchend", touchEndHandler);
+            document.addEventListener("touchend", touchEndHandler, true);
         }
 
         return () => {
@@ -166,9 +168,9 @@ export function useFloatingWindowDragLoop(o: FloatingWindowDragLoop) {
             pendingMouse = null;
             pendingTouch = null;
             document.removeEventListener("mousemove", mouseMoveHandler);
-            document.removeEventListener("mouseup", mouseUpHandler);
+            document.removeEventListener("mouseup", mouseUpHandler, true);
             document.removeEventListener("touchmove", touchMoveHandler);
-            document.removeEventListener("touchend", touchEndHandler);
+            document.removeEventListener("touchend", touchEndHandler, true);
         };
     }, [a, b]);
 }

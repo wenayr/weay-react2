@@ -553,6 +553,50 @@ const args = useListenArgs(listen)
 
 The hook does not choose transport. `remoteStore` needs `{ get(mask?), changed }` and may also provide `changedPaths`; apps may implement it with RPC, WebSocket, SSE, or test HTTP. `changedPaths` is used as a transport optimization: mirror pulls `mask ∩ paths` instead of the whole mask. `initial` is only the local mirror seed; changing it does not reset an existing mirror. `mask` is treated as a small declarative StoreMask, so structurally equal inline masks do not resubscribe. For add/delete keys, subscribe to the parent object node with `useStoreKeys(node)`; this also covers deep objects. If a state key conflicts with StoreNode methods such as `count`, use `store.node.at("count")`.
 
+### Owned service clients and asynchronous actions (3.2.0)
+
+```tsx
+import {useOwnedClient, useClientStore, useAsyncAction, useServiceCommands} from 'wenay-react2/react'
+
+const session = useOwnedClient({
+    key: sessionKey, // stable value; changes when URL/account/token identity changes
+    enabled: signedIn,
+    create: signal => createApplicationClient({url, token, signal}),
+    onCloseError: reportCleanupError,
+})
+const tasks = useClientStore(session.client?.views.tasks)
+const actions = useServiceCommands(session.ready ? session.client?.commands : null, {requestId})
+await actions.run('addTask', {title: 'Review'}) // name, input and result inferred from commands
+
+const action = useAsyncAction({key: session.client})
+await action.run(() => doSomething()) // inferred Promise<Awaited<result>>
+// action.pending / action.error / action.clearError()
+```
+
+`create` returns a **new exclusively owned** client or a promise of one. A client has
+`ready: () => PromiseLike<unknown>` (or a readiness promise) and `close(): void | PromiseLike<void>`.
+`client` appears after acquisition; `ready` becomes true after readiness. Failure closes the
+owned resource and exposes the original `error`. Key/enabled changes and unmount abort the
+factory signal and close the resource once, including late acquisition. `session.close()` closes
+the current generation until key/enabled changes. Inline factory identity does not recreate it:
+include all resource identity inputs in the key. Already shared/external clients must use
+`useClientStore` directly, which never closes them.
+
+Actions allow **one pending call per controller**: another call rejects with `AsyncActionBusyError`
+without invoking it or replacing the active error. Disabled/unmounted controllers reject with
+`AsyncActionUnavailableError`. A key change fences old UI results; it does not cancel external
+side effects. Catch the returned promise in event handlers; rejections also populate `error`.
+`useServiceCommands` accepts methods shaped `(requestId: string, ...args) => result`, preserves
+their receiver and allocates one ID inside the accepted invocation. The default is
+`crypto.randomUUID()` (secure context required); pass `requestId` for another ID policy.
+No automatic retry: retrying through this binding is a new invocation with a new ID. Reusing
+the same receipt ID after an uncertain outcome is explicit application/scaffold policy.
+
+common2 2.17.0 retains view Store identity across role/failover changes. A view's `ready` only
+describes its **first permitted keyframe**, not current permission. Observe the client's
+permissions/health Stores with existing `useStoreNode` or stable `useClientStore` adapters,
+and token/auth events with `useListenEffect`; do not add identity polling or reconnect to React.
+
 ### common2 Resource and AI clients
 
 common2 provides account-filtered file/job clients and provider-neutral AI-run

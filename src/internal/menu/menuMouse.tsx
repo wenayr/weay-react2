@@ -404,6 +404,12 @@ export function createContextMenu(data?: {name?: string}) {
                 if (!state.open || hasQueuedItems(other)) openQueued(e, "mouse");
             }}
             {...gesture}
+            onMouseUp={e => {
+                // Native contextmenu may arrive before OR after mouseup. Opening on both
+                // can replace row actions with the popup under the pointer on release.
+                // Layer has a native contextmenu path; keep only legacy left-double-click here.
+                if (e.button === 0) gesture.onMouseUp(e);
+            }}
         >
             {children}
             {state.open && enabled && state.layerId == layerId && <OutsideClickArea outsideClick={handleClose}>

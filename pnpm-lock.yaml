@@ -21,8 +21,8 @@ importers:
         specifier: ^10.5.3
         version: 10.5.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       wenay-common2:
-        specifier: ^2.16.0
-        version: 2.16.0
+        specifier: ^2.17.0
+        version: 2.17.0
     devDependencies:
       '@swc/core':
         specifier: ^1.16.1
@@ -2689,8 +2689,8 @@ packages:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
     engines: {node: '>=12'}
 
-  wenay-common2@2.16.0:
-    resolution: {integrity: sha512-535Lt7+Sl6NbRqdKIn/QWuuVbPLvbEMtgd+6zzixfpCHnLo5bcLP5wwDIvVl92GdT2vQzm/7u4DV7WmzHjxbVQ==}
+  wenay-common2@2.17.0:
+    resolution: {integrity: sha512-quq39AphtoouqRKSA/4ZLsqBfr2WNIUEjm/B4ZKZH6QUg/RvcSeYhSf4Vmk0f46hoUPUsiX401TGmNRarDFgRw==}
     engines: {node: '>=20.0.0'}
     hasBin: true
 
@@ -5498,7 +5498,7 @@ snapshots:
 
   webidl-conversions@7.0.0: {}
 
-  wenay-common2@2.16.0:
+  wenay-common2@2.17.0:
     dependencies:
       '@types/express': 5.0.6
       axios: 1.19.0

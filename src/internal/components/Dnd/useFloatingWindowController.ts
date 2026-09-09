@@ -405,6 +405,7 @@ export function useFloatingWindowController({
     };
 
     const onHeaderMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
+        if (e.button !== 0) return;
         if (disableDraggingRef.current?.()) return;
         armDetach(e.clientX, e.clientY);
         lastC.current = {

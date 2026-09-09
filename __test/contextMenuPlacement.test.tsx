@@ -78,6 +78,30 @@ describe("context menu placement", () => {
 });
 
 describe("context menu inside a floating window", () => {
+    test.each(['before-release', 'after-release'])('one right click opens row actions once (contextmenu %s)', timing => {
+        const menu = createContextMenu({name: `right-sequence-${timing}`});
+        const provider = jest.fn(({target}: {target: Element | null}) =>
+            target?.closest('[data-row]') ? [{name: 'Row action'}] : []);
+        render(<menu.Layer other={provider}>
+            <FloatingWindow title="Host" size={{width: 300, height: 200}}>
+                <div data-testid="gesture-row" data-row="one">row</div>
+            </FloatingWindow>
+        </menu.Layer>);
+        const row = screen.getByTestId('gesture-row');
+        fireEvent.mouseDown(row, {button: 2, buttons: 2, clientX: 120, clientY: 140});
+        if (timing === 'before-release') {
+            fireEvent.contextMenu(row, {button: 2, clientX: 120, clientY: 140});
+            // The popup now covers the pointer, so release targets the popup, not the row.
+            fireEvent.mouseUp(screen.getByText('Row action'), {button: 2, clientX: 120, clientY: 140});
+        } else {
+            fireEvent.mouseUp(row, {button: 2, clientX: 120, clientY: 140});
+            fireEvent.contextMenu(row, {button: 2, clientX: 120, clientY: 140});
+        }
+        expect(provider).toHaveBeenCalledTimes(1);
+        expect(menu.getState().open).toBe(true);
+        expect(screen.getByText('Row action').closest('[data-wenay-menu-window-layer]')).not.toBeNull();
+    });
+
     test("openAt from a window renders the menu in the window's own portal layer", () => {
         const menu = createContextMenu({name: "window-open"});
         render(

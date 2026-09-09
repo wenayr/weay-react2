@@ -72,7 +72,7 @@ test("useFloatingWindowController clamps header drag and announces saved movemen
     />);
 
     act(() => {
-        controller!.onHeaderMouseDown({clientX: 10, clientY: 20} as React.MouseEvent<HTMLDivElement>);
+        controller!.onHeaderMouseDown({button: 0, clientX: 10, clientY: 20} as React.MouseEvent<HTMLDivElement>);
     });
     expect(controller!.dragging).toBe(true);
 

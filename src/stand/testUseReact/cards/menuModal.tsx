@@ -360,7 +360,7 @@ const edgeRowStyle: React.CSSProperties = {
  *  no longer has to preload contextMenu.map before the press. */
 function rowItemsFor(target: Element | null) {
     const row = target?.closest<HTMLElement>("[data-row]")?.dataset.row;
-    if (!row) return [{name: "no row under the pointer"}];
+    if (!row) return [];
     return [
         {name: `open ${row}`, actionKey: "qa53.open", onClick: () => alert(`open ${row}`)},
         {name: `close ${row}`, actionKey: "qa53.close", onClick: () => alert(`close ${row}`)},
@@ -370,29 +370,42 @@ function rowItemsFor(target: Element | null) {
 
 const EdgeMenuDemo = () => {
     const [open, setOpen] = useState(false);
+    const [placement, setPlacement] = useState({key: 0, x: 120, y: 120});
+    const [point, setPoint] = useState({x: 120, y: 120});
+    const openAtEdge = () => {
+        const next = {x: Math.max(0, window.innerWidth - 360 - 8), y: Math.max(0, window.innerHeight - 300 - 8)};
+        setPlacement(p => ({key: p.key + 1, ...next}));
+        setPoint(next);
+        setOpen(true);
+    };
     return (
         <contextMenu.Layer zIndex={40} other={gesture => ({items: rowItemsFor(gesture.target), source: "qa53-rows"})}>
-            <div style={{display: "flex", flexDirection: "column", gap: 10}}>
-                <div style={{display: "flex", justifyContent: "space-between", gap: 12}}>
+            <div style={{display: "flex", flexDirection: "column", gap: 10, color: '#334155', textTransform: 'none'}}>
+                <div style={{display: "flex", justifyContent: "space-between", alignItems: 'flex-start', flexWrap: 'wrap', gap: 12}}>
                     <div style={{border: "1px solid #d0d7de", borderRadius: 8, minWidth: 200}}>
                         {edgeRows.map(row => (
                             <div key={row} data-row={row} style={edgeRowStyle}>{row}</div>
                         ))}
                     </div>
-                    <button onClick={() => setOpen(v => !v)}>{open ? "close window" : "open window"}</button>
+                    <div style={{display: 'flex', gap: 8, flexWrap: 'wrap'}}>
+                        <button onClick={() => setOpen(v => !v)}>{open ? "Закрыть окно" : "Открыть окно"}</button>
+                        <button onClick={openAtEdge}>Проверить у края</button>
+                    </div>
                 </div>
-                <div
-                    data-row="EDGE"
-                    style={{...edgeRowStyle, border: "1px dashed #8c959f", borderRadius: 8, textAlign: "right"}}
-                >
-                    drag this card to the right/bottom edge of the viewport and right-click here
-                </div>
+                <p style={{margin: 0, lineHeight: 1.5}}>Откройте окно и тяните за синюю шапку. Строки — для контекстного меню, не для перемещения. Кнопка «Проверить у края» поставит окно в правый нижний угол.</p>
+                <output style={{fontSize: 12}}>{open ? `Положение окна: ${Math.round(point.x)}, ${Math.round(point.y)}` : 'Окно закрыто'}</output>
                 {open && (
-                    <FloatingWindow title="Window rows" size={{width: 300, height: 190}} position={{x: 120, y: 120}} onClickClose={() => setOpen(false)}>
-                        <div style={{padding: 4}}>
+                    <FloatingWindow key={placement.key} className="wenayQaEdgeWindow" title="⠿ Перетащите окно за шапку" moveOnlyHeader
+                        size={{width: 360, height: 300}} position={{x: placement.x, y: placement.y}}
+                        onPositionChange={setPoint} onClickClose={() => setOpen(false)}>
+                        <div style={{padding: 10, height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column'}}>
+                            <p style={{margin: '0 0 8px', fontSize: 12, lineHeight: 1.4}}>Правая кнопка или долгое нажатие по строке открывает её меню. Затем снова переместите окно.</p>
                             {edgeRows.map(row => (
                                 <div key={row} data-row={`W:${row}`} style={edgeRowStyle}>{row}</div>
                             ))}
+                            <div data-row="EDGE" style={{...edgeRowStyle, marginTop: 'auto', border: '1px dashed #60a5fa', borderRadius: 6, background: '#eff6ff', textAlign: 'right'}}>
+                                Меню у края ↘
+                            </div>
                         </div>
                     </FloatingWindow>
                 )}
@@ -404,9 +417,9 @@ const EdgeMenuDemo = () => {
 export function Card53() {
     return (
     <Check id="context-menu-edges" n={53} title="Context menu - viewport edge, FloatingWindow, touch long press"
-                       do="Right-click a row within 20 px of the right and bottom edge of the viewport (scroll the card there). Open the window and right-click a row inside it, including one at its lower-right corner. On touch, long-press a row for ~300 ms."
-                       expect="The menu is always fully visible: at the right edge it slides back inside instead of running off. A menu opened from the window renders above the window and is not cut off by the window body. Long press yields the SAME items as the right click on that row, with contextMenu.map never written."
-                       note="The horizontal clamp is the twin of the vertical one and no longer needs coordinate.left (which only submenus pass). Window presses portal into the window's own isolated layer. The item provider receives the gesture (point, target, pointer), so one provider serves mouse and touch."
+                       do="Open the window and drag its blue title bar repeatedly, releasing over rows or controls. Right-click the title: it must not start a drag. Use Проверить у края, then right-click Меню у края near its lower-right corner. On touch, drag the title and long-press a row for ~300 ms; move the window again afterwards."
+                       expect="The whole window follows the pointer, stops on release and remains draggable after opening a menu. Only the title moves it. The menu stays inside the viewport and above the window, without clipping. Mouse and touch use the same row actions."
+                       note="The edge target is inside a real FloatingWindow, not a static card with a misleading drag instruction. The stand owns the scoped window skin. Window drag termination runs in capture so menu stopPropagation cannot leave it armed; non-primary mouse buttons never start it."
                        tall>
                     <EdgeMenuDemo />
                 </Check>

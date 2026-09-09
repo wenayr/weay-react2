@@ -40,6 +40,42 @@ The map for existing root code is the "3.0.0 entry map" section of
 `doc/WENAY_REACT2_RENAMES.md`; the cost of each entry (what it may pull) is asserted by
 `scripts/ag-grid-bundle-probe.mjs` and listed in `doc/changes/v3.0.0.md`.
 
+## Owned clients and action scopes (3.2.0)
+
+`useOwnedClient` is opt-in ownership, not another subscription wrapper. Its factory must
+return a new, exclusively owned resource; never return an app singleton or a shared client.
+Keep externally owned clients on `useClientStore` / the existing specialized view hooks.
+The key uses React dependency identity: include connection/account/token identity inputs,
+and keep object keys stable. Changing only an inline factory does not recreate a session.
+
+The hook exposes an acquired client before readiness so views can subscribe during startup.
+Only `ready: true` means its readiness promise/method completed. Cleanup aborts the factory
+signal and invokes each acquired resource's `close` once, including late acquisition.
+Abort is cooperative; a factory must clean up partial allocations if it throws before returning.
+Async close is observed, not awaited before starting a replacement. Use a non-throwing
+`onCloseError` for disposal diagnostics, including after unmount. Explicit `close()` keeps
+this generation closed until the key changes or `enabled` is toggled off/on.
+
+`useAsyncAction` rejects duplicate calls with `AsyncActionBusyError` before executing them;
+disabled/disposed controllers reject with `AsyncActionUnavailableError`. These guard errors
+do not replace the accepted action's error. Handle the returned promise at the event boundary:
+the hook stores the original action error and also rejects with it. A new key fences old UI
+updates but does not cancel an external side effect. Cancellation and retry remain app policy.
+
+`useServiceCommands` uses the command-map identity as that scope. Preserve the client's stable
+map rather than rebuilding/spreading it on each render. Command names, argument tuples and
+results are inferred; only a leading string request ID is supplied by the binding. The default
+`crypto.randomUUID()` needs a secure browser context; inject `requestId` otherwise. One ID is
+allocated per accepted invocation, never for a busy/disabled rejection. Running again creates
+a new ID, not a receipt retry; reuse of a receipt ID must be an explicit application decision.
+
+Active QA card 56 exercises these public hooks over real common2 Store/Replay, with artificial
+700 ms startup/action delays. It checks account changes, duplicate clicks, errors, explicit
+close, disable/re-enable and navigation cleanup. This local fixture is not evidence of network,
+server permissions or token-renewal correctness. common2 2.17.0 owns those mechanisms; React
+can observe its existing permission/health Stores with `useClientStore`. First-ready does not
+mean perpetual authorization: observe current permissions separately after revocation.
+
 ## Toolchain / Development
 
 - The supported project compiler is TypeScript 7. Module lookup is
@@ -88,6 +124,14 @@ escape hatch. `OutsideClickArea` marks logically nested React portal events as i
 so the canonical outside-click wrapper still works across the DOM boundary. QA card 52
 is the active two-window acceptance scenario; `__test/floatingWindow.test.tsx` pins the
 portal, focus, isolation, optional close button, and outside-click contracts.
+Drag/menu interaction (3.2.0): only the primary mouse button starts title dragging.
+Mouse/touch release is captured at document level, so a menu or control stopping propagation
+cannot leave the drag armed. `contextMenu.Layer` opens right-click menus on `contextmenu`
+only, not again on `mouseup` (which may already target the new popup). The touch and legacy
+left-double-click paths remain. Card 53 now uses a real movable window for the viewport-edge
+test, with a 42px handle, local `.wenayQaEdgeWindow` skin and an explicit edge-position button;
+the default transparent window tokens are unchanged. Regression cases live in
+`__test/floatingWindowDragEnd.test.tsx` and `__test/contextMenuPlacement.test.tsx`.
 Title bars support double-click and two-tap maximize/restore. The maximize button is deliberately
 hidden by default; set `maximizeButton` only when explicit chrome is useful. While a free window is
 dragged to the top-centre activation zone, a Windows 11-style Snap Layout picker presents three
