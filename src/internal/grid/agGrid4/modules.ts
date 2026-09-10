@@ -13,13 +13,17 @@ import {
     RowApiModule,
     RowAutoHeightModule,
     RowSelectionModule,
+    RowStyleModule,
     ScrollApiModule,
     TextFilterModule,
+    TooltipModule,
     type Module,
 } from 'ag-grid-community'
 
 /**
  * Features used by AgGridTable/useAgGrid and their production consumers.
+ * Row styling and tooltips are part of the documented consumer baseline, even
+ * when no library-owned grid currently uses them. Keep that compatibility contract.
  *
  * Keep optional features grid-scoped through AgGridReact's `modules` prop instead
  * of growing this shared baseline.
@@ -36,9 +40,11 @@ export const defaultAgGridModules: Module[] = [
     ScrollApiModule,
     RowSelectionModule,
     CellStyleModule,
+    RowStyleModule,
     TextFilterModule,
     NumberFilterModule,
     DateFilterModule,
+    TooltipModule,
 ]
 
 declare const process: {env: {NODE_ENV?: string}}

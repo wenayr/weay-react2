@@ -36,9 +36,11 @@ test('default AG Grid modules are targeted and register only once', () => {
         'ScrollApi',
         'RowSelection',
         'CellStyle',
+        'RowStyle',
         'TextFilter',
         'NumberFilter',
         'DateFilter',
+        'Tooltip',
     ]))
     expect(names).not.toContain('AllCommunity')
 
