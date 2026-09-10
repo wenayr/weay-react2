@@ -847,6 +847,73 @@ Semantics that are easy to get wrong:
 
 QA cards 23/24/33/34 (`testUseReact/replayVideo.tsx`, all in-proc): synthetic 10fps jpeg-frame producer on `Replay.replayListen({history, current})`; client A = direct `exposeReplay` remote; client B = simulated slow wire (1 envelope per rateMs) behind `conflateReplay({pending: () => buf.length, highWater: 4, lowWater: 1, keyOf: () => "frame"})`; client C = `archiveReplay` + `openHistory` scrubber; client D = freshness (`staleMs: 2000`, `React.memo` + no tick, mounted inside a local `<StrictMode>`; the flat renders counter under growing frames is the no-per-event-render proof; "stall producer" toggles the emit interval, "new client" remounts by key for the stalled-mount case; card 24 has the same via `staleMs: 2500` on the mirror); client E = pull path (`useReplayFrame` over the direct remote with a wrapped counting `frame()`, pace switch 250ms/1s/3s keeps seq). `window.__replayVideoDemo` is exposed for debugging (wire.setRateMs, stats). Node-verified: slow wire delivered 12/36 envelopes yet converged to the last frame with bounded buffer (coalesced tail recovery); `syncStoreReplay` off() freezes the mirror and `{since}` resubscribe catches up by tail. Card 33 = per-key feed (`useStoreReplayEach` over `exposeStoreReplay`): a dict-of-rows store, producer touches ONE random row per tick, the fold target is a plain Map with per-row cb counters — only the mutated row's counter grows, keyframe/`replace` are the only whole-table expansions, delete arrives as `(key, undefined)`. Card 34 = route hand-off (`useReplayRouteSubscribe` over the same video line): one canvas starts on relay, switches direct/relay by `switchRoute`, and failed replacement keeps the previous route alive. Browser QA of throttling-sensitive behavior needs a VISIBLE tab: hidden-tab timer/effect throttling stalls the producer and delays passive effects (known stand caveat).
 
+### common2 2.20.0 compatibility
+
+The dependency and peer minimum is now `^2.20.0`. Existing React hook signatures and
+imports are unchanged. common2 fixes outgoing effects after peer connection close
+and dynamic RPC callback subscription cleanup (PC1/PC2); React must not mask shutdown
+errors with global rejection handlers or timing delays. Keep parent RPC ownership,
+room/account identity and reconnect policy explicit. Dynamic callback subscriptions
+are not automatically retried on reconnect; this is not a promise of transparent
+room recovery for raw subscriptions. SC1 resource controllers, added in common2 2.19.0,
+own a stable status Store but expose a new remote per ready generation. Observe their
+status with existing Store hooks and bind consumers to the current generation; do not
+treat initial readiness as a permanent grant or reuse an old remote after reconnect.
+The application owns the controller and closes it at its session boundary; no parallel
+React resource runtime is added here.
+
+common2 2.20.0 fences late recorder/PCM callbacks inside its media source; useMediaSource
+retains that source as owner of frames and capture generations. Public host addresses
+and AI checkpoints are server configuration, not new React mechanisms. useAiRunClient
+continues exposing run records: an application using persistence should display a run's
+recovery fact instead of an indefinite active spinner. Recovery/resume and provider
+idempotency remain server decisions; the React hook does not repeat external effects.
+
+### Free-position drag keyboard (R4)
+
+`useDraggableApi` from `wenay-react2/react` accepts opt-in `keyboard: true` or
+`{step, multiplier, modifier}` (defaults: 10, 5, `shift`; modifiers also `alt`, `ctrl`,
+`meta`). Invalid non-positive/non-finite step values fall back to defaults. Bind
+`handleProps` to a named real button, not a wrapper around inputs/actions. Legacy
+`bind`/`props`/`dragProps` remain mouse/touch row bindings without keyboard interception.
+The handle has type button, pressed/disabled state and touch-action none. Scrolling
+outside the handle and arrow keys before capture retain their normal behavior.
+
+Space/Enter start or confirm; arrows move; repeated activation keydown cannot create
+another gesture. Escape cancels; handle blur, window blur, touchcancel, programmatic
+cancel and unmount abandon the gesture. `enabled: false` cancels either input mode;
+turning keyboard off cancels a keyboard gesture. A pending pointer hold already owns
+the input slot. Synchronous ownership prevents competing input and late releases after
+cancel from committing. No global keyboard listener or cross-instance focus move exists.
+
+`inputMode` is `mouse | touch | keyboard | null`. `onDragStart` runs after ownership
+is acquired; `onDragEnd(finalDelta)` runs after reset/ownership release. `onDragCancel`
+runs once for an active abandoned gesture, including unmount, never for a short hold
+or an already idle cancel. Clear transient external previews there, without committing.
+Callback bodies use the latest render; they are synchronous notifications, not awaited actions.
+
+Position is a delta, not a persisted board coordinate. The initial position seeds it
+once. Mouse/touch moves replace it with displacement from the press; keyboard moves
+add to the current value. `setPosition`/`resetPosition` do not emit move/end/cancel and
+do not release ownership. Reset, cancel and confirmation return the delta to zero;
+`onDragEnd` receives the pre-reset value. `trackState: false` bypasses React for both
+pointer and keyboard move ticks; getters/ref remain current and gesture boundaries render.
+Constraints may call setPosition from onMove, so the next keyboard step starts from
+the constrained delta. Scrolling/zoom conversion, current permissions, changed-only save,
+revision conflicts, announcements and network presence remain consumer policy.
+
+QA card 58 (`#free-drag-keyboard`) composes two local free notes through the public
+entrypoint, with imperative constrained preview, commit count, separate textarea/delete,
+step selection and timed permission withdrawal. It is not the deployed organizer.
+The demo also owns persistent-in-memory stacking: pointer/focus/drag raises a note,
+toolbar buttons can raise a fully covered note, and the order remains after drop/cancel.
+Only z-index changes; note DOM order/identity, text, coordinates and commit count stay intact.
+This is example policy, not another public layer-management API.
+After publication, Note can remove its keyboard ref/key handler and duplicated start/end
+arbitration; bind handleProps, reuse start/preview/commit, and clear in onDragCancel.
+Keep its base/revision/generation checks, scroll conversion, clamp, presence and RPC command.
+This repository does not replace the example's published dependency with local code.
+
 ## Logs
 Frequent global logger:
 ```

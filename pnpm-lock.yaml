@@ -21,8 +21,8 @@ importers:
         specifier: ^10.5.3
         version: 10.5.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       wenay-common2:
-        specifier: ^2.17.0
-        version: 2.17.0
+        specifier: ^2.20.0
+        version: 2.20.0(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6))
     devDependencies:
       '@swc/core':
         specifier: ^1.16.1
@@ -2689,10 +2689,21 @@ packages:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
     engines: {node: '>=12'}
 
-  wenay-common2@2.17.0:
-    resolution: {integrity: sha512-quq39AphtoouqRKSA/4ZLsqBfr2WNIUEjm/B4ZKZH6QUg/RvcSeYhSf4Vmk0f46hoUPUsiX401TGmNRarDFgRw==}
+  wenay-common2@2.20.0:
+    resolution: {integrity: sha512-d8J7/AFZR5MgDvpExtxkj7+4SXh0zZnTGHYAXzYqymx/xjqXLl5YJDadfXrxQm/cVJvbFfhFQfiWH+pPDdc5YA==}
     engines: {node: '>=20.0.0'}
     hasBin: true
+    peerDependencies:
+      socket.io: ^4.8.3
+      socket.io-client: ^4.8.3
+      swagger-ui-dist: ^5.32.14
+    peerDependenciesMeta:
+      socket.io:
+        optional: true
+      socket.io-client:
+        optional: true
+      swagger-ui-dist:
+        optional: true
 
   whatwg-encoding@3.1.1:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
@@ -5498,11 +5509,14 @@ snapshots:
 
   webidl-conversions@7.0.0: {}
 
-  wenay-common2@2.17.0:
+  wenay-common2@2.20.0(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6)):
     dependencies:
       '@types/express': 5.0.6
       axios: 1.19.0
       express: 5.2.1
+    optionalDependencies:
+      socket.io: 4.8.3(utf-8-validate@6.0.6)
+      socket.io-client: 4.8.3(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - debug
       - supports-color

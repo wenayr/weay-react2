@@ -158,7 +158,7 @@ Both hooks ride the same module-level `CResizeObserver` singleton (one native `R
 
 ## Drag / Floating Windows
 ```
-const drag = useDraggableApi({initialPosition, holdMs?, onDragStart?, onDragEnd?, onMove?, trackState?})
+const drag = useDraggableApi({initialPosition, holdMs?, onDragStart?, onDragEnd?, onDragCancel?, onMove?, trackState?})
 <div {...drag.bind} style={{transform: `translate(${drag.position.x}px, ${drag.position.y}px)`}} />
 drag.setPosition({x, y})
 drag.resetPosition()
@@ -168,6 +168,17 @@ drag.cancelDrag()
 // onDragStart/onDragEnd are a pair: with holdMs > 0 neither fires until the hold elapses,
 // so a plain click announces nothing; with holdMs 0 the drag starts on pointer-down
 // (pinned by __test/useDraggableHold.test.tsx)
+
+// Optional free-position keyboard input, same gesture owner as mouse/touch:
+const noteDrag = useDraggableApi({holdMs: 0, enabled: canMove,
+    keyboard: {step: 10, multiplier: 5, modifier: 'shift'}, trackState: false,
+    onDragStart: captureBase, onMove: previewDelta,
+    onDragEnd: commitDelta, onDragCancel: clearPreview})
+<button {...noteDrag.handleProps} aria-label="Move note" />
+// Space/Enter: start/confirm; arrows: move; Escape/blur: cancel.
+// inputMode: 'mouse' | 'touch' | 'keyboard' | null; isDragging is live.
+// The app owns absolute coordinates, constraints, revisions and persistence.
+// Changing the external note/room/revision: noteDrag.cancelDrag().
 
 const r = useReorder({order, commit, move?, canDrag?, preview?, holdMs?})   // mini reorder-by-drag
 <div ref={r.listRef}>{order.map(k => {                                      // children 1:1 with order

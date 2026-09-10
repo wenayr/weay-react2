@@ -177,6 +177,8 @@ Main APIs:
 - `FloatingWindow`, `useFloatingWindowController`
 - `WindowPortal`, `useFloatingWindowManager`, `FloatingWindowTaskbar`
 - `useDraggableApi`, `useReorder`, `useReorderBoard`
+- Free drag: opt-in keyboard button handle shares mouse/touch ownership and cancellation;
+  configurable steps and imperative deltas. Board coordinates, bounds and saves stay in the app.
 
 Use these when the UI problem is generic: outside-click closing, draggable
 position, ordered drag-and-drop, or a persistent floating window. `FloatingWindow`

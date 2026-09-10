@@ -20,6 +20,9 @@ export {useDraggable, useDraggableApi} from "../internal/hooks/useDraggable.js";
 export type {
     Position,
     UseDraggableApi,
+    DraggableInputMode,
+    DraggableKeyboardOptions,
+    DraggableHandleProps,
     UseDraggableOptions,
     UseDraggableReturn,
 } from "../internal/hooks/useDraggable.js";

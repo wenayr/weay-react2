@@ -1,4 +1,5 @@
 import type { QaCard } from "./standKit.js";
+import { Card58 } from './cards/freeDragKeyboard.js';
 import { Card57 } from './cards/reorderAccessible.js';
 import { Card56 } from './cards/serviceBindings.js';
 import { Card55 } from "./cards/replayChunks.js";
@@ -12,6 +13,7 @@ import { Card8, Card1, Card14, Card7, Card19, Card9, Card10, Card11 } from "./ca
 import { Card5, Card12, Card15, Card16 } from "./cards/grid.js";
 
 export const qaCards: QaCard[] = [
+    { id: 'free-drag-keyboard', n: 58, section: 'active', title: 'Free notes — keyboard and pointer lifecycle', Component: Card58 },
     { id: 'reorder-accessible', n: 57, section: 'active', title: 'Accessible organizer — keyboard, handles, edge scroll, command tuples', Component: Card57 },
     { id: 'service-bindings', n: 56, section: 'active', title: 'Owned client + typed commands — session lifecycle', Component: Card56 },
     { id: 'store-replay-chunks', n: 55, section: 'active', title: 'Store Replay — typed inventory and chunked loading', Component: Card55 },
