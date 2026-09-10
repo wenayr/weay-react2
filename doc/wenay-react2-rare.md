@@ -511,7 +511,7 @@ useOutsideRef(options) -> ref       // use useOutside(options).ref / .props
 OutsideClickArea                   // alias of OutsideClickArea
 
 StyleOtherRow
-StyleOtherColumn
+// StyleOtherColumn / StyleOtherRow removed in 2.0.0; no replacement
 ```
 
 `Button`, `OutsideButton`, `HoverButton`, and `AbsoluteButton` are still direct components rather than hook controllers.
@@ -552,13 +552,10 @@ Drag primitives after the A7 pass (2026-07-10): `DragBox` is a thin adapter over
 `useDraggableApi({holdMs: 0, trackState: false, onMove})` - same observable contract as its old
 bespoke loop (immediate start, per-tick imperative `onX`/`onY` with the delta from the press
 point, no re-render per move tick, `onStop` only after a real gesture, `last` ref shares the live
-position object; pinned by `__test/dragBox.test.tsx`, QA card 35). `DragArea` stays untouched and
-`@deprecated`: no consumers, and its semantics are unique (document.body listeners,
-`stopPropagation` per move tick, ABSOLUTE coords, no preventDefault) - re-basing it would change
-observable behavior; removal only in a breaking version. `useFloatingWindowController`'s header
-loop and `StickerMenu` deliberately keep their own loops: viewport clamp + `e.buttons===1` release
-recovery + persistence/z-stack, and mount-lifetime listeners + click-vs-drag suppression
-respectively, are load-bearing behavior `useDraggableApi` does not model.
+position object; pinned by `__test/dragBox.test.tsx`, QA card 35). `DragArea` and `StickerMenu`
+were subsequently removed in 2.0.0; use `DragBox` / `useDraggableApi` for new gestures.
+`useFloatingWindowController` retains its own header loop for viewport clamp, release
+recovery, persistence and z-stack behavior that `useDraggableApi` does not model.
 
 Reorder-by-drag (useReorder, `hooks/useReorder.tsx` - extracted from the Toolbar editor, which is
 its first consumer):
@@ -707,7 +704,7 @@ contextMenu.stats.onChange(cb) -> off
 other: (gesture) => items | {items, source?}   // gesture: {x, y, target, pointer: "mouse"|"touch"}
 contextMenu.map                         // legacy queue consumed by Layer; prefer openAt
 createContextMenu({name?})              // custom isolated instance with its own state and stats
-createRightClickMenu()                  // lower-level legacy right-click factory
+// createRightClickMenu / MenuR removed in 2.0.0; use contextMenu.Layer + openAt
 
 DropdownMenu({elements, trigger?, classNames?, styles?, style?, position?, verticalPosition?, keyForSave?})
 useRightMenuController({elements, style?, styles?, position?, verticalPosition?, keyForSave?})
@@ -715,7 +712,7 @@ createRightMenuController()
 mapRightMenu                         // persisted floating-menu state (ObservableMap, RightMenuStore)
 MenuRightPosition / MenuRightVerticalPosition / MenuRightSavedState / MenuRightRenderProps
 MenuRightTrigger / MenuRightClassNames / MenuRightStyles / RightMenuController
-StickerMenu                          // components/Menu re-export
+// StickerMenu removed in 2.0.0; no replacement
 ```
 
 Prefer `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, and stays supported through `1.x`; it should not be the primary API in new code — touch no longer needs it either: the Layer's `other` provider is called WITH the gesture (`{x, y, target, pointer}`) at the moment the long press fires, so one provider builds the same items for a right click and a hold on the row under the finger, and it may return `{items, source}` to get the same `source` accounting `openAt` gives. `MenuR`'s `other` receives the same gesture. A zero-argument provider still type-checks, so existing callers are unaffected.
@@ -724,7 +721,8 @@ Placement is viewport-clamped on both axes. The horizontal flip (`isLeftAligned`
 
 A press inside a viewport `FloatingWindow` has no Layer among its DOM ancestors (the window portals to body), so the menu used to open in the page's root Layer underneath the window; nesting a Layer in the window instead got the menu clipped by the window body's `overflow: auto`. The serving Layer now portals the menu into the source window's own portal root — the fixed isolated layer the window itself lives in — positioned in client coordinates and above the window chrome. `getState().windowPortal` exposes which window layer is hosting it, and a window that closes under an open menu falls back to inline rendering. QA card 53 pins all three: edge clamp, window-hosted menu, long-press parity. `contextMenu.stats` is local in-memory diagnostics, not hidden analytics: it counts direct `openAt`, `openAtPoint`, legacy Layer queued opens, empty opens, close/replace, source/layer usage, aggregate action outcomes, and keyed action outcomes. It deliberately does not persist, send network requests, or store arbitrary item labels. Per-action stats require explicit `MenuItemStrict.actionKey`; unkeyed actions update `actionTotals` only.
 
-`createRightClickMenu().MenuR` keeps wrapper-only right-click handling by default. Its additive `captureGlobal` prop installs document-level right-click listeners for portal or floating-window content; it is opt-in and removes the listeners on unmount.
+`createRightClickMenu` / `MenuR` and their `captureGlobal` API were removed in 2.0.0.
+Use `contextMenu.Layer` with the shared `useContextMenuGesture` integration.
 
 `Menu` does not mutate `item.status`. Open/hover state is an internal active index; `status` remains a seed/compatibility value, and custom item renderers receive a view item whose `status` mirrors the current open state.
 
@@ -732,6 +730,15 @@ A press inside a viewport `FloatingWindow` has no Layer among its DOM ancestors 
 
 
 ## Observe / Listen React Hooks
+
+Dependency baseline in 3.5.0: common2 2.21.1. Its 2.21.0 `createResourceScope` and
+`createReconciler` compose application resource ownership/background reconciliation;
+they do not replace the React generation/ready contract of `useOwnedClient`. No mandatory
+React-hook signature changes. Applications may use them inside an owned client factory.
+Follow common2's `doc/ASYNC-OWNERSHIP.md` for close deadlines versus actual settlement.
+The 2.21.1 patch only clarifies docs: a spread-based snapshot test double retains `chunks`,
+which can bypass an overridden `keyframe()`. For a monolithic snapshot test, remove `chunks`
+or use `chunkedKeyframe: false`; for chunk-transfer tests intercept the chunk facet itself.
 Canonical React adapter names:
 ```
 useStoreNode(node, {mode?, fallback?, drain?, key?})
@@ -926,26 +933,23 @@ useMessageEventLogsController({maxVisible?})
 MessageEventLogsView({controller, zIndex?, className?, style?})
 MessageEventLogCard({logs})
 MessageEventLogs({zIndex?}) // compatibility wrapper
-LogsPage({update?})
+logsApi.React.Setting() // settings view; InputSettingLogs is not a named export
 useMiniLogsTable({data, onClick?, columnDefs?, defaultColDef?})
 MiniLogsView({controller})
 MiniLogsTable({data, onClick?, columnDefs?, defaultColDef?})
 MiniLogs({data, onClick?}) // compatibility wrapper
 ```
 
-React-context logger:
-```
-LogsProvider
-useLogsContext()
-useLogsTableController()
-LogsTable()
-useLogsNotificationsController()
-LogsNotifications()
-LogsSettings()
-MainPage()
-```
+Removed in 2.0.0: `LogsPage`, `LogsProvider`, `useLogsContext`, `useLogsTableController`,
+`LogsTable`, `useLogsNotificationsController`, `LogsNotifications`, `LogsSettings` component,
+`MainPage` and `AppLogs`. Compose application tabs over `PageLogs` / `useLogsPageTable`
+and `logsApi.React.Setting`; `LogsSettings` now names a controller type, not a component.
 
-The context logger is a larger UI surface; the global `logsApi` is still the shorter integration point. `createLogsController` is the headless layer for append/limit/settings state; `useMessageEventLogsController` owns the global notification queue/timers/settings, while `MessageEventLogsView` and `MessageEventLogCard` own rendering. `PageLogs`, `MessageEventLogs`, and `LogsPage` remain compatibility UI wrappers. `useLogsTableController` and `useLogsNotificationsController` expose the provider-local table/notification state while `LogsTable` and `LogsNotifications` keep the visual wrappers. Shared logger chrome lives in `src/internal/logs/logStyles.ts` and is themed through `--logs-*` tokens.
+`createLogsController` is the headless layer for append/limit/settings state;
+`useMessageEventLogsController` owns the global notification queue/timers/settings, while
+`MessageEventLogsView` and `MessageEventLogCard` render it. `PageLogs` and `MessageEventLogs`
+remain UI wrappers. Shared logger chrome lives in `src/internal/logs/logStyles.ts` and is
+themed through `--logs-*` tokens. All current names above come from `wenay-react2/logs`.
 
 Full-page table controller (`useLogsPageTable` -> `LogsPageTableController`): the grid receives a
 MOUNT-TIME snapshot of the accumulated log map once (`useState` initializer), then reconciles
@@ -960,10 +964,25 @@ WITH a callback: they run imperatively on `renderBy` and never re-render the com
 `update` prop, which `PageLogs` still honors. QA card 9.
 
 ## Cache / Memory / Browser Utilities
+
+`restoreDates` is public on `/persist` again in 3.5.0. It mutates writable JSON-shaped
+objects and arrays (including arrays of strings), returns void, preserves existing Dates
+and shared/cyclic references. It recognizes the cache's ISO date-time format, with optional
+fraction and `Z`; date-only and timezone-offset strings remain unchanged. A bare root string
+cannot be replaced. This is not schema validation and does not narrow TypeScript input types.
+QA card 59 (`#restore-dates`) demonstrates repeated restoration from the public entrypoint.
+
+```ts
+import {restoreDates} from 'wenay-react2/persist';
+const payload: unknown = JSON.parse(json);
+restoreDates(payload);
+// Validate the application schema before treating payload as a domain object.
+```
+
 ```
 browserCacheStorage
 localStorageCache
-restoreDates(obj)
+restoreDates(obj: unknown): void // public again in 3.5.0, from wenay-react2/persist
 createCacheMapWithStorage(entries, save)
 createCacheMap(entries)
 
@@ -980,7 +999,7 @@ memoryGetById(key, def, id)
 memoryUpdate(key, mutate)
 memoryMarkDirty(key)
 createSearchHistory({key, max?})
-deepMergeWithMap(target, source)
+// deepMergeWithMap is internal, not a public export
 structEqual(a, b)                   // deep equality for plain data trees; JSON.stringify-idiom
                                     //   tolerances (undefined props absent, NaN==NaN) WITHOUT
                                     //   its key-order sensitivity; not for Maps/Sets/cycles

@@ -28,6 +28,8 @@ export {
     useFloatingWindowManager,
 } from "../internal/components/Dnd/FloatingDesktop.js";
 export type {
+    FloatingDesktopEntry,
+    FloatingDesktopStack,
     FloatingDesktopWindow,
     FloatingWindowManager,
     FloatingWindowTaskbarProps,

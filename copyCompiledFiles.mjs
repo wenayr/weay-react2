@@ -38,6 +38,8 @@ console.log("Copy files to",tempDir);
 
 if (1) {
 fs.copyFileSync("./package.json", path.join(tempDir,"package.json"));
+fs.mkdirSync(path.join(tempDir, "scripts"), {recursive: true});
+fs.copyFileSync("./scripts/migrate-root-imports.mjs", path.join(tempDir, "scripts/migrate-root-imports.mjs"));
 
 if (fs.existsSync("./README.md")) {
     fs.copyFileSync("./README.md", path.join(tempDir,"README.md"));

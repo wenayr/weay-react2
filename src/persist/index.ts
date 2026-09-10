@@ -20,6 +20,7 @@
  *  entries, and a hand-kept list is the documentation of what the block promises. */
 
 export {ObservableMap} from "../internal/persist/observableMap.js";
+export {restoreDates} from "../internal/persist/restoreDates.js";
 export type {MapChangeListener} from "../internal/persist/observableMap.js";
 
 export {

@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "description": "Common react",
   "type": "module",
   "strict": true,
@@ -8,7 +8,8 @@
   "types": "lib/index.d.ts",
   "scripts": {
     "testjest": "jest",
-    "test": "jest --runInBand",
+    "test": "jest --runInBand && npm run test:migration",
+    "test:migration": "npm run types:generate && node scripts/generate-root-barrel.mjs && node --test scripts/migrate-root-imports.test.mjs && node scripts/root-deprecation-probe.mjs",
     "testjest2": "jest --clearCache",
     "update": "pnpm update --latest",
     "typecheck": "tsc -p tsconfig.qa-check.json --noEmit && tsc -p tsconfig.test.json --noEmit",
@@ -34,6 +35,7 @@
   "files": [
     "lib/**/*",
     "doc/**/*",
+    "scripts/migrate-root-imports.mjs",
     "!**/*.tsbuildinfo"
   ],
   "sideEffects": [
@@ -47,18 +49,19 @@
     }
   },
   "dependencies": {
+    "@babel/parser": "^7.29.8",
     "ag-grid-community": "^36.1.0",
     "ag-grid-react": "^36.1.0",
     "re-resizable": "^6.11.2",
     "react-rnd": "^10.5.3",
-    "wenay-common2": "^2.20.0"
+    "wenay-common2": "^2.21.1"
   },
   "peerDependencies": {
     "ag-grid-community": "^36.1.0",
     "ag-grid-react": "^36.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "wenay-common2": "^2.20.0"
+    "wenay-common2": "^2.21.1"
   },
   "devDependencies": {
     "@swc/core": "^1.16.1",
@@ -136,10 +139,22 @@
       "default": "./lib/native/index.js"
     },
     "./package.json": "./package.json",
-    "./styles": "./lib/style/style.css",
-    "./styles/tokens": "./lib/style/tokens.css",
-    "./styles/menu-right": "./lib/style/menuRight.css",
-    "./styles/communication": "./lib/style/communication.css",
+    "./styles": {
+      "types": "./lib/style/styles.d.ts",
+      "default": "./lib/style/style.css"
+    },
+    "./styles/tokens": {
+      "types": "./lib/style/styles.d.ts",
+      "default": "./lib/style/tokens.css"
+    },
+    "./styles/menu-right": {
+      "types": "./lib/style/styles.d.ts",
+      "default": "./lib/style/menuRight.css"
+    },
+    "./styles/communication": {
+      "types": "./lib/style/styles.d.ts",
+      "default": "./lib/style/communication.css"
+    },
     "./communication": {
       "types": "./lib/communication/index.d.ts",
       "import": "./lib/communication/index.js",

@@ -8,6 +8,33 @@ changed is the canonical import path. The root is a compatibility union, depreca
 and trimmed in the next major, so new code and touched files import from the subpath in the
 right-hand column. Details: `doc/changes/v3.0.0.md`. `./native` is untouched.
 
+### Automated migration (3.5.0)
+
+From the consumer repository, run:
+
+```sh
+node node_modules/wenay-react2/scripts/migrate-root-imports.mjs src
+node node_modules/wenay-react2/scripts/migrate-root-imports.mjs --write src
+node node_modules/wenay-react2/scripts/migrate-root-imports.mjs --check src
+```
+
+The first command previews without writing. `--check` returns 1 when imports need migration,
+2 for unsupported syntax/names. Named imports and re-exports are split with aliases,
+type-only specifiers, comments, quote style and semicolons preserved. No file is written if
+any input has an unsupported case. Namespace/default/star/dynamic imports, type queries and
+module augmentations need manual decisions. The script does not rewrite strings/regexes in
+import-contract tests: review those, then run consumer types, tests and builds.
+
+The map comes from the installed package's declarations, with duplicate priority:
+core → persist → react → grid → windows → logs → communication → params → modal → menu → chart → ui.
+This deliberately picks `/persist` for shared persistence maps even where the table also
+lists a UI home. The CLI uses the packaged `@babel/parser`; TypeScript compiler API changes
+between 5/6 and 7 do not affect it. Node 20+ is required, as for the package.
+
+Root names have per-specifier `@deprecated` tags; canonical subpaths do not inherit those
+tags. IDE suggestions are not `tsc` errors: use `--check` in CI to prohibit remaining root
+named imports. Do not migrate `/native` to the web root.
+
 ### Root import -> canonical subpath (names that were root-only before 3.0.0)
 
 | Root name | Canonical subpath |
@@ -74,7 +101,7 @@ Breaking by design; documented here and in `doc/changes/v2.0.0.md`. Nothing belo
 | `StickerMenu` | `components/Menu` | none (no consumers) |
 | `RightMenuDemo`, `OutlineDragDemo` | `components/Menu/RightMenu.tsx`, `components/Dnd` | stand-only (`src/stand/testUseReact/`) |
 | `ApiLeftMenu` (eager singleton), `TestLeft333` | `components/Modal/LeftModal.tsx` | `getApiLeftMenu()` called by the app |
-| `LogsPage` | `logs/logs.tsx` | compose tabs in the app over `useLogsPageTable` / `PageLogs` + `InputSettingLogs` |
+| `LogsPage` | `logs/logs.tsx` | compose tabs in the app over `useLogsPageTable` / `PageLogs` + `logsApi.React.Setting` (import `logsApi` from `/logs`) |
 | `LogsProvider`, `useLogsContext`, `LogsTable`, `LogsNotifications`, `LogsSettings` (component), `MainPage`, `AppLogs` | `logs/logsContext.tsx` (deleted) | `createLogsController` + `useLogsPageTable` / `useMiniLogsTable` / `useMessageEventLogsController`; `LogEntry`/`LogInput`/`LogsSettings` now mean the controller types on every entrypoint |
 | `createChartCanvas`, `IChartCanvas`, `IChartConfig`, `IChartPoint`, `ChartDemo` | `myChart/1/` (deleted) | `Sparkline` or `createChartEngine` |
 | `MyChartEngine`, `generateIncrementalData` | `myChart/chartEngine` | stand-only demo; build your own component over `createChartEngine` |
@@ -82,7 +109,9 @@ Breaking by design; documented here and in `doc/changes/v2.0.0.md`. Nothing belo
 | `ArrayPromise` | `utils/arrayPromise.tsx` (deleted) | none |
 | `PageVisibilityContext`, `PageVisibilityProvider` | `utils/pageVisibilityContext.tsx` (deleted) | none |
 | `DragArea` | `components/Dnd/DragArea.tsx` (deleted) | `useDraggableApi` / `DragBox` |
-| `BrowserCacheStorage`, `LocalStorageCache`, `restoreDates`, `DirtyListener`, `deepMergeWithMap` | root barrel (`utils` `export *`) | still exported from their modules, not public; use `browserCacheStorage` / `localStorageCache` / `createCacheMapWithStorage` |
+| `BrowserCacheStorage`, `LocalStorageCache`, `deepMergeWithMap` | root barrel (`utils` `export *`) | not public; use `browserCacheStorage` / `localStorageCache` / `createCacheMapWithStorage` |
+| `restoreDates` | removed from root in 2.0.0 | public again in 3.5.0: `wenay-react2/persist`; mutates JSON-shaped objects/arrays in place, returns void |
+| `DirtyListener` | removed from root in 2.0.0 | public type on `wenay-react2/persist` since 3.0.0 |
 | `map3`, `mapWait` | `updateBy.ts` | module-private; `__observerStateForTests(obj)` read-only probe |
 | `FloatingWindowProps.onCLickClose` | typo alias | `onClickClose` |
 | `Button` `keySave` | alias | `keyForSave` |

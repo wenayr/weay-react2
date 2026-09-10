@@ -78,7 +78,7 @@ Rules:
 - The version name is mandatory and must be visible in the file title.
 - Write the entry like a commit summary: what changed, why it matters, and how it was checked.
 - If several related changes land before the next publish, append them to the same version file.
-- Keep only the latest 10 version files in `doc/changes/`; when adding the 11th, delete the oldest version file.
+- Keep the latest 10 ordinary version files in `doc/changes/`, plus permanent major migration notes (`v2.0.0.md`, `v3.0.0.md`, and future breaking-major guides). Never prune a major migration note referenced by RENAMES; older ordinary release notes may be pruned.
 - Do not move old release notes into `README.md`.
 
 ## QA Stand

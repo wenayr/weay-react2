@@ -1,5 +1,7 @@
 import {renderBy} from "../updateBy.js";
 import {ObservableMap} from "./observableMap.js";
+import {restoreDates} from './restoreDates.js';
+export {restoreDates} from './restoreDates.js';
 
 export type DirtyListener = (scope?: string, key?: string) => void
 
@@ -130,23 +132,6 @@ function addDataToMap(data: [k: string,v: unknown][], map: Map<string,unknown>) 
         }
     }
 }
-export const restoreDates = (obj: unknown): void => {
-    if (typeof obj == "object" && obj) {
-        if (Array.isArray(obj)) obj.forEach(restoreDates)
-        else Object.entries(obj).forEach(([k,v])=>{
-            if (typeof v == "string") {
-                if (isDate(v)) {(obj as Record<string, unknown>)[k] = new Date(v)}
-            }
-            if (typeof v == "object") restoreDates(v)
-        })
-    }
-}
-// module-level constant: this runs for every string of every cached object on load
-const ISO_DATE_RE = /^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]+)?(Z)?$/;
-function isDate(_date: string){
-    return ISO_DATE_RE.test(_date);
-}
-
 export function createCacheMapWithStorage(arr: [k: string, v: Map<string, unknown>][], Save: CacheStorage) {
     const savedPayloadByKey = new Map<string, string>()
     let saveTimer: ReturnType<typeof setTimeout> | null = null

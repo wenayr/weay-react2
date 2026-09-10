@@ -1,6 +1,6 @@
 # wenay-react2 - BRIEF cheat sheet (canonical UI/controller API)
 
-> Root import: `import { ... } from "wenay-react2"`.
+> Import canonical subpaths (`wenay-react2/react`, `/grid`, etc.); the root is deprecated.
 > Notation: `name(args) -> ret`. JSX examples show the intended public path, not every prop.
 > Short controller-style names are canonical. Removed names are recorded in
 > **WENAY_REACT2_RENAMES.md** for migration only; old aliases are not exported.
@@ -29,7 +29,7 @@ the CSS is still imported once: `import "wenay-react2/styles"`. Map for root cod
   `import {structEqual, tokens} from "wenay-react2/core"`
 - `wenay-react2/react` - `updateBy`/`renderBy`, outside/keyboard/drag/reorder hooks, Observe and Replay adapters, resize observer.
   `import {updateBy, useStoreNode, useReplaySubscribe} from "wenay-react2/react"`
-- `wenay-react2/persist` - `memoryCache`, the persisted maps, `memoryCommit`, `createPersistedController`, `CacheStorage` adapters, `useCacheMapPersistence`.
+- `wenay-react2/persist` - `memoryCache`, the persisted maps, `memoryCommit`, `createPersistedController`, `CacheStorage` adapters, `useCacheMapPersistence`, `restoreDates` (in-place JSON date restoration).
   `import {memoryGetOrCreate, memoryCommit, useCacheMapPersistence} from "wenay-react2/persist"`
 - `wenay-react2/grid` - agGrid4 buffer/table/theme, columnState + ColumnGrid, grid chrome, ag-grid style helpers.
   `import {createColumnGrid, createGridBuffer, GridStyleDefault} from "wenay-react2/grid"`

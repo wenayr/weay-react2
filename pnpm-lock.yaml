@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@babel/parser':
+        specifier: ^7.29.8
+        version: 7.29.8
       ag-grid-community:
         specifier: ^36.1.0
         version: 36.1.0
@@ -21,8 +24,8 @@ importers:
         specifier: ^10.5.3
         version: 10.5.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       wenay-common2:
-        specifier: ^2.20.0
-        version: 2.20.0(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6))
+        specifier: ^2.21.1
+        version: 2.21.1(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6))
     devDependencies:
       '@swc/core':
         specifier: ^1.16.1
@@ -2689,8 +2692,8 @@ packages:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
     engines: {node: '>=12'}
 
-  wenay-common2@2.20.0:
-    resolution: {integrity: sha512-d8J7/AFZR5MgDvpExtxkj7+4SXh0zZnTGHYAXzYqymx/xjqXLl5YJDadfXrxQm/cVJvbFfhFQfiWH+pPDdc5YA==}
+  wenay-common2@2.21.1:
+    resolution: {integrity: sha512-6Igj8/q8TK2UZ6F3+Pl33TWAfOWhnpZLkJ9BkR+/iEPYPEMijkGGhzEuOM9m3k8MGfEFtuOoO4VWVPBpXmjzgg==}
     engines: {node: '>=20.0.0'}
     hasBin: true
     peerDependencies:
@@ -5509,7 +5512,7 @@ snapshots:
 
   webidl-conversions@7.0.0: {}
 
-  wenay-common2@2.20.0(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6)):
+  wenay-common2@2.21.1(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6)):
     dependencies:
       '@types/express': 5.0.6
       axios: 1.19.0

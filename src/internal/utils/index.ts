@@ -1,5 +1,5 @@
 /** Public utils surface (2.0.0). Was `export *` over every module, which leaked implementation
- *  detail into the root barrel: `BrowserCacheStorage`, `LocalStorageCache`, `restoreDates`,
+ *  detail into the root barrel: `BrowserCacheStorage`, `LocalStorageCache`,
  *  `DirtyListener`, `deepMergeWithMap`, plus three dead modules. The list below is now explicit
  *  and matches what ./react and ./core already publish; the leaked names stay exported from
  *  their own modules for internal use, they are just no longer part of the package surface.
@@ -55,3 +55,4 @@ export {createSearchHistory} from '../persist/searchHistory.js';
 export type {SearchHistoryApi, SearchHistoryState} from '../persist/searchHistory.js';
 
 export {structEqual} from './structEqual.js';
+export {restoreDates} from '../persist/restoreDates.js';

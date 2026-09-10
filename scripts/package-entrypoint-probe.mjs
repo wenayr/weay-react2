@@ -26,9 +26,7 @@ function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
 
-// Asset subpaths (./styles*) are plain string targets: a stylesheet has no types and no
-// import/require split. Without these keys a consumer of ./core or ./react cannot reach the
-// CSS at all - a defined "exports" field blocks every unlisted subpath.
+// CSS needs a types condition for checked bare side-effect imports in TypeScript.
 function isAssetSubpath(subpath) {
     return subpath === "./package.json" || subpath === "./styles" || subpath.startsWith("./styles/");
 }
@@ -37,8 +35,8 @@ function validateExportConditions(manifest, label) {
     for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
         if (subpath === "./package.json") continue;
         if (isAssetSubpath(subpath)) {
-            assert(typeof target === "string" && target.endsWith(".css"),
-                `${label}: ${subpath} must point straight at a .css file`);
+            assert(Object.keys(target)[0] === "types" && target.types?.endsWith(".d.ts") && target.default?.endsWith(".css"),
+                `${label}: ${subpath} must have types first and a CSS default`);
             continue;
         }
         assert(target && typeof target === "object" && !Array.isArray(target),
@@ -77,7 +75,7 @@ for (const [subpath, target] of Object.entries(distManifest.exports)) {
     if (subpath === "./package.json") continue;
     for (const [condition, value] of typeof target === "string"
         ? [["asset", target]]
-        : ["types", "import", "default"].map(condition => [condition, target[condition]])) {
+        : Object.entries(target)) {
         const file = path.resolve(distRoot, value);
         assert(file.startsWith(distRoot + path.sep), `${subpath}/${condition} escapes dist`);
         assert(fs.existsSync(file), `${subpath}/${condition} target is missing: ${value}`);

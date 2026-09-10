@@ -31,13 +31,17 @@ function run(command, args, options = {}) {
 }
 
 const consumerSource = `
+import "wenay-react2/styles";
+import "wenay-react2/styles/tokens";
+import "wenay-react2/styles/menu-right";
+import "wenay-react2/styles/communication";
 import {structEqual} from "wenay-react2/core";
 import {createUpdateApi} from "wenay-react2/react";
 import {createGridBuffer} from "wenay-react2/grid";
 import {FloatingWindow} from "wenay-react2/windows";
 import {createLogsController} from "wenay-react2/logs";
 import {VideoCall} from "wenay-react2/communication";
-import {memoryCache} from "wenay-react2/persist";
+import {memoryCache, restoreDates} from "wenay-react2/persist";
 import {ParamsEditor} from "wenay-react2/params";
 import {ModalProvider} from "wenay-react2/modal";
 import {createContextMenu} from "wenay-react2/menu";
@@ -46,6 +50,7 @@ import {createToolbar} from "wenay-react2/ui";
 
 console.log(structEqual, createUpdateApi, createGridBuffer, FloatingWindow, createLogsController, VideoCall);
 console.log(memoryCache, ParamsEditor, ModalProvider, createContextMenu, createChartEngine, createToolbar);
+restoreDates({nested: ["2026-09-10T00:00:00.000Z"]});
 `;
 
 try {
@@ -64,6 +69,7 @@ try {
     }
 
     const consumerFile = path.join(tempRoot, "consumer.ts");
+    fs.symlinkSync(path.join(projectRoot, "node_modules", "vite"), path.join(tempRoot, "node_modules", "vite"), 'junction');
     fs.writeFileSync(consumerFile, consumerSource);
     run(path.join(projectRoot, "node_modules", ".bin", "tsc"), [
         "--ignoreConfig",
@@ -73,9 +79,23 @@ try {
         "--moduleResolution", "Bundler",
         "--jsx", "react-jsx",
         "--strict",
+        "--types", "vite/client",
+        "--noUncheckedSideEffectImports",
         "--skipLibCheck", "true",
         consumerFile,
     ]);
+
+    // Verify the CLI actually ships and runs from the extracted package, not this checkout.
+    fs.mkdirSync(path.join(tempRoot, 'node_modules', '@babel'));
+    fs.symlinkSync(path.join(projectRoot, 'node_modules', '@babel', 'parser'), path.join(tempRoot, 'node_modules', '@babel', 'parser'), 'junction');
+    const migrationFile = path.join(tempRoot, 'migration.ts');
+    fs.writeFileSync(migrationFile, 'import {structEqual, type CacheMap} from "wenay-react2"; export {PageLogs} from "wenay-react2";');
+    const cli = path.join(installedPackage, 'scripts', 'migrate-root-imports.mjs');
+    run('node', [cli, '--write', migrationFile]);
+    run('node', [cli, '--check', migrationFile]);
+    const migrated = fs.readFileSync(migrationFile, 'utf8');
+    for (const sub of ['core', 'persist', 'logs']) if (!migrated.includes(`wenay-react2/${sub}`)) throw new Error(`CLI did not migrate ${sub}`);
+    if (!fs.existsSync(path.join(installedPackage, 'doc', 'changes', 'v2.0.0.md'))) throw new Error('Packed major migration guide missing');
 
     await esbuild.build({
         stdin: {
@@ -109,9 +129,8 @@ try {
     // an emit Node cannot parse - extensionless relative imports, or ESM under a manifest with
     // no "type". That blind spot is exactly how the format bug survived several reviews.
     //
-    // Only the CSS-free entrypoints are checked: ./grid, ./windows, ./logs, ./communication and
-    // the root barrel import style.css as a side effect, which no Node loader can resolve. That
-    // is a deliberate, documented boundary - those surfaces require a bundler.
+    // Representative Node-safe surfaces. CSS is explicitly imported by consumers, never by
+    // package entrypoints; browser UI surfaces may have additional runtime environment needs.
     const NODE_LOADABLE = ["core", "react", "native"];
     const selfLink = path.join(projectRoot, "node_modules", "wenay-react2");
     if (fs.existsSync(selfLink)) throw new Error("node_modules/wenay-react2 already exists; refusing to overwrite it");
@@ -123,7 +142,7 @@ try {
         fs.rmSync(selfLink, {recursive: true, force: true});
     }
 
-    console.log(`checks: packed tarball; TypeScript subpath types; esbuild runtime resolution; Node ESM (${NODE_LOADABLE.join(", ")})`);
+    console.log(`checks: packed tarball; checked CSS imports with vite/client; TypeScript subpath types; shipped migration CLI and major guide; esbuild runtime resolution; Node ESM (${NODE_LOADABLE.join(", ")})`);
 } finally {
     const tempBase = path.resolve(os.tmpdir());
     const relative = path.relative(tempBase, tempRoot);
