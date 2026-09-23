@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {createPortal} from 'react-dom';
-import { useReorder, useReorderBoard, renderBy, updateBy, useCacheMapPersistence, memoryCache, type BoardColumn } from "../../../api.js";
+import { useReorder, useReorderBoard, renderBy, updateBy, type BoardColumn } from "../../../react/index.js";
+import { useCacheMapPersistence, memoryCache } from "../../../persist/index.js";
 import { Button } from "../../../internal/components/Buttons/index.js";
 import { FloatingWindow, FloatingWindowTaskbar, WindowPortal, type FloatingWindowMode, type FloatingWindowSnapRegion } from "../../../internal/components/index.js";
 import { DragBox } from "../../../internal/components/Dnd/FloatingWindow.js";

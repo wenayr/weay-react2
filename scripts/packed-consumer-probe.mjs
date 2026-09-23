@@ -56,16 +56,22 @@ restoreDates({nested: ["2026-09-10T00:00:00.000Z"]});
 try {
     const packOutput = run("npm", ["pack", path.join(projectRoot, "dist"), "--pack-destination", tempRoot, "--json"]);
     const packed = JSON.parse(packOutput);
-    const tarball = path.join(tempRoot, packed[0].filename);
     const unpackRoot = path.join(tempRoot, "unpacked");
     fs.mkdirSync(unpackRoot);
-    run("tar", ["-xzf", tarball, "-C", unpackRoot]);
+    // Relative paths: GNU tar (Git Bash, Linux) reads "C:\..." as host:path, Windows tar does not.
+    run("tar", ["-xzf", packed[0].filename, "-C", "unpacked"], {cwd: tempRoot});
 
     const installedPackage = path.join(tempRoot, "node_modules", "wenay-react2");
     fs.mkdirSync(path.dirname(installedPackage), {recursive: true});
     fs.cpSync(path.join(unpackRoot, "package"), installedPackage, {recursive: true});
     if (!fs.existsSync(path.join(installedPackage, "lib", "style", "style.css"))) {
         throw new Error("packed package is missing lib/style/style.css");
+    }
+    // The maintainer backlog and working notes live next to the public docs but must not ship.
+    for (const internal of ["target", "progress"]) {
+        if (fs.existsSync(path.join(installedPackage, "doc", internal))) {
+            throw new Error(`packed package contains internal doc/${internal}`);
+        }
     }
 
     const consumerFile = path.join(tempRoot, "consumer.ts");
@@ -86,16 +92,23 @@ try {
     ]);
 
     // Verify the CLI actually ships and runs from the extracted package, not this checkout.
+    const migrationFile = path.join(tempRoot, 'migration.ts');
+    fs.writeFileSync(migrationFile, 'import {structEqual, type CacheMap} from "wenay-react2"; export {PageLogs} from "wenay-react2"; import {mapResiReact} from "wenay-react2/ui";');
+    const cli = path.join(installedPackage, 'scripts', 'migrate-root-imports.mjs');
+    // @babel/parser is an optional peer: without it the CLI must stop with an install hint.
+    const bare = spawnSync(process.execPath, [cli, '--check', migrationFile], {cwd: tempRoot, encoding: 'utf8'});
+    if (bare.status !== 2 || !bare.stderr.includes('npm i -D @babel/parser')) {
+        throw new Error(`CLI without @babel/parser must exit 2 with an install hint\n${bare.stdout}\n${bare.stderr}`);
+    }
     fs.mkdirSync(path.join(tempRoot, 'node_modules', '@babel'));
     fs.symlinkSync(path.join(projectRoot, 'node_modules', '@babel', 'parser'), path.join(tempRoot, 'node_modules', '@babel', 'parser'), 'junction');
-    const migrationFile = path.join(tempRoot, 'migration.ts');
-    fs.writeFileSync(migrationFile, 'import {structEqual, type CacheMap} from "wenay-react2"; export {PageLogs} from "wenay-react2";');
-    const cli = path.join(installedPackage, 'scripts', 'migrate-root-imports.mjs');
     run('node', [cli, '--write', migrationFile]);
     run('node', [cli, '--check', migrationFile]);
     const migrated = fs.readFileSync(migrationFile, 'utf8');
     for (const sub of ['core', 'persist', 'logs']) if (!migrated.includes(`wenay-react2/${sub}`)) throw new Error(`CLI did not migrate ${sub}`);
-    if (!fs.existsSync(path.join(installedPackage, 'doc', 'changes', 'v2.0.0.md'))) throw new Error('Packed major migration guide missing');
+    if (!migrated.includes('resizableSizeMap as mapResiReact')) throw new Error('CLI did not apply the 4.0.0 rename');
+    for (const major of ['v2.0.0.md', 'v3.0.0.md', 'v4.0.0.md'])
+        if (!fs.existsSync(path.join(installedPackage, 'doc', 'changes', major))) throw new Error(`Packed major migration guide missing: ${major}`);
 
     await esbuild.build({
         stdin: {
@@ -142,7 +155,7 @@ try {
         fs.rmSync(selfLink, {recursive: true, force: true});
     }
 
-    console.log(`checks: packed tarball; checked CSS imports with vite/client; TypeScript subpath types; shipped migration CLI and major guide; esbuild runtime resolution; Node ESM (${NODE_LOADABLE.join(", ")})`);
+    console.log(`checks: packed tarball without internal docs; checked CSS imports with vite/client; TypeScript subpath types; shipped migration CLI (root imports, 4.0.0 renames, missing @babel/parser) and major guides; esbuild runtime resolution; Node ESM (${NODE_LOADABLE.join(", ")})`);
 } finally {
     const tempBase = path.resolve(os.tmpdir());
     const relative = path.relative(tempBase, tempRoot);

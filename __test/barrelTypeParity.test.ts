@@ -1,120 +1,66 @@
-import * as root from "../src/index";
 import * as logs from "../src/logs/index";
 import * as core from "../src/core/index";
 import * as react from "../src/react/index";
 
 /** barrelParity.test.ts compares RUNTIME bindings, so it is blind to the half of the surface
- *  that vanishes at runtime: types. A consumer migrating `import {LogEntry} from "wenay-react2"`
- *  to `"wenay-react2/logs"` used to get a silently different type.
- *
- *  This file locks the shared names down at COMPILE time. `Eq` fails to typecheck when the two
- *  sides diverge, so the assertion lives in the type system - the runtime body only exists to
- *  give jest something to run. Known-divergent names are listed explicitly with a reason, so a
- *  NEW divergence cannot slip in unnoticed. */
+ *  that vanishes at runtime: types. Since 4.0.0 there is no root barrel; the types that several
+ *  entries publish (./persist shares its maps, memory API and saved-state shapes with ./react,
+ *  ./core, ./menu and ./windows) must stay identical, so switching the import path never changes
+ *  a type. `Eq` fails to typecheck when two sides diverge; the runtime body only gives jest
+ *  something to run. */
 
 type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Expect<T extends true> = T;
 
-// ---- names that MUST stay identical across the root and subpath surfaces -------------------
-type _Tokens = Expect<Eq<import("../src/index").Tokens, import("../src/core/index").Tokens>>;
 type _MapChange = Expect<Eq<
-    import("../src/index").MapChangeListener<string>,
-    import("../src/core/index").MapChangeListener<string>
+    import("../src/core/index").MapChangeListener<string>,
+    import("../src/persist/index").MapChangeListener<string>
 >>;
-type _FixedOrder = Expect<Eq<
-    import("../src/index").FixedOrderDescriptor,
-    import("../src/core/index").FixedOrderDescriptor
+type _CacheMap = Expect<Eq<import("../src/react/index").CacheMap, import("../src/persist/index").CacheMap>>;
+type _CacheStorage = Expect<Eq<import("../src/react/index").CacheStorage, import("../src/persist/index").CacheStorage>>;
+type _MenuRightPosition = Expect<Eq<import("../src/menu/index").MenuRightPosition, import("../src/persist/index").MenuRightPosition>>;
+type _MenuRightSavedState = Expect<Eq<import("../src/menu/index").MenuRightSavedState, import("../src/persist/index").MenuRightSavedState>>;
+type _MenuRightVertical = Expect<Eq<
+    import("../src/menu/index").MenuRightVerticalPosition,
+    import("../src/persist/index").MenuRightVerticalPosition
 >>;
-type _UpdateApi = Expect<Eq<
-    import("../src/index").UpdateApi<{a: number}>,
-    import("../src/react/index").UpdateApi<{a: number}>
+type _CloseReason = Expect<Eq<
+    import("../src/windows/index").FloatingWindowCloseReason,
+    import("../src/persist/index").FloatingWindowCloseReason
 >>;
-type _Position = Expect<Eq<
-    import("../src/index").FloatingWindowPosition,
-    import("../src/windows/index").FloatingWindowPosition
->>;
+type _Mode = Expect<Eq<import("../src/windows/index").FloatingWindowMode, import("../src/persist/index").FloatingWindowMode>>;
+type _Position = Expect<Eq<import("../src/windows/index").FloatingWindowPosition, import("../src/persist/index").FloatingWindowPosition>>;
 type _Saved = Expect<Eq<
-    import("../src/index").FloatingWindowSavedGeometry,
-    import("../src/windows/index").FloatingWindowSavedGeometry
+    import("../src/windows/index").FloatingWindowSavedGeometry,
+    import("../src/persist/index").FloatingWindowSavedGeometry
+>>;
+type _Size = Expect<Eq<import("../src/windows/index").FloatingWindowSize, import("../src/persist/index").FloatingWindowSize>>;
+type _Snap = Expect<Eq<
+    import("../src/windows/index").FloatingWindowSnapRegion,
+    import("../src/persist/index").FloatingWindowSnapRegion
 >>;
 
-/** 2.0.0 removed src/internal/logs/logsContext.tsx, the parallel logs stack that owned the
- *  loose `LogEntry` / `LogInput` shapes and the `LogsSettings` React component. Every log name
- *  now resolves to logsController on BOTH surfaces, so the divergence list is empty and these
- *  three names became ordinary parity assertions. */
-type _LogEntry = Expect<Eq<
-    import("../src/index").LogEntry<{a: number}>,
-    import("../src/logs/index").LogEntry<{a: number}>
+/** 4.0.0: the window controller's resize handlers are this package's own types, so the public
+ *  surface no longer names react-rnd, and they still fit the react-rnd props they are passed to. */
+type _ResizeHandler = Expect<Eq<
+    import("../src/windows/index").FloatingWindowController["onResize"],
+    import("../src/windows/index").FloatingWindowResizeHandler
 >>;
-type _LogInput = Expect<Eq<
-    import("../src/index").LogInput<{a: number}>,
-    import("../src/logs/index").LogInput<{a: number}>
->>;
-type _LogsSettings = Expect<Eq<
-    import("../src/index").LogsSettings,
-    import("../src/logs/index").LogsSettings
->>;
+type _RndAccepts = Expect<import("../src/windows/index").FloatingWindowResizeHandler extends NonNullable<import("react-rnd").Props["onResize"]> ? true : false>;
+type _RndStartAccepts = Expect<import("../src/windows/index").FloatingWindowResizeStartHandler extends NonNullable<import("react-rnd").Props["onResizeStart"]> ? true : false>;
 
-/** 3.0.0 entries: one representative type per new subpath, so a rewrite of an entry that
- *  re-declares a shape instead of re-exporting it fails to compile here. */
-type _MenuItem = Expect<Eq<
-    import("../src/index").MenuItem<{a: number}>,
-    import("../src/menu/index").MenuItem<{a: number}>
->>;
-type _MenuRightSavedState = Expect<Eq<
-    import("../src/index").MenuRightSavedState,
-    import("../src/menu/index").MenuRightSavedState
->>;
-type _ModalController = Expect<Eq<
-    import("../src/index").ModalController,
-    import("../src/modal/index").ModalController
->>;
-type _ParamsEditorController = Expect<Eq<
-    import("../src/index").ParamsEditorController,
-    import("../src/params/index").ParamsEditorController
->>;
-type _SparklineProps = Expect<Eq<
-    import("../src/index").SparklineProps,
-    import("../src/chart/index").SparklineProps
->>;
-type _ChartEngine = Expect<Eq<
-    import("../src/index").ChartEngine,
-    import("../src/chart/index").ChartEngine
->>;
-type _ToolbarItem = Expect<Eq<
-    import("../src/index").ToolbarItem,
-    import("../src/ui/index").ToolbarItem
->>;
-type _SettingsSection = Expect<Eq<
-    import("../src/index").SettingsSection,
-    import("../src/ui/index").SettingsSection
->>;
-type _AgGridClassRule = Expect<Eq<
-    import("../src/index").AgGridClassRule<{a: number}>,
-    import("../src/grid/index").AgGridClassRule<{a: number}>
->>;
-
-const knownLogDivergences = [] as const;
-
-describe("barrel type parity", () => {
+describe("entry type parity", () => {
     test("the compile-time assertions above hold", () => {
-        // reaching this line means tsc accepted every Expect<Eq<...>> in this file
+        // reaching this line means tsc accepted every Expect<...> in this file
         expect(true).toBe(true);
     });
 
-    test("LogsSettings is a type on both surfaces and a value on neither", () => {
-        // the runtime half: logsContext used to export a COMPONENT under this name from the root
-        // barrel while ./logs exported a TYPE. Both must now be type-only.
-        expect((root as Record<string, unknown>).LogsSettings).toBeUndefined();
+    test("LogsSettings is a type, not a runtime value", () => {
+        // logsContext (removed in 2.0.0) used to export a COMPONENT under this name
         expect((logs as Record<string, unknown>).LogsSettings).toBeUndefined();
     });
 
-    test("the list of known divergences is empty", () => {
-        expect(knownLogDivergences).toHaveLength(0);
-    });
-
-    test("core and react surfaces are non-empty and disjoint in purpose", () => {
-        // guards against an accidental `export *` that would blur the boundary the probes check
+    test("core and react surfaces are non-empty", () => {
         expect(Object.keys(core).length).toBeGreaterThan(0);
         expect(Object.keys(react).length).toBeGreaterThan(0);
     });

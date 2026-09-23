@@ -7,8 +7,8 @@
  *  one - no React, no DOM, no ag-grid, no imports at all.
  *
  *  It is deliberately NOT re-exported from src/native/index.ts: __test/barrelParity.test.ts
- *  requires ./native and the root barrel to share zero runtime names, and the root barrel
- *  re-exports utils/fixedOrder. Consumers inside this package import it by file path. */
+ *  requires ./native and the web entries to share zero runtime names, and ./core re-exports
+ *  utils/fixedOrder. Consumers inside this package import it by file path. */
 
 export type ColumnCoreMeta = {
     key: string

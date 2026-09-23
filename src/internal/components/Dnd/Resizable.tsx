@@ -1,6 +1,6 @@
 import React, {useEffect, useRef} from "react";
 import {Resizable, ResizableProps} from "re-resizable";
-import {mapResiReact, type ResizableSavedSize} from "../../persist/persistedMaps.js";
+import {resizableSizeMap, type ResizableSavedSize} from "../../persist/persistedMaps.js";
 import {isUsableDimension} from "./windowGeometry.js";
 
 /** What re-resizable itself refuses to shrink below when the caller declares no minimum
@@ -13,10 +13,10 @@ const floorFor = (min: number | string | undefined) => typeof min == "number" ? 
 type tSaveMap = ResizableSavedSize
 // Memory for all column sizes; declared in persist/persistedMaps (memoryCache registry must not
 // import the component layer) and re-exported here so the public surface is unchanged
-export { mapResiReact }
+export { resizableSizeMap }
 type t3 = Pick<ResizableProps, "style" | "enable" | "onResize" | "children" | "size" | "maxWidth"| "maxHeight"| "minWidth"| "minHeight">
 
-export function FResizableReact(
+export function ResizableBox(
     {style, onResize, enable, children, keyForSave, onResizeStop,
      size = {height: 50, width: 50},
         minWidth, minHeight,
@@ -34,7 +34,7 @@ export function FResizableReact(
     const repaired = useRef(false)
     let obj : tSaveMap = size
     if (keyForSave) {
-        let b = mapResiReact.get(keyForSave)
+        let b = resizableSizeMap.get(keyForSave)
         if (b) {
             // The stored size wins over the prop - so a stored 0 (a parent that renders
             // size={{width: 0}} on its first, pre-measurement pass) would win forever, and a
@@ -45,14 +45,14 @@ export function FResizableReact(
             if (!isUsableDimension(b.height, floorH)) { b.height = size.height; repaired.current = true }
             obj = b
         }
-        else mapResiReact.set(keyForSave, obj)
+        else resizableSizeMap.set(keyForSave, obj)
     }
     // Announce a repair out of the render phase, so the damaged record is rewritten once
     // instead of being healed again on every mount.
     useEffect(() => {
         if (!keyForSave || !repaired.current) return
         repaired.current = false
-        mapResiReact.touch(keyForSave)
+        resizableSizeMap.touch(keyForSave)
     })
     return <Resizable style = {style}
                       onResize = {(event, direction, elementRef, delta)=> {
@@ -72,7 +72,7 @@ export function FResizableReact(
                               else {obj.height = elementRef.style.height}
                           // onResize?.(size)
                           // obj is mutated in place - invisible to the map, so announce it
-                          if (keyForSave) mapResiReact.touch(keyForSave)
+                          if (keyForSave) resizableSizeMap.touch(keyForSave)
                           onResizeStop?.(obj)
                           // this.Refresh()
                       }}

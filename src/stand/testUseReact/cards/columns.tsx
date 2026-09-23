@@ -1,5 +1,8 @@
 import React, { useState, useRef, useLayoutEffect, useEffect } from "react";
-import { createColumnState, createColumnGrid, createToolbar, ColumnsMenu, ColumnDots, CardList, AgGridTable, contextMenu, renderBy, updateBy } from "../../../api.js";
+import { createColumnState, createColumnGrid, ColumnsMenu, ColumnDots, CardList, AgGridTable } from "../../../grid/index.js";
+import { createToolbar } from "../../../ui/index.js";
+import { contextMenu } from "../../../menu/index.js";
+import { renderBy, updateBy } from "../../../react/index.js";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { FloatingWindow } from "../../../internal/components/index.js";
 import { OutsideClickArea } from "../../../internal/components/OutsideClickArea.js";

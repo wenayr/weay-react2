@@ -1,7 +1,7 @@
 /** The canvas plumbing all three renderers need: device pixel ratio, a container-size
  *  subscription, and sizing the bitmap for a CSS box.
  *
- *  Sparkline solved this properly, chartEngineReact solved half of it (ResizeObserver, no DPR),
+ *  Sparkline solved this properly, the chart engine solved half of it (ResizeObserver, no DPR),
  *  and myChart solved none of it - it measured the container once at creation and never again,
  *  so a chart in a resizable panel kept its original bitmap forever. Three copies of the same
  *  concern is also why DPR support could never be rolled out consistently.

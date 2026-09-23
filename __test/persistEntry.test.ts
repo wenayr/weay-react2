@@ -20,8 +20,8 @@ test("the entry exposes the block's runtime names", () => {
     expect(typeof persist.memoryCommit).toBe("function");
     expect(persist.floatingWindowMap).toBeInstanceOf(persist.ObservableMap);
     expect(persist.buttonStatusMap).toBeInstanceOf(persist.ObservableMap);
-    expect(persist.mapResiReact).toBeInstanceOf(persist.ObservableMap);
-    expect(persist.mapRightMenu).toBeInstanceOf(persist.ObservableMap);
+    expect(persist.resizableSizeMap).toBeInstanceOf(persist.ObservableMap);
+    expect(persist.rightMenuMap).toBeInstanceOf(persist.ObservableMap);
     expect(persist.localStorageCache).toBeDefined();
 });
 

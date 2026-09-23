@@ -11,7 +11,7 @@ import {type Position, useDraggable} from "../../hooks/useDraggable.js";
 import {OutsideClickArea} from "../OutsideClickArea.js";
 import { createModalRenderStore } from "../Modal/Modal.js";
 import {
-    mapRightMenu,
+    rightMenuMap,
     type MenuRightPosition,
     type MenuRightVerticalPosition,
     type MenuRightSavedState
@@ -102,13 +102,13 @@ export function useRightMenuController({
             offset: { x: 0, y: 0 }
         };
         if (!keyForSave) return fallback;
-        return mapRightMenu.get(keyForSave) ?? fallback;
+        return rightMenuMap.get(keyForSave) ?? fallback;
     });
     // Seeding the map moved OUT of the useState initializer: a set() there is a write to the
     // persisted store (and a dirty event) during render, which StrictMode runs twice.
     useEffect(() => {
-        if (!keyForSave || mapRightMenu.has(keyForSave)) return;
-        mapRightMenu.set(keyForSave, initialState);
+        if (!keyForSave || rightMenuMap.has(keyForSave)) return;
+        rightMenuMap.set(keyForSave, initialState);
     }, [keyForSave]);
     const [isOpen, setIsOpen] = useState(false);
     const [isFixed, setIsFixed] = useState(false);
@@ -159,8 +159,8 @@ export function useRightMenuController({
         setIsTop(toTop);
 
         if (keyForSave) {
-            // mapRightMenu is observable: set() itself marks the cache dirty
-            mapRightMenu.set(keyForSave, {
+            // rightMenuMap is observable: set() itself marks the cache dirty
+            rightMenuMap.set(keyForSave, {
                 position: nextPosition,
                 verticalPosition: toTop ? 'top' : 'bottom',
                 offset: { ...nextOffset }

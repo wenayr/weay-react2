@@ -1,17 +1,19 @@
 import { deepClone } from "../utils/deepClone.js";
 import { renderBy } from "../updateBy.js";
-import { buttonStatusMap, floatingWindowMap, mapResiReact, mapRightMenu } from "./persistedMaps.js";
+import { buttonStatusMap, floatingWindowMap, resizableSizeMap, rightMenuMap } from "./persistedMaps.js";
 import {createCacheMap} from "./cache.js";
 import { ObservableMap } from "./observableMap.js";
 
 // observable - memoryCache marks itself dirty on its mutations
 const memoryProps = new ObservableMap<string,object>()
 
-export function memorySet(key: any, data: object) {
+/** Stores `data` only when `key` has no entry yet; an existing entry (a loaded one included) wins.
+ *  Named `memorySet` before 4.0.0, which read like an overwrite. */
+export function memorySetIfAbsent(key: string, data: object) {
     if (!memoryProps.has(key)) memoryProps.set(key,data)
 }
 
-export function memoryGet(key: any) {
+export function memoryGet(key: string) {
     return memoryProps.get(key)
 }
 
@@ -67,12 +69,12 @@ const merged = new WeakSet<object>()
  *  WeakSet keyed by its identity. An inline object literal is a new identity on every render,
  *  so the merge re-runs each time - it stays correct, and a no-op merge no longer re-announces
  *  the entry, but the deep walk itself is still paid per render. */
-export function memoryGetOrCreate<T extends object>(key: any, def: T, options: {abs?: boolean, deepAutoMerge?: boolean, reversDeep?: boolean} = {reversDeep: false}) {
+export function memoryGetOrCreate<T extends object>(key: string, def: T, options: {abs?: boolean, deepAutoMerge?: boolean, reverseDeep?: boolean} = {reverseDeep: false}) {
     if (options.deepAutoMerge && !merged.has(def)) {
         merged.add(def)
         const stats: MergeStats = {changed: 0}
         const had = memoryProps.has(key)
-        const next = !options.reversDeep
+        const next = !options.reverseDeep
             ? mergeInto(memoryProps.get(key) ?? {}, def, new Map(), stats)
             : mergeInto(deepClone(def), memoryProps.get(key) ?? {}, new Map(), stats)
         // set() always emits, and the emit reaches memoryCache as a dirty event; with an
@@ -85,10 +87,10 @@ export function memoryGetOrCreate<T extends object>(key: any, def: T, options: {
 }
 
 /** Announce a direct in-place mutation of an object taken from memoryGetOrCreate - such
- *  mutations are invisible to map methods. memorySet/memoryGetOrCreate need no announcement:
- *  their set() calls are observed by memoryCache automatically. */
-export function memoryMarkDirty(key: any) {
-    memoryProps.touch(typeof key == "string" ? key : undefined)
+ *  mutations are invisible to map methods. memorySetIfAbsent/memoryGetOrCreate need no
+ *  announcement: their set() calls are observed by memoryCache automatically. */
+export function memoryMarkDirty(key: string) {
+    memoryProps.touch(key)
 }
 
 /** The persisted-commit idiom, in ONE place: mutate in place, rerender subscribers, mark the
@@ -97,7 +99,7 @@ export function memoryMarkDirty(key: any) {
  *  (the controller imports this module, so the shared body has to live on this side of the
  *  edge to stay cycle-free). `entry` is passed explicitly rather than re-read from the map:
  *  a controller announces the object it handed out, whatever the map holds now. */
-export function memoryCommit<T extends object>(key: any, entry: T, mutate?: (cur: T) => void): T {
+export function memoryCommit<T extends object>(key: string, entry: T, mutate?: (cur: T) => void): T {
     mutate?.(entry)
     renderBy(entry)
     memoryMarkDirty(key)
@@ -106,13 +108,13 @@ export function memoryCommit<T extends object>(key: any, entry: T, mutate?: (cur
 
 /** App-facing change of a persisted memoryProps entry in one call:
  *  mutate + rerender subscribers + mark the cache dirty. No-op if the key is absent. */
-export function memoryUpdate<T extends object>(key: any, mutate: (cur: T) => void): T | undefined {
+export function memoryUpdate<T extends object>(key: string, mutate: (cur: T) => void): T | undefined {
     const cur = memoryProps.get(key) as T | undefined
     if (cur === undefined) return undefined
     return memoryCommit(key, cur, mutate)
 }
 
-export function memoryGetById<T extends object>(key: any, def: T, id: string|number){
+export function memoryGetById<T extends object>(key: string, def: T, id: string|number){
     type W = {__id: string|number, data: T}
     const stored = memoryProps.get(key) as W | undefined
     if (!stored || stored.__id !== id) {
@@ -122,11 +124,13 @@ export function memoryGetById<T extends object>(key: any, def: T, id: string|num
     }
     return stored.data
 }
+// The scope strings are storage keys written by every earlier version: they keep the pre-4.0.0
+// map names on purpose, renaming them would orphan the users' saved sizes and menus.
 export const memoryCache = createCacheMap(
     [
-        ["mapResiReact", mapResiReact],
+        ["mapResiReact", resizableSizeMap],
         ["floatingWindowMap", floatingWindowMap],
-        ["mapRightMenu", mapRightMenu],
+        ["mapRightMenu", rightMenuMap],
         ["buttonStatusMap", buttonStatusMap],
         ["memoryProps", memoryProps]
     ]
@@ -134,8 +138,8 @@ export const memoryCache = createCacheMap(
 
 export const memoryMaps = {
     rnd: floatingWindowMap,
-    resize: mapResiReact,
-    rightMenu: mapRightMenu,
+    resize: resizableSizeMap,
+    rightMenu: rightMenuMap,
     button: buttonStatusMap,
     other: memoryProps
 }

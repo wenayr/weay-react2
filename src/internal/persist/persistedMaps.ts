@@ -9,7 +9,7 @@ import type { FloatingWindowSavedGeometry } from "./floatingWindowTypes.js";
  *  a component/controller module, even at declaration-build time - which is why the window
  *  geometry contract sits next to this file in utils rather than under components/Dnd. */
 
-/** Saved size of an FResizableReact column/box; the shape the resize layer persists. */
+/** Saved size of a ResizableBox column/box; the shape the resize layer persists. */
 export type ResizableSavedSize = { height?: number | string, width?: number | string }
 
 export type MenuRightPosition = 'left' | 'right';
@@ -26,5 +26,5 @@ export type ButtonSavedState = { open: boolean }
 // observable - memoryCache marks itself dirty on their mutations
 export const floatingWindowMap = new ObservableMap<string, FloatingWindowSavedGeometry>();
 export const buttonStatusMap = new ObservableMap<string, ButtonSavedState>();
-export const mapResiReact = new ObservableMap<string, ResizableSavedSize>();
-export const mapRightMenu = new ObservableMap<string, MenuRightSavedState>();
+export const resizableSizeMap = new ObservableMap<string, ResizableSavedSize>();
+export const rightMenuMap = new ObservableMap<string, MenuRightSavedState>();

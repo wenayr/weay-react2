@@ -3,7 +3,6 @@
  *  FloatingWindow.tsx re-exports all of this unchanged - this file is internal. */
 import type React from "react";
 import type { ReactNode } from "react";
-import type { RndResizeCallback, RndResizeStartCallback } from "react-rnd";
 import type {
     FloatingWindowCloseReason,
     FloatingWindowMode,
@@ -12,9 +11,17 @@ import type {
     FloatingWindowSnapRegion,
 } from "../../persist/floatingWindowTypes.js";
 
+/** Edge or corner a resize runs from - the union react-rnd and re-resizable use, declared here so
+ *  the public types do not depend on the resize library (4.0.0). */
+export type FloatingWindowResizeDirection = "top" | "right" | "bottom" | "left" | "topRight" | "bottomRight" | "bottomLeft" | "topLeft";
+export type FloatingWindowResizeHandler = (e: MouseEvent | TouchEvent, dir: FloatingWindowResizeDirection, element: HTMLElement,
+    delta: { width: number; height: number }, position: FloatingWindowPosition) => void;
+export type FloatingWindowResizeStartHandler = (e: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>,
+    dir: FloatingWindowResizeDirection, element: HTMLElement) => void | boolean;
+
 export type FloatingWindowUpdate = {
     e: MouseEvent | TouchEvent;
-    dir: string;
+    dir: FloatingWindowResizeDirection;
     elementRef: HTMLElement;
     delta: { width: number; height: number };
     position: FloatingWindowPosition;
@@ -120,7 +127,7 @@ export type FloatingWindowController = {
     onHeaderDoubleClick: React.MouseEventHandler<HTMLDivElement>;
     onWindowMouseDown: React.MouseEventHandler<HTMLDivElement>;
     onWindowKeyDown: React.KeyboardEventHandler<HTMLDivElement>;
-    onResize: RndResizeCallback;
-    onResizeStart: RndResizeStartCallback;
-    onResizeStop: RndResizeCallback;
+    onResize: FloatingWindowResizeHandler;
+    onResizeStart: FloatingWindowResizeStartHandler;
+    onResizeStop: FloatingWindowResizeHandler;
 };

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, renderBy, type BufferTable } from "../../../api.js";
+import { useAgGrid, AgGridTable, createGridBuffer, createColumnBuffer, type BufferTable } from "../../../grid/index.js";
+import { renderBy } from "../../../react/index.js";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { GridExample, tt } from "../useGrid.js";
 import { Check } from "../standKit.js";

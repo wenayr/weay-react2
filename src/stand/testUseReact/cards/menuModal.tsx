@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { FloatingWindow } from "../../../internal/components/index.js";
-import { Menu, contextMenu, ModalProvider, useModal, SettingsDialog, registerSettingsSection, createUiSlot, createCallbackHub, createToolbar, registerToolbarDensity, useCacheMapPersistence, memoryCache, useListenEffect, updateBy, renderBy, type ToolbarItem, type ToolbarConfig } from "../../../api.js";
+import { Menu, contextMenu } from "../../../menu/index.js";
+import { ModalProvider, useModal } from "../../../modal/index.js";
+import { SettingsDialog, registerSettingsSection, createUiSlot, createToolbar, registerToolbarDensity, type ToolbarItem, type ToolbarConfig } from "../../../ui/index.js";
+import { createCallbackHub } from "../../../core/index.js";
+import { useCacheMapPersistence, memoryCache } from "../../../persist/index.js";
+import { useListenEffect, updateBy, renderBy } from "../../../react/index.js";
 import { HoverButton } from "../../../internal/components/Buttons/index.js";
 import { Check } from "../standKit.js";
 import { RightMenuDemo } from "../rightMenuDemo.js";

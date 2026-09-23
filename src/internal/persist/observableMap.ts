@@ -1,5 +1,5 @@
-/** Map that announces its own mutations. The persisted-state maps (floatingWindowMap, mapResiReact,
- *  mapRightMenu, memoryProps) are ObservableMap instances, so the dirty signal originates in
+/** Map that announces its own mutations. The persisted-state maps (floatingWindowMap, resizableSizeMap,
+ *  rightMenuMap, memoryProps) are ObservableMap instances, so the dirty signal originates in
  *  the data layer itself: set/delete/clear emit automatically, touch(key) announces an
  *  in-place mutation of a stored object (invisible to map methods). createCacheMapWithStorage
  *  subscribes to the maps it owns - mutation sites never talk to the cache directly. */

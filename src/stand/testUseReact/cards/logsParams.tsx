@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { renderBy, updateBy, logsApi, MiniLogsTable, ParamsEdit, ParamsArrayEdit, ParamsEditor, useKeyboard, keyboard, useResizeObserver, useElementSize } from "../../../api.js";
+import { renderBy, updateBy, useKeyboard, keyboard, useResizeObserver, useElementSize } from "../../../react/index.js";
+import { logsApi, MiniLogsTable } from "../../../logs/index.js";
+import { ParamsEdit, ParamsArrayEdit, ParamsEditor } from "../../../params/index.js";
 import { Params } from "wenay-common2/client";
 import { OutsideClickArea } from "../../../internal/components/OutsideClickArea.js";
 import { TestParams } from "../testParams.js";

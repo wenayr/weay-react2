@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      # The pnpm the lockfile is maintained with (see the release ritual); npx pnpm rewrites it.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.14.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck (source and tests)
+        run: npm run typecheck
+      - name: Jest
+        run: npx jest --runInBand
+      - name: Build with entrypoint and packed-consumer probes
+        run: npm run build
+      - name: Bundle boundaries
+        run: npm run bundle:probe
+      - name: Migration CLI, root barrel and deprecation probe
+        run: npm run test:migration

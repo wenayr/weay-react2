@@ -1,5 +1,4 @@
 import {createRoot} from "react-dom/client";
-import "../index.js"
 import "../style/style.css"
 import "../style/menuRight.css"
 import "../style/communication.css"

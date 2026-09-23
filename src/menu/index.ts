@@ -1,6 +1,6 @@
 /** `wenay-react2/menu` (3.0.0) - the menu block: the context-menu engine (Menu, MenuItemElement,
  *  MenuProgress and the contextMenu layer/controller created by createContextMenu) and the
- *  persisted right-hand DropdownMenu with its controller and the mapRightMenu map it saves to.
+ *  persisted right-hand DropdownMenu with its controller and the rightMenuMap map it saves to.
  *  Depends on ./react and, through DropdownMenu's modal render store, on ./modal (so react-rnd
  *  is reachable from this entry); pulls no ag-grid and no grid/logs/chart/communication code. */
 
@@ -40,7 +40,7 @@ export type {
     RightMenuController,
     UseRightMenuControllerOptions,
 } from "../internal/components/Menu/RightMenu.js";
-export {mapRightMenu} from "../internal/components/Menu/RightMenuStore.js";
+export {rightMenuMap} from "../internal/components/Menu/RightMenuStore.js";
 export type {
     MenuRightPosition,
     MenuRightSavedState,

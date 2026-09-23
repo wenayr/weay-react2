@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { createRightMenuController, type MenuElement } from "../../api.js";
+import { createRightMenuController, type MenuElement } from "../../menu/index.js";
 import { OutlineDragDemo } from "./OutlineDragDemo.js";
 
 /** Demo for the RightMenu dropdown controller. Moved out of the library

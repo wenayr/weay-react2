@@ -1,5 +1,5 @@
 import React from "react";
-import { Sparkline } from "../../../api.js";
+import { Sparkline } from "../../../chart/index.js";
 import { MyChartEngine } from "../myChartEngineDemo.js";
 import { Check } from "../standKit.js";
 

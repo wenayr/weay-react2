@@ -7,8 +7,8 @@
  *  a place to notice that the shape on disk is older than the code and migrate it. That is why
  *  this exists, and why `version`/`migrate` are the point rather than the line count.
  *
- *  Not re-exported from utils/index.ts (the root public surface); it reaches consumers through
- *  the ./persist entrypoint (src/persist/index.ts) and internally by path.
+ *  It reaches consumers through the ./persist entrypoint (src/persist/index.ts) and internally
+ *  by path.
  *
  *  The surrounding controllers keep their own logic (listen channels, runtime-only state,
  *  normalize) - this owns only the persisted slot itself. */
@@ -21,7 +21,7 @@ export type PersistedControllerOptions<T extends object> = {
     /** Shape used when nothing is stored yet. Must be a STABLE reference (see memoryGetOrCreate). */
     def: T;
     /** Forwarded verbatim to memoryGetOrCreate. */
-    memory?: {abs?: boolean; deepAutoMerge?: boolean; reversDeep?: boolean};
+    memory?: {abs?: boolean; deepAutoMerge?: boolean; reverseDeep?: boolean};
     /** Current schema version. When set, the stored entry carries it under `v`. */
     version?: number;
     /** Called once, at creation, when the stored `v` differs from `version` - including the
@@ -31,7 +31,7 @@ export type PersistedControllerOptions<T extends object> = {
 };
 
 export function createPersistedController<T extends object>(opts: PersistedControllerOptions<T>) {
-    const state = memoryGetOrCreate<T>(opts.key, opts.def, opts.memory ?? {reversDeep: false});
+    const state = memoryGetOrCreate<T>(opts.key, opts.def, opts.memory ?? {reverseDeep: false});
     const api = createUpdateApi(state);
 
     if (opts.version != undefined) {

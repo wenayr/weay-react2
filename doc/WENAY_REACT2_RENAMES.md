@@ -1,18 +1,74 @@
 # wenay-react2 Rename Map
 
+## 4.0.0 migration cut (2026-09-24)
+
+4.0.0 removes the root entry and renames the legacy names of the 3.x Cleanup Inventory. One CLI
+run migrates a 3.x consumer: it moves root imports to canonical subpaths and imports every
+renamed name under its old local name (`{renderByReverse as renderByRevers}`), so the code below
+the imports keeps compiling unchanged. Run it from the consumer repository after installing 4.0.0:
+
+```sh
+npm i -D @babel/parser          # optional peer, only needed for the migration run
+node node_modules/wenay-react2/scripts/migrate-root-imports.mjs src           # preview
+node node_modules/wenay-react2/scripts/migrate-root-imports.mjs --write src
+node node_modules/wenay-react2/scripts/migrate-root-imports.mjs --check src   # 0 = nothing left
+```
+
+The CLI handles named imports and re-exports, from the root and from subpaths. A name removed
+without a replacement stops the batch (no file is written). Namespace imports
+(`import * as r from "wenay-react2/react"` with `r.renderByRevers`), dynamic imports and type
+queries need a manual edit; TypeScript reports each of them. Rename the aliased locals later at
+your own pace.
+
+### Removed
+
+| 3.x | 4.0.0 |
+| --- | --- |
+| root `wenay-react2` (`import {...} from "wenay-react2"`; manifest `main` / `types` / `"."`) | the canonical subpaths; the CLI rewrites the imports |
+| `__observerStateForTests` (`./react`) | none: a test-only probe, imported from `src/internal/updateBy` inside this repository |
+
+### Renamed
+
+| 3.x | 4.0.0 | Entries |
+| --- | --- | --- |
+| `renderByRevers` | `renderByReverse` | `./react` |
+| `mapResiReact` | `resizableSizeMap` | `./ui`, `./persist` |
+| `mapRightMenu` | `rightMenuMap` | `./menu`, `./persist` |
+| `FResizableReact` | `ResizableBox` | `./ui` |
+| `CResizeObserver` | `ResizeObserverHub` | `./react` |
+| `memorySet` | `memorySetIfAbsent` (same behaviour: an existing entry wins) | `./react`, `./persist` |
+
+Storage is unaffected: `memoryCache` keeps writing the `"mapResiReact"` and `"mapRightMenu"`
+scopes, so saved sizes and menus load as before.
+
+### Changed signatures (TypeScript reports every use)
+
+| 3.x | 4.0.0 |
+| --- | --- |
+| `memoryGetOrCreate(key, def, {reversDeep})` | `{reverseDeep}` |
+| memory API `key: any` (`memoryGet`, `memoryGetOrCreate`, `memorySetIfAbsent`, `memoryGetById`, `memoryUpdate`, `memoryCommit`, `memoryMarkDirty`) | `key: string` |
+| `createColumnState().api.onChange`, `createToolbar().api.onChange`: the common2 `ListenApi` (`on`, `emit`, `close`, `off`, `count`, ...) | a read-only `ListenLike` view `{on(cb, opts?) -> off}`; `.on(cb)` and `useListenEffect(api.onChange, cb)` are unchanged |
+| `FloatingWindowController.onResize` / `onResizeStart` / `onResizeStop` typed with react-rnd's `RndResizeCallback` / `RndResizeStartCallback` | `FloatingWindowResizeHandler` / `FloatingWindowResizeStartHandler` from `./windows`, same parameters |
+| `FloatingWindowUpdate.dir: string` | `FloatingWindowResizeDirection` |
+| `@babel/parser` as a runtime dependency | an optional peer, needed only by the migration CLI |
+| peer `wenay-common2@^2.21.1` | `^3.0.0` plus `wenay-exchange@^1.0.0`; exchange data (`Bars`, `CQuotesHistory*`, `OHLC`, ...) imports from `wenay-exchange` |
+
+Details and verification: `doc/changes/v4.0.0.md`.
+
 ## 3.0.0 entry map (2026-09-06)
 
-Not a rename: every name keeps its binding, and the root barrel `wenay-react2` still exports
-all of them (`__test/barrelParity.test.ts` asserts `root[name] === subpath[name]`). What
-changed is the canonical import path. The root is a compatibility union, deprecated in 3.x
-and trimmed in the next major, so new code and touched files import from the subpath in the
-right-hand column. Details: `doc/changes/v3.0.0.md`. `./native` is untouched.
+Not a rename: every name kept its binding, and in 3.x the root barrel `wenay-react2` still
+exported all of them. What changed was the canonical import path. The root was a compatibility
+union, deprecated in 3.x and removed in 4.0.0; the tables below stay as the map for 3.x code,
+and the 4.0.0 CLI applies them automatically. Details: `doc/changes/v3.0.0.md`. `./native` is
+untouched.
 
-### Automated migration (3.5.0)
+### Automated migration (3.5.0; 4.0.0 adds the renames)
 
 From the consumer repository, run:
 
 ```sh
+npm i -D @babel/parser          # since 4.0.0 an optional peer, not installed with the package
 node node_modules/wenay-react2/scripts/migrate-root-imports.mjs src
 node node_modules/wenay-react2/scripts/migrate-root-imports.mjs --write src
 node node_modules/wenay-react2/scripts/migrate-root-imports.mjs --check src
@@ -28,12 +84,15 @@ import-contract tests: review those, then run consumer types, tests and builds.
 The map comes from the installed package's declarations, with duplicate priority:
 core → persist → react → grid → windows → logs → communication → params → modal → menu → chart → ui.
 This deliberately picks `/persist` for shared persistence maps even where the table also
-lists a UI home. The CLI uses the packaged `@babel/parser`; TypeScript compiler API changes
-between 5/6 and 7 do not affect it. Node 20+ is required, as for the package.
+lists a UI home. The CLI parses with `@babel/parser`, an optional peer since 4.0.0 (3.5.x
+installed it as a runtime dependency of every consumer): install it for the migration run and
+remove it afterwards if nothing else needs it. Without it the CLI exits 2 with that hint.
+TypeScript compiler API changes between 5/6 and 7 do not affect it. Node 20+ is required, as
+for the package.
 
-Root names have per-specifier `@deprecated` tags; canonical subpaths do not inherit those
-tags. IDE suggestions are not `tsc` errors: use `--check` in CI to prohibit remaining root
-named imports. Do not migrate `/native` to the web root.
+In 3.5.x the root names carried per-specifier `@deprecated` tags; since 4.0.0 there is no root
+to import from. Use `--check` in CI to prohibit remaining root named imports. `/native` is not
+part of this map.
 
 ### Root import -> canonical subpath (names that were root-only before 3.0.0)
 

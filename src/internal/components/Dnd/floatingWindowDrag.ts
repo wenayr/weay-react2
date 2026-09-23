@@ -1,6 +1,6 @@
 /** The document-level mouse/touch drag loops of a floating window. Lifted out of
  *  FloatingWindow.tsx verbatim: the controller still owns every piece of state and passes it in,
- *  and the effect keeps its original `[a, b]` dependency array, so the handlers close over the
+ *  and the effect keeps its original dependency array (the two armed flags), so the handlers close over the
  *  same render they always did. */
 import { useEffect } from "react";
 import { floatingWindowMap } from "../../persist/persistedMaps.js";
@@ -8,10 +8,8 @@ import { clampToLimit, type FloatingWindowLimit } from "./windowGeometry.js";
 import type { FloatingWindowSnapRegion } from "../../persist/floatingWindowTypes.js";
 
 export type FloatingWindowDragLoop = {
-    /** Mouse drag armed. */
-    a: boolean;
-    /** Touch drag armed. */
-    b: boolean;
+    mouseDragging: boolean;
+    touchDragging: boolean;
     ks: string | undefined;
     lastC: { current: { x: number; y: number } | null };
     lastT: { current: { x: number; y: number; id: number } | null };
@@ -24,8 +22,8 @@ export type FloatingWindowDragLoop = {
     resolveDetach: (clientX: number, clientY: number) => { x: number; y: number } | null | undefined;
     updateSnapPicker: (clientX: number, clientY: number) => void;
     commitPosition: (next: { x: number; y: number }) => void;
-    setA: (value: boolean) => void;
-    setB: (value: boolean) => void;
+    setMouseDragging: (value: boolean) => void;
+    setTouchDragging: (value: boolean) => void;
     snapTo: (region: FloatingWindowSnapRegion) => void;
     hideSnapLayout: () => void;
 };
@@ -37,7 +35,7 @@ export type FloatingWindowDragLoop = {
 const scheduleFrame = typeof requestAnimationFrame == "function" ? requestAnimationFrame : null;
 
 export function useFloatingWindowDragLoop(o: FloatingWindowDragLoop) {
-    const {a, b} = o;
+    const {mouseDragging, touchDragging} = o;
     useEffect(() => {
         let frame = 0;
         let pendingMouse: {clientX: number; clientY: number} | null = null;
@@ -101,7 +99,7 @@ export function useFloatingWindowDragLoop(o: FloatingWindowDragLoop) {
             document.removeEventListener("mousemove", mouseMoveHandler);
             o.lastC.current = null;
             o.pendingDetach.current = null;
-            o.setA(false);
+            o.setMouseDragging(false);
             if (target) o.snapTo(target);
             else o.hideSnapLayout();
             if (o.ks) floatingWindowMap.touch(o.ks);
@@ -144,20 +142,20 @@ export function useFloatingWindowDragLoop(o: FloatingWindowDragLoop) {
                 document.removeEventListener("touchend", touchEndHandler, true);
                 document.removeEventListener("touchmove", touchMoveHandler);
                 o.pendingDetach.current = null;
-                o.setB(false);
+                o.setTouchDragging(false);
                 if (target) o.snapTo(target);
                 else o.hideSnapLayout();
                 if (o.ks) floatingWindowMap.touch(o.ks);
             }
         };
 
-        if (a) {
+        if (mouseDragging) {
             document.addEventListener("mousemove", mouseMoveHandler);
             // Menus and interactive children may stop bubbling on release. Finish the
             // gesture in capture so their handlers cannot leave the window drag armed.
             document.addEventListener("mouseup", mouseUpHandler, true);
         }
-        if (b) {
+        if (touchDragging) {
             document.addEventListener("touchmove", touchMoveHandler);
             document.addEventListener("touchend", touchEndHandler, true);
         }
@@ -172,5 +170,5 @@ export function useFloatingWindowDragLoop(o: FloatingWindowDragLoop) {
             document.removeEventListener("touchmove", touchMoveHandler);
             document.removeEventListener("touchend", touchEndHandler, true);
         };
-    }, [a, b]);
+    }, [mouseDragging, touchDragging]);
 }

@@ -2,7 +2,8 @@
 
 > Everyday API lives in **`wenay-react2.md`**.
 > This file lists low-level primitives and migration notes.
-> Root import: `import { ... } from "wenay-react2"`.
+> Imports: the canonical subpaths (`wenay-react2/react`, `/grid`, ...; map in `wenay-react2.md`,
+> "Package entrypoints"). There is no root `wenay-react2` entry since 4.0.0.
 
 ## Migration Rule
 ```
@@ -26,19 +27,15 @@ get / set / reset / cancel         // local hook/controller state
 on -> off                          // subscriptions
 ```
 
-## Root Namespaces
-The root export is flat. `kit` was removed in 2.0.0 (see `doc/WENAY_REACT2_RENAMES.md`); import names directly or from a subpath.
-
-Root barrel compatibility (3.0.0): the root `wenay-react2` is a compatibility union of the
-canonical subpaths (`/core`, `/react`, `/persist`, `/grid`, `/windows`, `/logs`,
-`/communication`, `/params`, `/modal`, `/menu`, `/chart`, `/ui`; `/native` is separate and
-never overlaps the root). Every root import keeps resolving to the same binding in 3.x
-(`__test/barrelParity.test.ts` asserts `root[name] === subpath[name]` and that no runtime
-name is root-only), but the root is deprecated and the union will be trimmed in the next
-major. Do not add a module to the root without a subpath home - the parity test rejects it.
-The map for existing root code is the "3.0.0 entry map" section of
-`doc/WENAY_REACT2_RENAMES.md`; the cost of each entry (what it may pull) is asserted by
-`scripts/ag-grid-bundle-probe.mjs` and listed in `doc/changes/v3.0.0.md`.
+## Entry points (no root since 4.0.0)
+Every runtime name lives on the canonical subpaths (`/core`, `/react`, `/persist`, `/grid`,
+`/windows`, `/logs`, `/communication`, `/params`, `/modal`, `/menu`, `/chart`, `/ui`; `/native`
+is separate and shares no runtime name with them). 4.0.0 removed the root `wenay-react2`, the
+compatibility union of 3.x. Names that several entries publish (the persisted maps, the memory
+API) are the same bindings and types everywhere: `__test/barrelParity.test.ts` and
+`__test/barrelTypeParity.test.ts` assert it. `kit` was removed in 2.0.0. Moving old code: the
+"4.0.0 migration cut" of `doc/WENAY_REACT2_RENAMES.md`; the cost of each entry (what it may
+pull) is asserted by `scripts/ag-grid-bundle-probe.mjs`.
 
 ## Reorder handles, cancellation and edge scroll (3.3.0)
 
@@ -129,7 +126,7 @@ mean perpetual authorization: observe current permissions separately after revoc
   surfaces assembled by Vite.
 - `tsconfig.json` deliberately fixes `rootDir: "src"` and `types: []`;
   `tsconfig.test.json` opts Jest and Node globals back into the test tree.
-- CSS imports are declared by `src/styles.d.ts`, which satisfies TypeScript
+- CSS imports are declared by `src/style/styles.d.ts`, which satisfies TypeScript
   7's side-effect import validation while leaving CSS loading to Vite and
   package consumers.
 - Jest 30 transforms TypeScript and TSX with SWC. There is no Babel or
@@ -206,7 +203,7 @@ prop at mount and on late hydration, then announced once so the record is rewrit
 re-healed forever. Without this a single render at `innerWidth == 0` left a permanent 2x2 window
 that stored geometry kept resurrecting over the `size` prop, unrecoverable from the UI.
 
-The same rule is applied wherever stored state outranks a prop. `FResizableReact` judges a
+The same rule is applied wherever stored state outranks a prop. `ResizableBox` judges a
 stored size against the caller's own `minWidth`/`minHeight` (or re-resizable's implicit 10px
 floor): below it the value cannot have come from a drag, so the entry is repaired from the
 `size` prop instead of collapsing the box to a handle nobody can grab, and accumulated resize
@@ -223,9 +220,7 @@ Focused window roots accept Win/Meta+Left/Right (Snap), Up (maximize), and Down
 Left-side modal/menu helpers:
 ```
 LeftModal({arr, zIndex})
-ApiLeftMenu
 getApiLeftMenu()
-TestLeft333()
 ```
 
 These are app-shell style utilities. Prefer local app wrappers for new layouts.
@@ -304,7 +299,8 @@ registered settings section, no prop changes. Semantics that are easy to get wro
   row handler focuses the handle itself). No dnd dependency; FloatingWindow/react-rnd deliberately not
   used (free-floating windows, wrong tool). `touch-action: none` + `user-select: none` on
   draggable rows (`.wenayTbRowGrab`).
-- `api.onChange` is a wenay-common2 `listen` stream; emits the NORMALIZED config after every
+- `api.onChange` is a read-only subscription view (`{on(cb) -> off}`, a `ListenLike`; since 4.0.0
+  no `emit`/`close` from outside) over a wenay-common2 `listen`; emits the NORMALIZED config after every
   config edit. useConfig subscribes via updateBy; getConfig is a non-reactive snapshot.
   `setOrder(order)` is the focused external-control path for grid/menu reorder sync: it preserves
   current membership, density, and pseudo-control visibility while changing only item order. `show(key,on)`,
@@ -508,17 +504,15 @@ Styling uses shared classes `.wenayColDots*` / `.wenayCardList*`; runtime geomet
 ## Outside / Buttons Compatibility
 ```
 useOutsideRef(options) -> ref       // use useOutside(options).ref / .props
-OutsideClickArea                   // alias of OutsideClickArea
+OutsideClickArea                   // component form: outsideClick + status
 
-StyleOtherRow
 // StyleOtherColumn / StyleOtherRow removed in 2.0.0; no replacement
 ```
 
 `Button`, `OutsideButton`, `HoverButton`, and `AbsoluteButton` are still direct components rather than hook controllers.
 
 `Button` persists its open/closed status under `keyForSave` (module-lifetime; same naming as
-FloatingWindow/Resizable/RightMenu); the old `keySave` prop is a deprecated alias (`keyForSave`
-wins when both are set).
+FloatingWindow/Resizable/RightMenu). The old `keySave` alias was removed in 2.0.0.
 
 ## Drag / Resize Low Level
 ```
@@ -534,10 +528,8 @@ FloatingWindowUpdate
 FloatingWindowProps / FloatingWindowController / FloatingWindowSavedGeometry / FloatingWindowSnapRegion
 
 DragBox(props)                       // delta-drag component; thin adapter over useDraggableApi (A7)
-DragArea(props)                     // @deprecated: unique semantics kept as-is; prefer useDraggableApi/DragBox
-FResizableReact(props)
-mapResiReact                        // persisted resize map (ObservableMap)
-OutlineDragDemo()
+ResizableBox(props)
+resizableSizeMap                        // persisted resize map (ObservableMap)
 ```
 
 For new pointer logic, prefer:
@@ -636,11 +628,7 @@ useReorderBoard({columns: [{key, items}], commit(next), canDrag?, holdMs?,
   target in a status line, and keeps diagnostic counters in a collapsed details block.
 
 ## Grid Row Utilities
-```
-applyGridRows(params)
-```
-
-Use `agGrid4` for new tables:
+`applyGridRows(params)` was removed in 2.0.0. Use `agGrid4` for tables:
 ```
 createGridBuffer()
 useAgGrid()
@@ -709,13 +697,13 @@ createContextMenu({name?})              // custom isolated instance with its own
 DropdownMenu({elements, trigger?, classNames?, styles?, style?, position?, verticalPosition?, keyForSave?})
 useRightMenuController({elements, style?, styles?, position?, verticalPosition?, keyForSave?})
 createRightMenuController()
-mapRightMenu                         // persisted floating-menu state (ObservableMap, RightMenuStore)
+rightMenuMap                         // persisted floating-menu state (ObservableMap, RightMenuStore)
 MenuRightPosition / MenuRightVerticalPosition / MenuRightSavedState / MenuRightRenderProps
 MenuRightTrigger / MenuRightClassNames / MenuRightStyles / RightMenuController
 // StickerMenu removed in 2.0.0; no replacement
 ```
 
-Prefer `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click, and stays supported through `1.x`; it should not be the primary API in new code — touch no longer needs it either: the Layer's `other` provider is called WITH the gesture (`{x, y, target, pointer}`) at the moment the long press fires, so one provider builds the same items for a right click and a hold on the row under the finger, and it may return `{items, source}` to get the same `source` accounting `openAt` gives. `MenuR`'s `other` receives the same gesture. A zero-argument provider still type-checks, so existing callers are unaffected.
+Prefer `contextMenu.openAt(e, items, {source?})` for new right-click integrations. `contextMenu.map` remains for older callers that queue items before Layer handles the right-click; it should not be the primary API in new code — touch no longer needs it either: the Layer's `other` provider is called WITH the gesture (`{x, y, target, pointer}`) at the moment the long press fires, so one provider builds the same items for a right click and a hold on the row under the finger, and it may return `{items, source}` to get the same `source` accounting `openAt` gives. A zero-argument provider still type-checks, so existing callers are unaffected.
 
 Placement is viewport-clamped on both axes. The horizontal flip (`isLeftAligned`) stays a submenu manoeuvre — it needs the parent's left edge through `coordinate.left`, which only submenus pass — so a root menu near the right edge is instead pulled back by the twin of the vertical snap, measured from the unshifted base and never dragged past the left edge.
 
@@ -876,6 +864,22 @@ continues exposing run records: an application using persistence should display 
 recovery fact instead of an indefinite active spinner. Recovery/resume and provider
 idempotency remain server decisions; the React hook does not repeat external effects.
 
+### common2 3.0.0 and wenay-exchange
+
+The dependency and peer minimum is now `wenay-common2@^3.0.0`, plus `wenay-exchange@^1.0.0`
+(dependency and peer, the same one-copy policy). common2 3.0.0 moved the exchange data
+(`Bars`, `CQuotesHistory*`, `CBar*`, `OHLC`, `CTimeSeries*`, `createRandomBars`,
+`LoadQuoteBase`, ...) into `wenay-exchange` under the same names; `TF`, `Period`, the time API
+and `Params` stay in common2. React hook signatures and imports are unchanged: this package
+imports none of the moved names and re-exports none of them. Application code imports them
+from `'wenay-exchange'`; the peer keeps one common2 copy, so `Bars.TF === TF`.
+
+Other common2 3.0.0 cuts with no React impact: the `wenay-common2/lib/client` and
+`lib/server` aliases are gone (this package never used them), axios is gone, and `express`
+is an optional peer needed only by common2's server entries. Side effect: the `./logs` and
+`./params` entries, which pull the common2 client barrel for `Params`, are about 3.5 KB gzip
+smaller because the barrel no longer carries the exchange code.
+
 ### Free-position drag keyboard (R4)
 
 `useDraggableApi` from `wenay-react2/react` accepts opt-in `keyboard: true` or
@@ -992,7 +996,7 @@ memoryCache.onDirty(cb) -> off             // instance dirty channel (coalesced,
 memoryCache.isDirty()
 memoryCache.markDirty(scope?, key?)        // manual announce, for plain-Map entries only
 
-memorySet(key, data)
+memorySetIfAbsent(key, data)
 memoryGet(key)
 memoryGetOrCreate(key, def, options?)
 memoryGetById(key, def, id)
@@ -1006,16 +1010,14 @@ structEqual(a, b)                   // deep equality for plain data trees; JSON.
 memoryCache
 memoryMaps
 
-ArrayPromise({arr, catchF?, thenF?})
-PageVisibilityProvider
-PageVisibilityContext
-setAutoStepForElement(input, {minStep?, maxStep?})
+setAutoStepForElement(input, {minStep?, maxStep?})   // wenay-react2/params
+// ArrayPromise and PageVisibilityProvider / PageVisibilityContext were removed in 2.0.0
 
 useCacheMapPersistence(cache: CacheMap, delay?=300) -> {isDirty(), flush(), save(), reload()}
 ```
 
-Layering (2026-07 architecture pass): the persisted maps (`floatingWindowMap`, `mapResiReact`,
-`mapRightMenu`) are DECLARED in the utils leaf `utils/persistedMaps.ts` and re-exported by their
+Layering (2026-07 architecture pass): the persisted maps (`floatingWindowMap`, `resizableSizeMap`,
+`rightMenuMap`) are DECLARED in the utils leaf `utils/persistedMaps.ts` and re-exported by their
 owning components (FloatingWindow/Resizable/RightMenuStore) - importing `memoryStore`/`memoryCache`
 no longer pulls react-rnd or the Menu tree; only `import type` lines point upward (erased at build).
 Shared order helper `utils/fixedOrder.ts` (`pinFixedOrder`, `movedOrderWithFixed`) is the single
@@ -1035,7 +1037,7 @@ subscribers just debounce the same save.
 Dirty/save contract: the dirty signal originates in the data layer. The persisted maps are
 `ObservableMap`s, so `set/delete/clear` announce themselves; in-place mutations of stored
 objects are invisible to map methods and are announced with `map.touch(key)` at the commit
-points (FloatingWindow drag/resize stop, FResizableReact resize stop, createUiSlot.setPlace) or,
+points (FloatingWindow drag/resize stop, ResizableBox resize stop, createUiSlot.setPlace) or,
 app-side, with `memoryUpdate(key, mutate)` / `memoryMarkDirty(key)`. `createCacheMapWithStorage`
 subscribes to the ObservableMaps it owns - the channel is per instance, there is no global
 bus; plain Maps in `arr` stay silent (announce those via `memoryCache.markDirty`). Announcements
@@ -1050,9 +1052,27 @@ so a change arriving mid-write survives. Caveat: `flush()` is async - on pagehid
 localStorage writes usually complete but are not guaranteed (Cache API is not); prefer
 visibilitychange->hidden as the primary final save.
 
+### Module-level state
+
+Several primitives keep one instance per loaded module, by design: `memoryCache` and the
+persisted maps behind it (`memoryGetOrCreate` entries, `floatingWindowMap`, `resizableSizeMap`,
+`rightMenuMap`, `buttonStatusMap`), the default `contextMenu`, the global `logsApi`, the
+overlay stack, floating-window stack groups, the Settings section and toolbar density
+registries, and the shared `ResizeObserver`. Consequences:
+
+- Two copies of the package in one app (a duplicated install, or two bundles) are two
+  independent worlds: windows, menus and persisted maps of one copy do not see the other.
+  Check with `npm ls wenay-react2` and dedupe.
+- SSR: the state is shared by every request of the server process. Render with defaults and
+  call `memoryCache.load()` / save only in the browser (`updateBy` itself is SSR-safe).
+- Tests: Jest gives each test file its own module registry, but tests inside one file share
+  it. Use distinct keys per test or `clear()` the maps you touched (`memoryMaps.*` are
+  `ObservableMap`s). Isolated instances exist where a second copy is useful:
+  `createContextMenu()`, `getLogsApi()`, `createCacheMapWithStorage()`.
+
 ## Resize Observer
 ```
-CResizeObserver
+ResizeObserverHub
 setResizeableElement(el)
 removeResizeableElement(el)
 ObserveID
@@ -1114,7 +1134,7 @@ Normalization rule: new shared CSS should first try an existing token. Add a new
 Open normalization candidates:
 - `src/style/style.css`: `.msTradeAlt`, `.msTradeActive`, `.newButtonSimple`, `.toIndicatorMenuButton:hover`, submit-button green, and several toolbar row hover/drag literals still use raw colors.
 - `src/internal/grid/columnState/*`: compact menu/dots/card visuals now use `.wenayColumnGrid*`, `.wenayColsMenu*`, `.wenayColDots*`, `.wenayCardList*` plus `--cols-grid-*`, `--cols-menu-*`, `--cols-dots-*`, and `--cols-card-*`; further changes here should be visual QA only, not a new default palette.
-- `src/internal/components/ParamsEditor.tsx` and `src/internal/components/Input.tsx`: if these stay public primitives, define default class/token contracts instead of component-owned visual styling.
+- `src/internal/components/ParamsEditor/ParamsEditor.tsx` and `src/internal/components/Input.tsx`: if these stay public primitives, define default class/token contracts instead of component-owned visual styling.
 - `src/internal/styles/commentaryStyles.css`: standalone `.commentary` CSS is not imported by the root style bundle; either import/tokenize it if still used, or mark it as a local component concern.
 
 Recently normalized: mouse context-menu item colors through `--menu-*`, `--menu-outline-color` for `OutlineDragDemo`, `--logs-*` for logger chrome, `--dlg-scrim` in `ModalProvider`, compact `ColumnsMenu/MenuStrip` visuals through `.wenayColsMenu*` / `--cols-menu-*`, card-29 mobile primitives through `--cols-dots-*` / `--cols-card-*`, createColumnGrid overlay through `.wenayColumnGrid*` / `--cols-grid-*`, and Grid Chrome through `.wenayGridChrome*` / `--grid-chrome-*`.
@@ -1131,24 +1151,44 @@ Do not delete a public export just because it looks unused inside this repo. Ext
 Resolved in 2.0.0 (see `doc/WENAY_REACT2_RENAMES.md`, "2.0.0 migration cut"): every item below that
 was marked as a removal candidate is gone - `menuR`, `StickerMenu`, `DragArea`, the demo exports,
 `logsContext`, `myChart/1`, `MyChartEngine`, the deprecated aliases, dead utils, `kit`, CSS side
-effects, the deep `./lib/common/api.js` export and the published stand. What remains open from the
-2026-09-01 review is non-breaking follow-up work, tracked in `doc/target/my.md`:
-- `memoryUpdate` as a wrapper over `persistedController.commit` (a module cycle prevents it today).
-- `Toolbar` pure config algebra -> `toolbarConfig.ts`; `SettingsDialog` search/tree helpers -> `Settings/searchText.ts`.
-- `barrelParity` inverse assertion (root module -> subpath).
+effects, the deep `./lib/common/api.js` export and the published stand. The non-breaking
+follow-ups of the 2026-09-01 review shipped in 2.3.0 (`toolbarConfig.ts`, `settingsTree.ts` /
+`searchText.tsx`, the inverse `barrelParity` assertion) and 3.0.0 (`memoryCommit`).
+
+### 4.0.0 cut (done, review 2026-09-23)
+
+Shipped as one deliberate major; every name is in `doc/WENAY_REACT2_RENAMES.md`, "4.0.0
+migration cut", and in the migration CLI, which imports the new name under the old local one.
+
+| 3.x surface | Problem | 4.0.0 |
+| --- | --- | --- |
+| root `wenay-react2` | deprecated compatibility union since 3.0.0 | removed (no `"."` export, `main`, `types`); the CLI moves root imports to subpaths |
+| `renderByRevers` (`./react`) | misspelled | `renderByReverse` |
+| `memoryGetOrCreate(key, def, {reversDeep})` | misspelled option | `reverseDeep` |
+| `mapResiReact` (`./ui`, `./persist`) | legacy abbreviation | `resizableSizeMap` |
+| `mapRightMenu` (`./menu`, `./persist`) | naming out of line with `floatingWindowMap` | `rightMenuMap` |
+| `FResizableReact` (`./ui`) | legacy prefix/suffix | `ResizableBox` (not `Resizable`, which re-resizable already exports) |
+| `CResizeObserver` (`./react`) | class-prefix naming | `ResizeObserverHub` |
+| `__observerStateForTests` (`./react`) | test probe on a public entry | removed from the entry; tests import the internal module |
+| memory API `key: any` | non-string keys do not round-trip through storage | `key: string` |
+| `memorySet(key, data)` | read like an overwrite, silently kept an existing entry | `memorySetIfAbsent` (same behaviour) |
+| `createColumnState().api.onChange`, `createToolbar().api.onChange` | raw common2 `ListenApi`: a consumer could `emit` fake changes or `close` the channel | read-only view `{on(cb, opts?) -> off}` (`ListenLike`): `.on` and `useListenEffect` keep working |
+| `FloatingWindowController.onResize*` | typed with react-rnd's callbacks | own `FloatingWindowResizeHandler` / `FloatingWindowResizeStartHandler` (react-rnd compatible); the public types no longer name react-rnd |
+
+The storage scope strings of `memoryCache` (`"mapResiReact"`, `"mapRightMenu"`) are unchanged
+on purpose: renaming them would orphan every saved size and menu.
+
+Non-breaking notes that stay open:
 - Chart engine primitives (`DataSet`, `Panel`, `Renderer`, `Interaction`, `ChartEngine`) are still very
   low-level; product apps should wrap them.
 - `StyleCSSHeadGridEdit` / `StyleCSSHeadGrid` mutate `<head>` directly; new grid styling should prefer
   ag-grid theme params and tokens.
 
 ## Charts
-Canvas chart:
-```
-createChartCanvas(config) -> IChartCanvas
-ChartDemo()
-```
+Compact rows: `Sparkline` (brief doc, "Charts"). `createChartCanvas`, `ChartDemo`,
+`MyChartEngine` and `generateIncrementalData` were removed in 2.0.0.
 
-Chart engine:
+Chart engine (`wenay-react2/chart`):
 ```
 createDataSet(params)
 createDataModel()
@@ -1156,8 +1196,6 @@ createPanelManager()
 createRenderer()
 createInteraction(...)
 createChartEngine(canvas)
-generateIncrementalData(...)
-MyChartEngine
 ```
 
 The chart engine exports many internal interfaces (`DataPoint`, `DataSet`, `Panel`, `Renderer`, `Transform`,
@@ -1168,7 +1206,7 @@ The chart engine exports many internal interfaces (`DataPoint`, `DataSet`, `Pane
 Get*             // usually a factory from older style; prefer create* or use*
 *FuncJSX         // imperative JSX store; prefer React context/controller
 *2 / *3          // version suffix; document the intended canonical one in brief
-removed old grid update names -> applyGridRows / agGrid4
+removed old grid update names -> agGrid4 (applyGridRows itself was removed in 2.0.0)
 ```
 
 Do not add new generic utilities with app words in their signature. For example, a column primitive should accept

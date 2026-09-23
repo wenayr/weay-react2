@@ -1,4 +1,5 @@
 import type { QaCard } from "./standKit.js";
+import { Card60 } from './cards/videoCallLabels.js';
 import { Card59 } from './cards/restoreDates.js';
 import { Card58 } from './cards/freeDragKeyboard.js';
 import { Card57 } from './cards/reorderAccessible.js';
@@ -14,6 +15,7 @@ import { Card8, Card1, Card14, Card7, Card19, Card9, Card10, Card11 } from "./ca
 import { Card5, Card12, Card15, Card16 } from "./cards/grid.js";
 
 export const qaCards: QaCard[] = [
+    { id: 'video-call-labels', n: 60, section: 'active', title: 'VideoCall — interface language (labels)', tall: true, Component: Card60 },
     { id: 'restore-dates', n: 59, section: 'active', title: 'Public persist — restore JSON dates', Component: Card59 },
     { id: 'free-drag-keyboard', n: 58, section: 'active', title: 'Free notes — keyboard and pointer lifecycle', Component: Card58 },
     { id: 'reorder-accessible', n: 57, section: 'active', title: 'Accessible organizer — keyboard, handles, edge scroll, command tuples', Component: Card57 },

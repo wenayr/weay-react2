@@ -30,6 +30,7 @@ import {
     normalizeColumnsConfig,
 } from '../../../native/columnStateCore.js'
 import {structEqual} from '../../utils/structEqual.js'
+import type {ListenLike} from '../../hooks/useObserveStore.js'
 
 export type ColumnMeta = {
     /** stable id (persist key; must equal the grid colId) */
@@ -104,6 +105,9 @@ export function createColumnState(opts: {
     const st = persisted.state
     const stApi = persisted.api
     const [emitChange, onChange] = createListen<[ColumnsConfig]>()
+    // 4.0.0: consumers get a subscription view. The raw listen api let any caller emit a fake
+    // config or close the channel for every subscriber.
+    const changes: ListenLike<[ColumnsConfig]> = {on: (cb, o) => onChange.on(cb, o?.key !== undefined ? {key: o.key} : undefined)}
     const previewRt = {order: null as string[] | null}
     const previewApi = createUpdateApi(previewRt)
 
@@ -445,7 +449,7 @@ export function createColumnState(opts: {
         /** The column descriptors this state was created over - UI components
          *  (dots, cards, icon menus) render from these + the config. */
         columns: opts.columns as readonly ColumnMeta[],
-        api: {getConfig, setConfig, useConfig, onChange, reset, show, move, setSort, toggleSort, visibleKeys,
+        api: {getConfig, setConfig, useConfig, onChange: changes, reset, show, move, setSort, toggleSort, visibleKeys,
             getPresent, usePresent, isPresent, setPresent, getPresentGate, setPresentGate, useDisplayConfig, setPreviewOrder, listSource},
         grid: {attach, detach},
     }

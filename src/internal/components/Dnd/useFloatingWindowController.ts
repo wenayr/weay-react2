@@ -5,7 +5,6 @@
  *  testing and detach geometry). The hooks below are still called in the original order with
  *  the original dependency arrays; only the bodies moved. */
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { RndResizeCallback, RndResizeStartCallback } from "react-rnd";
 import { floatingWindowMap } from "../../persist/persistedMaps.js";
 import { cascadeWindowPosition, useFloatingDesktopWindow } from "./FloatingDesktop.js";
 import {
@@ -23,7 +22,12 @@ import type {
     FloatingWindowSize,
     FloatingWindowSnapRegion,
 } from "../../persist/floatingWindowTypes.js";
-import type { FloatingWindowController, FloatingWindowControllerOptions } from "./floatingWindowProps.js";
+import type {
+    FloatingWindowController,
+    FloatingWindowControllerOptions,
+    FloatingWindowResizeHandler,
+    FloatingWindowResizeStartHandler,
+} from "./floatingWindowProps.js";
 
 type tPosition = FloatingWindowPosition;
 type tSize = FloatingWindowSize;
@@ -75,8 +79,8 @@ export function useFloatingWindowController({
         moved: boolean;
         last?: {time: number; x: number; y: number};
     }>({moved: false});
-    const [a, setA] = useState(false);
-    const [b, setB] = useState(false);
+    const [mouseDragging, setMouseDragging] = useState(false);
+    const [touchDragging, setTouchDragging] = useState(false);
 
     const [x, setX] = useState(savedPosition.x);
     const [y, setY] = useState(savedPosition.y);
@@ -270,8 +274,8 @@ export function useFloatingWindowController({
     useLayoutEffect(() => { disableDraggingRef.current = disableDragging; });
 
     useFloatingWindowDragLoop({
-        a,
-        b,
+        mouseDragging,
+        touchDragging,
         ks,
         lastC,
         lastT,
@@ -282,8 +286,8 @@ export function useFloatingWindowController({
         resolveDetach,
         updateSnapPicker,
         commitPosition,
-        setA,
-        setB,
+        setMouseDragging,
+        setTouchDragging,
         snapTo,
         hideSnapLayout,
     });
@@ -334,9 +338,9 @@ export function useFloatingWindowController({
         if (minimized) return;
         // A drag/resize moves the geometry every frame, and this effect is the most expensive
         // thing in that loop (a rect for the window plus one per chrome node). The pointer owns
-        // the position while it is down, so clamping it there is also pointless. `a || b` going
+        // the position while it is down, so clamping it there is also pointless. `mouseDragging || touchDragging` going
         // back to false re-runs this once on release, which is where the clamp belongs.
-        if (a || b) return;
+        if (mouseDragging || touchDragging) return;
         const rect = el.getBoundingClientRect();
         const outer = Array.from(el.querySelectorAll<HTMLElement>(".wenayWndClose, .wenayWndControl"))
             .map(node => node.getBoundingClientRect())
@@ -368,7 +372,7 @@ export function useFloatingWindowController({
         if (typeof height === "number" && height > maxWindowHeight) {
             commitSize({width: typeof width == "number" && width > maxWindowWidth ? maxWindowWidth : width, height: maxWindowHeight});
         }
-    }, [x, y, width, height, sizeByWindow, viewportRevision, mode, minimized, a, b]);
+    }, [x, y, width, height, sizeByWindow, viewportRevision, mode, minimized, mouseDragging, touchDragging]);
 
     const onHeaderTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
         const t = e.changedTouches[0];
@@ -382,7 +386,7 @@ export function useFloatingWindowController({
                 id: t.identifier
             };
         }
-        setB(true);
+        setTouchDragging(true);
     };
 
     const onHeaderTouchEnd: React.TouchEventHandler<HTMLDivElement> = (e) => {
@@ -412,7 +416,7 @@ export function useFloatingWindowController({
             x: x - e.clientX,
             y: y - e.clientY
         };
-        setA(true);
+        setMouseDragging(true);
     };
     const onHeaderDoubleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
         if (!maximizable) return;
@@ -476,20 +480,20 @@ export function useFloatingWindowController({
     // never reaches the raise handler above. For a window nested in another window's React
     // tree that press still bubbles through the portal to the opener, which would then raise
     // itself over the window being resized. Claim the press here first, then raise.
-    const onResizeStart: RndResizeStartCallback = (e) => {
+    const onResizeStart: FloatingWindowResizeStartHandler = (e) => {
         const native = (e as React.SyntheticEvent).nativeEvent;
         if (native) claimedPresses.add(native);
         bringToFront();
     };
 
-    const onResizeStop: RndResizeCallback = (e, dir, elementRef, delta, { x: nx, y: ny }) => {
+    const onResizeStop: FloatingWindowResizeHandler = (e, dir, elementRef, delta, { x: nx, y: ny }) => {
         commitPosition({x: nx, y: ny});
         commitSize({height: elementRef.offsetHeight, width: elementRef.offsetWidth});
         setUpdate(value => value + 1);
         if (ks) floatingWindowMap.touch(ks);
     };
 
-    const onResize: RndResizeCallback = (e, dir, elementRef, delta, pos) => {
+    const onResize: FloatingWindowResizeHandler = (e, dir, elementRef, delta, pos) => {
         onUpdate?.({ e, dir, elementRef, delta, position: pos });
     };
 
@@ -501,7 +505,7 @@ export function useFloatingWindowController({
         stackIndex: stack.index,
         zIndex: windowZIndex,
         overlayZIndex: windowZIndex + 1,
-        dragging: a || b,
+        dragging: mouseDragging || touchDragging,
         active: stack.active,
         mode,
         minimized,

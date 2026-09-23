@@ -1,4 +1,5 @@
-import {Menu, contextMenu, renderBy, MenuItem, updateBy} from "../../api.js";
+import { Menu, contextMenu, MenuItem } from "../../menu/index.js";
+import { renderBy, updateBy } from "../../react/index.js";
 import {GridExample, tt} from "./useGrid.js";
 import {MyChartEngine} from "./myChartEngineDemo.js";
 import {TestParams} from "./testParams.js";

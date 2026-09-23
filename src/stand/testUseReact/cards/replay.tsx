@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, useAiRunClient, useFileJobClient, useContractSlot } from "../../../api.js";
+import { useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenArgs, useListenValue, useAiRunClient, useFileJobClient, useContractSlot } from "../../../react/index.js";
 import { listen as createListen } from "wenay-common2/client";
 import * as Contract from "wenay-common2/contract";
 import * as Observe from "wenay-common2/observe";

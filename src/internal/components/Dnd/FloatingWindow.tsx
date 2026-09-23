@@ -19,6 +19,9 @@ export type {
     FloatingWindowController,
     FloatingWindowControllerOptions,
     FloatingWindowProps,
+    FloatingWindowResizeDirection,
+    FloatingWindowResizeHandler,
+    FloatingWindowResizeStartHandler,
     FloatingWindowUpdate,
 } from "./floatingWindowProps.js";
 

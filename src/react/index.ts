@@ -1,9 +1,8 @@
 export {
-    __observerStateForTests,
     createUpdateApi,
     renderBy,
     renderByLast,
-    renderByRevers,
+    renderByReverse,
     updateBy,
     useUpdateBy,
     useUpdateByApi,
@@ -133,7 +132,7 @@ export {
     memoryGetById,
     memoryGetOrCreate,
     memoryMarkDirty,
-    memorySet,
+    memorySetIfAbsent,
     memoryUpdate,
 } from "../internal/persist/memoryStore.js";
 export {
@@ -149,5 +148,5 @@ export {createSearchHistory} from "../internal/persist/searchHistory.js";
 // The project's only shared ResizeObserver. It lives under components/ for historical reasons,
 // which kept it out of this barrel entirely - so every consumer (and the chart engines) rolled
 // their own observer instead.
-export {CResizeObserver, useElementSize, useResizeObserver} from "../internal/components/MyResizeObserver.js";
+export {ResizeObserverHub, useElementSize, useResizeObserver} from "../internal/components/MyResizeObserver.js";
 export type {ObserveID} from "../internal/components/MyResizeObserver.js";

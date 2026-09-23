@@ -4,7 +4,7 @@ export type ObserveID = { readonly [Symbol.species]: ObserveID };
 
 // Class for tracking element size changes
 
-export class CResizeObserver {
+export class ResizeObserverHub {
     #idMap = new WeakMap<ObserveID, { element: Element, func: () => void }>();
     #funcMap = new WeakMap<Element, (() => void)[]>();
     #observer = typeof ResizeObserver !== "undefined"
@@ -44,7 +44,7 @@ export class CResizeObserver {
     }
 }
 
-const global_resizeObserver = new CResizeObserver();
+const global_resizeObserver = new ResizeObserverHub();
 
 /** Subscribe an element to the shared resize observer via the returned callback ref.
  *  `onResize` goes through a ref - a new function identity neither resubscribes nor is missed.

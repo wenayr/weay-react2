@@ -3,13 +3,37 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {exportMap, migrate, main} from './migrate-root-imports.mjs';
+import {exportMap, migrate, main, renamed} from './migrate-root-imports.mjs';
 
 const map = exportMap();
 test('published names and duplicate priority are deterministic', () => {
-    for (const [name, sub] of Object.entries({ObservableMap: 'core', floatingWindowMap: 'persist', mapResiReact: 'persist', mapRightMenu: 'persist', restoreDates: 'persist', FloatingDesktopEntry: 'windows'})) assert.equal(map.get(name).sub, sub);
+    for (const [name, sub] of Object.entries({ObservableMap: 'core', floatingWindowMap: 'persist', resizableSizeMap: 'persist', rightMenuMap: 'persist', restoreDates: 'persist', FloatingDesktopEntry: 'windows'})) assert.equal(map.get(name).sub, sub);
     assert.equal(map.get('CacheMap').type, true);
     assert.equal(map.has('LogsPage'), false);
+    for (const [old, next] of renamed) { assert.equal(map.has(old), false, old); assert(map.has(next), next); }
+    assert.equal(map.has('__observerStateForTests'), false);
+});
+test('4.0.0 renames: root imports move and alias the new name under the old one', () => {
+    const input = "import { renderByRevers, mapResiReact as sizes, type CResizeObserver } from 'wenay-react2';\nsizes.clear(); renderByRevers({});";
+    const result = migrate(input, map);
+    assert.deepEqual(result.diagnostics, []);
+    assert(result.text.includes("import { renderByReverse as renderByRevers, type ResizeObserverHub as CResizeObserver } from 'wenay-react2/react';"), result.text);
+    assert(result.text.includes("import { resizableSizeMap as sizes } from 'wenay-react2/persist';"), result.text);
+    assert(result.text.endsWith('sizes.clear(); renderByRevers({});'));
+    assert.equal(migrate(result.text, map).changed, false);
+});
+test('4.0.0 renames: subpath imports and re-exports are renamed in place', () => {
+    const input = 'import { mapResiReact, FResizableReact as Box, Button } from "wenay-react2/ui"\nexport { memorySet } from "wenay-react2/persist"\nimport { structEqual } from "wenay-react2/core"';
+    const result = migrate(input, map);
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(result.text, 'import { resizableSizeMap as mapResiReact, ResizableBox as Box, Button } from "wenay-react2/ui"\nexport { memorySetIfAbsent as memorySet } from "wenay-react2/persist"\nimport { structEqual } from "wenay-react2/core"');
+    assert.equal(migrate(result.text, map).changed, false);
+});
+test('4.0.0 removals are reported without a partial rewrite', () => {
+    const input = "import { __observerStateForTests, renderByRevers } from 'wenay-react2/react';";
+    const result = migrate(input, map);
+    assert.match(result.diagnostics.join(), /__observerStateForTests was removed in 4\.0\.0/);
+    assert.equal(result.text, input);
 });
 test('splits mixed import aliases and inline types, preserving quote and semicolon style', () => {
     const result = migrate(`import { ObservableMap as OM, type CacheMap, PageLogs } from 'wenay-react2';\nconst x = 1;`, map);

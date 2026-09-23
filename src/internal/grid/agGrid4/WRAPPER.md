@@ -96,7 +96,7 @@ That wrapper should decide:
 
 ```ts
 import type { ColDef, ColGroupDef, GridApi } from 'ag-grid-community'
-import { createColumnBuffer } from 'wenay-react2'
+import { createColumnBuffer } from 'wenay-react2/grid'
 
 type AnyCol<T> = ColDef<T> | ColGroupDef<T>
 

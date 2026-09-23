@@ -60,14 +60,14 @@ import { useAgGrid, createColumnState } from "wenay-react2/grid"
 import { createToolbar } from "wenay-react2/ui"     // CSS-free, tree-shake-safe subpaths (3.0.0):
                                                     // ./core ./react ./persist ./grid ./windows ./logs
                                                     // ./communication ./params ./modal ./menu ./chart ./ui
-                                                    // ./native (DOM-free, never overlaps the root)
+                                                    // ./native (DOM-free, shares no name with the web entries)
 ```
 
-Each subsystem below names its canonical entry. `src/api.tsx` is the root barrel
-`wenay-react2`: since 3.0.0 a deprecated compatibility union of the subpaths (same bindings,
-asserted by `__test/barrelParity.test.ts`, trimmed in the next major); since 2.0.0 a flat
-re-export list with no side effects. No entrypoint imports CSS on its own, there is no `kit`
-namespace object, and no demo, stand or application code is compiled into `lib/`. The library
+Each subsystem below names its canonical entry. There is no root `wenay-react2` entry since
+4.0.0 (it was the deprecated compatibility union of 3.x); names that several entries publish are
+the same bindings, asserted by `__test/barrelParity.test.ts`. No entrypoint imports CSS on its
+own, there is no `kit` namespace object, and no demo, stand or application code is compiled
+into `lib/`. The library
 lives under `src/internal/`, the QA stand and demos under `src/stand/` (`./demo/peer-media`
 and `./demo/peer-conference` are the two demo entrypoints still published, from
 `lib/stand/demo`). What each entry may pull (ag-grid, react-rnd, the wenay-common2 client
@@ -131,7 +131,7 @@ Canonical entry: `wenay-react2/react` (the memory names are canonical on
 
 Main APIs:
 
-- `updateBy`, `useUpdateBy`, `renderBy`, `renderByRevers`, `renderByLast`
+- `updateBy`, `useUpdateBy`, `renderBy`, `renderByReverse`, `renderByLast`
 - `createUpdateApi`, `useUpdateByApi`
 - `memoryGetOrCreate`, `memoryCommit`, `memoryUpdate`, `memoryMarkDirty`, `memoryCache`
 
@@ -146,7 +146,7 @@ local to one component and has no external lifecycle, `useState` is simpler.
 Purpose: centralize process/browser memory maps used by shared UI surfaces.
 
 Canonical entry: `wenay-react2/persist` (3.0.0; `src/internal/persist/`). It exports
-`memoryCache`, the persisted maps (`floatingWindowMap`, `mapResiReact`, `mapRightMenu`,
+`memoryCache`, the persisted maps (`floatingWindowMap`, `resizableSizeMap`, `rightMenuMap`,
 `buttonStatusMap`), `memoryCommit` (the one commit idiom: mutate, render, mark dirty; used by
 `memoryUpdate` and `createPersistedController().commit`), `createPersistedController`,
 `useCacheMapPersistence` and the `CacheStorage` adapter contract. The block is
@@ -167,7 +167,7 @@ should not silently write storage at surprising times.
 Purpose: reusable interaction wrappers for menus, popups, and floating panels.
 
 Canonical entries: `wenay-react2/ui` (buttons, `OutsideClickArea`, `Overlay`,
-`FResizableReact`), `wenay-react2/windows` (floating windows, desktop manager,
+`ResizableBox`), `wenay-react2/windows` (floating windows, desktop manager,
 `floatingWindowMap`), `wenay-react2/react` (`useOutside`, drag and reorder hooks).
 
 Main APIs:
@@ -306,8 +306,8 @@ Use `createColumnBuffer` for generic dynamic column-name lifecycle. The shared
 buffer stores names and replays them; the app wrapper decides target group,
 column shape, `colId`, labels, and domain rules.
 
-Low-level `applyGridRows` exists, but it is not the preferred path for new
-React examples. Prefer the controller path because it owns attach/detach/sync
+The low-level `applyGridRows` helper was removed in 2.0.0. Prefer the controller
+path over direct `api.applyTransaction` calls because it owns attach/detach/sync
 and reduces race conditions around grid readiness.
 
 ### Column State
@@ -509,9 +509,9 @@ Important current cards:
 - 31: `createToolbar` over `columnState.api.listSource`.
 - 32: `createColumnGrid` wrapper with built-in dots overlay driving table/cards.
 
-Known audit note: archive card 5 and `src/stand/testUseReact/useGrid.tsx`
-still demonstrate direct `applyGridRows`. That is useful as a regression
-check for the low-level helper, but new examples should teach `useAgGrid`,
+Known audit note: archive card 5 (`src/stand/testUseReact/useGrid.tsx`) keeps
+the old `applyGridRows` transaction repro with the helper inlined (the public
+helper was removed in 2.0.0). New examples should teach `useAgGrid`,
 `AgGridTable`, or `createGridBuffer` first.
 
 ## Adding A New Feature

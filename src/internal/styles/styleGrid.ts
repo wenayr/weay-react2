@@ -3,7 +3,7 @@ import {provideGlobalGridOptions} from "ag-grid-community";
 import {buildAgTheme} from "../grid/agGrid4/theme.js";
 
 // The cell-style concerns now live next to the grid that uses them; re-exported here so the
-// root public names (`StyleGridDefault`, `AgGridClassRule`) survive.
+// public names (`StyleGridDefault`, `AgGridClassRule`) on ./grid survive.
 export {StyleGridDefault} from "../grid/agGrid4/cellStyle.js";
 export type {AgGridClassRule} from "../grid/agGrid4/cellStyle.js";
 

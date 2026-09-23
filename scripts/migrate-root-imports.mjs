@@ -1,14 +1,53 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {parse} from '@babel/parser';
 
 export const priority = ['core', 'persist', 'react', 'grid', 'windows', 'logs', 'communication', 'params', 'modal', 'menu', 'chart', 'ui'];
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const syntax = (text, file) => parse(text, {sourceType: 'unambiguous', plugins: [
+
+// @babel/parser is an optional peer: a one-off migration must not make every UI install carry a
+// parser. Loaded on first use so a missing parser surfaces as a CLI error (exit 2), not a crash.
+let babel;
+function parser() {
+    if (babel) return babel;
+    try { return babel = createRequire(import.meta.url)('@babel/parser'); }
+    catch (error) {
+        if (error?.code !== 'MODULE_NOT_FOUND') throw error;
+        throw new Error('The migration CLI needs @babel/parser (an optional peer of wenay-react2). ' +
+            'Install it for the migration run, e.g. `npm i -D @babel/parser`, then run the command again.');
+    }
+}
+const syntax = (text, file) => parser().parse(text, {sourceType: 'unambiguous', plugins: [
     ['typescript', {dts: file.endsWith('.d.ts')}], ...(/\.[cm]?ts$/.test(file) ? [] : ['jsx']),
 ]});
+
+/** 4.0.0 renames. The CLI imports the new name under the old local one (`{new as old}`), so the
+ *  code below the import keeps compiling unchanged; root and subpath imports alike. */
+export const renamed = new Map([
+    ['renderByRevers', 'renderByReverse'],
+    ['mapResiReact', 'resizableSizeMap'],
+    ['mapRightMenu', 'rightMenuMap'],
+    ['FResizableReact', 'ResizableBox'],
+    ['CResizeObserver', 'ResizeObserverHub'],
+    ['memorySet', 'memorySetIfAbsent'],
+]);
+/** Removed in 4.0.0 without a public replacement: reported, never guessed. */
+export const removed = new Set(['__observerStateForTests']);
+
+// `{old}` -> `{new as old}`, `{old as x}` -> `{new as x}`; `type` modifiers and comments stay.
+function renameSpecifier(text, spec, importing) {
+    const source = importing ? spec.imported : spec.local;
+    const name = source.name ?? source.value;
+    const raw = text.slice(spec.start, spec.end);
+    const next = renamed.get(name);
+    if (!next) return {name, raw};
+    const alias = importing ? spec.local : spec.exported;
+    const offset = source.start - spec.start;
+    const tail = alias.start === source.start ? ` as ${name}` : '';
+    return {name: next, raw: raw.slice(0, offset) + next + tail + raw.slice(offset + source.end - source.start)};
+}
 
 // First published home wins, including type exports. Never infer a private/deep path.
 export function exportMap(root = packageRoot, source = false) {
@@ -32,6 +71,18 @@ export function migrate(text, map, file = 'input.ts') {
     const diagnostics = [];
     const handled = new Set();
     for (const node of ast.program.body) {
+        // Canonical subpath imports stay where they are; only 4.0.0 renames/removals touch them.
+        if (/^wenay-react2\/[\w-]+$/.test(node.source?.value ?? '') && node.specifiers?.length) {
+            const importing = node.type === 'ImportDeclaration';
+            for (const spec of node.specifiers) {
+                if (spec.type !== (importing ? 'ImportSpecifier' : 'ExportSpecifier')) continue;
+                const source = importing ? spec.imported : spec.local;
+                const name = source.name ?? source.value;
+                if (removed.has(name)) diagnostics.push(`line ${node.loc.start.line}: ${name} was removed in 4.0.0; see WENAY_REACT2_RENAMES.md`);
+                else if (renamed.has(name)) edits.push({start: spec.start, end: spec.end, replacement: renameSpecifier(text, spec, importing).raw});
+            }
+            continue;
+        }
         if (node.source?.value !== 'wenay-react2') continue;
         handled.add(node.source);
         const importing = node.type === 'ImportDeclaration';
@@ -45,10 +96,11 @@ export function migrate(text, map, file = 'input.ts') {
         let unknown = false;
         const innerComments = ast.comments.filter(c => c.start > text.indexOf('{', node.start) && c.end < node.source.start);
         for (const spec of node.specifiers) {
-            const name = (importing ? spec.imported : spec.local).name ?? (importing ? spec.imported : spec.local).value;
+            const renamedSpec = renameSpecifier(text, spec, importing);
+            const name = renamedSpec.name;
             const target = map.get(name);
             if (!target) { diagnostics.push(`line ${node.loc.start.line}: unknown/removed export ${name}; see WENAY_REACT2_RENAMES.md`); unknown = true; continue; }
-            let raw = text.slice(spec.start, spec.end);
+            let raw = renamedSpec.raw;
             // Keep comments inside a specifier verbatim; carry inter-specifier comments along.
             const comments = innerComments.filter(c => !(c.start >= spec.start && c.end <= spec.end) &&
                 (node.specifiers.find(s => s.start >= c.end) ?? node.specifiers.at(-1)) === spec);
@@ -92,7 +144,7 @@ export function migrate(text, map, file = 'input.ts') {
 
 export function main(args) {
     if (args.includes('--help') || args.length === 0) {
-        console.log('Usage: node node_modules/wenay-react2/scripts/migrate-root-imports.mjs [--check | --write] <files/directories...>\nDefault: preview only. --check: fail if migration is needed. --write: edit only if every input is supported.\nSkips symlinks, node_modules, .git, dist, build and coverage. Review string/regex import-contract tests manually.');
+        console.log('Usage: node node_modules/wenay-react2/scripts/migrate-root-imports.mjs [--check | --write] <files/directories...>\nMoves root imports to canonical subpaths and applies the 4.0.0 renames as `{new as old}`.\nDefault: preview only. --check: fail if migration is needed. --write: edit only if every input is supported.\nSkips symlinks, node_modules, .git, dist, build and coverage. Review string/regex import-contract tests manually.');
         return 0;
     }
     const flags = args.filter(arg => arg.startsWith('--'));

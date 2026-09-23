@@ -36,7 +36,8 @@ const mapWait = new Map<object, ReturnType<typeof createThrottle>>();
 
 /** The raw registries used to be exported. They are implementation detail - a consumer holding
  *  map3 can corrupt the reentrancy flags - so 2.0.0 keeps them module-private and exposes only
- *  this read-only probe for the tests that assert on the version counter. */
+ *  this read-only probe for the tests that assert on the version counter (off the public
+ *  ./react entry since 4.0.0). */
 export function __observerStateForTests(obj: object): Readonly<ObserverState> | undefined {
     return map3.get(obj);
 }
@@ -151,7 +152,7 @@ export function renderBy(a: object, ms?: number) {
     schedule(a, ms);
 }
 
-export function renderByRevers(a: object, ms?: number, reverse = true) {
+export function renderByReverse(a: object, ms?: number, reverse = true) {
     schedule(a, ms, reverse);
 }
 
@@ -231,7 +232,7 @@ export function createUpdateApi<T extends object>(obj: T): UpdateApi<T> {
         object: obj,
         emit(ms?: number) { renderBy(obj, ms); },
         render(ms?: number) { renderBy(obj, ms); },
-        renderReverse(ms?: number, reverse = true) { renderByRevers(obj, ms, reverse); },
+        renderReverse(ms?: number, reverse = true) { renderByReverse(obj, ms, reverse); },
         renderLast(ms?: number) { renderByLast(obj, ms); },
         // 2.0.0: `on` used to own a THIRD listener channel (common2 `listen`, kept in its own
         // WeakMap) next to `listeners`/`callbacks`. It duplicated the imperative channel exactly,

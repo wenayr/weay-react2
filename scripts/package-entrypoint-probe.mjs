@@ -54,11 +54,18 @@ function validateExportConditions(manifest, label) {
 const sourceManifest = readJson(path.join(projectRoot, "package.json"));
 validateExportConditions(sourceManifest, "source package.json");
 
+// 4.0.0: no root entry. A stale main/types or "." would resolve to files the build no longer emits.
+function assertNoRoot(manifest, label) {
+    assert(!("." in (manifest.exports ?? {})) && manifest.main === undefined && manifest.types === undefined,
+        `${label}: the root entry was removed in 4.0.0 (no "." export, main or types)`);
+}
+assertNoRoot(sourceManifest, "source package.json");
+
 for (const [subpath, source] of Object.entries(canonicalEntries)) {
     assert(sourceManifest.exports?.[subpath], `source package.json: missing ${subpath}`);
     const text = fs.readFileSync(path.join(projectRoot, source), "utf8");
     assert(!/^\s*export\s+\*/m.test(text), `${source}: canonical entrypoints must use explicit exports`);
-    // 3.0.0: FResizableReact / mapResiReact left this list - ./ui is their canonical home now
+    // ResizableBox / resizableSizeMap (FResizableReact / mapResiReact before 4.0.0) live in ./ui
     assert(!/(?:[/\\]demo[/\\]|OutlineDragDemo|logsContext|components[/\\]Dnd[/\\]DragArea)/.test(text),
         `${source}: canonical entrypoint contains a demo or compatibility export`);
 }
@@ -68,6 +75,7 @@ const distManifestFile = path.join(distRoot, "package.json");
 assert(fs.existsSync(distManifestFile), "dist/package.json is missing; run npm run build first");
 const distManifest = readJson(distManifestFile);
 validateExportConditions(distManifest, "dist/package.json");
+assertNoRoot(distManifest, "dist/package.json");
 assert(JSON.stringify(distManifest.exports) === JSON.stringify(sourceManifest.exports),
     "dist/package.json exports differ from the source manifest");
 
@@ -82,4 +90,4 @@ for (const [subpath, target] of Object.entries(distManifest.exports)) {
     }
 }
 
-console.log(`checks: ${Object.keys(canonicalEntries).length} canonical entrypoints; explicit surfaces; dist runtime/types targets`);
+console.log(`checks: ${Object.keys(canonicalEntries).length} canonical entrypoints; no root entry; explicit surfaces; dist runtime/types targets`);

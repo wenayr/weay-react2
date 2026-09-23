@@ -35,7 +35,7 @@ function ButtonBase({children, button, style = {}, className = "", state: [a, se
 }
 
 export function Button({keyForSave, statusDef, outClick, ...data}: ButtonProps) {
-    // keyForSave means the same thing here as on FloatingWindow and FResizableReact: the state
+    // keyForSave means the same thing here as on FloatingWindow and ResizableBox: the state
     // rides an ObservableMap registered in memoryCache, and the APP decides when storage is
     // written. This used to be a private module object instead - a second, undeclared
     // persistence path that PROJECT_FUNCTIONALITY lists under Non-Goals ("a hidden persistence

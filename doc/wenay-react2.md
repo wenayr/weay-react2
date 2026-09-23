@@ -1,6 +1,8 @@
 # wenay-react2 - BRIEF cheat sheet (canonical UI/controller API)
 
-> Import canonical subpaths (`wenay-react2/react`, `/grid`, etc.); the root is deprecated.
+> New to the package? Start with [QUICKSTART.md](QUICKSTART.md).
+
+> Import canonical subpaths (`wenay-react2/react`, `/grid`, etc.); 4.0.0 has no root entry.
 > Notation: `name(args) -> ret`. JSX examples show the intended public path, not every prop.
 > Short controller-style names are canonical. Removed names are recorded in
 > **WENAY_REACT2_RENAMES.md** for migration only; old aliases are not exported.
@@ -20,10 +22,10 @@ Put app-specific layout/build rules in an app wrapper above the primitive.
 
 ## Package entrypoints
 
-Since 3.0.0 every runtime name has a canonical subpath. The root `wenay-react2` is a
-deprecated compatibility union of the subpaths (same bindings, trimmed in the next major);
-the CSS is still imported once: `import "wenay-react2/styles"`. Map for root code:
-`WENAY_REACT2_RENAMES.md`, "3.0.0 entry map".
+Every runtime name lives on one or more subpaths below; 4.0.0 removed the root `wenay-react2`
+(the deprecated compatibility union of 3.x). The CSS is imported once:
+`import "wenay-react2/styles"`. Moving old code: `WENAY_REACT2_RENAMES.md`, "4.0.0 migration
+cut" - one CLI run rewrites root imports and the 4.0.0 renames.
 
 - `wenay-react2/core` - tokens, callback hub, fixed-order helpers, `ObservableMap`, `structEqual`; no React.
   `import {structEqual, tokens} from "wenay-react2/core"`
@@ -47,7 +49,7 @@ the CSS is still imported once: `import "wenay-react2/styles"`. Map for root cod
   `import {contextMenu, DropdownMenu} from "wenay-react2/menu"`
 - `wenay-react2/chart` - `Sparkline` and the canvas chart engine factories.
   `import {Sparkline, createChartEngine} from "wenay-react2/chart"`
-- `wenay-react2/ui` - button family, `OutsideClickArea`, `Overlay`, `FResizableReact`, `createUiSlot`, `createToolbar`, `SettingsDialog`.
+- `wenay-react2/ui` - button family, `OutsideClickArea`, `Overlay`, `ResizableBox`, `createUiSlot`, `createToolbar`, `SettingsDialog`.
   `import {Button, createToolbar, SettingsDialog} from "wenay-react2/ui"`
 - `wenay-react2/native` - the DOM/CSS/ag-grid-free React Native entrypoint (`doc/native.md`).
   `import {createNativeColumnState} from "wenay-react2/native"`
@@ -62,7 +64,7 @@ updateBy(obj) / useUpdateBy(obj)                 // subscribe current component 
 updateBy(obj, cb)                                // imperative callback instead of a re-render;
                                                  //   cb goes through a ref - inline identity is fine
 renderBy(obj, ms?)                               // emit render for subscribers
-renderByRevers(obj, ms?, reverse?=true)          // reverse/last affect ONLY React subscribers;
+renderByReverse(obj, ms?, reverse?=true)          // reverse/last affect ONLY React subscribers;
 renderByLast(obj, ms?)                           //   updateBy(obj, cb) callbacks always all run first
 
 const state = { count: 0 }
@@ -76,9 +78,9 @@ const api2 = useUpdateByApi(state)               // hook + controller in one cal
 
 Persistent process memory:
 ```
-memoryGetOrCreate(key, def, {abs?, deepAutoMerge?, reversDeep?}) -> def-or-stored
+memoryGetOrCreate(key, def, {abs?, deepAutoMerge?, reverseDeep?}) -> def-or-stored
 memoryGetById(key, def, id) -> stored only while id is the same
-memorySet(key, data)
+memorySetIfAbsent(key, data)                     // keeps an existing entry (memorySet before 4.0.0)
 memoryGet(key)
 memoryUpdate(key, mutate) -> cur?               // mutate + rerender + announce in one call
 memoryMarkDirty(key)                            // announce an in-place mutation of a memoryGetOrCreate object
@@ -87,7 +89,7 @@ memoryMaps                                       // rnd / resize / other maps
 ```
 
 Persistence contract (memoryCache): the library NEVER writes storage by itself. The persisted maps
-(floatingWindowMap, mapResiReact, mapRightMenu, memoryProps) are `ObservableMap`s - set/delete/clear
+(floatingWindowMap, resizableSizeMap, rightMenuMap, memoryProps) are `ObservableMap`s - set/delete/clear
 announce themselves, in-place mutations are announced at the commit points (drag/resize stop,
 menu drag end, setPlace). memoryCache observes the maps it owns; the app owns the write policy:
 ```
@@ -123,7 +125,7 @@ createCacheMapWithStorage(memoryMaps, storage: CacheStorage)  // storage adapter
 ```
 The block is storage-neutral: `localStorageCache` is the browser default, and a React Native
 host supplies an AsyncStorage-shaped `CacheStorage` object instead (`doc/native.md`). The
-persisted maps (`floatingWindowMap`, `mapResiReact`, `mapRightMenu`, `buttonStatusMap`) and
+persisted maps (`floatingWindowMap`, `resizableSizeMap`, `rightMenuMap`, `buttonStatusMap`) and
 the saved-state types are exported from here; `./react` keeps re-exporting the memory names.
 
 ## Outside Click / Buttons
@@ -136,7 +138,7 @@ outside.contains(event.target)
 
 <OutsideClickArea outsideClick={close} status={open}>...</OutsideClickArea>
 
-<Button button={<button>Open</button>} outClick keyForSave?>{...}</Button>   // keySave = deprecated alias
+<Button button={<button>Open</button>} outClick keyForSave?>{...}</Button>
 <OutsideButton button={...}>{...}</OutsideButton>
 <HoverButton button={...}>{...}</HoverButton>
 <AbsoluteButton button={...}>{...}</AbsoluteButton>
@@ -154,7 +156,7 @@ size.getSize()                                   // live getter (exact, no rende
 
 setResizeableElement(el) / removeResizeableElement(el)   // legacy imperative auto-shrink path, unchanged
 ```
-Both hooks ride the same module-level `CResizeObserver` singleton (one native `ResizeObserver` for the whole app). QA card 19.
+Both hooks ride the same module-level `ResizeObserverHub` singleton (one native `ResizeObserver` for the whole app). QA card 19.
 
 ## Drag / Floating Windows
 ```
@@ -284,7 +286,7 @@ const tb = createToolbar({key, items: [{key, title, icon?, short?, render?, onCl
 tb.api.useConfig() / getConfig() / setConfig(next) / setOrder(order) / show(key,on) / setDensity(key) / reset()
 tb.api.showSettings(on) / showReset(on)             // pseudo-controls visibility
 tb.api.useItems()            // headless bar: ordered visible [{item, density, content}] - custom markup
-tb.api.onChange.on(cfg => ...) -> off        // fires on every edit
+tb.api.onChange.on(cfg => ...) -> off        // fires on every edit; a read-only view (no emit/close since 4.0.0)
 tb.api.dispose()             // release the external-source subscription (HMR/remounts); persisted config stays
 
 registerToolbarDensity({key, name, renderItem?}) -> unregister   // built-ins: 'icon', 'label'
@@ -424,7 +426,7 @@ cs.columns                                       // the descriptors (UI renders 
 cs.api.useConfig() / getConfig() / setConfig(next) / reset()
 cs.api.show(key, on) / move(order) / setSort({key, dir} | null) / toggleSort(key)   // asc->desc->off
 cs.api.visibleKeys()                             // keys to render, in order (group-gated)
-cs.api.onChange.on(cfg => ...) -> off
+cs.api.onChange.on(cfg => ...) -> off            // read-only subscription view (4.0.0), fits useListenEffect
 cs.api.usePresent() / isPresent(key) / setPresent(keys | null)   // live-grid presence
 cs.api.getPresentGate() / setPresentGate(keys | null)           // app runtime availability gate, not persisted
 cs.api.listSource                                // {order, visible} slice as a Toolbar `source`
@@ -483,7 +485,7 @@ const cg = createColumnGrid<Row>({
 <cg.Toolbar settings />
 <cg.Settings />
 ```
-`createColumnGrid` returns `{state, toolbar, chrome, api, grid, tableProps, Table, Menu, Dots, Cards, Toolbar, Settings, Chrome, View, dispose}`; `dispose()` releases factory-lifetime subscriptions (config onChange, toolbar source, pending fit) without touching the persisted config. The columnState BARREL stays ag-grid-free; `createColumnGrid` ships from its own module (both are exported from the package root).
+`createColumnGrid` returns `{state, toolbar, chrome, api, grid, tableProps, Table, Menu, Dots, Cards, Toolbar, Settings, Chrome, View, dispose}`; `dispose()` releases factory-lifetime subscriptions (config onChange, toolbar source, pending fit) without touching the persisted config. The columnState BARREL stays ag-grid-free; `createColumnGrid` ships from its own module (both are on `wenay-react2/grid`).
 Its `Table`/`tableProps()` attach/detach the columnState grid adapter automatically and default
 `autoSizeColumns=false` so restored widths are not overwritten. `autoSizeOnColumnCountChange` is
 separate and only calls `sizeColumnsToFit()` when the visible column count changes. `useColumnGrid(opts)`
@@ -523,10 +525,12 @@ QA cards 28 (grid layer + F5 restore), 29 (mobile dots + cards), 30 (toolbar ico
 
 ## Observe React Adapter
 `wenay-common2` owns the store/listen/RPC primitives. `wenay-react2` owns React lifecycle hooks around them.
+Since common2 3.0.0 the exchange data (`Bars`, `CQuotesHistory*`, `OHLC`, ...) comes from `wenay-exchange`
+(a peer next to common2); import it from there, this package does not re-export it.
 
 ```ts
 import { Observe } from "wenay-common2"
-import { useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenValue } from "wenay-react2"
+import { useStoreMirror, useStoreNode, useStoreKeys, useStoreSelect, useStoreChangedPaths, useListenEffect, useListenValue } from "wenay-react2/react"
 ```
 
 Node subscription:
@@ -647,7 +651,7 @@ already-created resource to React:
 ```tsx
 import * as Ai from "wenay-common2/ai"
 import * as Resource from "wenay-common2/resource"
-import {useAiRunClient, useFileJobClient} from "wenay-react2"
+import { useAiRunClient, useFileJobClient } from "wenay-react2/react"
 
 const aiClient = Ai.createAiRunClient({remote: rpc.func.ai})
 const fileClient = Resource.createFileJobClient({remote: rpc.func.files})
@@ -674,7 +678,7 @@ one stable logical slot:
 
 ```tsx
 import {Contract} from "wenay-common2"
-import {useContractSlot} from "wenay-react2"
+import { useContractSlot } from "wenay-react2/react"
 
 const runtime = Contract.createContractRuntime({offers, policy})
 await runtime.control.require(editorDemand)
@@ -764,7 +768,7 @@ while preserving the normal `keepSeq` resume policy. QA card 55 demonstrates thi
 inventory, configurable chunks and a progress bar.
 
 ```ts
-import { useReplaySubscribe, useReplayRouteSubscribe, useStoreReplaySync, useStoreReplayMirror, useStoreReplayRouteSync, useStoreReplayRouteMirror, useStoreReplayEach, useReplayFrame, useReplayHistory } from "wenay-react2"
+import { useReplaySubscribe, useReplayRouteSubscribe, useStoreReplaySync, useStoreReplayMirror, useStoreReplayRouteSync, useStoreReplayRouteMirror, useStoreReplayEach, useReplayFrame, useReplayHistory } from "wenay-react2/react"
 
 // any replay line ({line, since, keyframe, frame?, frameLine?} remote)
 const sub = useReplaySubscribe(remote, (frame) => draw(frame), {onSeq?, onError?, since?, enabled?, staleMs?, onStale?, policy?, hint?})
@@ -822,14 +826,14 @@ Media lines (common2 1.0.66 `Media.createAudioSource` / `Media.createVideoSource
 ## Communication UI
 `VideoCall` styles ship separately: `import "wenay-react2/styles/communication"` once, next to `wenay-react2/styles`.
 ```tsx
-import {VideoCall, useVideoCallController} from "wenay-react2"
-// or the independent entry: wenay-react2/communication
+import { VideoCall, useVideoCallController, videoCallLabelsEn } from "wenay-react2/communication"
 
 const phase = call.active ? "active" : call.ringing ? "ringing" : "lobby"
 const ui = useVideoCallController({phase, speakerId: participants[0].id})
 
 <VideoCall
   controller={ui}
+  labels={videoCallLabelsEn}     // optional; any Partial<VideoCallLabels>, Russian by default
   phase={phase}
   meeting={meeting}
   participants={participants}
@@ -853,9 +857,9 @@ const ui = useVideoCallController({phase, speakerId: participants[0].id})
   onAssistantCommand={assistant.run}
 />
 ```
-`VideoCall` is the second communication layer: a controlled product surface based on the call design, not a second protocol. The app owns call authorization, participant/room truth, capture, relay/direct routes, translation service, recording policy and canvas/video attachment. `useVideoCallController` owns only visual state (`panel`, `focusMode`, `layout`, `speakerId`, poll/effect/drafts, laser pointer, elapsed timer and inactivity-hiding controls). The shipped `videoCallShowcase.tsx` adapter demonstrates the boundary with real `Peer.createCallManager`, `Peer.createMediaRelay`, `usePeerCalls`, `useMediaSource`, `getDisplayMedia`, `MediaRecorder` and optional Web Speech recognition. The package does not embed an AI vendor or secret: production caption translation is supplied by the application; the stand uses a deterministic RU → EN fixture.
+`VideoCall` is the second communication layer: a controlled product surface based on the call design, not a second protocol. The app owns call authorization, participant/room truth, capture, relay/direct routes, translation service, recording policy and canvas/video attachment. `useVideoCallController` owns only visual state (`panel`, `focusMode`, `layout`, `speakerId`, poll/effect/drafts, laser pointer, elapsed timer and inactivity-hiding controls). Every visible and assistive text comes from `labels` (4.0.0): missing keys fall back to `videoCallLabelsRu`, and `videoCallLabelsEn` is a complete English set. `assistantCommands` are sent verbatim to `onAssistantCommand`, so the app's command parser must use the same language (QA card 60). The repository sketch `src/stand/demo/videoCallShowcase.tsx` (not published, not mounted by the stand) wires the boundary with real `Peer.createCallManager`, `Peer.createMediaRelay`, `usePeerCalls`, `useMediaSource`, `getDisplayMedia`, `MediaRecorder` and optional Web Speech recognition. The package does not embed an AI vendor or secret: production caption translation is supplied by the application; the stand uses a deterministic RU → EN fixture.
 
-The working application composition lives in `src/calls/VideoMeetingPlatform.tsx`; its development backend is registered in `vite.config.ts` at `/__video-call-rpc`. Unlike the lower-level showcase, it provides the complete create-link/name/join/leave/end lifecycle and uses the public `VideoCall` surface for the in-room UI. Camera, microphone and screen permissions are requested only from explicit user controls. A production deployment must run the same room/RPC authority behind HTTPS/WSS and size its relay or SFU for the intended concurrency.
+The working application composition lives in `src/stand/calls/VideoMeetingPlatform.tsx` (repository only, not published); its development backend is registered in `vite.config.ts` at `/__video-call-rpc`. Unlike the lower-level showcase, it provides the complete create-link/name/join/leave/end lifecycle and uses the public `VideoCall` surface for the in-room UI. Camera, microphone and screen permissions are requested only from explicit user controls. A production deployment must run the same room/RPC authority behind HTTPS/WSS and size its relay or SFU for the intended concurrency.
 
 Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. The reconnect contract introduced in `wenay-common2@1.0.75` remains in 2.x: a temporary RPC transport disconnect/reconnect keeps the same logical `remote`, common2 rebinds its physical Listen subscription, catches up from its own last delivered seq, and deduplicates racing live events. React must not call `restart()`, remount, change a key, or add Socket.IO listeners for that case. `policy: "queue"` is the lossless choice; `"frame"` is deliberately conflated. A retained-history gap without a keyframe is a terminal `error`, not a fresh start. Deliberate `client.dispose()`/`close()` and hub `connect()`/`setToken()` are hard teardown boundaries, not auto-reconnects. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. Freshness: detection lives in wenay-common2 (`staleMs` watchdog); the non-route hooks mirror its edge-triggered `onStale` into `stale`, so a fresh 100 ev/s line causes zero extra renders. Route hand-off is explicit through `switchRoute(nextRemote, {label?, since?, reset?, policy?, hint?})`: old route stays live while the replacement catches up by `seq`, then closes. `useReplayHistory` is archive playback — staleness does not apply. QA cards 23 (video line + conflation + time travel + freshness), 24 (Store Replay V2), 33 (per-key feed), and 34 (route hand-off) are the live examples.
 
@@ -920,8 +924,8 @@ Shared CSS variables include `--menu-outline-color`, `--logs-*`, `--dlg-*`, `--w
   {key: "ask", data: row.askHistory, color: "#cf222e", show: showAsk},
 ]} />
 
-<MyChartEngine style={{height: 400}} />
-createChartCanvas(config) -> canvas controller
+const engine = createChartEngine(canvas)        // low-level canvas engine, app-owned wrapper
+engine.init(); engine.createDataSet(params); engine.addPanel(config); engine.destroy()
 ```
 
 `Sparkline` is the canonical non-interactive chart for compact rows. Its own root
@@ -950,8 +954,10 @@ Migration from a local `CMiniGraph`:
 
 Keep `data` and `series` references stable between unrelated React renders (for
 example with `useMemo`) so a table redraw happens only when its values change.
-The older chart engine surface remains low-level, and `MyChartEngine` remains a
-demo; neither is used by `Sparkline`.
+The chart engine surface (`createChartEngine` and its data set / panel / renderer /
+interaction factories) remains low-level and is not used by `Sparkline`; product apps
+wrap it in their own component. `MyChartEngine` and `createChartCanvas` were removed in
+2.0.0 (`doc/WENAY_REACT2_RENAMES.md`).
 
 ## QA Stand
 ```

@@ -2,6 +2,7 @@
 
 Documentation index only.
 
+- Start here: [doc/QUICKSTART.md](doc/QUICKSTART.md)
 - Brief API guide: [doc/wenay-react2.md](doc/wenay-react2.md)
 - React Native/headless entrypoint: [doc/native.md](doc/native.md)
 - Detailed / rare API guide: [doc/wenay-react2-rare.md](doc/wenay-react2-rare.md)

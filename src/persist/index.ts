@@ -8,8 +8,8 @@
  *    React Native (or any other host) plugs in by supplying an object with the same three
  *    async methods over AsyncStorage/SQLite/a server - the block itself never touches the DOM.
  *  - `memoryCache` - the module-level registry: one CacheMap over the persisted maps below
- *    (floatingWindowMap, mapResiReact, mapRightMenu, buttonStatusMap) plus the free-form
- *    `memoryProps` slot behind memoryGetOrCreate/memorySet/memoryUpdate. Components import
+ *    (floatingWindowMap, resizableSizeMap, rightMenuMap, buttonStatusMap) plus the free-form
+ *    `memoryProps` slot behind memoryGetOrCreate/memorySetIfAbsent/memoryUpdate. Components import
  *    their map from here; the app wires load/save once with `useCacheMapPersistence`.
  *
  *  `createPersistedController` is the idiom on top of memoryProps: read-or-create, an updateBy
@@ -39,15 +39,15 @@ export {
     memoryGetById,
     memoryGetOrCreate,
     memoryMarkDirty,
-    memorySet,
+    memorySetIfAbsent,
     memoryUpdate,
 } from "../internal/persist/memoryStore.js";
 
 export {
     buttonStatusMap,
     floatingWindowMap,
-    mapResiReact,
-    mapRightMenu,
+    resizableSizeMap,
+    rightMenuMap,
 } from "../internal/persist/persistedMaps.js";
 export type {
     ButtonSavedState,

@@ -1,6 +1,6 @@
 // Grid cell-style concerns for agGrid4: the default inline cellStyle and the
 // cell class-rule signature. Lived in styles/styleGrid.ts before; styleGrid.ts
-// re-exports both so the root public names survive.
+// re-exports both so the public names on ./grid survive.
 import type {CSSProperties} from "react";
 import type {CellClassParams} from "ag-grid-community";
 

@@ -10,6 +10,7 @@ It should say where the important files are, not teach the API, duplicate exampl
 
 Canonical documentation locations:
 
+- `doc/QUICKSTART.md` - the start page: install, six everyday snippets, which state model to use. Its snippets are compiled by `__test/quickstart.types.tsx`; change both together.
 - `doc/wenay-react2.md` - brief everyday API for this package.
 - `doc/wenay-react2-rare.md` - detailed, rare, compatibility, and migration notes for this package.
 - `doc/PROJECT_FUNCTIONALITY.md` - project functionality map: what each subsystem is for and what belongs outside the library.
@@ -51,7 +52,7 @@ If the package is updated, read the changelog from the newly installed package b
 ## Generated Declarations
 
 - `lib/**/*.d.ts` files are generated artifacts. Never edit them by hand.
-- For a compact public-surface overview, read `lib/index.d.ts`,
+- For a compact public-surface overview, read `lib/<entry>/index.d.ts`,
   `lib/native/index.d.ts`, or the matching generated entrypoint before
   traversing implementation files.
 - Treat declarations as an export/type map, not as evidence of runtime
@@ -78,7 +79,7 @@ Rules:
 - The version name is mandatory and must be visible in the file title.
 - Write the entry like a commit summary: what changed, why it matters, and how it was checked.
 - If several related changes land before the next publish, append them to the same version file.
-- Keep the latest 10 ordinary version files in `doc/changes/`, plus permanent major migration notes (`v2.0.0.md`, `v3.0.0.md`, and future breaking-major guides). Never prune a major migration note referenced by RENAMES; older ordinary release notes may be pruned.
+- Keep the latest 10 ordinary version files in `doc/changes/`, plus permanent major migration notes (`v2.0.0.md`, `v3.0.0.md`, `v4.0.0.md`, and future breaking-major guides). Never prune a major migration note referenced by RENAMES; older ordinary release notes may be pruned.
 - Do not move old release notes into `README.md`.
 
 ## QA Stand

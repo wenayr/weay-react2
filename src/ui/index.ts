@@ -1,6 +1,6 @@
 /** `wenay-react2/ui` (3.0.0) - the generic UI block: the persisted toggle-button family
  *  (Button, HoverButton, OutsideButton, AbsoluteButton, MiniButton, PopupButton), the outside-
- *  click area and Overlay, the persisted re-resizable wrapper (FResizableReact + mapResiReact)
+ *  click area and Overlay, the persisted re-resizable wrapper (ResizableBox + resizableSizeMap)
  *  and the resize-handle helpers, the UiSlot mount-point registry, the customizable Toolbar with
  *  its density registry, and the SettingsDialog with its section registry. Depends on ./react,
  *  ./windows (SettingsDialog hosts itself in FloatingWindowBase, so react-rnd is part of this
@@ -12,7 +12,7 @@ export {OutsideClickArea} from "../internal/components/OutsideClickArea.js";
 export {Overlay} from "../internal/components/Overlay.js";
 export type {OverlayProps} from "../internal/components/Overlay.js";
 export {removeResizeableElement, setResizeableElement} from "../internal/components/MyResizeObserver.js";
-export {FResizableReact, mapResiReact} from "../internal/components/Dnd/Resizable.js";
+export {ResizableBox, resizableSizeMap} from "../internal/components/Dnd/Resizable.js";
 export {createUiSlot} from "../internal/components/UiSlot/UiSlot.js";
 export {
     createToolbar,

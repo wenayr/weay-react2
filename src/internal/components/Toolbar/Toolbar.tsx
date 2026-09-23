@@ -7,6 +7,7 @@ import {movedOrderWithFixed} from '../../utils/fixedOrder.js'
 import {normalizeToolbarConfig, sameOrder, sourceKeySet, RESET_KEY, SETTINGS_KEY, type ToolbarListConfig} from './toolbarConfig.js'
 import {OutsideClickArea} from '../OutsideClickArea.js'
 import {useReorder} from '../../hooks/useReorder.js'
+import type {ListenLike} from '../../hooks/useObserveStore.js'
 
 /** createToolbar - a customizable, self-describing toolbar primitive.
  *  Three decoupled layers: config (plain serializable data, persisted via
@@ -225,6 +226,8 @@ export function createToolbar(opts: {
     const st = persisted.state
     const stApi = persisted.api
     const [emitChange, onChange] = createListen<[ToolbarConfig]>()
+    // 4.0.0: a subscription view instead of the raw listen api (no emit/close from outside)
+    const changes: ListenLike<[ToolbarConfig]> = {on: (cb, o) => onChange.on(cb, o?.key !== undefined ? {key: o.key} : undefined)}
     // ext is fixed for the controller's lifetime, so hook call order inside
     // useConfig/Bar/Settings never changes for a given toolbar instance
     const ext = opts.source
@@ -522,6 +525,6 @@ export function createToolbar(opts: {
     return {
         Bar,
         Settings,
-        api: {useConfig, useItems, getConfig, setConfig, setOrder, show, setDensity, showSettings, showReset, reset, onChange, dispose},
+        api: {useConfig, useItems, getConfig, setConfig, setOrder, show, setDensity, showSettings, showReset, reset, onChange: changes, dispose},
     }
 }

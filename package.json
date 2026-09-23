@@ -1,15 +1,13 @@
 {
   "name": "wenay-react2",
-  "version": "3.5.1",
+  "version": "4.0.0",
   "description": "Common react",
   "type": "module",
   "strict": true,
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
   "scripts": {
     "testjest": "jest",
     "test": "jest --runInBand && npm run test:migration",
-    "test:migration": "npm run types:generate && node scripts/generate-root-barrel.mjs && node --test scripts/migrate-root-imports.test.mjs && node scripts/root-deprecation-probe.mjs",
+    "test:migration": "npm run types:generate  &&  node --test scripts/migrate-root-imports.test.mjs",
     "testjest2": "jest --clearCache",
     "update": "pnpm update --latest",
     "typecheck": "tsc -p tsconfig.qa-check.json --noEmit && tsc -p tsconfig.test.json --noEmit",
@@ -21,20 +19,22 @@
     "bundle:probe": "node scripts/ag-grid-bundle-probe.mjs",
     "package:probe": "node scripts/package-entrypoint-probe.mjs",
     "package:consumer": "node scripts/packed-consumer-probe.mjs",
-    "pack": "npm run build  &&  npm pack .\\dist",
+    "pack": "npm run build  &&  npm pack ./dist",
     "testReact": "vite",
-    "_publish": "npm publish .\\dist",
-    "_afterBuild": "node copyCompiledFiles.mjs .\\dist  &&  cd dist  &&  npm pkg delete scripts devDependencies private",
+    "_publish": "npm publish ./dist",
+    "_afterBuild": "node copyCompiledFiles.mjs ./dist  &&  cd dist  &&  npm pkg delete scripts devDependencies private",
     "_copyTypeSupport": "node copyTypeSupport.mjs",
-    "_checkGeneratedTypes": "tsc --ignoreConfig --noEmit --target ESNext --module ESNext --moduleResolution Bundler --jsx react-jsx --strict --skipLibCheck false lib/index.d.ts lib/native/index.d.ts lib/core/index.d.ts lib/react/index.d.ts lib/grid/index.d.ts lib/windows/index.d.ts lib/logs/index.d.ts lib/communication/index.d.ts lib/persist/index.d.ts lib/params/index.d.ts lib/modal/index.d.ts lib/menu/index.d.ts lib/chart/index.d.ts lib/ui/index.d.ts",
-    "_copyStyle": "xcopy /Y /S \".\\src\\style\\*.*\" \".\\dist\\lib\\style\\\"\n",
+    "_checkGeneratedTypes": "tsc --ignoreConfig --noEmit --target ESNext --module ESNext --moduleResolution Bundler --jsx react-jsx --strict --skipLibCheck false lib/native/index.d.ts lib/core/index.d.ts lib/react/index.d.ts lib/grid/index.d.ts lib/windows/index.d.ts lib/logs/index.d.ts lib/communication/index.d.ts lib/persist/index.d.ts lib/params/index.d.ts lib/modal/index.d.ts lib/menu/index.d.ts lib/chart/index.d.ts lib/ui/index.d.ts",
+    "_copyStyle": "node scripts/build-fs.mjs copy src/style dist/lib/style",
     "publish": "npm run _afterBuild && npm run _copyStyle &&  npm run _publish",
     "build & publish": "npm run build  &&  npm run _publish",
-    "_clearDir": "IF exist lib (rd /s /q lib)  &&  mkdir lib  &&  echo:"
+    "_clearDir": "node scripts/build-fs.mjs clean lib"
   },
   "files": [
     "lib/**/*",
     "doc/**/*",
+    "!doc/target/**",
+    "!doc/progress/**",
     "scripts/migrate-root-imports.mjs",
     "!**/*.tsbuildinfo"
   ],
@@ -44,26 +44,32 @@
   "author": "wenay",
   "license": "ISC",
   "peerDependenciesMeta": {
+    "@babel/parser": {
+      "optional": true
+    },
     "react-dom": {
       "optional": true
     }
   },
   "dependencies": {
-    "@babel/parser": "^7.29.8",
     "ag-grid-community": "^36.1.0",
     "ag-grid-react": "^36.1.0",
     "re-resizable": "^6.11.2",
     "react-rnd": "^10.5.3",
-    "wenay-common2": "^2.21.1"
+    "wenay-common2": "^3.0.0",
+    "wenay-exchange": "^1.0.0"
   },
   "peerDependencies": {
+    "@babel/parser": "^7.29.8",
     "ag-grid-community": "^36.1.0",
     "ag-grid-react": "^36.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "wenay-common2": "^2.21.1"
+    "wenay-common2": "^3.0.0",
+    "wenay-exchange": "^1.0.0"
   },
   "devDependencies": {
+    "@babel/parser": "^7.29.8",
     "@swc/core": "^1.16.1",
     "@swc/jest": "^0.2.39",
     "@testing-library/dom": "^10.4.1",
@@ -98,11 +104,6 @@
     ]
   },
   "exports": {
-    ".": {
-      "types": "./lib/index.d.ts",
-      "import": "./lib/index.js",
-      "default": "./lib/index.js"
-    },
     "./core": {
       "types": "./lib/core/index.d.ts",
       "import": "./lib/core/index.js",

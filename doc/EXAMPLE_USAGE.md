@@ -13,7 +13,7 @@ Prefer the highest-level primitive that owns the lifecycle you need. For reusabl
 
 Examples:
 
-- Use `useAgGrid` / `AgGridTable` before direct `applyGridRows`.
+- Use `useAgGrid` / `AgGridTable` before direct `api.applyTransaction` calls.
 - Use `createColumnState` before a local "visible columns" object.
 - Use `createToolbar({source})` before manually bridging toolbar and grid
   order.
@@ -51,20 +51,17 @@ When a replacement API is introduced:
 
 ## Imports
 
-Use root imports in consumer code:
+Import from the canonical subpaths in consumer code:
 
 ```ts
-import {
-    AgGridTable,
-    createColumnState,
-    createToolbar,
-    memoryCache,
-    useAgGrid,
-} from "wenay-react2"
+import { AgGridTable, createColumnState, useAgGrid } from "wenay-react2/grid"
+import { createToolbar } from "wenay-react2/ui"
+import { memoryCache } from "wenay-react2/persist"
 ```
 
-Use deep imports only inside this repository or when working on a local module
-that has no root export yet.
+There is no root `wenay-react2` entry since 4.0.0 (it was a deprecated compatibility union in
+3.x). Never import `lib/...` or `src/...` paths from consumer code: only the
+entries listed in `package.json#exports` are public.
 
 ## Style Standard
 
@@ -82,7 +79,7 @@ When changing styles:
 Use when the app wants persisted shared UI preferences.
 
 ```ts
-import { memoryCache } from "wenay-react2"
+import { memoryCache } from "wenay-react2/persist"
 
 memoryCache.load()
 
@@ -119,7 +116,7 @@ Standard:
 Use when React owns the full row list.
 
 ```tsx
-import { AgGridTable } from "wenay-react2"
+import { AgGridTable } from "wenay-react2/grid"
 import type { ColDef } from "ag-grid-community"
 
 type Row = { id: string; name: string; price: number }
@@ -164,7 +161,7 @@ Standard:
 Use when rows arrive as add/update/remove patches.
 
 ```tsx
-import { AgGridTable, useAgGrid } from "wenay-react2"
+import { AgGridTable, useAgGrid } from "wenay-react2/grid"
 import type { ColDef } from "ag-grid-community"
 import { useEffect } from "react"
 
@@ -211,7 +208,7 @@ Standard:
 Use when React owns which rows exist, but a stream updates values on those rows.
 
 ```tsx
-import { AgGridTable, createGridBuffer, useAgGrid } from "wenay-react2"
+import { AgGridTable, createGridBuffer, useAgGrid } from "wenay-react2/grid"
 import { useEffect, useState } from "react"
 
 type Row = { id: string; name: string; streamPrice?: number }
@@ -268,7 +265,7 @@ Use when a table has a stable base schema plus a variable set of dynamic
 column names.
 
 ```tsx
-import { AgGridTable, createColumnBuffer } from "wenay-react2"
+import { AgGridTable, createColumnBuffer } from "wenay-react2/grid"
 import type { ColDef, ColGroupDef } from "ag-grid-community"
 import { useState } from "react"
 
@@ -333,14 +330,8 @@ Standard:
 Use when one column config should drive multiple surfaces.
 
 ```tsx
-import {
-    AgGridTable,
-    CardList,
-    ColumnDots,
-    ColumnsMenu,
-    createColumnState,
-    createToolbar,
-} from "wenay-react2"
+import { AgGridTable, CardList, ColumnDots, ColumnsMenu, createColumnState } from "wenay-react2/grid"
+import { createToolbar } from "wenay-react2/ui"
 import type { ColDef } from "ag-grid-community"
 
 type Row = { id: string; name: string; price: number; qty: number }
@@ -423,7 +414,7 @@ Use when a normal grid should get the standard column menu, toolbar settings,
 and mobile card/table representation without hand-wiring every surface.
 
 ```tsx
-import { createColumnGrid } from "wenay-react2"
+import { createColumnGrid } from "wenay-react2/grid"
 import type { ColDef } from "ag-grid-community"
 
 type Row = { id: string; name: string; price: number; qty: number; note: string }
@@ -481,7 +472,7 @@ of small buttons. It reuses the existing column state; it never creates another
 column config or serializes domain rows itself.
 
 ```tsx
-import { createColumnGrid } from "wenay-react2"
+import { createColumnGrid } from "wenay-react2/grid"
 
 const ordersGrid = createColumnGrid<Order>({
     key: "orders.columns",
@@ -534,7 +525,7 @@ same fixed trigger slot and without coupling the library to an app header style.
 Use when a command strip has its own commands and user-configurable layout.
 
 ```tsx
-import { createToolbar } from "wenay-react2"
+import { createToolbar } from "wenay-react2/ui"
 
 const ordersToolbar = createToolbar({
     key: "orders.toolbar",
@@ -570,7 +561,7 @@ Standard:
 Use when app settings need a searchable tree.
 
 ```tsx
-import { SettingsDialog, registerSettingsSection, useSettingsDialogController } from "wenay-react2"
+import { SettingsDialog, registerSettingsSection, useSettingsDialogController } from "wenay-react2/ui"
 import { useEffect } from "react"
 
 const ColumnsSettings = columnsToolbar.Settings
@@ -630,7 +621,7 @@ Standard:
 Use `ParamsEditor` for the normal generated editor. Use `useParamsEditorController` only when the app needs a custom renderer over the same draft/debounce/expand contract.
 
 ```tsx
-import { ParamsEditor, useParamsEditorController } from "wenay-react2"
+import { ParamsEditor, useParamsEditorController } from "wenay-react2/params"
 
 export function DefaultParams({params, save}: {params: any; save: (next: any) => void}) {
     return <ParamsEditor params={params} onChange={save} onExpand={save} />
@@ -662,7 +653,7 @@ Standard:
 Use for right-click actions.
 
 ```tsx
-import { contextMenu } from "wenay-react2"
+import { contextMenu } from "wenay-react2/menu"
 
 export function RowSurface() {
     return (
@@ -701,7 +692,7 @@ Standard:
 Use `DropdownMenu` for the default floating action menu. Use `useRightMenuController` when the app needs its own DOM while keeping the same open/fixed/select/submenu state contract.
 
 ```tsx
-import { DropdownMenu, useRightMenuController } from "wenay-react2"
+import { DropdownMenu, useRightMenuController } from "wenay-react2/menu"
 
 const elements = [
     { label: "Columns", subMenuContent: () => <ColumnsPanel /> },
@@ -737,13 +728,14 @@ Why:
 Standard:
 
 - Do not duplicate right-menu hover/fixed/submenu timers in product code.
-- Keep persisted placement in `keyForSave` / `mapRightMenu`; do not create another store for the same menu.
+- Keep persisted placement in `keyForSave` / `rightMenuMap`; do not create another store for the same menu.
 ## Floating Settings Window
 
 Use when a settings editor needs to stay stable while the bar itself reflows.
 
 ```tsx
-import { FloatingWindow, FloatingWindowTaskbar, OutsideClickArea, WindowPortal } from "wenay-react2"
+import { FloatingWindow, FloatingWindowTaskbar, WindowPortal } from "wenay-react2/windows"
+import { OutsideClickArea } from "wenay-react2/ui"
 
 const OrdersToolbarSettings = ordersToolbar.Settings
 
@@ -816,7 +808,7 @@ Controller-first variant for custom chrome:
 ```tsx
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { useFloatingWindowController } from "wenay-react2"
+import { useFloatingWindowController } from "wenay-react2/windows"
 
 export function CustomFloatingPanel({ children }: { children: ReactNode }) {
     const wnd = useFloatingWindowController({
@@ -858,7 +850,7 @@ stacking context. Keep `FloatingWindow` as the normal path for standard draggabl
 Use when React needs a local mirror of a remote Observe store.
 
 ```tsx
-import { useStoreMirror, useStoreNode } from "wenay-react2"
+import { useStoreMirror, useStoreNode } from "wenay-react2/react"
 
 type State = { data: Record<string, number>; meta: { status: string } }
 
@@ -899,7 +891,7 @@ render and keep that same object through a temporary Socket.IO reconnect.
 
 ```tsx
 import { useRef } from "react"
-import { useReplaySubscribe } from "wenay-react2"
+import { useReplaySubscribe } from "wenay-react2/react"
 
 // Created once by the RPC/client setup, not during OrdersFeed render.
 // It remains the same object while its transport reconnects.
@@ -946,7 +938,8 @@ Standard:
 Use when a replay line carries store patches and the grid should update per key.
 
 ```tsx
-import { AgGridTable, useAgGrid, useStoreReplayEach } from "wenay-react2"
+import { AgGridTable, useAgGrid } from "wenay-react2/grid"
+import { useStoreReplayEach } from "wenay-react2/react"
 
 type Row = { id: string; price: number }
 type Rows = Record<string, Row>
@@ -996,7 +989,7 @@ Standard:
 Use for shared app-visible log output.
 
 ```tsx
-import { logsApi } from "wenay-react2"
+import { logsApi } from "wenay-react2/logs"
 
 logsApi.addLogs({
     id: "orders",
@@ -1015,7 +1008,7 @@ export function LogsPanel() {
 For headless custom log stores, use `createLogsController`; `getLogsApi` remains the compatibility entrypoint for the shared global logger:
 
 ```ts
-import { createLogsController } from "wenay-react2"
+import { createLogsController } from "wenay-react2/logs"
 
 const logs = createLogsController({options: {limit: 50, limitPer: 500}})
 logs.addLogs({id: "orders", time: new Date(), txt: "queued", var: 1})
@@ -1025,7 +1018,7 @@ logs.getLatest()
 For corner notifications, the compatibility wrapper is still the shortest path. Use the hook/controller layer when the app needs to place or restyle the notification chrome itself:
 
 ```tsx
-import { MessageEventLogsView, useMessageEventLogsController } from "wenay-react2"
+import { MessageEventLogsView, useMessageEventLogsController } from "wenay-react2/logs"
 
 export function CornerLogs() {
     const notifications = useMessageEventLogsController({maxVisible: 4})
@@ -1036,7 +1029,8 @@ export function CornerLogs() {
 For compact embedded log tables, use the MiniLogs hook/controller first when the parent needs grid control:
 
 ```tsx
-import { AgGridTable, MiniLogsTable, useMiniLogsTable } from "wenay-react2"
+import { AgGridTable } from "wenay-react2/grid"
+import { MiniLogsTable, useMiniLogsTable } from "wenay-react2/logs"
 
 type LogRow = { time: Date; id: string; var: number; txt: string; address?: string }
 
@@ -1087,14 +1081,14 @@ Current strong examples:
 - `qa.tsx` card 48 for common2 AI/file-job clients: a live Store/event transition beside the
   RPC-boundary ownership pattern for `useAiRunClient` and `useFileJobClient`.
 - `qa.tsx` cards 23-26 for Replay hooks.
-- `src/internal/grid/agGrid4/example.tsx` for `useAgGrid` / `AgGridTable` controller examples.
+- `src/stand/agGrid4Example.tsx` for `useAgGrid` / `AgGridTable` controller examples.
 - `qa.tsx` active cards for current work.
 
 Legacy or low-level examples:
 
-- `src/stand/testUseReact/useGrid.tsx` and archive card 5 use direct
-  `applyGridRows`. Keep this as regression coverage for the low-level helper,
-  but do not copy it as the first pattern for new grids.
+- Archive card 5 (`src/stand/testUseReact/useGrid.tsx`) keeps the old
+  `applyGridRows` transaction repro with the helper inlined; the public helper was
+  removed in 2.0.0. Keep it as regression coverage, but do not copy it as a pattern.
 - Archive cards may preserve old bug repros or compatibility paths. Their
   presence does not automatically make the shown API canonical.
 
@@ -1106,7 +1100,7 @@ When adding an example:
   the public connection from test wiring.
 - Name the owner of lifecycle/state.
 - Mention what the app still owns.
-- Prefer root imports.
+- Import from canonical subpaths (`wenay-react2/grid`, `/ui`, ...).
 - Avoid business-specific names in shared docs.
 - If the example is intentionally low-level, label it as low-level.
 
@@ -1115,7 +1109,7 @@ When adding an example:
 | Anti-pattern | Prefer | Reason |
 | --- | --- | --- |
 | Reusable behavior owned by a visual component | Headless `use*` hook or `create*` controller plus a thin component | Apps and stand cards can reuse lifecycle/state without copying JSX. |
-| Direct `applyGridRows` in new React UI | `useAgGrid` / `createGridBuffer` | Controller owns readiness, sync, detach, and remount behavior. |
+| Direct `api.applyTransaction` calls in new React UI | `useAgGrid` / `createGridBuffer` | Controller owns readiness, sync, detach, and remount behavior. |
 | Manual toolbar-grid order bridge | `createToolbar({source: columnState.api.listSource})` | One config should drive all views. |
 | Writing storage inside a primitive | `memoryCache.onDirty` in app startup | App owns persistence timing. |
 | One-off search history state in a component | `createSearchHistory({key})` | Search recall is reusable and publishes through memoryCache. |

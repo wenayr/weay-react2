@@ -17,12 +17,8 @@ const entries = {
         ModuleRegistry.registerModules(defaultAgGridModules)
         console.log(AgGridReact)
     `,
-    rootUtility: `
-        import {memoryCache} from './src/index.ts'
-        console.log(memoryCache)
-    `,
     wrapper: `
-        import {AgGridTable} from './src/index.ts'
+        import {AgGridTable} from './src/grid/index.ts'
         console.log(AgGridTable)
     `,
     canonicalCore: `
@@ -101,7 +97,6 @@ async function bundle(name, nodeEnv, minify = true) {
 
 const allCommunity = await bundle('allCommunity', 'production')
 const targeted = await bundle('targeted', 'production')
-const rootUtility = await bundle('rootUtility', 'production')
 const wrapper = await bundle('wrapper', 'production')
 const productionReadable = await bundle('wrapper', 'production', false)
 const developmentReadable = await bundle('wrapper', 'development', false)
@@ -120,20 +115,13 @@ const canonical = {
     ui: await bundle('canonicalUi', 'production'),
 }
 
-for (const [name, value] of Object.entries({allCommunity, targeted, rootUtility, wrapper}))
+for (const [name, value] of Object.entries({allCommunity, targeted, wrapper}))
     console.log(`${name}: ${value.bytes} raw / ${value.gzip} gzip`)
 for (const [name, value] of Object.entries(canonical))
     console.log(`canonical/${name}: ${value.bytes} raw / ${value.gzip} gzip`)
 
 if (targeted.bytes >= allCommunity.bytes || targeted.gzip >= allCommunity.gzip)
     throw new Error('Targeted AG Grid bundle must be smaller than AllCommunityModule')
-
-const utilityAgBytes = Object.values(rootUtility.result.metafile.outputs)
-    .flatMap(output => Object.entries(output.inputs ?? {}))
-    .filter(([path]) => /ag-grid-(community|react)/.test(path))
-    .reduce((sum, [, input]) => sum + input.bytesInOutput, 0)
-if (utilityAgBytes != 0)
-    throw new Error(`Root utility bundle contains ${utilityAgBytes} bytes of AG Grid`)
 
 if (productionReadable.text.includes('var AllCommunityModule'))
     throw new Error('Production wrapper bundle defines AllCommunityModule')
@@ -234,4 +222,4 @@ assertBoundary('ui', [
     /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
 ])
 
-console.log('checks: targeted smaller; root utility AG Grid-free; validation development-only; canonical boundaries isolated')
+console.log('checks: targeted smaller; validation development-only; canonical boundaries isolated')
