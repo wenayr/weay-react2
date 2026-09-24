@@ -21,11 +21,11 @@ importers:
         specifier: ^10.5.3
         version: 10.5.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       wenay-common2:
-        specifier: ^3.0.0
-        version: 3.0.0(@types/express@5.0.6)(express@5.2.1)(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6))
+        specifier: ^3.1.1
+        version: 3.1.1(@types/express@5.0.6)(express@5.2.1)(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6))
       wenay-exchange:
         specifier: ^1.0.0
-        version: 1.0.0(wenay-common2@3.0.0(@types/express@5.0.6)(express@5.2.1)(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6)))
+        version: 1.0.0(wenay-common2@3.1.1(@types/express@5.0.6)(express@5.2.1)(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6)))
     devDependencies:
       '@babel/parser':
         specifier: ^7.29.8
@@ -2648,8 +2648,8 @@ packages:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
     engines: {node: '>=12'}
 
-  wenay-common2@3.0.0:
-    resolution: {integrity: sha512-B/JnbJKk8xVMp7mO0oV3Fcb8jol3uuTRjvJd1r/xGe/hu8MDNT4VMyZyuKYACTPuJql81Gjg3cKCNErFmkdA+g==}
+  wenay-common2@3.1.1:
+    resolution: {integrity: sha512-9Bv+fbMmov2tNpAZAbyokavxMUQiFt+LxNac288oTb7lM3N5utKWQM9DnNzaphxiD7Bfcfz2RjnrNvg+gYKgVw==}
     engines: {node: '>=20.0.0'}
     hasBin: true
     peerDependencies:
@@ -5493,16 +5493,16 @@ snapshots:
 
   webidl-conversions@7.0.0: {}
 
-  wenay-common2@3.0.0(@types/express@5.0.6)(express@5.2.1)(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6)):
+  wenay-common2@3.1.1(@types/express@5.0.6)(express@5.2.1)(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6)):
     optionalDependencies:
       '@types/express': 5.0.6
       express: 5.2.1
       socket.io: 4.8.3(utf-8-validate@6.0.6)
       socket.io-client: 4.8.3(utf-8-validate@6.0.6)
 
-  wenay-exchange@1.0.0(wenay-common2@3.0.0(@types/express@5.0.6)(express@5.2.1)(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6))):
+  wenay-exchange@1.0.0(wenay-common2@3.1.1(@types/express@5.0.6)(express@5.2.1)(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6))):
     dependencies:
-      wenay-common2: 3.0.0(@types/express@5.0.6)(express@5.2.1)(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6))
+      wenay-common2: 3.1.1(@types/express@5.0.6)(express@5.2.1)(socket.io-client@4.8.3(utf-8-validate@6.0.6))(socket.io@4.8.3(utf-8-validate@6.0.6))
 
   whatwg-encoding@3.1.1:
     dependencies:

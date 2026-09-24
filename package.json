@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Common react",
   "type": "module",
   "strict": true,
@@ -56,7 +56,7 @@
     "ag-grid-react": "^36.1.0",
     "re-resizable": "^6.11.2",
     "react-rnd": "^10.5.3",
-    "wenay-common2": "^3.0.0",
+    "wenay-common2": "^3.1.1",
     "wenay-exchange": "^1.0.0"
   },
   "peerDependencies": {
@@ -65,7 +65,7 @@
     "ag-grid-react": "^36.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "wenay-common2": "^3.0.0",
+    "wenay-common2": "^3.1.1",
     "wenay-exchange": "^1.0.0"
   },
   "devDependencies": {

@@ -880,6 +880,34 @@ is an optional peer needed only by common2's server entries. Side effect: the `.
 `./params` entries, which pull the common2 client barrel for `Params`, are about 3.5 KB gzip
 smaller because the barrel no longer carries the exchange code.
 
+### common2 3.1.1
+
+The dependency and peer minimum is now `wenay-common2@^3.1.1` (3.0.1 security and correctness,
+3.1.0 performance, 3.1.1 Store engine memory). No new common2 API needs a React binding, and the
+hook signatures and imports are unchanged. What the hooks inherit:
+
+- `useStoreNode` / `useStoreKeys` on a leaf no longer go silent when the parent is deleted and
+  recreated inside one drain window (local writes, `node.replace(null)`, patch batches, replay tail
+  resume). Leaf subscriptions are also cheaper: a Store node costs about 200 B instead of 1.8 KB.
+- Since 3.1.0 a primitive-leaf subscription does not re-read raw writes that bypass the proxy or go
+  through an aliased branch. Write through the Store (`node.replace`, proxy assignments), as the
+  common2 consumer guide states; a `useStoreNode` on such a leaf otherwise keeps its old value.
+- `useStoreLazyLineMirror` / `useStoreLazyLineSync`: chunks carry detached values, so a mirror no
+  longer shares objects with an in-process host.
+- Replay: a consumer callback that throws during catch-up now releases its live subscription
+  instead of leaking it, and one bad live item no longer drops its micro-batch. Keep the callbacks
+  passed to `useReplaySubscribe` and the Store Replay hooks non-throwing.
+- Applications that render auth state: treat a session as downgraded once `auth()` answers
+  `ok: false`, not on the expiry notice alone (the notice and the downgrading map are separate
+  packets over long-polling).
+- Not used here: the service-leader token rules of 3.0.1 and the Replicated Map ordering change of
+  3.1.0 (`keys` subscribers before `onKey`).
+- Known upstream type gap (common2 3.1.1, "found, not changed"): `StoreReplayRemote` accepts only V2
+  batch tuples, so the Store Replay hooks do too; a `conflateReplay(exposed.replay)` remote needs a
+  cast until common2 widens the type.
+
+Size: `./logs` and `./params` grow by about 0.7 KB gzip (codec fast paths in the client barrel).
+
 ### Free-position drag keyboard (R4)
 
 `useDraggableApi` from `wenay-react2/react` accepts opt-in `keyboard: true` or
