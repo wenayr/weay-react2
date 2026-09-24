@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {exportMap, migrate, main, renamed} from './migrate-root-imports.mjs';
+import {exportMap, migrate, main, movedToCalls, renamed} from './migrate-root-imports.mjs';
 
 const map = exportMap();
 test('published names and duplicate priority are deterministic', () => {
@@ -33,6 +33,40 @@ test('4.0.0 removals are reported without a partial rewrite', () => {
     const input = "import { __observerStateForTests, renderByRevers } from 'wenay-react2/react';";
     const result = migrate(input, map);
     assert.match(result.diagnostics.join(), /__observerStateForTests was removed in 4\.0\.0/);
+    assert.equal(result.text, input);
+});
+test('5.0.0: the moved-name list is exactly what wenay-calls exports', () => {
+    const entry = fs.readFileSync(new URL('../packages/wenay-calls/src/index.ts', import.meta.url), 'utf8');
+    const exported = [...entry.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)]
+        .flatMap(match => match[1].split(',').map(name => name.trim()).filter(Boolean));
+    assert.deepEqual([...exported].sort(), [...movedToCalls].sort());
+    for (const name of movedToCalls) assert.equal(map.has(name), false, name);
+});
+test('5.0.0: root imports of call names go to wenay-calls, the rest to subpaths', () => {
+    const input = "import { VideoCall, structEqual, type VideoCallProps, usePeer as peer } from 'wenay-react2';";
+    const result = migrate(input, map);
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(result.text, "import { VideoCall, type VideoCallProps, usePeer as peer } from 'wenay-calls';\nimport { structEqual } from 'wenay-react2/core';");
+    assert.equal(migrate(result.text, map).changed, false);
+});
+test('5.0.0: moved modules keep the statement, including side-effect style imports', () => {
+    const input = 'import "wenay-react2/styles/communication"\nimport type { VideoCallProps } from "wenay-react2/communication"\nimport * as calls from "wenay-react2/communication"\nexport { PeerCallDemo } from "wenay-react2/demo/peer-media"\nimport "wenay-react2/styles"';
+    const result = migrate(input, map);
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(result.text, 'import "wenay-calls/styles"\nimport type { VideoCallProps } from "wenay-calls"\nimport * as calls from "wenay-calls"\nexport { PeerCallDemo } from "wenay-calls/demo/peer-media"\nimport "wenay-react2/styles"');
+    assert.equal(migrate(result.text, map).changed, false);
+});
+test('5.0.0: useRouteState leaves a ./react import, renames there still apply', () => {
+    const input = "import { useRouteState, renderByRevers, useStoreNode } from 'wenay-react2/react';";
+    const result = migrate(input, map);
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(result.text, "import { useRouteState } from 'wenay-calls';\nimport { renderByReverse as renderByRevers, useStoreNode } from 'wenay-react2/react';");
+    assert.equal(migrate(result.text, map).changed, false);
+});
+test('5.0.0: a dynamic import of a moved module is reported', () => {
+    const input = "const calls = await import('wenay-react2/communication');";
+    const result = migrate(input, map);
+    assert.match(result.diagnostics.join(), /dynamic/);
     assert.equal(result.text, input);
 });
 test('splits mixed import aliases and inline types, preserving quote and semicolon style', () => {

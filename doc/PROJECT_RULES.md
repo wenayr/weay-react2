@@ -17,6 +17,7 @@ Canonical documentation locations:
 - `doc/EXAMPLE_USAGE.md` - example usage standards: which primitive to choose, how to use it, and why.
 - `doc/WENAY_REACT2_RENAMES.md` - breaking rename map for this package.
 - `doc/changes/` - recent version changes.
+- `packages/wenay-calls/README.md` - the `wenay-calls` package doc; its "Changes" section is that package's change log.
 
 `wenay-common2` documentation is not canonical in this repository. When common2 behavior matters, read the installed package/module docs and summarize only the React-facing impact in `doc/wenay-react2.md` or `doc/wenay-react2-rare.md`.
 
@@ -79,8 +80,20 @@ Rules:
 - The version name is mandatory and must be visible in the file title.
 - Write the entry like a commit summary: what changed, why it matters, and how it was checked.
 - If several related changes land before the next publish, append them to the same version file.
-- Keep the latest 10 ordinary version files in `doc/changes/`, plus permanent major migration notes (`v2.0.0.md`, `v3.0.0.md`, `v4.0.0.md`, and future breaking-major guides). Never prune a major migration note referenced by RENAMES; older ordinary release notes may be pruned.
+- Keep the latest 10 ordinary version files in `doc/changes/`, plus permanent major migration notes (`v2.0.0.md`, `v3.0.0.md`, `v4.0.0.md`, `v5.0.0.md`, and future breaking-major guides). Never prune a major migration note referenced by RENAMES; older ordinary release notes may be pruned.
 - Do not move old release notes into `README.md`.
+
+## Packages
+
+This repository publishes two npm packages:
+
+- `wenay-react2` from the root: `npm run build`, then `npm publish ./dist`.
+- `wenay-calls` from `packages/wenay-calls`: `npm run build:calls` (tsc, stylesheet and
+  `scripts/calls-package-probe.mjs`), then `npm publish ./packages/wenay-calls`.
+
+`wenay-calls` must never import `wenay-react2`: two copies of the module-level state would split
+silently. `__test/barrelParity.test.ts` and the `calls` boundary of `scripts/ag-grid-bundle-probe.mjs`
+enforce it. The stand, tests, tsc and Vite resolve `wenay-calls` by name from source.
 
 ## QA Stand
 

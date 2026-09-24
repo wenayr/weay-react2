@@ -1,6 +1,6 @@
 {
   "name": "wenay-react2",
-  "version": "4.0.1",
+  "version": "5.0.0",
   "description": "Common react",
   "type": "module",
   "strict": true,
@@ -10,7 +10,7 @@
     "test:migration": "npm run types:generate  &&  node --test scripts/migrate-root-imports.test.mjs",
     "testjest2": "jest --clearCache",
     "update": "pnpm update --latest",
-    "typecheck": "tsc -p tsconfig.qa-check.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "typecheck": "tsc -p tsconfig.qa-check.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p packages/wenay-calls/tsconfig.json --noEmit",
     "build & watch": "npm run _clearDir  &&  npm run _copyTypeSupport  &&  tsc --watch",
     "build": "npm run _clearDir  &&  tsc --build --verbose  &&  npm run _copyTypeSupport  &&  npm run _checkGeneratedTypes  &&  npm run _afterBuild  && npm run _copyStyle  &&  npm run package:probe  &&  npm run package:consumer",
     "types:generate": "tsc -p tsconfig.json --emitDeclarationOnly  &&  npm run _copyTypeSupport  &&  npm run _checkGeneratedTypes",
@@ -24,11 +24,13 @@
     "_publish": "npm publish ./dist",
     "_afterBuild": "node copyCompiledFiles.mjs ./dist  &&  cd dist  &&  npm pkg delete scripts devDependencies private",
     "_copyTypeSupport": "node copyTypeSupport.mjs",
-    "_checkGeneratedTypes": "tsc --ignoreConfig --noEmit --target ESNext --module ESNext --moduleResolution Bundler --jsx react-jsx --strict --skipLibCheck false lib/native/index.d.ts lib/core/index.d.ts lib/react/index.d.ts lib/grid/index.d.ts lib/windows/index.d.ts lib/logs/index.d.ts lib/communication/index.d.ts lib/persist/index.d.ts lib/params/index.d.ts lib/modal/index.d.ts lib/menu/index.d.ts lib/chart/index.d.ts lib/ui/index.d.ts",
+    "_checkGeneratedTypes": "tsc --ignoreConfig --noEmit --target ESNext --module ESNext --moduleResolution Bundler --jsx react-jsx --strict --skipLibCheck false lib/native/index.d.ts lib/core/index.d.ts lib/react/index.d.ts lib/grid/index.d.ts lib/windows/index.d.ts lib/logs/index.d.ts lib/persist/index.d.ts lib/params/index.d.ts lib/modal/index.d.ts lib/menu/index.d.ts lib/chart/index.d.ts lib/ui/index.d.ts",
     "_copyStyle": "node scripts/build-fs.mjs copy src/style dist/lib/style",
     "publish": "npm run _afterBuild && npm run _copyStyle &&  npm run _publish",
     "build & publish": "npm run build  &&  npm run _publish",
-    "_clearDir": "node scripts/build-fs.mjs clean lib"
+    "_clearDir": "node scripts/build-fs.mjs clean lib",
+    "build:calls": "node scripts/build-fs.mjs clean packages/wenay-calls/lib  &&  tsc -p packages/wenay-calls/tsconfig.json  &&  node scripts/build-fs.mjs copy packages/wenay-calls/style packages/wenay-calls/lib/style  &&  node scripts/calls-package-probe.mjs",
+    "_publishCalls": "npm publish ./packages/wenay-calls"
   },
   "files": [
     "lib/**/*",
@@ -47,13 +49,17 @@
     "@babel/parser": {
       "optional": true
     },
+    "ag-grid-community": {
+      "optional": true
+    },
+    "ag-grid-react": {
+      "optional": true
+    },
     "react-dom": {
       "optional": true
     }
   },
   "dependencies": {
-    "ag-grid-community": "^36.1.0",
-    "ag-grid-react": "^36.1.0",
     "re-resizable": "^6.11.2",
     "react-rnd": "^10.5.3",
     "wenay-common2": "^3.1.1",
@@ -80,6 +86,8 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^6.1.0",
+    "ag-grid-community": "^36.1.0",
+    "ag-grid-react": "^36.1.0",
     "esbuild": "^0.28.2",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.4.1",
@@ -152,15 +160,6 @@
       "types": "./lib/style/styles.d.ts",
       "default": "./lib/style/menuRight.css"
     },
-    "./styles/communication": {
-      "types": "./lib/style/styles.d.ts",
-      "default": "./lib/style/communication.css"
-    },
-    "./communication": {
-      "types": "./lib/communication/index.d.ts",
-      "import": "./lib/communication/index.js",
-      "default": "./lib/communication/index.js"
-    },
     "./params": {
       "types": "./lib/params/index.d.ts",
       "import": "./lib/params/index.js",
@@ -185,16 +184,6 @@
       "types": "./lib/ui/index.d.ts",
       "import": "./lib/ui/index.js",
       "default": "./lib/ui/index.js"
-    },
-    "./demo/peer-media": {
-      "types": "./lib/stand/demo/peerMedia.d.ts",
-      "import": "./lib/stand/demo/peerMedia.js",
-      "default": "./lib/stand/demo/peerMedia.js"
-    },
-    "./demo/peer-conference": {
-      "types": "./lib/stand/demo/peerConference.d.ts",
-      "import": "./lib/stand/demo/peerConference.js",
-      "default": "./lib/stand/demo/peerConference.js"
     }
   }
 }

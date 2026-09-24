@@ -3,7 +3,7 @@
  * BOTH technologies at once — the shared media relay (Peer.createMediaRelay, the grid)
  * and a policy-routed WebRTC direct line (Replay.createRouteCoordinator, the focus tile).
  * The QA board imports this exact component; consumers can import it from
- * `wenay-react2/demo/peer-conference`.
+ * `wenay-calls/demo/peer-conference`.
  *
  * Load-bearing invariant: the focus link's relay hop and its WebRTC direct route both
  * serve the SAME owner-sequenced routed line (replayListen per seat). Route hand-offs
@@ -16,11 +16,11 @@
  * Media.attachVideoCanvas stay covered by QA cards 43-45.
  */
 import React, {useEffect, useMemo, useRef, useState} from "react";
-import {listen as createListen} from "wenay-common2/client";
+import {listen as createListen} from "wenay-common2/listen";
 import * as Peer from "wenay-common2/peer";
 import * as Replay from "wenay-common2/replay";
-import {usePeerCalls} from "../../internal/hooks/usePeerCall.js";
-import {useRouteState} from "../../internal/hooks/useRoute.js";
+import {usePeerCalls} from "../usePeerCall.js";
+import {useRouteState} from "../useRoute.js";
 import {createFakeRtcNet} from "./fakeRtcLoopback.js";
 
 export type ConfFrame = {n: number, at: number, image: string};

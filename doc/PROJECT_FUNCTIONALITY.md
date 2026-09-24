@@ -54,12 +54,12 @@ Consumers import from a canonical subpath and import the stylesheet once:
 
 ```ts
 import "wenay-react2/styles"            // once per app; tokens: "wenay-react2/styles/tokens"
-import "wenay-react2/styles/communication" // only if VideoCall (./communication) is rendered
+import "wenay-calls/styles"              // only if VideoCall (the wenay-calls package) is rendered
 import { useStoreNode } from "wenay-react2/react"
 import { useAgGrid, createColumnState } from "wenay-react2/grid"
 import { createToolbar } from "wenay-react2/ui"     // CSS-free, tree-shake-safe subpaths (3.0.0):
                                                     // ./core ./react ./persist ./grid ./windows ./logs
-                                                    // ./communication ./params ./modal ./menu ./chart ./ui
+                                                    // ./params ./modal ./menu ./chart ./ui
                                                     // ./native (DOM-free, shares no name with the web entries)
 ```
 
@@ -68,9 +68,8 @@ Each subsystem below names its canonical entry. There is no root `wenay-react2` 
 the same bindings, asserted by `__test/barrelParity.test.ts`. No entrypoint imports CSS on its
 own, there is no `kit` namespace object, and no demo, stand or application code is compiled
 into `lib/`. The library
-lives under `src/internal/`, the QA stand and demos under `src/stand/` (`./demo/peer-media`
-and `./demo/peer-conference` are the two demo entrypoints still published, from
-`lib/stand/demo`). What each entry may pull (ag-grid, react-rnd, the wenay-common2 client
+lives under `src/internal/`, the QA stand under `src/stand/`; the call UI and its demos are the
+separate package `wenay-calls` in `packages/wenay-calls` since 5.0.0. What each entry may pull (ag-grid, react-rnd, the wenay-common2 client
 barrel) is asserted per entry by `scripts/ag-grid-bundle-probe.mjs`.
 
 Subsystem -> canonical entry, at a glance:
@@ -87,7 +86,7 @@ Subsystem -> canonical entry, at a glance:
 | Logs | `wenay-react2/logs` |
 | Params | `wenay-react2/params` |
 | Charts | `wenay-react2/chart` |
-| Communication UI | `wenay-react2/communication` |
+| Call UI (`VideoCall`, peer/media hooks, demos) | the separate package `wenay-calls` (since 5.0.0) |
 | Tokens, callback hub, pure helpers | `wenay-react2/core` |
 
 ## Owned service resources and actions
@@ -453,7 +452,7 @@ Purpose: shared visual tokens and theme hooks for library primitives.
 
 Canonical entries: `wenay-react2/core` (`tokens`, `tokensVar`), `wenay-react2/grid`
 (ag-grid theme and style helpers), and the CSS subpaths `wenay-react2/styles`,
-`styles/tokens`, `styles/menu-right`, `styles/communication`.
+`styles/tokens`, `styles/menu-right` (the call stylesheet is `wenay-calls/styles`).
 
 Main files:
 

@@ -4,7 +4,7 @@ import {
     VideoCall,
     type VideoCallAssistant,
     useVideoCallController,
-} from '../src/internal/components/Communication/VideoCall'
+} from '../packages/wenay-calls/src/VideoCall'
 
 type HarnessProps = {
     assistant?: VideoCallAssistant

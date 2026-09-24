@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { useMediaSource, usePeer } from "../../../communication/index.js";
+import { useMediaSource, usePeer } from "wenay-calls";
 import { useStoreNode } from "../../../react/index.js";
 import { listen as createListen } from "wenay-common2/client";
 import * as Media from "wenay-common2/media";
 import * as Peer from "wenay-common2/peer";
-import { PeerCallDemo, PeerPresenceDemo, MediaRelayAclDemo, MediaRelayAudioDemo, PeerCallVideoAudioDemo } from "../../demo/peerMedia.js";
-import { ConferenceCallDemo } from "../../demo/peerConference.js";
+import { PeerCallDemo, PeerPresenceDemo, MediaRelayAclDemo, MediaRelayAudioDemo, PeerCallVideoAudioDemo } from "wenay-calls/demo/peer-media";
+import { ConferenceCallDemo } from "wenay-calls/demo/peer-conference";
 import { Check, btn } from "../standKit.js";
 
 
@@ -401,7 +401,7 @@ export function Card45() {
     <Check n={45} title="Peer call with live video and audio relay"
                        do="Enable camera + mic, call B, then accept on B. The canvas starts receiving video only after accept; speak to hear the relayed audio. Hang up: the viewer detaches."
                        expect="One real scenario: call state gates server-style relay access and viewer lifecycle. Before/after the active call, capture may run but B receives no media."
-                       note="This is the complete in-process consumer demo exported from wenay-react2/demo/peer-media; production keeps the same ACL decision on its server.">
+                       note="This is the complete in-process consumer demo exported from wenay-calls/demo/peer-media; production keeps the same ACL decision on its server.">
                     <PeerCallVideoAudioDemo />
                 </Check>
     );
@@ -412,7 +412,7 @@ export function Card46() {
     <Check n={46} title="Conference: 3-way star room over the media relay + policy-routed direct focus" tall
                        do="Ring conf-b and conf-c from the host and accept on both seats: all six grid tiles start moving (each seat watches the other two). Hang up conf-b: only its tiles freeze (live membership ACL); re-ring and re-accept to resume. In the focus panel pick an owner and press go direct: the chip walks relay -> direct:connecting -> direct while the frame counter stays strictly monotonic (no reset, no jump). Press back to relay. Toggle policy: force relay and promote again - denied with reason policy: mustRelay. Untoggle it, toggle server: refuse endpoint exposure and promote - the offer is rejected, the link lands in fallback and frames continue on relay. Clear the toggles, promote, then press server revoke: the live direct session dies server-side and the tile auto-falls back without losing frames. Re-promote and press kill direct transport: the same visible fallback from the transport side. If real WebRTC is unavailable here, keep simulate RTC checked - the loopback runtime negotiates the same signaling."
                        expect="The grid is Peer.createMediaRelay fan-out with canWatch reading room membership derived from pairwise host-star calls (group calling is composed, not native: the host holds N-1 concurrent outgoing calls on ONE CallManager). The focus tile is Replay.createRouteCoordinator over ONE owner-sequenced line served by BOTH routes - an in-proc serveReplayChannel relay hop and a WebRTC datachannel via createWebRtcConnector/acceptWebRtcDirect - so every hand-off is gap-free by seq. Client policy hooks and the host authorize gate are separate boundaries and both fail loudly as result objects, never exceptions; server revoke and transport death both auto-fall back to relay."
-                       note="Frames are JSON snapshots because the replay channel wire is text (connector info binary: false); real-camera binary frames through attachVideoCanvas stay proven by cards 43-45. Exactly one host.connection per account: the signal hub delivers to the LAST registered port, and the call manager, webrtc connector and acceptor deliberately share it. Never route the coordinator through relay.watchOf lines - those are per-watcher re-sequenced journals and a hand-off would silently drop frames. Exported as wenay-react2/demo/peer-conference.">
+                       note="Frames are JSON snapshots because the replay channel wire is text (connector info binary: false); real-camera binary frames through attachVideoCanvas stay proven by cards 43-45. Exactly one host.connection per account: the signal hub delivers to the LAST registered port, and the call manager, webrtc connector and acceptor deliberately share it. Never route the coordinator through relay.watchOf lines - those are per-watcher re-sequenced journals and a hand-off would silently drop frames. Exported as wenay-calls/demo/peer-conference.">
                     <ConferenceCallDemo />
                 </Check>
     );

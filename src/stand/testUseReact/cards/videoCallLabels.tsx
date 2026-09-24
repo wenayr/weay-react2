@@ -6,7 +6,7 @@ import {
     type VideoCallLabels,
     type VideoCallMessage,
     type VideoCallPhase,
-} from '../../../communication/index.js';
+} from 'wenay-calls';
 import {Check, DemoHint, ExampleCode} from '../standKit.js';
 
 const languages: Record<'ru' | 'en' | 'custom', {name: string; labels?: Partial<VideoCallLabels>}> = {
@@ -53,7 +53,7 @@ function LabelsDemo() {
         <p role="status" aria-label="Последняя команда ассистента">Команда ассистента, которую получило приложение: {lastCommand}</p>
         <DemoHint>Библиотека владеет только текстами и визуальным состоянием. Звонок, медиа, права и разбор
             команд ассистента остаются у приложения: `assistantCommands` уходят в `onAssistantCommand` как есть.</DemoHint>
-        <ExampleCode>{`import {VideoCall, videoCallLabelsEn} from 'wenay-react2/communication';
+        <ExampleCode>{`import {VideoCall, videoCallLabelsEn} from 'wenay-calls';
 <VideoCall labels={videoCallLabelsEn} {...callProps} />            // ready English set
 <VideoCall labels={{hangup: 'Leave', join: 'Enter'}} {...callProps} /> // any subset, the rest stays Russian`}</ExampleCode>
     </div>;
@@ -63,5 +63,5 @@ export function Card60() {
     return <Check n={60} id="video-call-labels" title="VideoCall — interface language (labels)"
         do="Switch English / Russian / custom labels in the lobby and in the call; open chat, rooms, menu and the assistant; send a chat message; click an assistant command."
         expect="English leaves no Russian text or aria-label in the call surface; custom labels change only the four overridden texts; the app receives the command text of the current language."
-        note="Public ./communication entry; no media or network is used." tall><LabelsDemo/></Check>;
+        note="Public wenay-calls entry; no media or network is used." tall><LabelsDemo/></Check>;
 }

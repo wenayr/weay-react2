@@ -12,7 +12,7 @@ import {createRpcClientHub} from "wenay-common2/client";
 import * as Observe from "wenay-common2/observe";
 import * as Replay from "wenay-common2/replay";
 import {io} from "socket.io-client";
-import {useReplaySubscribe, useReplayRouteSubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreReplayEach, useStoreNode, useStoreKeys} from "../../internal/hooks/index.js";
+import {useReplaySubscribe, useReplayRouteSubscribe, useReplayFrame, useReplayHistory, useStoreReplayMirror, useStoreReplayEach, useStoreNode, useStoreKeys} from "../../react/index.js";
 
 type tFrame = {n: number, w: number, h: number, ts: number, jpeg: string};
 type tFrameRemote = Replay.ReplayRemote<[tFrame]>;

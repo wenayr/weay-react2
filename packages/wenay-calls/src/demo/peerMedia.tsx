@@ -1,13 +1,13 @@
 /**
  * Shipped interactive Peer/Media demonstrations. The QA board imports these exact
- * components; consumers can import them from `wenay-react2/demo/peer-media`.
+ * components; consumers can import them from `wenay-calls/demo/peer-media`.
  * They use an in-process host intentionally, so no server credentials are needed.
  */
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import * as Media from "wenay-common2/media";
 import * as Peer from "wenay-common2/peer";
-import {useMediaSource} from "../../internal/hooks/useMedia.js";
-import {usePeerCalls, usePeerPresence} from "../../internal/hooks/usePeerCall.js";
+import {useMediaSource} from "../useMedia.js";
+import {usePeerCalls, usePeerPresence} from "../usePeerCall.js";
 /* ---------- 41/42. Peer calls and host presence ---------- */
 export const PeerCallDemo = () => {
     const pair = useMemo(() => {

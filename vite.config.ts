@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -390,6 +391,8 @@ async function handleQaObserve(req: IncomingMessage, res: ServerResponse, next: 
   sendJson(res, 404, { error: 'unknown qa observe endpoint' });
 }
 
+const calls = (file: string) => fileURLToPath(new URL(`./packages/wenay-calls/${file}`, import.meta.url));
+
 export default defineConfig({
   define: {
     // react-draggable (used by react-rnd) reads this flag at runtime. Vite does
@@ -477,10 +480,15 @@ export default defineConfig({
     },
   ],
   resolve: {
-    alias: {
+    alias: [
       // Polyfill for the Node.js path module that was used in Webpack.
-      'path': 'path-browserify',
-    },
+      {find: 'path', replacement: 'path-browserify'},
+      // The stand consumes packages/wenay-calls by its public name, straight from source.
+      {find: /^wenay-calls$/, replacement: calls('src/index.ts')},
+      {find: /^wenay-calls\/styles$/, replacement: calls('style/calls.css')},
+      {find: /^wenay-calls\/demo\/peer-media$/, replacement: calls('src/demo/peerMedia.tsx')},
+      {find: /^wenay-calls\/demo\/peer-conference$/, replacement: calls('src/demo/peerConference.tsx')},
+    ],
   },
   server: {
     host: true,

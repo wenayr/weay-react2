@@ -7,9 +7,9 @@ import {
     type VideoCallMessage,
     type VideoCallParticipant,
     type VideoCallRecording,
+    useMediaSource,
     useVideoCallController,
-} from "../../internal/components/Communication/index.js";
-import {useMediaSource} from "../../internal/hooks/useMedia.js";
+} from "wenay-calls";
 
 type MeetingMember = {
     id: string;

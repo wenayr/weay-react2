@@ -39,7 +39,6 @@ _Пусто._
 
 - **Per-subpath CSS files** (остаток architecture review 2026-09-01) — только если потребителям понадобится меньше полного stylesheet.
 
-- **Отдельный пакет для communication/VideoCall и demo** (ревью 2026-09-23): сузить основной пакет до UI/grid/windows/React-биндингов. Решение владельца: имя пакета, версия, перенос `./communication`, `./demo/*` и стилей `styles/communication`.
 
 - **ColumnDots: фильтр-ползунок по значениям + мультисорт-опция + именованные пресеты** (надиктовка 2026-07-10, дословно в конце файла; контекст — мобильный ползунок таблицы, карточки 29/32).
   - **1. Сорт-кнопка**: сейчас одна (asc→desc→off) — оставить одиночной по умолчанию, но добавить ОПЦИЮ множественной сортировки (multi-sort) настройкой.
@@ -59,6 +58,7 @@ _Пусто._
 
 ## Verify
 
+- **Релиз `wenay-calls` 1.0.0 + `wenay-react2` 5.0.0: разделение** (надиктовка 2026-09-24 «спроси у фейбл, сравни со своим решением и начни автоматически выполнять»). Звонки — пакет `packages/wenay-calls`, 5.0.0 без `./communication`, ag-grid — optional peer; миграция — `doc/WENAY_REACT2_RENAMES.md` «5.0.0 migration cut», подробности — `doc/changes/v5.0.0.md`. Проверено локально: tsc ×3, Jest 74/363, CLI 22, обе сборки со всеми probe, bundle probe, стенд (карточки 42/60, `#video-calls`). Осталось: 1) push и первый прогон CI; 2) перевести lanaFour одной командой CLI (3.x → 5.0; там 127 корневых импортов); 3) решение по `wenay-exchange` (код его не импортирует — оставить или убрать).
 - **Релиз 4.0.0: исправления по ревью 2026-09-23, срез 4.0.0, common2 3.0.0 / wenay-exchange 1.0.0** (надиктовки 2026-09-24 «исправь основную часть», «обнови wenay-common2 и теперь нам нужен ещё wenay-exchange», «делай 4.0.0, коммить и публикуй»). Реализовано и проверено локально, подробности — `doc/changes/v4.0.0.md`, миграция — `doc/WENAY_REACT2_RENAMES.md` «4.0.0 migration cut». Осталось: 1) первый прогон GitHub Actions CI после push; 2) перевести lanaFour на 4.0.0 одной командой `migrate-root-imports.mjs --write` и прогнать его сборку; 3) визуально посмотреть карточку 60.
 - **common2 1.0.74: Calls, presence and protected Media relay** — реализация в 1.0.46; осталась ручная проверка с живой камерой на QA cards 41–44 (ring/accept/active, relay keyframe, hangup/decline/offline/busy, ACL-revoke закрывает открытую подписку).
 - **WebRTC recipe (common2 1.0.66–1.0.73, пункт 3)** — похоже, закрыт примером `doc/examples/conference-server.mjs` + `conference-client.*` (1.0.49: app-injected `rtc`, signal hub по RPC-сокету, promote/fallback). Подтвердить по README примеров и удалить.

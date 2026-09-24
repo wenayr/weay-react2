@@ -10,10 +10,10 @@ import {
     type VideoCallRecording,
     type VideoCallRoom,
     type VideoCallScreenState,
+    useMediaSource,
+    usePeerCalls,
     useVideoCallController,
-} from "../../internal/components/Communication/index.js";
-import {useMediaSource} from "../../internal/hooks/useMedia.js";
-import {usePeerCalls} from "../../internal/hooks/usePeerCall.js";
+} from "wenay-calls";
 
 type BrowserSpeechResultEvent = {
     results?: Record<number, Record<number, {transcript?: string}> | undefined>;

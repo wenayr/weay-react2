@@ -7,7 +7,7 @@ import {
     type VideoCallLabels,
     type VideoCallPhase,
     type VideoCallProps,
-} from '../src/communication/index.js'
+} from '../packages/wenay-calls/src/index.js'
 
 const noop = () => {}
 const participants: VideoCallProps['participants'] = [

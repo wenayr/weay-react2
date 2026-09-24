@@ -10,4 +10,3 @@ export * from './MyResizeObserver.js';
 export * from './Settings/index.js';
 export * from './UiSlot/index.js';
 export * from './Toolbar/index.js';
-export * from './Communication/index.js';

@@ -3,6 +3,7 @@
 Documentation index only.
 
 - Start here: [doc/QUICKSTART.md](doc/QUICKSTART.md)
+- Call UI package `wenay-calls` (since 5.0.0): [packages/wenay-calls/README.md](packages/wenay-calls/README.md)
 - Brief API guide: [doc/wenay-react2.md](doc/wenay-react2.md)
 - React Native/headless entrypoint: [doc/native.md](doc/native.md)
 - Detailed / rare API guide: [doc/wenay-react2-rare.md](doc/wenay-react2-rare.md)
@@ -18,6 +19,6 @@ Feature-specific docs may also live next to their code, for example agGrid4 docs
 
 ## Shipped examples
 
-- [doc/examples/peer-call-media.tsx](doc/examples/peer-call-media.tsx) — Peer calls, presence, camera and microphone relay with server-owned ACL (`wenay-react2/demo/peer-media`).
-- [doc/examples/conference-server.mjs](doc/examples/conference-server.mjs) + client — real-backend conference bridge (`wenay-react2/demo/peer-conference` is the in-process world).
+- [doc/examples/peer-call-media.tsx](doc/examples/peer-call-media.tsx) — Peer calls, presence, camera and microphone relay with server-owned ACL (`wenay-calls/demo/peer-media`).
+- [doc/examples/conference-server.mjs](doc/examples/conference-server.mjs) + client — real-backend conference bridge (`wenay-calls/demo/peer-conference` is the in-process world).
 - The interactive QA stand is not published since 2.0.0; run it from the repository with `npm run testReact` (`src/stand/`).

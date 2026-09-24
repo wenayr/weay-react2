@@ -7,11 +7,14 @@ Every snippet is compiled by `__test/quickstart.types.tsx`.
 ## Install
 
 ```sh
-npm i wenay-react2 react react-dom ag-grid-community ag-grid-react wenay-common2
+npm i wenay-react2 react react-dom wenay-common2
+npm i ag-grid-community ag-grid-react     # only for wenay-react2/grid and /logs
 ```
 
-`ag-grid-*` and `wenay-common2` are peer dependencies; list them in the app because app code
-imports them directly (grid types, stores). `wenay-exchange` is a peer as well: bars and quotes
+`wenay-common2` is a peer dependency the app imports directly (stores). `ag-grid-*` are optional
+peers since 5.0.0: only the `./grid` and `./logs` entries need them, so a grid-free app (or a
+React Native app on `./native`) does not install 21 MB of ag-grid. The call UI (`VideoCall`,
+peer/media hooks) is the separate package `wenay-calls`. `wenay-exchange` is a peer as well: bars and quotes
 history come from it, not from common2 (since common2 3.0.0). Import the stylesheet once, next to your app
 entry, and import code only from the canonical subpaths (`wenay-react2/grid`, `/ui`, ...).
 There is no root `wenay-react2` entry (removed in 4.0.0).
@@ -184,7 +187,7 @@ export function DensityToggle() {
 ## Ownership rules
 
 - The app owns storage timing, transport, authorization and domain rules.
-- Hooks that bind an existing client (`useClientStore`, `usePeer`, `useContractSlot`, ...)
+- Hooks that bind an existing client (`useClientStore`, `useContractSlot`, `useStoreMirror`, ...)
   never close it; `useOwnedClient` creates and closes its own resource.
 - `create*` controllers at module level keep their state across remounts; use the `use*`
   variant (for example `useColumnGrid`) when the state should die with the component.

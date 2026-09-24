@@ -1,5 +1,41 @@
 # wenay-react2 Rename Map
 
+## 5.0.0 migration cut (2026-09-24)
+
+5.0.0 moves the call UI into the separate package `wenay-calls` and makes ag-grid an optional
+peer. One CLI run migrates 3.x and 4.x code alike: root imports, the 4.0.0 renames and these
+moves.
+
+```sh
+npm i wenay-react2@5
+npm i wenay-calls                        # only where the call UI is used
+npm i ag-grid-community ag-grid-react    # only where wenay-react2/grid or /logs is used
+npm i -D @babel/parser                   # for the migration run
+node node_modules/wenay-react2/scripts/migrate-root-imports.mjs --write src
+node node_modules/wenay-react2/scripts/migrate-root-imports.mjs --check src   # 0 = nothing left
+```
+
+### Moved to `wenay-calls`
+
+| 4.x | 5.0.0 |
+| --- | --- |
+| `wenay-react2/communication`: `VideoCall`, `useVideoCallController`, `videoCallLabelsRu`, `videoCallLabelsEn`, `useMediaSource`, `usePeer`, `usePeerCalls`, `usePeerPresence` and their types | `wenay-calls` |
+| `useRouteState`, type `RouteLogEntry` on `wenay-react2/react` | `wenay-calls` |
+| `wenay-react2/styles/communication` | `wenay-calls/styles` |
+| `wenay-react2/demo/peer-media` | `wenay-calls/demo/peer-media` |
+| `wenay-react2/demo/peer-conference` | `wenay-calls/demo/peer-conference` |
+
+The names themselves are unchanged. The CLI re-points whole modules (side-effect stylesheet
+imports included), groups root imports of these names under `wenay-calls`, and splits a
+`wenay-react2/react` import that contains `useRouteState`. A dynamic import of a moved module is
+reported for a manual edit.
+
+### Install shape
+
+| 4.x | 5.0.0 |
+| --- | --- |
+| `ag-grid-community`, `ag-grid-react` installed as dependencies | optional peers: install them where `./grid` or `./logs` is used; other apps skip about 21 MB |
+
 ## 4.0.0 migration cut (2026-09-24)
 
 4.0.0 removes the root entry and renames the legacy names of the 3.x Cleanup Inventory. One CLI

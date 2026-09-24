@@ -41,8 +41,8 @@ const entries = {
         import {createLogsController} from './src/logs/index.ts'
         console.log(createLogsController)
     `,
-    canonicalCommunication: `
-        import {VideoCall} from './src/communication/index.ts'
+    calls: `
+        import {VideoCall} from './packages/wenay-calls/src/index.ts'
         console.log(VideoCall)
     `,
     canonicalPersist: `
@@ -106,7 +106,7 @@ const canonical = {
     grid: await bundle('canonicalGrid', 'production'),
     windows: await bundle('canonicalWindows', 'production'),
     logs: await bundle('canonicalLogs', 'production'),
-    communication: await bundle('canonicalCommunication', 'production'),
+    calls: await bundle('calls', 'production'),
     persist: await bundle('canonicalPersist', 'production'),
     params: await bundle('canonicalParams', 'production'),
     modal: await bundle('canonicalModal', 'production'),
@@ -156,28 +156,29 @@ assertBoundary('core', [
 assertBoundary('react', [
     COMMON2_CLIENT_BARREL,
     /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
-    /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
+    /src\/internal\/(?:grid|logs|myChart)\//,
 ])
 assertBoundary('grid', [
     COMMON2_CLIENT_BARREL,
     /src\/stand\//,
-    /src\/internal\/(?:components\/Dnd|components\/Communication|logs|myChart)\//,
+    /src\/internal\/(?:components\/Dnd|logs|myChart)\//,
 ])
 assertBoundary('windows', [
     COMMON2_CLIENT_BARREL,
     /node_modules\/ag-grid-/,
     /src\/stand\//,
-    /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
+    /src\/internal\/(?:grid|logs|myChart)\//,
 ])
 assertBoundary('logs', [
     /src\/stand\//,
-    /src\/internal\/(?:components\/Dnd|components\/Communication|myChart)\//,
+    /src\/internal\/(?:components\/Dnd|myChart)\//,
 ])
-assertBoundary('communication', [
+// 5.0.0: packages/wenay-calls is a separate package and must not contain one byte of
+// wenay-react2 (src/): two copies of its module-level state would split silently.
+assertBoundary('calls', [
     COMMON2_CLIENT_BARREL,
     /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
-    /src\/stand\//,
-    /src\/internal\/(?:components\/Dnd|grid|logs|myChart)\//,
+    /^src\//,
 ])
 // 3.0.0 entries. ./persist is the storage layer: React is allowed (useCacheMapPersistence,
 // updateBy) but nothing from the component layer, no grid, no window libraries.
@@ -192,7 +193,7 @@ assertBoundary('persist', [
 assertBoundary('params', [
     /node_modules\/(?:ag-grid-|react-rnd|re-resizable)/,
     /src\/stand\//,
-    /src\/internal\/(?:components\/Dnd|components\/Communication|grid|logs|myChart)\//,
+    /src\/internal\/(?:components\/Dnd|grid|logs|myChart)\//,
 ])
 // ./modal, ./menu and ./ui host themselves in floating windows (Input -> FloatingWindow,
 // DropdownMenu -> modal render store, SettingsDialog -> FloatingWindowBase), so react-rnd and
@@ -201,13 +202,13 @@ assertBoundary('modal', [
     COMMON2_CLIENT_BARREL,
     /node_modules\/ag-grid-/,
     /src\/stand\//,
-    /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
+    /src\/internal\/(?:grid|logs|myChart)\//,
 ])
 assertBoundary('menu', [
     COMMON2_CLIENT_BARREL,
     /node_modules\/ag-grid-/,
     /src\/stand\//,
-    /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
+    /src\/internal\/(?:grid|logs|myChart)\//,
 ])
 assertBoundary('chart', [
     COMMON2_CLIENT_BARREL,
@@ -219,7 +220,7 @@ assertBoundary('ui', [
     COMMON2_CLIENT_BARREL,
     /node_modules\/ag-grid-/,
     /src\/stand\//,
-    /src\/internal\/(?:components\/Communication|grid|logs|myChart)\//,
+    /src\/internal\/(?:grid|logs|myChart)\//,
 ])
 
 console.log('checks: targeted smaller; validation development-only; canonical boundaries isolated')

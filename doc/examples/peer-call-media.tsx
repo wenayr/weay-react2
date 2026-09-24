@@ -3,6 +3,6 @@
  * It is shipped as a supported demo entrypoint, not a private test helper.
  *
  * import {PeerCallDemo, PeerPresenceDemo, MediaRelayAclDemo, MediaRelayAudioDemo}
- *   from "wenay-react2/demo/peer-media"
+ *   from "wenay-calls/demo/peer-media"
  */
-export {PeerCallDemo, PeerPresenceDemo, MediaRelayAclDemo, MediaRelayAudioDemo} from "wenay-react2/demo/peer-media";
+export {PeerCallDemo, PeerPresenceDemo, MediaRelayAclDemo, MediaRelayAudioDemo} from "wenay-calls/demo/peer-media";

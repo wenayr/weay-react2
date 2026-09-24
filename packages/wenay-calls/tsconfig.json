@@ -9,28 +9,16 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "rootDir": "src",
+    "outDir": "lib",
     "types": [],
     "esModuleInterop": true,
-    "noImplicitReturns": false,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "outDir": "lib",
     "declaration": true,
     "jsx": "react-jsx"
   },
-  "files": [
-    "src/native/index.ts",
-    "src/core/index.ts",
-    "src/react/index.ts",
-    "src/grid/index.ts",
-    "src/windows/index.ts",
-    "src/logs/index.ts",
-    "src/persist/index.ts",
-    "src/params/index.ts",
-    "src/modal/index.ts",
-    "src/menu/index.ts",
-    "src/chart/index.ts",
-    "src/ui/index.ts"
+  "include": [
+    "src/**/*"
   ]
 }

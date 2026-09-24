@@ -34,13 +34,11 @@ const consumerSource = `
 import "wenay-react2/styles";
 import "wenay-react2/styles/tokens";
 import "wenay-react2/styles/menu-right";
-import "wenay-react2/styles/communication";
 import {structEqual} from "wenay-react2/core";
 import {createUpdateApi} from "wenay-react2/react";
 import {createGridBuffer} from "wenay-react2/grid";
 import {FloatingWindow} from "wenay-react2/windows";
 import {createLogsController} from "wenay-react2/logs";
-import {VideoCall} from "wenay-react2/communication";
 import {memoryCache, restoreDates} from "wenay-react2/persist";
 import {ParamsEditor} from "wenay-react2/params";
 import {ModalProvider} from "wenay-react2/modal";
@@ -48,7 +46,7 @@ import {createContextMenu} from "wenay-react2/menu";
 import {createChartEngine} from "wenay-react2/chart";
 import {createToolbar} from "wenay-react2/ui";
 
-console.log(structEqual, createUpdateApi, createGridBuffer, FloatingWindow, createLogsController, VideoCall);
+console.log(structEqual, createUpdateApi, createGridBuffer, FloatingWindow, createLogsController);
 console.log(memoryCache, ParamsEditor, ModalProvider, createContextMenu, createChartEngine, createToolbar);
 restoreDates({nested: ["2026-09-10T00:00:00.000Z"]});
 `;
@@ -93,7 +91,7 @@ try {
 
     // Verify the CLI actually ships and runs from the extracted package, not this checkout.
     const migrationFile = path.join(tempRoot, 'migration.ts');
-    fs.writeFileSync(migrationFile, 'import {structEqual, type CacheMap} from "wenay-react2"; export {PageLogs} from "wenay-react2"; import {mapResiReact} from "wenay-react2/ui";');
+    fs.writeFileSync(migrationFile, 'import {structEqual, type CacheMap} from "wenay-react2"; export {PageLogs} from "wenay-react2"; import {mapResiReact} from "wenay-react2/ui"; import {VideoCall} from "wenay-react2/communication";');
     const cli = path.join(installedPackage, 'scripts', 'migrate-root-imports.mjs');
     // @babel/parser is an optional peer: without it the CLI must stop with an install hint.
     const bare = spawnSync(process.execPath, [cli, '--check', migrationFile], {cwd: tempRoot, encoding: 'utf8'});
@@ -107,7 +105,8 @@ try {
     const migrated = fs.readFileSync(migrationFile, 'utf8');
     for (const sub of ['core', 'persist', 'logs']) if (!migrated.includes(`wenay-react2/${sub}`)) throw new Error(`CLI did not migrate ${sub}`);
     if (!migrated.includes('resizableSizeMap as mapResiReact')) throw new Error('CLI did not apply the 4.0.0 rename');
-    for (const major of ['v2.0.0.md', 'v3.0.0.md', 'v4.0.0.md'])
+    if (!migrated.includes('from "wenay-calls"')) throw new Error('CLI did not apply the 5.0.0 move to wenay-calls');
+    for (const major of ['v2.0.0.md', 'v3.0.0.md', 'v4.0.0.md', 'v5.0.0.md'])
         if (!fs.existsSync(path.join(installedPackage, 'doc', 'changes', major))) throw new Error(`Packed major migration guide missing: ${major}`);
 
     await esbuild.build({
@@ -155,7 +154,7 @@ try {
         fs.rmSync(selfLink, {recursive: true, force: true});
     }
 
-    console.log(`checks: packed tarball without internal docs; checked CSS imports with vite/client; TypeScript subpath types; shipped migration CLI (root imports, 4.0.0 renames, missing @babel/parser) and major guides; esbuild runtime resolution; Node ESM (${NODE_LOADABLE.join(", ")})`);
+    console.log(`checks: packed tarball without internal docs; checked CSS imports with vite/client; TypeScript subpath types; shipped migration CLI (root imports, 4.0.0 renames, 5.0.0 moves, missing @babel/parser) and major guides; esbuild runtime resolution; Node ESM (${NODE_LOADABLE.join(", ")})`);
 } finally {
     const tempBase = path.resolve(os.tmpdir());
     const relative = path.relative(tempBase, tempRoot);

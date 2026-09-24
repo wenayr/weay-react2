@@ -1,7 +1,7 @@
 import React from "react";
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
-import {createFakeRtcNet} from "../src/stand/demo/fakeRtcLoopback";
-import {ConfFrame, ConferenceCallDemo, createConferenceWorld} from "../src/stand/demo/peerConference";
+import {createFakeRtcNet} from "../packages/wenay-calls/src/demo/fakeRtcLoopback";
+import {ConfFrame, ConferenceCallDemo, createConferenceWorld} from "../packages/wenay-calls/src/demo/peerConference";
 
 const cheapFrame = (account: string, n: number): ConfFrame => ({n, at: 1000 + n, image: account + "#" + n});
 

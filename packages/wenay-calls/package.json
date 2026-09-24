@@ -1,0 +1,60 @@
+{
+  "name": "wenay-calls",
+  "version": "1.0.0",
+  "description": "React call UI and hooks over wenay-common2 peer/media: VideoCall, media capture, peer calls, presence and route state",
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "files": [
+    "lib/**/*",
+    "README.md",
+    "!**/*.tsbuildinfo"
+  ],
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js",
+      "default": "./lib/index.js"
+    },
+    "./styles": {
+      "types": "./lib/style/styles.d.ts",
+      "default": "./lib/style/calls.css"
+    },
+    "./demo/peer-media": {
+      "types": "./lib/demo/peerMedia.d.ts",
+      "import": "./lib/demo/peerMedia.js",
+      "default": "./lib/demo/peerMedia.js"
+    },
+    "./demo/peer-conference": {
+      "types": "./lib/demo/peerConference.d.ts",
+      "import": "./lib/demo/peerConference.js",
+      "default": "./lib/demo/peerConference.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "wenay-common2": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "react",
+    "video-call",
+    "webrtc",
+    "peer",
+    "media",
+    "wenay"
+  ],
+  "author": "wenay",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wenayr/weay-react2.git",
+    "directory": "packages/wenay-calls"
+  }
+}

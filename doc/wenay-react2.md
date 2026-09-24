@@ -39,8 +39,8 @@ cut" - one CLI run rewrites root imports and the 4.0.0 renames.
   `import {FloatingWindow, useFloatingWindowManager} from "wenay-react2/windows"`
 - `wenay-react2/logs` - logs controller, `logsApi`, `PageLogs`, `MiniLogs`, `MessageEventLogs` and their table hooks.
   `import {createLogsController, logsApi, MiniLogsTable} from "wenay-react2/logs"`
-- `wenay-react2/communication` - peer/media hooks and `VideoCall` (+ `"wenay-react2/styles/communication"`).
-  `import {VideoCall, useMediaSource, usePeerCalls} from "wenay-react2/communication"`
+- Call UI (`VideoCall`, peer/media hooks, `useRouteState`, demos, stylesheet) is the separate package
+  `wenay-calls` since 5.0.0: `import {VideoCall, useMediaSource} from "wenay-calls"`.
 - `wenay-react2/params` - `ParamsEditor` and its controller, row renderers, `ParamsEdit`/`ParamsArrayEdit`; pulls the wenay-common2 `Params` model (the heavy entry).
   `import {ParamsEditor, useParamsEditorController} from "wenay-react2/params"`
 - `wenay-react2/modal` - `ModalProvider`/`useModal`, confirm/input helpers, text/file input panels, `LeftModal`.
@@ -724,7 +724,7 @@ stand exposes directly:
 - `Media.createVideoSource({fps: 0})` is the explicit unpaced MAX policy. It
   preserves the selected source resolution and starts the next capture after
   the previous frame is encoded instead of enforcing an artificial attempt
-  cap. `useMediaSource("video", {fps: 0})` already forwards this option; QA card
+  cap. `useMediaSource("video", {fps: 0})` (`wenay-calls`) already forwards this option; QA card
   38 compares it with a balanced 12 fps profile and reports actual capture fps,
   draw rate and wire throughput.
 
@@ -815,51 +815,27 @@ compiled against the 1.x adapter can migrate without a flag-day rewrite.
 `Observe.storeReplayMode()` reports the invariant mode `"v2"`. Peer relay patch
 routes are a separate protocol and are unaffected by this Store Replay cleanup.
 
-Route hand-off here is the MANUAL surface (`switchRoute`). common2 1.0.67 `Replay.createRouteCoordinator` moves route decisions (policy, promote/fallback/shadow) out of the consumer; a coordinator `link.subscribe(cb)` handle has the same shape (`ready, seq(), label(), active()`) and survives every route change, so components consuming a coordinator link do not need `switchRoute` at all. common2 1.0.68 supplies the direct transport for it: `createWebRtcConnector` with an app-injected `rtc: () => new RTCPeerConnection(cfg)` factory (the browser — i.e. the React app — owns that injection) and signaling over the existing RPC socket (`createSignalHub`). common2 1.0.69 wraps the whole stack into the `Peer` SDK (`wenay-common2/peer`): `createPeerClient(...).peer(account)` returns a live mirrored store (works with `useStoreNode`/`useStoreKeys` as-is) + route control, surviving relay<->direct hand-offs in one seq space. `usePeer(client, account)` is the thin React adapter: it returns that mirror plus low-frequency route/status and explicit route/resync controls; it does not own journal, repair or transport state. `usePeerCalls(manager)` binds a `Peer.createCallManager` to rings/active/call UI state without owning `manager.close()` or signal policy. The exact interactive components used by QA cards 41–44 ship from `wenay-react2/demo/peer-media`; [`doc/examples/peer-call-media.tsx`](examples/peer-call-media.tsx) shows the import. `usePeerPresence(fragment.presence)` subscribes before reading the host snapshot and exposes online/offline edges. For calls with media, wire `Peer.createMediaRelay` on the server (`publishOf(owner)`, `watchOf(watcher)`, `canWatch`) and attach viewers only when the server-owned call policy grants access; React must never make the ACL decision.
+Route hand-off here is the MANUAL surface (`switchRoute`). common2 1.0.67 `Replay.createRouteCoordinator` moves route decisions (policy, promote/fallback/shadow) out of the consumer; a coordinator `link.subscribe(cb)` handle has the same shape (`ready, seq(), label(), active()`) and survives every route change, so components consuming a coordinator link do not need `switchRoute` at all.
 
-Conference composition ships as a live example: `wenay-react2/demo/peer-conference` (QA card 46) builds a 3-way host-star room where group calling is COMPOSED from pairwise calls (one CallManager holds N-1 concurrent outgoing calls; the roster of active calls is the single ACL authority), the grid rides `Peer.createMediaRelay` fan-out, and a focus pair rides `Replay.createRouteCoordinator` over ONE owner-sequenced line served by BOTH routes — an in-proc `serveReplayChannel` hop and a WebRTC datachannel (`createWebRtcConnector`/`acceptWebRtcDirect`) — so hand-offs are gap-free by seq. Never serve a coordinator route from `relay.watchOf` lines: those are per-watcher re-sequenced journals. `useRouteState(coordinator, link)` is the thin React binding for the route chip: state, last reason, 500ms connector metrics and a short hand-off log; the caller owns coordinator/link lifecycle. The real-backend variant lives in [`doc/examples/conference-server.mjs`](examples/conference-server.mjs) + [`conference-client.html`](examples/conference-client.html): the Node server owns the peer host, the room policy (accepted calls join both parties; offers are brokered only inside a shared room) and the media relay; browser seats connect over Socket.IO, and each peer-store pair can `promoteDirect()` to a real RTCPeerConnection negotiated through that same server hub.
+### Calls: the `wenay-calls` package (5.0.0)
 
-`#video-calls` is now a standalone Wenay Calls product route rather than a QA card. A host enters a name and meeting title, creates a server-owned room, and receives a shareable `#video-calls/room/<id>` URL. A guest opens the URL, enters a display name and joins the same room. Participants, chat messages, host moderation, room closure and media permissions synchronize over a dedicated Socket.IO/RPC endpoint; camera, microphone and screen frames use a policy-gated common2 media relay. The server removes disconnected seats after a reconnect grace period and rejects media from non-members. There is no arbitrary UI participant cap: practical capacity is a deployment/SFU and bandwidth decision.
+The peer and call bindings live in the separate package `wenay-calls` since 5.0.0
+([packages/wenay-calls/README.md](../packages/wenay-calls/README.md)): `usePeer` (the Peer SDK
+mirror with route/resync controls), `usePeerCalls`, `usePeerPresence`, `useMediaSource`,
+`useRouteState` (the coordinator route chip), `VideoCall` with `labels`, its stylesheet
+`wenay-calls/styles`, and the demos `wenay-calls/demo/peer-media` and
+`wenay-calls/demo/peer-conference`. It depends only on react and wenay-common2, never on this
+package. A mirrored Peer store still plugs into `useStoreNode` / `useStoreKeys` from `./react`.
+The migration CLI rewrites old imports (`doc/WENAY_REACT2_RENAMES.md`, "5.0.0 migration cut").
 
-Media lines (common2 1.0.66 `Media.createAudioSource` / `Media.createVideoSource`) are ordinary binary Listen sources; with `replay:true` their `listen` is a replay line, so `useReplaySubscribe` / `useReplayFrame` consume mic/camera frames with no media-specific hook. `useMediaSource(kind, options)` is only the capture lifecycle adapter (`start`, `stop`, device selection, state and stats); it stops a started source on unmount and returns `listen` unchanged. Each frame is one `Uint8Array` (`Media.decodeMediaFrame`); draw/play it via ref (canvas, AudioContext), never useState — the same rule as any high-frequency line. Without `replay`, the plain `listen` works with the listen hooks above.
+The QA stand in this repository keeps the call cards (38–46, 60) and the `#video-calls` product
+page, now consuming `wenay-calls` by name (`src/stand/calls/VideoMeetingPlatform.tsx`, dev
+backend `/__video-call-rpc` in `vite.config.ts`). A host creates a server-owned room and shares
+`#video-calls/room/<id>`; participants, chat, moderation, room closure and media permissions
+synchronize over Socket.IO/RPC, and camera, microphone and screen frames use a policy-gated
+common2 media relay. Practical capacity is a deployment/SFU and bandwidth decision.
 
-## Communication UI
-`VideoCall` styles ship separately: `import "wenay-react2/styles/communication"` once, next to `wenay-react2/styles`.
-```tsx
-import { VideoCall, useVideoCallController, videoCallLabelsEn } from "wenay-react2/communication"
-
-const phase = call.active ? "active" : call.ringing ? "ringing" : "lobby"
-const ui = useVideoCallController({phase, speakerId: participants[0].id})
-
-<VideoCall
-  controller={ui}
-  labels={videoCallLabelsEn}     // optional; any Partial<VideoCallLabels>, Russian by default
-  phase={phase}
-  meeting={meeting}
-  participants={participants}
-  selfParticipantId={me}
-  canvasRef={remoteCanvasRef}
-  cameraState={camera.state}
-  microphoneState={microphone.state}
-  screenShareState={screen.state}
-  screenVideoRef={screen.videoRef}
-  recording={recording}
-  rooms={rooms}
-  assistant={assistant}
-  onJoin={call.start}
-  onHangup={call.hangup}
-  onToggleCamera={camera.toggle}
-  onToggleMicrophone={microphone.toggle}
-  onToggleScreenShare={screen.toggle}
-  onToggleRecording={recording.toggle}
-  onJoinRoom={rooms.join}
-  onLeaveRoom={rooms.leave}
-  onAssistantCommand={assistant.run}
-/>
-```
-`VideoCall` is the second communication layer: a controlled product surface based on the call design, not a second protocol. The app owns call authorization, participant/room truth, capture, relay/direct routes, translation service, recording policy and canvas/video attachment. `useVideoCallController` owns only visual state (`panel`, `focusMode`, `layout`, `speakerId`, poll/effect/drafts, laser pointer, elapsed timer and inactivity-hiding controls). Every visible and assistive text comes from `labels` (4.0.0): missing keys fall back to `videoCallLabelsRu`, and `videoCallLabelsEn` is a complete English set. `assistantCommands` are sent verbatim to `onAssistantCommand`, so the app's command parser must use the same language (QA card 60). The repository sketch `src/stand/demo/videoCallShowcase.tsx` (not published, not mounted by the stand) wires the boundary with real `Peer.createCallManager`, `Peer.createMediaRelay`, `usePeerCalls`, `useMediaSource`, `getDisplayMedia`, `MediaRecorder` and optional Web Speech recognition. The package does not embed an AI vendor or secret: production caption translation is supplied by the application; the stand uses a deterministic RU → EN fixture.
-
-The working application composition lives in `src/stand/calls/VideoMeetingPlatform.tsx` (repository only, not published); its development backend is registered in `vite.config.ts` at `/__video-call-rpc`. Unlike the lower-level showcase, it provides the complete create-link/name/join/leave/end lifecycle and uses the public `VideoCall` surface for the in-room UI. Camera, microphone and screen permissions are requested only from explicit user controls. A production deployment must run the same room/RPC authority behind HTTPS/WSS and size its relay or SFU for the intended concurrency.
+Media lines (common2 1.0.66 `Media.createAudioSource` / `Media.createVideoSource`) are ordinary binary Listen sources; with `replay:true` their `listen` is a replay line, so `useReplaySubscribe` / `useReplayFrame` from `./react` consume mic/camera frames with no media-specific hook. The capture lifecycle adapter `useMediaSource` lives in `wenay-calls`. Each frame is one `Uint8Array` (`Media.decodeMediaFrame`); draw/play it via ref (canvas, AudioContext), never useState — the same rule as any high-frequency line.
 
 Contract: `off()` on unmount, StrictMode-safe; seq survives resubscribes inside one mount (keepSeq, default on) — a resubscribe reconnects with `{since}` and gets the journal tail, not a keyframe. Across a FULL unmount/remount keep the position outside via `onSeq` and pass it back as `since`. The reconnect contract introduced in `wenay-common2@1.0.75` remains in 2.x: a temporary RPC transport disconnect/reconnect keeps the same logical `remote`, common2 rebinds its physical Listen subscription, catches up from its own last delivered seq, and deduplicates racing live events. React must not call `restart()`, remount, change a key, or add Socket.IO listeners for that case. `policy: "queue"` is the lossless choice; `"frame"` is deliberately conflated. A retained-history gap without a keyframe is a terminal `error`, not a fresh start. Deliberate `client.dispose()`/`close()` and hub `connect()`/`setToken()` are hard teardown boundaries, not auto-reconnects. `seq()` is a getter — high-frequency lines (video frames, ticks) do not re-render per event; draw to canvas via ref, bypassing VDOM. Freshness: detection lives in wenay-common2 (`staleMs` watchdog); the non-route hooks mirror its edge-triggered `onStale` into `stale`, so a fresh 100 ev/s line causes zero extra renders. Route hand-off is explicit through `switchRoute(nextRemote, {label?, since?, reset?, policy?, hint?})`: old route stays live while the replacement catches up by `seq`, then closes. `useReplayHistory` is archive playback — staleness does not apply. QA cards 23 (video line + conflation + time travel + freshness), 24 (Store Replay V2), 33 (per-key feed), and 34 (route hand-off) are the live examples.
 

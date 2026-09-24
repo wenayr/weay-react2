@@ -1,7 +1,7 @@
 import {createRoot} from "react-dom/client";
 import "../style/style.css"
 import "../style/menuRight.css"
-import "../style/communication.css"
+import "wenay-calls/styles"
 import "./stand.css"
 import {GridStyleDefault} from "../internal/styles/styleGrid.js";
 import {QABoard} from "./testUseReact/qa.js";

@@ -4,7 +4,7 @@ import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-export const priority = ['core', 'persist', 'react', 'grid', 'windows', 'logs', 'communication', 'params', 'modal', 'menu', 'chart', 'ui'];
+export const priority = ['core', 'persist', 'react', 'grid', 'windows', 'logs', 'params', 'modal', 'menu', 'chart', 'ui'];
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // @babel/parser is an optional peer: a one-off migration must not make every UI install carry a
@@ -35,6 +35,30 @@ export const renamed = new Map([
 ]);
 /** Removed in 4.0.0 without a public replacement: reported, never guessed. */
 export const removed = new Set(['__observerStateForTests']);
+
+/** 5.0.0 moved the call UI into the `wenay-calls` package: the 4.x `./communication` names plus
+ *  `useRouteState`. Kept as data because the consumer may not have installed wenay-calls yet. */
+export const callsPackage = 'wenay-calls';
+export const movedToCalls = new Set([
+    'useMediaSource', 'usePeer', 'usePeerCalls', 'usePeerPresence', 'useRouteState', 'VideoCall', 'useVideoCallController',
+    'videoCallLabelsEn', 'videoCallLabelsRu', 'UseMediaSourceController', 'PeerPresence', 'RouteLogEntry',
+    'UseVideoCallControllerOptions', 'VideoCallAssistant', 'VideoCallController', 'VideoCallFocusMode', 'VideoCallLabels',
+    'VideoCallLayout', 'VideoCallMediaState', 'VideoCallMeeting', 'VideoCallMessage', 'VideoCallPanel', 'VideoCallParticipant',
+    'VideoCallPhase', 'VideoCallPoll', 'VideoCallProps', 'VideoCallRecording', 'VideoCallRecordingState', 'VideoCallRoom',
+    'VideoCallScreenState', 'VideoCallTone',
+]);
+/** 5.0.0 whole-module moves; side-effect, namespace and re-export statements included. */
+export const movedModules = new Map([
+    ['wenay-react2/communication', callsPackage],
+    ['wenay-react2/styles/communication', `${callsPackage}/styles`],
+    ['wenay-react2/demo/peer-media', `${callsPackage}/demo/peer-media`],
+    ['wenay-react2/demo/peer-conference', `${callsPackage}/demo/peer-conference`],
+]);
+
+const importedName = (spec, importing) => {
+    const source = importing ? spec.imported : spec.local;
+    return source.name ?? source.value;
+};
 
 // `{old}` -> `{new as old}`, `{old as x}` -> `{new as x}`; `type` modifiers and comments stay.
 function renameSpecifier(text, spec, importing) {
@@ -70,20 +94,54 @@ export function migrate(text, map, file = 'input.ts') {
     const edits = [];
     const diagnostics = [];
     const handled = new Set();
+    const newline = text.includes('\r\n') ? '\r\n' : '\n';
+    // One statement per target module, in first-use order, keeping the quote/semicolon/`type` style.
+    function statements(node, importing, groups) {
+        const quote = text[node.source.start];
+        const semi = text.slice(node.start, node.end).endsWith(';') ? ';' : '';
+        const type = (importing ? node.importKind : node.exportKind) === 'type' ? ' type' : '';
+        const indent = text.slice(text.lastIndexOf('\n', node.start - 1) + 1, node.start).match(/^\s*/)[0];
+        return [...groups].map(([module, specs]) => {
+            const body = specs.join(', ');
+            return `${importing ? 'import' : 'export'}${type} { ${body}${body.includes('//') ? newline : ' '}} from ${quote}${module}${quote}${semi}`;
+        }).join(newline + indent);
+    }
+    const add = (groups, module, raw) => (groups.get(module) ?? groups.set(module, []).get(module)).push(raw);
     for (const node of ast.program.body) {
-        // Canonical subpath imports stay where they are; only 4.0.0 renames/removals touch them.
-        if (/^wenay-react2\/[\w-]+$/.test(node.source?.value ?? '') && node.specifiers?.length) {
+        const source = node.source?.value;
+        if (typeof source !== 'string') continue;
+        // 5.0.0: a whole module moved to wenay-calls; only the specifier string changes.
+        if (movedModules.has(source)) {
+            handled.add(node.source);
+            const quote = text[node.source.start];
+            edits.push({start: node.source.start, end: node.source.end, replacement: quote + movedModules.get(source) + quote});
+            continue;
+        }
+        // Canonical subpath imports stay where they are; only 4.0.0 renames/removals and names that
+        // moved to wenay-calls in 5.0.0 touch them.
+        if (/^wenay-react2\/[\w-]+$/.test(source) && node.specifiers?.length) {
             const importing = node.type === 'ImportDeclaration';
-            for (const spec of node.specifiers) {
-                if (spec.type !== (importing ? 'ImportSpecifier' : 'ExportSpecifier')) continue;
-                const source = importing ? spec.imported : spec.local;
-                const name = source.name ?? source.value;
+            const specs = node.specifiers.filter(spec => spec.type === (importing ? 'ImportSpecifier' : 'ExportSpecifier'));
+            for (const spec of specs) {
+                const name = importedName(spec, importing);
                 if (removed.has(name)) diagnostics.push(`line ${node.loc.start.line}: ${name} was removed in 4.0.0; see WENAY_REACT2_RENAMES.md`);
-                else if (renamed.has(name)) edits.push({start: spec.start, end: spec.end, replacement: renameSpecifier(text, spec, importing).raw});
+            }
+            if (specs.some(spec => movedToCalls.has(importedName(spec, importing)))) {
+                if (specs.length !== node.specifiers.length) {
+                    diagnostics.push(`line ${node.loc.start.line}: default/namespace import next to a name that moved to ${callsPackage} needs manual migration`);
+                    continue;
+                }
+                const groups = new Map();
+                for (const spec of specs) add(groups, movedToCalls.has(importedName(spec, importing)) ? callsPackage : source,
+                    renameSpecifier(text, spec, importing).raw);
+                edits.push({start: node.start, end: node.end, replacement: statements(node, importing, groups)});
+            } else {
+                for (const spec of specs) if (renamed.has(importedName(spec, importing)))
+                    edits.push({start: spec.start, end: spec.end, replacement: renameSpecifier(text, spec, importing).raw});
             }
             continue;
         }
-        if (node.source?.value !== 'wenay-react2') continue;
+        if (source !== 'wenay-react2') continue;
         handled.add(node.source);
         const importing = node.type === 'ImportDeclaration';
         if ((!importing && node.type !== 'ExportNamedDeclaration') || !node.specifiers.length ||
@@ -98,34 +156,23 @@ export function migrate(text, map, file = 'input.ts') {
         for (const spec of node.specifiers) {
             const renamedSpec = renameSpecifier(text, spec, importing);
             const name = renamedSpec.name;
-            const target = map.get(name);
+            const target = movedToCalls.has(name) ? callsPackage : map.get(name) && `wenay-react2/${map.get(name).sub}`;
             if (!target) { diagnostics.push(`line ${node.loc.start.line}: unknown/removed export ${name}; see WENAY_REACT2_RENAMES.md`); unknown = true; continue; }
             let raw = renamedSpec.raw;
             // Keep comments inside a specifier verbatim; carry inter-specifier comments along.
             const comments = innerComments.filter(c => !(c.start >= spec.start && c.end <= spec.end) &&
                 (node.specifiers.find(s => s.start >= c.end) ?? node.specifiers.at(-1)) === spec);
             if (comments.length) raw = comments.map(c => text.slice(c.start, c.end) + '\n').join('') + raw;
-            const group = groups.get(target.sub) ?? [];
-            group.push(raw);
-            groups.set(target.sub, group);
+            add(groups, target, raw);
         }
         if (unknown) continue;
-        const quote = text[node.source.start];
-        const semi = text.slice(node.start, node.end).endsWith(';') ? ';' : '';
-        const type = (importing ? node.importKind : node.exportKind) === 'type' ? ' type' : '';
-        const newline = text.includes('\r\n') ? '\r\n' : '\n';
-        const indent = text.slice(text.lastIndexOf('\n', node.start - 1) + 1, node.start).match(/^\s*/)[0];
-        const replacement = [...groups].map(([sub, specs]) => {
-            const body = specs.join(', ');
-            return `${importing ? 'import' : 'export'}${type} { ${body}${body.includes('//') ? newline : ' '}} from ${quote}wenay-react2/${sub}${quote}${semi}`;
-        }).join(newline + indent);
-        edits.push({start: node.start, end: node.end, replacement});
+        edits.push({start: node.start, end: node.end, replacement: statements(node, importing, groups)});
     }
     // Do not silently pass dynamic import/require or module augmentation. Ordinary strings,
     // comments, snapshots and regex-based contract tests are deliberately not rewritten.
     function walk(node, parent) {
         if (!node || typeof node !== 'object') return;
-        if (node.type === 'StringLiteral' && node.value === 'wenay-react2' && !handled.has(node) &&
+        if (node.type === 'StringLiteral' && (node.value === 'wenay-react2' || movedModules.has(node.value)) && !handled.has(node) &&
             (['CallExpression', 'ImportExpression', 'TSModuleDeclaration', 'TSImportType', 'TSExternalModuleReference', 'ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(parent?.type))) {
             diagnostics.push(`line ${node.loc.start.line}: dynamic/require/type-query/augmentation needs manual migration`);
         }
@@ -144,7 +191,7 @@ export function migrate(text, map, file = 'input.ts') {
 
 export function main(args) {
     if (args.includes('--help') || args.length === 0) {
-        console.log('Usage: node node_modules/wenay-react2/scripts/migrate-root-imports.mjs [--check | --write] <files/directories...>\nMoves root imports to canonical subpaths and applies the 4.0.0 renames as `{new as old}`.\nDefault: preview only. --check: fail if migration is needed. --write: edit only if every input is supported.\nSkips symlinks, node_modules, .git, dist, build and coverage. Review string/regex import-contract tests manually.');
+        console.log('Usage: node node_modules/wenay-react2/scripts/migrate-root-imports.mjs [--check | --write] <files/directories...>\nMoves root imports to canonical subpaths, applies the 4.0.0 renames as `{new as old}` and the 5.0.0 moves to wenay-calls (3.x -> 5.0 in one run).\nDefault: preview only. --check: fail if migration is needed. --write: edit only if every input is supported.\nSkips symlinks, node_modules, .git, dist, build and coverage. Review string/regex import-contract tests manually.');
         return 0;
     }
     const flags = args.filter(arg => arg.startsWith('--'));

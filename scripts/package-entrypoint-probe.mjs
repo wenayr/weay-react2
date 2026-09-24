@@ -9,7 +9,6 @@ const canonicalEntries = {
     "./grid": "src/grid/index.ts",
     "./windows": "src/windows/index.ts",
     "./logs": "src/logs/index.ts",
-    "./communication": "src/communication/index.ts",
     "./persist": "src/persist/index.ts",
     "./params": "src/params/index.ts",
     "./modal": "src/modal/index.ts",

@@ -103,8 +103,6 @@ export type {
     UseStoreReplayRouteSyncOptions,
     UseStoreReplaySyncOptions,
 } from "../internal/hooks/useReplay.js";
-export {useRouteState} from "../internal/hooks/useRoute.js";
-export type {RouteLogEntry} from "../internal/hooks/useRoute.js";
 export {
     useAiRunClient,
     useClientStore,

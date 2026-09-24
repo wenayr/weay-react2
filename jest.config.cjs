@@ -13,6 +13,11 @@ const jestConfig = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '\\.css$': '<rootDir>/__test/cssStub.js',
+    // packages/wenay-calls resolves by its public name, straight from source
+    '^wenay-calls$': '<rootDir>/packages/wenay-calls/src/index.ts',
+    '^wenay-calls/styles$': '<rootDir>/__test/cssStub.js',
+    '^wenay-calls/demo/peer-media$': '<rootDir>/packages/wenay-calls/src/demo/peerMedia.tsx',
+    '^wenay-calls/demo/peer-conference$': '<rootDir>/packages/wenay-calls/src/demo/peerConference.tsx',
   },
   transform: {
     '^.+\\.[jt]sx?$': ['@swc/jest', {

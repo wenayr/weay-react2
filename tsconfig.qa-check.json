@@ -1,7 +1,15 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "rootDir": ".",
+    // The QA stand consumes packages/wenay-calls by its public name, straight from source.
+    "paths": {
+      "wenay-calls": ["./packages/wenay-calls/src/index.ts"],
+      "wenay-calls/demo/peer-media": ["./packages/wenay-calls/src/demo/peerMedia.tsx"],
+      "wenay-calls/demo/peer-conference": ["./packages/wenay-calls/src/demo/peerConference.tsx"],
+      "wenay-calls/styles": ["./packages/wenay-calls/style/styles.d.ts"]
+    }
   },
   "files": [],
   "include": ["src/**/*"]
